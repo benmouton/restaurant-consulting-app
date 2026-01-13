@@ -27,9 +27,15 @@ const allowlist = [
   "stripe",
   "uuid",
   "ws",
-  "xlsx",
   "zod",
   "zod-validation-error",
+];
+
+// Libraries that should NOT be bundled due to dynamic requires or native modules
+const forceExternal = [
+  "pdf-parse",
+  "xlsx",
+  "papaparse",
 ];
 
 async function buildAll() {
@@ -44,7 +50,10 @@ async function buildAll() {
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
+  const externals = [
+    ...allDeps.filter((dep) => !allowlist.includes(dep)),
+    ...forceExternal,
+  ];
 
   await esbuild({
     entryPoints: ["server/index.ts"],
@@ -52,8 +61,25 @@ async function buildAll() {
     bundle: true,
     format: "cjs",
     outfile: "dist/index.cjs",
+    banner: {
+      js: `
+// Shims for ESM compatibility in CJS bundle
+const { createRequire: _createRequire } = require('module');
+const { pathToFileURL } = require('url');
+if (typeof globalThis.__filename === 'undefined') {
+  globalThis.__filename = __filename;
+}
+if (typeof globalThis.__dirname === 'undefined') {
+  globalThis.__dirname = __dirname;
+}
+// Create import.meta.url shim for libraries that expect it
+const _importMetaUrl = pathToFileURL(__filename).href;
+`,
+    },
     define: {
       "process.env.NODE_ENV": '"production"',
+      "import.meta.url": "_importMetaUrl",
+      "import.meta.dirname": "__dirname",
     },
     minify: true,
     external: externals,
