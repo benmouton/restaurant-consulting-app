@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { domains, frameworkContent, userBookmarks, trainingTemplates } from './schema';
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialMessages } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -90,6 +90,66 @@ export const api = {
       responses: {
         200: z.array(z.custom<typeof trainingTemplates.$inferSelect>()),
         404: errorSchemas.notFound,
+      },
+    },
+  },
+  financial: {
+    documents: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/financial/documents',
+        responses: {
+          200: z.array(z.custom<typeof financialDocuments.$inferSelect>()),
+        },
+      },
+      get: {
+        method: 'GET' as const,
+        path: '/api/financial/documents/:id',
+        responses: {
+          200: z.object({
+            document: z.custom<typeof financialDocuments.$inferSelect>(),
+            extract: z.any().nullable(),
+          }),
+          404: errorSchemas.notFound,
+        },
+      },
+      upload: {
+        method: 'POST' as const,
+        path: '/api/financial/upload',
+        responses: {
+          201: z.custom<typeof financialDocuments.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+      delete: {
+        method: 'DELETE' as const,
+        path: '/api/financial/documents/:id',
+        responses: {
+          204: z.void(),
+          404: errorSchemas.notFound,
+        },
+      },
+    },
+    messages: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/financial/messages',
+        responses: {
+          200: z.array(z.custom<typeof financialMessages.$inferSelect>()),
+        },
+      },
+    },
+    ask: {
+      method: 'POST' as const,
+      path: '/api/financial/ask',
+      input: z.object({
+        question: z.string(),
+        documentId: z.number().optional(),
+      }),
+      streaming: true,
+      responses: {
+        200: z.object({ content: z.string().optional(), done: z.boolean().optional() }),
+        400: errorSchemas.validation,
       },
     },
   },

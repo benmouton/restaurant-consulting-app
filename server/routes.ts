@@ -4,7 +4,11 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { parseDocument, type FinancialMetrics } from "./document-parser";
 import { registerChatRoutes } from "./replit_integrations/chat";
 
 const openai = new OpenAI({
@@ -200,11 +204,349 @@ export async function registerRoutes(
     res.json(templates);
   });
 
+  // Financial Document Routes
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const upload = multer({
+    storage: multer.diskStorage({
+      destination: uploadsDir,
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+      },
+    }),
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        "application/pdf",
+        "text/csv",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ];
+      if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith(".csv")) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only PDF, CSV, and Excel files are allowed"));
+      }
+    },
+  });
+
+  // List user's financial documents
+  app.get(api.financial.documents.list.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const documents = await storage.getFinancialDocuments(userId);
+    res.json(documents);
+  });
+
+  // Get single document with extract
+  app.get(api.financial.documents.get.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const document = await storage.getFinancialDocument(Number(req.params.id), userId);
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    const extract = await storage.getFinancialExtract(document.id);
+    res.json({ document, extract: extract || null });
+  });
+
+  // Upload and process financial document
+  app.post(api.financial.documents.upload.path, isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const userId = req.user.claims.sub;
+      const { docType, periodStart, periodEnd } = req.body;
+
+      // Create document record
+      const document = await storage.createFinancialDocument({
+        userId,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        docType: docType || "other",
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        status: "processing",
+        periodStart: periodStart || null,
+        periodEnd: periodEnd || null,
+      });
+
+      // Process document asynchronously
+      processDocument(document.id, req.file.path, req.file.mimetype, req.file.originalname);
+
+      res.status(201).json(document);
+    } catch (err) {
+      console.error("Upload error:", err);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Delete document
+  app.delete(api.financial.documents.delete.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const document = await storage.getFinancialDocument(Number(req.params.id), userId);
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    
+    // Delete file
+    const filePath = path.join(uploadsDir, document.filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    await storage.deleteFinancialDocument(document.id, userId);
+    res.status(204).send();
+  });
+
+  // Get financial messages
+  app.get(api.financial.messages.list.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const documentId = req.query.documentId ? Number(req.query.documentId) : undefined;
+    const messages = await storage.getFinancialMessages(userId, documentId);
+    res.json(messages);
+  });
+
+  // Financial AI Q&A (streaming)
+  app.post(api.financial.ask.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const { question, documentId } = api.financial.ask.input.parse(req.body);
+      const userId = req.user.claims.sub;
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      // Build context from document(s)
+      let financialContext = "";
+      let documents: any[] = [];
+
+      if (documentId) {
+        const doc = await storage.getFinancialDocument(documentId, userId);
+        if (doc) {
+          documents = [doc];
+          const extract = await storage.getFinancialExtract(documentId);
+          if (extract) {
+            financialContext = buildFinancialContext(extract);
+          }
+        }
+      } else {
+        // Get all user's documents for general analysis
+        documents = await storage.getFinancialDocuments(userId);
+        for (const doc of documents.slice(0, 5)) { // Limit to 5 most recent
+          const extract = await storage.getFinancialExtract(doc.id);
+          if (extract) {
+            financialContext += `\n--- ${doc.originalName} (${doc.docType}) ---\n`;
+            financialContext += buildFinancialContext(extract);
+          }
+        }
+      }
+
+      // Save user message
+      await storage.createFinancialMessage({
+        userId,
+        documentId: documentId || null,
+        role: "user",
+        content: question,
+      });
+
+      const systemPrompt = buildFinancialSystemPrompt(financialContext);
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: question },
+        ],
+        stream: true,
+        max_tokens: 2048,
+      });
+
+      let fullResponse = "";
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          fullResponse += content;
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      // Save assistant response
+      await storage.createFinancialMessage({
+        userId,
+        documentId: documentId || null,
+        role: "assistant",
+        content: fullResponse,
+      });
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      console.error("Financial AI error:", err);
+      res.status(500).json({ message: "Failed to get response" });
+    }
+  });
+
   // Seed Data
   await seedDatabase();
   await seedTrainingTemplates();
 
   return httpServer;
+}
+
+// Helper function to process uploaded documents asynchronously
+async function processDocument(documentId: number, filePath: string, mimeType: string, originalName: string) {
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const result = await parseDocument(buffer, mimeType, originalName);
+    
+    if (result.error) {
+      await storage.updateFinancialDocumentStatus(documentId, "failed");
+      await storage.createFinancialExtract({
+        documentId,
+        rawText: result.rawText,
+        structuredMetrics: null,
+        summary: null,
+        errorMessage: result.error,
+      });
+    } else {
+      await storage.updateFinancialDocumentStatus(documentId, "ready");
+      
+      // Generate AI summary of the document
+      let summary = "";
+      try {
+        const summaryResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: "You are a restaurant financial analyst. Summarize this financial document in 2-3 sentences, highlighting key metrics and any notable trends or concerns. Be specific with numbers when available.",
+            },
+            {
+              role: "user",
+              content: `Document content:\n${result.rawText.slice(0, 4000)}\n\nExtracted metrics: ${JSON.stringify(result.structuredMetrics)}`,
+            },
+          ],
+          max_tokens: 200,
+        });
+        summary = summaryResponse.choices[0]?.message?.content || "";
+      } catch (err) {
+        console.error("Failed to generate summary:", err);
+      }
+      
+      await storage.createFinancialExtract({
+        documentId,
+        rawText: result.rawText,
+        structuredMetrics: result.structuredMetrics,
+        summary,
+        errorMessage: null,
+      });
+    }
+  } catch (err) {
+    console.error("Document processing error:", err);
+    await storage.updateFinancialDocumentStatus(documentId, "failed");
+    await storage.createFinancialExtract({
+      documentId,
+      rawText: null,
+      structuredMetrics: null,
+      summary: null,
+      errorMessage: err instanceof Error ? err.message : "Processing failed",
+    });
+  }
+}
+
+// Helper function to build context from financial extract
+function buildFinancialContext(extract: any): string {
+  const parts: string[] = [];
+  
+  if (extract.summary) {
+    parts.push(`Summary: ${extract.summary}`);
+  }
+  
+  if (extract.structuredMetrics) {
+    const metrics = extract.structuredMetrics as FinancialMetrics;
+    
+    if (metrics.revenue?.total) {
+      parts.push(`Total Revenue: $${metrics.revenue.total.toLocaleString()}`);
+    }
+    if (metrics.revenue?.foodSales) {
+      parts.push(`Food Sales: $${metrics.revenue.foodSales.toLocaleString()}`);
+    }
+    if (metrics.revenue?.beverageSales) {
+      parts.push(`Beverage Sales: $${metrics.revenue.beverageSales.toLocaleString()}`);
+    }
+    if (metrics.costs?.foodCostPercent) {
+      parts.push(`Food Cost: ${metrics.costs.foodCostPercent.toFixed(1)}%`);
+    }
+    if (metrics.labor?.laborPercent) {
+      parts.push(`Labor Cost: ${metrics.labor.laborPercent.toFixed(1)}%`);
+    }
+    if (metrics.primeCost?.percent) {
+      parts.push(`Prime Cost: ${metrics.primeCost.percent.toFixed(1)}%`);
+    }
+    if (metrics.profitability?.netMargin) {
+      parts.push(`Net Margin: ${metrics.profitability.netMargin.toFixed(1)}%`);
+    }
+    if (metrics.salesMetrics?.covers) {
+      parts.push(`Covers: ${metrics.salesMetrics.covers}`);
+    }
+    if (metrics.salesMetrics?.averageCheck) {
+      parts.push(`Average Check: $${metrics.salesMetrics.averageCheck.toFixed(2)}`);
+    }
+  }
+  
+  if (extract.rawText) {
+    parts.push(`\nRaw Document Content (excerpt):\n${extract.rawText.slice(0, 3000)}`);
+  }
+  
+  return parts.join("\n");
+}
+
+// Helper function to build the financial analysis system prompt
+function buildFinancialSystemPrompt(financialContext: string): string {
+  return `You are a restaurant financial analyst with deep expertise in restaurant operations and P&L management. You help restaurant owners understand their financial data and make data-driven decisions to improve profitability.
+
+YOUR APPROACH:
+- Analyze the provided financial data carefully
+- Identify specific areas of concern (high food cost, labor overruns, declining revenue)
+- Provide actionable recommendations tied to specific numbers
+- Reference industry benchmarks when relevant
+- Be direct and practical, not theoretical
+
+RESTAURANT FINANCIAL BENCHMARKS:
+- Food Cost: 28-35% of food sales (ideal: 30%)
+- Beverage Cost: 18-24% of beverage sales (ideal: 20%)
+- Labor Cost: 25-35% of total revenue (ideal: 30%)
+- Prime Cost (Food + Labor): 55-65% of revenue (ideal: 60%)
+- Net Profit Margin: 3-9% (healthy: 6%+)
+- Average Check targets vary by concept
+
+WHEN ANALYZING DATA:
+1. Compare actual metrics to benchmarks
+2. Identify the biggest dollar-impact opportunities
+3. Suggest specific operational changes (portion control, scheduling, menu engineering)
+4. Prioritize recommendations by potential impact
+5. Be realistic about what's achievable
+
+FINANCIAL CONTEXT FROM UPLOADED DOCUMENTS:
+${financialContext || "No documents uploaded yet. Ask the user to upload their sales reports, P&L statements, or other financial documents for analysis."}
+
+RESPONSE STYLE:
+- Start with a brief overview of what you see
+- Highlight 2-3 key findings with specific numbers
+- Provide actionable recommendations for each finding
+- Use bullet points for clarity
+- If data is missing or unclear, ask clarifying questions`;
 }
 
 async function seedDatabase() {
