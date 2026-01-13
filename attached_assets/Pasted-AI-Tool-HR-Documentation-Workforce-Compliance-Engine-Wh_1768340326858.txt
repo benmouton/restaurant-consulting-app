@@ -1,0 +1,113 @@
+AI Tool: HR Documentation & Workforce Compliance Engine
+What It Does
+
+This AI tool converts workplace issues into clear, factual, and State Workforce Commission–compliant HR documentation designed to hold up under unemployment claims, audits, and disputes.
+
+Instead of informal notes, emotional write-ups, or inconsistent discipline, the tool produces objective, policy-based counseling forms and warnings that align with state workforce commission standards for due process, consistency, and documentation.
+
+Core Function
+
+Identify the issue → apply the correct disciplinary standard → generate compliant documentation that protects the business.
+
+This tool is built to answer one question clearly:
+
+“If this goes to the Workforce Commission, will this document stand?”
+
+How It Works
+1. Issue Intake (Plain Language)
+
+The manager explains what happened:
+
+Attendance or tardiness
+
+No-call / no-show
+
+Performance failure
+
+Conduct or policy violation
+
+Guest-related incident
+
+Safety or compliance issue
+
+No legal wording required from the manager.
+
+2. Compliance-Driven Clarification
+
+The AI asks only the questions the Workforce Commission cares about:
+
+What specific policy or expectation was violated?
+
+Was the employee aware of this policy?
+
+Is this a first occurrence or part of a pattern?
+
+Was prior coaching or discipline issued?
+
+Did the behavior impact operations, guests, safety, or coworkers?
+
+Were mitigating circumstances considered?
+
+This ensures procedural fairness and consistency.
+
+3. Severity & Escalation Logic (SWC-Aligned)
+
+The AI determines the appropriate response:
+
+Documented coaching
+
+Written warning
+
+Final written warning
+
+Performance improvement notice
+
+Termination documentation
+
+Incident report (non-disciplinary)
+
+Escalation is based on documented pattern, not emotion.
+
+What It Produces (Compliance-Ready)
+
+The output is a state-compliant HR document that includes:
+
+Objective statement of facts (who, what, when, where — no opinions)
+
+Policy or standard reference (clearly stated expectation)
+
+Employee acknowledgment of expectations
+
+Corrective action required
+
+Opportunity to correct behavior
+
+Clear consequences for failure to improve
+
+At-will employment language (where applicable)
+
+Employee and manager acknowledgment sections
+
+All language is written to:
+
+Avoid retaliation or discriminatory phrasing
+
+Demonstrate fairness and consistency
+
+Support denial of unemployment benefits when appropriate
+
+Workforce Commission Compliance Safeguards
+
+This tool is designed around the principles used by Workforce Commissions when evaluating claims:
+
+✔ Clear policy communication
+✔ Prior notice and opportunity to improve
+✔ Progressive discipline where appropriate
+✔ Consistent enforcement across employees
+✔ Objective, documented facts
+✔ Signed acknowledgments
+
+Coaching without documentation is invisible to the Workforce Commission.
+Documentation without clarity is useless.
+
+This tool ensures neither happens.

@@ -264,6 +264,308 @@ function FoodCostCalculator() {
   );
 }
 
+function HRComplianceEngine() {
+  const { toast } = useToast();
+  const [issueType, setIssueType] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [employeeName, setEmployeeName] = useState<string>("");
+  const [employeeRole, setEmployeeRole] = useState<string>("");
+  const [incidentDate, setIncidentDate] = useState<string>("");
+  const [priorIncidents, setPriorIncidents] = useState<string>("none");
+  const [policyAware, setPolicyAware] = useState<string>("yes");
+  const [documentation, setDocumentation] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const issueTypes = [
+    { value: "attendance", label: "Attendance / Tardiness" },
+    { value: "ncns", label: "No-Call / No-Show" },
+    { value: "performance", label: "Performance Failure" },
+    { value: "conduct", label: "Conduct / Policy Violation" },
+    { value: "guest-incident", label: "Guest-Related Incident" },
+    { value: "safety", label: "Safety / Compliance Issue" },
+    { value: "insubordination", label: "Insubordination" },
+    { value: "cash-handling", label: "Cash Handling Violation" },
+  ];
+
+  const priorIncidentOptions = [
+    { value: "none", label: "First occurrence" },
+    { value: "verbal", label: "Prior verbal coaching" },
+    { value: "written", label: "Prior written warning" },
+    { value: "final", label: "On final written warning" },
+    { value: "multiple", label: "Multiple prior incidents" },
+  ];
+
+  const generateDocumentation = async () => {
+    if (!issueType || !description) {
+      toast({ title: "Please select issue type and describe what happened", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    setDocumentation("");
+
+    try {
+      const issueLabel = issueTypes.find(i => i.value === issueType)?.label || issueType;
+      const priorLabel = priorIncidentOptions.find(p => p.value === priorIncidents)?.label || priorIncidents;
+
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `Generate State Workforce Commission-compliant HR documentation for a restaurant employee issue.
+
+ISSUE TYPE: ${issueLabel}
+EMPLOYEE NAME: ${employeeName || "[Employee Name]"}
+EMPLOYEE ROLE: ${employeeRole || "[Position]"}
+INCIDENT DATE: ${incidentDate || "[Date]"}
+
+WHAT HAPPENED:
+${description}
+
+PRIOR DISCIPLINE HISTORY: ${priorLabel}
+EMPLOYEE WAS AWARE OF POLICY: ${policyAware === "yes" ? "Yes" : "No/Unclear"}
+
+Based on progressive discipline principles and Workforce Commission standards, generate a compliant HR document.
+
+First, determine the appropriate documentation level:
+- Documented Coaching (first occurrence, minor issue)
+- Written Warning (repeated issue or moderate severity)
+- Final Written Warning (pattern of behavior or serious issue)
+- Performance Improvement Plan (ongoing performance failure)
+- Termination Documentation (policy warrants immediate termination or final warning violated)
+
+Then produce a complete document with these sections:
+
+---
+[DOCUMENT TYPE: Coaching Memo / Written Warning / Final Written Warning / etc.]
+
+DATE: ${incidentDate || "[Date]"}
+EMPLOYEE: ${employeeName || "[Employee Name]"}
+POSITION: ${employeeRole || "[Position]"}
+
+STATEMENT OF FACTS:
+[Objective description - who, what, when, where. No opinions or emotional language.]
+
+POLICY/STANDARD VIOLATED:
+[Specific policy or expectation that was not met]
+
+PRIOR COMMUNICATION OF EXPECTATIONS:
+[How/when employee was made aware of this standard]
+
+PRIOR DISCIPLINE (if applicable):
+[Reference any prior coaching or warnings]
+
+IMPACT:
+[How this affected operations, guests, team, or safety]
+
+REQUIRED CORRECTIVE ACTION:
+[Specific, measurable actions the employee must take]
+
+CONSEQUENCES FOR FAILURE TO IMPROVE:
+[Clear statement of what happens if behavior continues]
+
+EMPLOYEE ACKNOWLEDGMENT:
+[ ] I have read and understand this document
+[ ] I understand that failure to improve may result in further discipline up to and including termination
+
+Employee Signature: _________________ Date: _______
+Manager Signature: _________________ Date: _______
+---
+
+AT-WILL STATEMENT:
+[Standard at-will employment language]
+
+NOTES FOR MANAGER:
+[Any additional guidance on follow-up, documentation retention, or next steps]
+
+Ensure all language is:
+- Objective and factual (no emotional language)
+- Consistent with progressive discipline
+- Defensible if reviewed by Workforce Commission
+- Clear about expectations and consequences`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate documentation");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setDocumentation(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate documentation", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(documentation);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          HR Documentation & Compliance Engine
+        </CardTitle>
+        <CardDescription>
+          Generate Workforce Commission-compliant documentation. If it goes to a hearing, will this document stand?
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="issueType">Issue Type</Label>
+            <Select value={issueType} onValueChange={setIssueType}>
+              <SelectTrigger id="issueType" className="mt-1" data-testid="select-hr-issue-type">
+                <SelectValue placeholder="Select issue type..." />
+              </SelectTrigger>
+              <SelectContent>
+                {issueTypes.map(type => (
+                  <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="priorIncidents">Prior Discipline History</Label>
+            <Select value={priorIncidents} onValueChange={setPriorIncidents}>
+              <SelectTrigger id="priorIncidents" className="mt-1" data-testid="select-prior-incidents">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {priorIncidentOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="employeeName">Employee Name</Label>
+            <Input
+              id="employeeName"
+              placeholder="e.g., John Smith"
+              className="mt-1"
+              value={employeeName}
+              onChange={(e) => setEmployeeName(e.target.value)}
+              data-testid="input-employee-name"
+            />
+          </div>
+          <div>
+            <Label htmlFor="employeeRole">Position</Label>
+            <Input
+              id="employeeRole"
+              placeholder="e.g., Server"
+              className="mt-1"
+              value={employeeRole}
+              onChange={(e) => setEmployeeRole(e.target.value)}
+              data-testid="input-employee-role"
+            />
+          </div>
+          <div>
+            <Label htmlFor="incidentDate">Incident Date</Label>
+            <Input
+              id="incidentDate"
+              type="date"
+              className="mt-1"
+              value={incidentDate}
+              onChange={(e) => setIncidentDate(e.target.value)}
+              data-testid="input-incident-date"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="policyAware">Was employee aware of the policy/expectation?</Label>
+          <Select value={policyAware} onValueChange={setPolicyAware}>
+            <SelectTrigger id="policyAware" className="mt-1" data-testid="select-policy-aware">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="yes">Yes - policy was clearly communicated</SelectItem>
+              <SelectItem value="no">No / Unclear</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="description">What Happened (Plain Language)</Label>
+          <Textarea
+            id="description"
+            placeholder="Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. The AI will convert this into objective, compliant documentation."
+            className="mt-1 min-h-[120px]"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            data-testid="input-hr-description"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            No legal wording needed - just describe the facts
+          </p>
+        </div>
+
+        <Button 
+          onClick={generateDocumentation} 
+          disabled={isGenerating || !issueType || !description}
+          className="w-full"
+          data-testid="btn-generate-hr-doc"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating compliant documentation...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate HR Documentation
+            </>
+          )}
+        </Button>
+
+        {documentation && (
+          <div className="mt-4 space-y-4">
+            <div className="p-4 bg-accent/50 rounded-lg border">
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap font-mono text-sm">
+                {documentation}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-hr-doc">
+              <Copy className="h-4 w-4 mr-2" />
+              Copy Documentation
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function LaborDemandEngine() {
   const { toast } = useToast();
   const [daypart, setDaypart] = useState<string>("dinner");
@@ -1867,6 +2169,9 @@ export default function DomainPage() {
 
         {/* Labor Demand Engine - only show for staffing domain */}
         {slug === "staffing" && <LaborDemandEngine />}
+
+        {/* HR Compliance Engine - only show for hr domain */}
+        {slug === "hr" && <HRComplianceEngine />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">
