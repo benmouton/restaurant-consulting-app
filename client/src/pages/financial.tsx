@@ -52,11 +52,24 @@ export default function FinancialPage() {
 
   const { data: selectedDoc } = useQuery<DocumentWithExtract>({
     queryKey: ["/api/financial/documents", selectedDocId],
+    queryFn: async () => {
+      const res = await fetch(`/api/financial/documents/${selectedDocId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch document");
+      return res.json();
+    },
     enabled: !!selectedDocId,
   });
 
   const { data: messages } = useQuery<FinancialMessage[]>({
-    queryKey: ["/api/financial/messages", { documentId: selectedDocId }],
+    queryKey: ["/api/financial/messages", selectedDocId],
+    queryFn: async () => {
+      const url = selectedDocId 
+        ? `/api/financial/messages?documentId=${selectedDocId}`
+        : "/api/financial/messages";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch messages");
+      return res.json();
+    },
     enabled: !!user,
   });
 
