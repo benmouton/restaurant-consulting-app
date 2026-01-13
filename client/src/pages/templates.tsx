@@ -26,8 +26,14 @@ import type { TrainingTemplate } from "@shared/schema";
 function personalizeContent(content: string, restaurantName: string | null | undefined): string {
   if (!restaurantName) return content;
   return content
-    .replace(/Mouton's Bistro/g, restaurantName)
-    .replace(/Mouton's/g, restaurantName);
+    .replace(/Mouton's Bistro/gi, restaurantName)
+    .replace(/Mouton's/gi, restaurantName);
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 const contentTypeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -273,15 +279,15 @@ export default function TemplatesPage() {
                                 </style>
                               </head>
                               <body>
-                                <h1>${personalizeContent(selectedTemplate.title, user?.restaurantName)}</h1>
-                                <div class="section">${selectedTemplate.section} | ${selectedTemplate.contentType}</div>
+                                <h1>${escapeHtml(personalizeContent(selectedTemplate.title, user?.restaurantName))}</h1>
+                                <div class="section">${escapeHtml(selectedTemplate.section)} | ${escapeHtml(selectedTemplate.contentType)}</div>
                                 ${selectedTemplate.keyPoints?.length ? `
                                   <div class="key-points">
                                     <strong>Key Points:</strong><br/>
-                                    ${selectedTemplate.keyPoints.map(p => `<span class="badge">${personalizeContent(p, user?.restaurantName)}</span>`).join('')}
+                                    ${selectedTemplate.keyPoints.map(p => `<span class="badge">${escapeHtml(personalizeContent(p, user?.restaurantName))}</span>`).join('')}
                                   </div>
                                 ` : ''}
-                                <div class="content">${printContent}</div>
+                                <div class="content">${escapeHtml(printContent)}</div>
                               </body>
                               </html>
                             `);
