@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import { OnboardingModal } from "@/components/onboarding-modal";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import DomainPage from "@/pages/domain";
@@ -24,14 +25,17 @@ function Router() {
   }
 
   return (
-    <Switch>
-      <Route path="/" component={user ? Dashboard : Landing} />
-      <Route path="/domain/:slug" component={user ? DomainPage : Landing} />
-      <Route path="/consultant" component={user ? ConsultantPage : Landing} />
-      <Route path="/templates" component={user ? TemplatesPage : Landing} />
-      <Route path="/financial" component={user ? FinancialPage : Landing} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      {user && <OnboardingModal user={user} />}
+      <Switch>
+        <Route path="/" component={user ? Dashboard : Landing} />
+        <Route path="/domain/:slug" component={user ? DomainPage : Landing} />
+        <Route path="/consultant" component={user ? ConsultantPage : Landing} />
+        <Route path="/templates" component={user ? TemplatesPage : Landing} />
+        <Route path="/financial" component={user ? FinancialPage : Landing} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
