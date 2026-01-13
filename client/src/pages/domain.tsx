@@ -264,6 +264,240 @@ function FoodCostCalculator() {
   );
 }
 
+function GuestRecoveryAdvisor() {
+  const { toast } = useToast();
+  const [issueType, setIssueType] = useState<string>("");
+  const [timeDelay, setTimeDelay] = useState<string>("");
+  const [checkValue, setCheckValue] = useState<string>("");
+  const [responderRole, setResponderRole] = useState<string>("server");
+  const [additionalContext, setAdditionalContext] = useState<string>("");
+  const [response, setResponse] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const issueTypes = [
+    { value: "late-food", label: "Late Food" },
+    { value: "wrong-item", label: "Wrong Item Delivered" },
+    { value: "cold-food", label: "Cold/Poor Quality Food" },
+    { value: "staff-attitude", label: "Staff Attitude Issue" },
+    { value: "long-wait-seat", label: "Long Wait for Seating" },
+    { value: "forgotten-item", label: "Forgotten Item/Course" },
+    { value: "billing-error", label: "Billing Error" },
+    { value: "cleanliness", label: "Cleanliness Issue" },
+    { value: "other", label: "Other Issue" },
+  ];
+
+  const roles = [
+    { value: "server", label: "Server" },
+    { value: "bartender", label: "Bartender" },
+    { value: "host", label: "Host" },
+    { value: "shift-lead", label: "Shift Lead" },
+    { value: "manager", label: "Manager" },
+  ];
+
+  const generateRecovery = async () => {
+    if (!issueType) {
+      toast({ title: "Please select an issue type", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    setResponse("");
+
+    try {
+      const issueLabel = issueTypes.find(i => i.value === issueType)?.label || issueType;
+      const roleLabel = roles.find(r => r.value === responderRole)?.label || responderRole;
+
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `As a restaurant recovery specialist, provide a specific guest recovery recommendation for this situation:
+
+ISSUE TYPE: ${issueLabel}
+${timeDelay ? `TIME DELAY: ${timeDelay} minutes over expected` : ""}
+${checkValue ? `CHECK VALUE: $${checkValue}` : ""}
+RESPONDER ROLE: ${roleLabel}
+${additionalContext ? `ADDITIONAL CONTEXT: ${additionalContext}` : ""}
+
+Based on standard restaurant comp authority limits:
+- Server: Free dessert, free non-alcoholic drink, item replacement
+- Bartender: One round comped, free appetizer  
+- Shift Lead: Up to $25 in comps
+- Manager: Up to $100, full meal if warranted
+- Over $100: Owner notification required
+
+Provide a structured response with:
+
+1. RECOVERY SCRIPT (what to say to the guest - use warm, professional language)
+
+2. APPROVED COMP RANGE (specific items or dollar amount based on the responder's authority and situation severity)
+
+3. REQUIRED FOLLOW-UP STEPS (what must happen after the initial recovery)
+
+4. ESCALATION NEEDED? (Yes/No and why - if the situation exceeds the responder's authority)
+
+Keep the response practical and immediately actionable. This is real-time guidance for a live service situation.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate recovery advice");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setResponse(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate recovery advice", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(response);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          Guest Recovery Decision Advisor
+        </CardTitle>
+        <CardDescription>
+          Get real-time guidance on how to recover a service failure—within your comp limits
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="issueType">Issue Type</Label>
+            <Select value={issueType} onValueChange={setIssueType}>
+              <SelectTrigger id="issueType" className="mt-1" data-testid="select-issue-type">
+                <SelectValue placeholder="Select issue type..." />
+              </SelectTrigger>
+              <SelectContent>
+                {issueTypes.map(type => (
+                  <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="responderRole">Who is Responding?</Label>
+            <Select value={responderRole} onValueChange={setResponderRole}>
+              <SelectTrigger id="responderRole" className="mt-1" data-testid="select-responder-role">
+                <SelectValue placeholder="Select role..." />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map(role => (
+                  <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="timeDelay">Time Delay (minutes over expected)</Label>
+            <Input
+              id="timeDelay"
+              type="number"
+              placeholder="e.g., 18"
+              className="mt-1"
+              value={timeDelay}
+              onChange={(e) => setTimeDelay(e.target.value)}
+              data-testid="input-time-delay"
+            />
+          </div>
+          <div>
+            <Label htmlFor="checkValue">Check Value ($)</Label>
+            <div className="relative mt-1">
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="checkValue"
+                type="number"
+                placeholder="e.g., 96"
+                className="pl-9"
+                value={checkValue}
+                onChange={(e) => setCheckValue(e.target.value)}
+                data-testid="input-check-value"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="additionalContext">Additional Context (optional)</Label>
+          <Textarea
+            id="additionalContext"
+            placeholder="e.g., Server already apologized, guest is a regular, celebrating anniversary..."
+            className="mt-1 min-h-[80px]"
+            value={additionalContext}
+            onChange={(e) => setAdditionalContext(e.target.value)}
+            data-testid="input-additional-context"
+          />
+        </div>
+
+        <Button 
+          onClick={generateRecovery} 
+          disabled={isGenerating || !issueType}
+          className="w-full"
+          data-testid="btn-generate-recovery"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating recovery advice...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Get Recovery Advice
+            </>
+          )}
+        </Button>
+
+        {response && (
+          <div className="mt-4 space-y-4">
+            <div className="p-4 bg-accent/50 rounded-lg">
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                {response}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-recovery">
+              <Copy className="h-4 w-4 mr-2" />
+              Copy to Clipboard
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DailyTaskReminder() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<string>("");
@@ -814,6 +1048,9 @@ export default function DomainPage() {
 
         {/* Daily Task Reminder - only show for leadership domain */}
         {slug === "leadership" && <DailyTaskReminder />}
+
+        {/* Guest Recovery Advisor - only show for service domain */}
+        {slug === "service" && <GuestRecoveryAdvisor />}
 
         {/* Food Cost Calculator - only show for costs domain */}
         {slug === "costs" && <FoodCostCalculator />}
