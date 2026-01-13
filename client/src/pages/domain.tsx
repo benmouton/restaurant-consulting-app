@@ -264,6 +264,427 @@ function FoodCostCalculator() {
   );
 }
 
+function LaborDemandEngine() {
+  const { toast } = useToast();
+  const [daypart, setDaypart] = useState<string>("dinner");
+  const [dayOfWeek, setDayOfWeek] = useState<string>(new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase());
+  const [projectedCovers, setProjectedCovers] = useState<string>("");
+  const [actualCovers, setActualCovers] = useState<string>("");
+  const [reservations, setReservations] = useState<string>("");
+  const [currentStaff, setCurrentStaff] = useState<string>("");
+  const [laborTarget, setLaborTarget] = useState<string>("28");
+  const [avgCheck, setAvgCheck] = useState<string>("45");
+  const [currentTime, setCurrentTime] = useState<string>("");
+  const [serviceNotes, setServiceNotes] = useState<string>("");
+  const [recommendation, setRecommendation] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [mode, setMode] = useState<"preshift" | "midshift">("preshift");
+
+  const dayparts = [
+    { value: "lunch", label: "Lunch (11am-3pm)" },
+    { value: "dinner", label: "Dinner (5pm-10pm)" },
+    { value: "brunch", label: "Brunch" },
+    { value: "late-night", label: "Late Night" },
+  ];
+
+  const daysOfWeek = [
+    { value: "monday", label: "Monday" },
+    { value: "tuesday", label: "Tuesday" },
+    { value: "wednesday", label: "Wednesday" },
+    { value: "thursday", label: "Thursday" },
+    { value: "friday", label: "Friday" },
+    { value: "saturday", label: "Saturday" },
+    { value: "sunday", label: "Sunday" },
+  ];
+
+  const generateRecommendation = async () => {
+    if (!projectedCovers) {
+      toast({ title: "Please enter projected covers", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    setRecommendation("");
+
+    try {
+      const dayLabel = daysOfWeek.find(d => d.value === dayOfWeek)?.label || dayOfWeek;
+      const daypartLabel = dayparts.find(d => d.value === daypart)?.label || daypart;
+
+      const prompt = mode === "preshift" 
+        ? `Generate a pre-shift labor recommendation for a restaurant.
+
+DAY: ${dayLabel}
+DAYPART: ${daypartLabel}
+PROJECTED COVERS: ${projectedCovers}
+RESERVATIONS ON BOOKS: ${reservations || "Not specified"}
+CURRENT SCHEDULED STAFF: ${currentStaff || "Not specified"}
+LABOR TARGET: ${laborTarget}% of sales
+AVERAGE CHECK: $${avgCheck}
+
+Based on cover-driven scheduling principles:
+- Standard ratios: 1 server per 15-20 covers, 1 bartender per 25-30 guests, 1 cook per 30-40 covers
+- Fridays/Saturdays require tighter staffing
+- Weather and events impact walk-ins
+- Labor should be scheduled to projection, not preference
+
+Provide a structured pre-shift recommendation:
+
+PROJECTED SALES: $[calculate from covers x avg check]
+
+RECOMMENDED STAFFING:
+- Servers: [number] 
+- Bartenders: [number]
+- Hosts: [number]
+- Cooks: [number]
+- Food Runners/Expo: [number]
+
+LABOR RISK ASSESSMENT: [Low/Moderate/High] - explain why
+
+CUT EVALUATION WINDOW: [specific time] - when to reassess
+
+HOLD INSTRUCTIONS: [specific guidance for the shift lead]
+
+PRE-SHIFT BRIEFING NOTES: [2-3 key points to communicate to staff]
+
+Be directive, not suggestive. This removes emotion from staffing decisions.`
+        : `Generate a mid-shift labor decision for a restaurant.
+
+DAY: ${dayLabel}
+DAYPART: ${daypartLabel}
+PROJECTED COVERS: ${projectedCovers}
+ACTUAL COVERS SO FAR: ${actualCovers}
+CURRENT TIME: ${currentTime || "Mid-service"}
+CURRENT STAFF ON FLOOR: ${currentStaff || "Not specified"}
+LABOR TARGET: ${laborTarget}% of sales
+AVERAGE CHECK: $${avgCheck}
+SERVICE NOTES: ${serviceNotes || "None"}
+
+Calculate variance and make a clear decision:
+- If actual < projected by 20%+: recommend cuts
+- If actual > projected by 15%+: recommend adds or holds
+- Consider remaining service time
+- Factor in ticket times and service stress
+
+Provide a decisive mid-shift recommendation:
+
+VARIANCE: [actual vs projected, % difference]
+
+DECISION: [HOLD / CUT / ADD] - be specific
+
+${actualCovers && parseInt(actualCovers) < parseInt(projectedCovers) * 0.85 ? `
+CUT RECOMMENDATION:
+- Role to cut: [specific role]
+- Who goes first: [seniority-based or section-based]
+- Cut time: [specific time]
+- Cut script: "We're slower than projected tonight. I'm going to let you go at [time]. Thank you for your flexibility."
+` : ''}
+
+NEXT EVALUATION: [when to reassess]
+
+MANAGER NOTES: [documentation for labor log]
+
+REMAINING SHIFT GUIDANCE: [specific instructions]
+
+This is a directive, not a suggestion. Hope is not a staffing strategy.`;
+
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: prompt }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate recommendation");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setRecommendation(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate recommendation", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(recommendation);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          Labor Demand & Cut-Decision Engine
+        </CardTitle>
+        <CardDescription>
+          Cover-driven staffing decisions. No guessing, no hoping—just data-driven labor actions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Mode Toggle */}
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "preshift" | "midshift")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="preshift" data-testid="tab-preshift">Pre-Shift Planning</TabsTrigger>
+            <TabsTrigger value="midshift" data-testid="tab-midshift">Mid-Shift Decision</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="preshift" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="dayOfWeek">Day</Label>
+                <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+                  <SelectTrigger id="dayOfWeek" className="mt-1" data-testid="select-day">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {daysOfWeek.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="daypart">Daypart</Label>
+                <Select value={daypart} onValueChange={setDaypart}>
+                  <SelectTrigger id="daypart" className="mt-1" data-testid="select-daypart">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dayparts.map(d => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="projectedCovers">Projected Covers</Label>
+                <Input
+                  id="projectedCovers"
+                  type="number"
+                  placeholder="e.g., 112"
+                  className="mt-1"
+                  value={projectedCovers}
+                  onChange={(e) => setProjectedCovers(e.target.value)}
+                  data-testid="input-projected-covers"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="reservations">Reservations on Books</Label>
+                <Input
+                  id="reservations"
+                  type="number"
+                  placeholder="e.g., 45"
+                  className="mt-1"
+                  value={reservations}
+                  onChange={(e) => setReservations(e.target.value)}
+                  data-testid="input-reservations"
+                />
+              </div>
+              <div>
+                <Label htmlFor="avgCheck">Average Check ($)</Label>
+                <div className="relative mt-1">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="avgCheck"
+                    type="number"
+                    placeholder="45"
+                    className="pl-9"
+                    value={avgCheck}
+                    onChange={(e) => setAvgCheck(e.target.value)}
+                    data-testid="input-avg-check"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="laborTarget">Labor Target (%)</Label>
+                <div className="relative mt-1">
+                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="laborTarget"
+                    type="number"
+                    placeholder="28"
+                    className="pl-9"
+                    value={laborTarget}
+                    onChange={(e) => setLaborTarget(e.target.value)}
+                    data-testid="input-labor-target"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="currentStaff">Current Scheduled Staff</Label>
+              <Textarea
+                id="currentStaff"
+                placeholder="e.g., 4 servers, 2 bartenders, 1 host, 4 cooks, 1 expo"
+                className="mt-1 min-h-[60px]"
+                value={currentStaff}
+                onChange={(e) => setCurrentStaff(e.target.value)}
+                data-testid="input-current-staff"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="midshift" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="projectedCoversMid">Projected Covers</Label>
+                <Input
+                  id="projectedCoversMid"
+                  type="number"
+                  placeholder="e.g., 112"
+                  className="mt-1"
+                  value={projectedCovers}
+                  onChange={(e) => setProjectedCovers(e.target.value)}
+                  data-testid="input-projected-covers-mid"
+                />
+              </div>
+              <div>
+                <Label htmlFor="actualCovers">Actual Covers (so far)</Label>
+                <Input
+                  id="actualCovers"
+                  type="number"
+                  placeholder="e.g., 78"
+                  className="mt-1"
+                  value={actualCovers}
+                  onChange={(e) => setActualCovers(e.target.value)}
+                  data-testid="input-actual-covers"
+                />
+              </div>
+              <div>
+                <Label htmlFor="currentTime">Current Time</Label>
+                <Input
+                  id="currentTime"
+                  type="time"
+                  className="mt-1"
+                  value={currentTime}
+                  onChange={(e) => setCurrentTime(e.target.value)}
+                  data-testid="input-current-time"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="avgCheckMid">Average Check ($)</Label>
+                <div className="relative mt-1">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="avgCheckMid"
+                    type="number"
+                    placeholder="45"
+                    className="pl-9"
+                    value={avgCheck}
+                    onChange={(e) => setAvgCheck(e.target.value)}
+                    data-testid="input-avg-check-mid"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="laborTargetMid">Labor Target (%)</Label>
+                <div className="relative mt-1">
+                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="laborTargetMid"
+                    type="number"
+                    placeholder="28"
+                    className="pl-9"
+                    value={laborTarget}
+                    onChange={(e) => setLaborTarget(e.target.value)}
+                    data-testid="input-labor-target-mid"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="currentStaffMid">Current Staff on Floor</Label>
+              <Textarea
+                id="currentStaffMid"
+                placeholder="e.g., 4 servers, 2 bartenders, 1 host"
+                className="mt-1 min-h-[60px]"
+                value={currentStaff}
+                onChange={(e) => setCurrentStaff(e.target.value)}
+                data-testid="input-current-staff-mid"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="serviceNotes">Service Notes (optional)</Label>
+              <Textarea
+                id="serviceNotes"
+                placeholder="e.g., Ticket times stable, one server struggling, large party at 8:30..."
+                className="mt-1 min-h-[60px]"
+                value={serviceNotes}
+                onChange={(e) => setServiceNotes(e.target.value)}
+                data-testid="input-service-notes"
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <Button 
+          onClick={generateRecommendation} 
+          disabled={isGenerating || !projectedCovers}
+          className="w-full"
+          data-testid="btn-generate-labor"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating {mode === "preshift" ? "staffing plan" : "cut decision"}...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {mode === "preshift" ? "Generate Staffing Plan" : "Get Labor Decision"}
+            </>
+          )}
+        </Button>
+
+        {recommendation && (
+          <div className="mt-4 space-y-4">
+            <div className="p-4 bg-accent/50 rounded-lg">
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                {recommendation}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-labor">
+              <Copy className="h-4 w-4 mr-2" />
+              Copy to Clipboard
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SkillsCertificationEngine() {
   const { toast } = useToast();
   const [role, setRole] = useState<string>("server");
@@ -1443,6 +1864,9 @@ export default function DomainPage() {
 
         {/* Skills Certification Engine - only show for training domain */}
         {slug === "training" && <SkillsCertificationEngine />}
+
+        {/* Labor Demand Engine - only show for staffing domain */}
+        {slug === "staffing" && <LaborDemandEngine />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">
