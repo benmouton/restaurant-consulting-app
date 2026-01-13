@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -49,6 +49,20 @@ export default function TemplatesPage() {
   const kitchenTemplates = templates?.filter(t => t.category === "kitchen") || [];
 
   const currentTemplates = activeCategory === "server" ? serverTemplates : kitchenTemplates;
+
+  useEffect(() => {
+    if (currentTemplates.length > 0 && !selectedTemplate) {
+      setSelectedTemplate(currentTemplates[0]);
+    }
+  }, [templates]);
+
+  useEffect(() => {
+    if (currentTemplates.length > 0) {
+      setSelectedTemplate(currentTemplates[0]);
+    } else {
+      setSelectedTemplate(null);
+    }
+  }, [activeCategory]);
 
   const groupedBySection = currentTemplates.reduce<Record<string, TrainingTemplate[]>>((acc, template) => {
     if (!acc[template.section]) {
