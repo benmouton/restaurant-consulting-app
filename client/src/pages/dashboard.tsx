@@ -60,6 +60,12 @@ export default function Dashboard() {
             <span className="font-bold">The Restaurant Consultant</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/templates">
+              <Button variant="outline" size="sm" data-testid="button-templates-nav">
+                <GraduationCap className="h-4 w-4 mr-2" />
+                Templates
+              </Button>
+            </Link>
             <Link href="/consultant">
               <Button variant="outline" size="sm" data-testid="button-consultant-nav">
                 <MessageSquare className="h-4 w-4 mr-2" />

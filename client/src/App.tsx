@@ -8,6 +8,7 @@ import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import DomainPage from "@/pages/domain";
 import ConsultantPage from "@/pages/consultant";
+import TemplatesPage from "@/pages/templates";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/" component={user ? Dashboard : Landing} />
       <Route path="/domain/:slug" component={user ? DomainPage : Landing} />
       <Route path="/consultant" component={user ? ConsultantPage : Landing} />
+      <Route path="/templates" component={user ? TemplatesPage : Landing} />
       <Route component={NotFound} />
     </Switch>
   );
