@@ -149,13 +149,14 @@ export async function registerRoutes(
   // AI Consultant Route (streaming)
   app.post(api.consultant.ask.path, async (req, res) => {
     try {
-      const { question, context } = api.consultant.ask.input.parse(req.body);
+      const { question, context, image } = api.consultant.ask.input.parse(req.body);
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const messages: { role: "system" | "user"; content: string }[] = [
+      type MessageContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
+      const messages: { role: "system" | "user"; content: MessageContent }[] = [
         { role: "system", content: CONSULTANT_SYSTEM_PROMPT },
       ];
 
@@ -163,11 +164,21 @@ export async function registerRoutes(
         messages.push({ role: "user", content: `Context: ${context}` });
       }
 
-      messages.push({ role: "user", content: question });
+      if (image) {
+        messages.push({
+          role: "user",
+          content: [
+            { type: "text", text: question },
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${image}` } },
+          ],
+        });
+      } else {
+        messages.push({ role: "user", content: question });
+      }
 
       const stream = await openai.chat.completions.create({
         model: "gpt-4o",
-        messages,
+        messages: messages as any,
         stream: true,
         max_tokens: 2048,
       });

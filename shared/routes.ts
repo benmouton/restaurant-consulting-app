@@ -68,6 +68,7 @@ export const api = {
       input: z.object({ 
         question: z.string(),
         context: z.string().optional(),
+        image: z.string().optional(),
       }),
       streaming: true,
       responses: {

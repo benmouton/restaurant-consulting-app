@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,7 +35,10 @@ import {
   Sparkles,
   Calendar,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Image,
+  X,
+  Upload
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
@@ -402,10 +405,64 @@ function ReviewResponseGenerator() {
   const [yourTitle, setYourTitle] = useState<string>("Manager");
   const [response, setResponse] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [screenshotBase64, setScreenshotBase64] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Please upload an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Image must be less than 10MB", variant: "destructive" });
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setScreenshotPreview(result);
+      setScreenshotBase64(result.split(',')[1]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            handleImageUpload(file);
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+  };
+
+  const removeScreenshot = () => {
+    setScreenshotPreview(null);
+    setScreenshotBase64(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const generateResponse = async () => {
-    if (!review.trim()) {
-      toast({ title: "Please paste a review first", variant: "destructive" });
+    if (!review.trim() && !screenshotBase64) {
+      toast({ title: "Please paste a review or upload a screenshot", variant: "destructive" });
       return;
     }
 
@@ -413,11 +470,21 @@ function ReviewResponseGenerator() {
     setResponse("");
 
     try {
+      const imageInstruction = screenshotBase64 
+        ? "I have attached a screenshot of the review. Please analyze the image to understand the customer's feedback and generate an appropriate response."
+        : "";
+      
+      const textInstruction = review.trim() 
+        ? `CUSTOMER REVIEW TEXT:\n"${review}"`
+        : "Please extract the review text from the attached screenshot.";
+
       const res = await fetch("/api/consultant/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: `Generate a professional, polite, and friendly response to this ${reviewType} customer review for my restaurant${restaurantName ? ` called "${restaurantName}"` : ""}. 
+
+${imageInstruction}
 
 The response should:
 - Be warm and genuine, not corporate or robotic
@@ -428,10 +495,10 @@ The response should:
 - Keep it concise (3-4 sentences max)
 - Never argue with the customer or blame staff
 
-CUSTOMER REVIEW:
-"${review}"
+${textInstruction}
 
 Generate ONLY the response text, nothing else.`,
+          image: screenshotBase64 || undefined,
         }),
         credentials: "include",
       });
@@ -554,13 +621,68 @@ Generate ONLY the response text, nothing else.`,
             className="mt-1 min-h-[120px]"
             value={review}
             onChange={(e) => setReview(e.target.value)}
+            onPaste={handlePaste}
             data-testid="textarea-review"
           />
         </div>
 
+        <div>
+          <Label>Or Upload a Screenshot of the Review</Label>
+          <div 
+            className="mt-1 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/30"
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            data-testid="screenshot-drop-zone"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file);
+              }}
+              data-testid="input-screenshot"
+            />
+            {screenshotPreview ? (
+              <div className="relative inline-block">
+                <img 
+                  src={screenshotPreview} 
+                  alt="Review screenshot" 
+                  className="max-h-48 mx-auto rounded-md"
+                />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeScreenshot();
+                  }}
+                  data-testid="btn-remove-screenshot"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="py-4">
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Drag & drop a screenshot here, or click to upload
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You can also paste (Ctrl+V) directly into the text area above
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <Button 
           onClick={generateResponse} 
-          disabled={isGenerating || !review.trim()}
+          disabled={isGenerating || (!review.trim() && !screenshotBase64)}
           className="w-full"
           data-testid="btn-generate-response"
         >
