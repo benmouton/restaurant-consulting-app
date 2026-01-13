@@ -15,6 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   ArrowLeft,
   ChefHat,
@@ -25,8 +27,14 @@ import {
   LogOut,
   Calculator,
   DollarSign,
-  Percent
+  Percent,
+  MessageSquare,
+  Star,
+  Copy,
+  Loader2,
+  Sparkles
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
 
 function FoodCostCalculator() {
@@ -250,6 +258,209 @@ function FoodCostCalculator() {
   );
 }
 
+function ReviewResponseGenerator() {
+  const { toast } = useToast();
+  const [review, setReview] = useState<string>("");
+  const [reviewType, setReviewType] = useState<string>("negative");
+  const [restaurantName, setRestaurantName] = useState<string>("");
+  const [yourName, setYourName] = useState<string>("");
+  const [yourTitle, setYourTitle] = useState<string>("Manager");
+  const [response, setResponse] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const generateResponse = async () => {
+    if (!review.trim()) {
+      toast({ title: "Please paste a review first", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    setResponse("");
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `Generate a professional, polite, and friendly response to this ${reviewType} customer review for my restaurant${restaurantName ? ` called "${restaurantName}"` : ""}. 
+
+The response should:
+- Be warm and genuine, not corporate or robotic
+- Thank them for their feedback
+- ${reviewType === "negative" ? "Acknowledge their concern without being defensive or making excuses" : "Express genuine appreciation for their kind words"}
+- ${reviewType === "negative" ? "Offer to make it right and invite them to reach out directly" : "Invite them to visit again"}
+- Sign off with ${yourName || "[Your Name]"}, ${yourTitle || "Manager"}
+- Keep it concise (3-4 sentences max)
+- Never argue with the customer or blame staff
+
+CUSTOMER REVIEW:
+"${review}"
+
+Generate ONLY the response text, nothing else.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate response");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setResponse(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate response", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(response);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          Review Response Generator
+        </CardTitle>
+        <CardDescription>
+          Paste a customer review and get a professional, friendly response
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="reviewType">Review Type</Label>
+            <Select value={reviewType} onValueChange={setReviewType}>
+              <SelectTrigger className="mt-1" data-testid="select-review-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="negative">
+                  <span className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-destructive" />
+                    Negative Review
+                  </span>
+                </SelectItem>
+                <SelectItem value="positive">
+                  <span className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    Positive Review
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="restaurantName">Restaurant Name (optional)</Label>
+            <Input
+              id="restaurantName"
+              placeholder="Your Restaurant"
+              className="mt-1"
+              value={restaurantName}
+              onChange={(e) => setRestaurantName(e.target.value)}
+              data-testid="input-restaurant-name"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="yourName">Your Name</Label>
+            <Input
+              id="yourName"
+              placeholder="John"
+              className="mt-1"
+              value={yourName}
+              onChange={(e) => setYourName(e.target.value)}
+              data-testid="input-your-name"
+            />
+          </div>
+          <div>
+            <Label htmlFor="yourTitle">Your Title</Label>
+            <Input
+              id="yourTitle"
+              placeholder="Manager"
+              className="mt-1"
+              value={yourTitle}
+              onChange={(e) => setYourTitle(e.target.value)}
+              data-testid="input-your-title"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="review">Paste the Customer Review</Label>
+          <Textarea
+            id="review"
+            placeholder="Paste the customer's review here..."
+            className="mt-1 min-h-[120px]"
+            value={review}
+            onChange={(e) => setReview(e.target.value)}
+            data-testid="textarea-review"
+          />
+        </div>
+
+        <Button 
+          onClick={generateResponse} 
+          disabled={isGenerating || !review.trim()}
+          className="w-full"
+          data-testid="btn-generate-response"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate Response
+            </>
+          )}
+        </Button>
+
+        {response && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Generated Response</Label>
+              <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-response">
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+            <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm">
+              {response}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const contentTypeConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   principle: { icon: Lightbulb, label: "Principle", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
   output: { icon: FileOutput, label: "Framework", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
@@ -346,6 +557,9 @@ export default function DomainPage() {
 
         {/* Food Cost Calculator - only show for costs domain */}
         {slug === "costs" && <FoodCostCalculator />}
+
+        {/* Review Response Generator - only show for reviews domain */}
+        {slug === "reviews" && <ReviewResponseGenerator />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">
