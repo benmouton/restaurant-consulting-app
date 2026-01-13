@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   LogOut,
   MessageSquare,
-  ArrowRight
+  ArrowRight,
+  BarChart3
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 
@@ -64,6 +65,12 @@ export default function Dashboard() {
               <Button variant="outline" size="sm" data-testid="button-templates-nav">
                 <GraduationCap className="h-4 w-4 mr-2" />
                 Templates
+              </Button>
+            </Link>
+            <Link href="/financial">
+              <Button variant="outline" size="sm" data-testid="button-financial-nav">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Financial
               </Button>
             </Link>
             <Link href="/consultant">
