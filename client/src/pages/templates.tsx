@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,9 +18,17 @@ import {
   ClipboardList,
   FileText,
   CheckSquare,
-  GraduationCap
+  GraduationCap,
+  Printer
 } from "lucide-react";
 import type { TrainingTemplate } from "@shared/schema";
+
+function personalizeContent(content: string, restaurantName: string | null | undefined): string {
+  if (!restaurantName) return content;
+  return content
+    .replace(/Mouton's Bistro/g, restaurantName)
+    .replace(/Mouton's/g, restaurantName);
+}
 
 const contentTypeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   overview: BookOpen,
@@ -115,8 +123,11 @@ export default function TemplatesPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Real Training Templates</h1>
           <p className="text-muted-foreground">
-            These examples from Mouton's Bistro demonstrate how the consulting philosophy translates into actual training materials.
-            Use these as models for building your own systems.
+            {user?.restaurantName ? (
+              <>These training templates are personalized for <strong>{user.restaurantName}</strong>. Use them to build consistent, repeatable systems.</>
+            ) : (
+              <>These examples demonstrate how the consulting philosophy translates into actual training materials. Use these as models for building your own systems.</>
+            )}
           </p>
         </div>
 
@@ -206,17 +217,90 @@ export default function TemplatesPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <CardTitle className="text-xl">{selectedTemplate.title}</CardTitle>
+                      <CardTitle className="text-xl">
+                        {personalizeContent(selectedTemplate.title, user?.restaurantName)}
+                      </CardTitle>
                       <CardDescription className="mt-1">
                         {selectedTemplate.section}
                       </CardDescription>
                     </div>
-                    <Badge 
-                      variant="secondary"
-                      className={contentTypeColors[selectedTemplate.contentType] || ""}
-                    >
-                      {selectedTemplate.contentType}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const printContent = personalizeContent(selectedTemplate.content, user?.restaurantName);
+                          const printWindow = window.open('', '_blank');
+                          if (printWindow) {
+                            printWindow.document.write(`
+                              <!DOCTYPE html>
+                              <html>
+                              <head>
+                                <title>${personalizeContent(selectedTemplate.title, user?.restaurantName)}</title>
+                                <style>
+                                  body { 
+                                    font-family: system-ui, -apple-system, sans-serif; 
+                                    padding: 40px; 
+                                    max-width: 800px; 
+                                    margin: 0 auto;
+                                    line-height: 1.6;
+                                  }
+                                  h1 { margin-bottom: 8px; font-size: 24px; }
+                                  .section { color: #666; margin-bottom: 16px; font-size: 14px; }
+                                  .badge { 
+                                    display: inline-block; 
+                                    background: #f3f4f6; 
+                                    padding: 4px 8px; 
+                                    border-radius: 4px; 
+                                    font-size: 12px;
+                                    margin-right: 8px;
+                                    margin-bottom: 8px;
+                                  }
+                                  .key-points { margin-bottom: 24px; }
+                                  .content { 
+                                    white-space: pre-wrap; 
+                                    font-family: monospace; 
+                                    background: #f9fafb; 
+                                    padding: 20px; 
+                                    border-radius: 8px;
+                                    border: 1px solid #e5e7eb;
+                                    font-size: 13px;
+                                  }
+                                  @media print {
+                                    body { padding: 20px; }
+                                    .no-print { display: none; }
+                                  }
+                                </style>
+                              </head>
+                              <body>
+                                <h1>${personalizeContent(selectedTemplate.title, user?.restaurantName)}</h1>
+                                <div class="section">${selectedTemplate.section} | ${selectedTemplate.contentType}</div>
+                                ${selectedTemplate.keyPoints?.length ? `
+                                  <div class="key-points">
+                                    <strong>Key Points:</strong><br/>
+                                    ${selectedTemplate.keyPoints.map(p => `<span class="badge">${personalizeContent(p, user?.restaurantName)}</span>`).join('')}
+                                  </div>
+                                ` : ''}
+                                <div class="content">${printContent}</div>
+                              </body>
+                              </html>
+                            `);
+                            printWindow.document.close();
+                            printWindow.print();
+                          }
+                        }}
+                        data-testid="btn-print-template"
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print
+                      </Button>
+                      <Badge 
+                        variant="secondary"
+                        className={contentTypeColors[selectedTemplate.contentType] || ""}
+                      >
+                        {selectedTemplate.contentType}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -228,7 +312,7 @@ export default function TemplatesPage() {
                       <div className="flex flex-wrap gap-2">
                         {selectedTemplate.keyPoints.map((point, i) => (
                           <Badge key={i} variant="outline">
-                            {point}
+                            {personalizeContent(point, user?.restaurantName)}
                           </Badge>
                         ))}
                       </div>
@@ -236,7 +320,7 @@ export default function TemplatesPage() {
                   )}
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <div className="whitespace-pre-wrap font-mono text-sm bg-muted/50 p-4 rounded-lg border">
-                      {selectedTemplate.content}
+                      {personalizeContent(selectedTemplate.content, user?.restaurantName)}
                     </div>
                   </div>
                 </CardContent>
