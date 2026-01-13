@@ -70,56 +70,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Philosophy */}
-      <section className="py-16 px-4 bg-card border-y border-border">
-        <div className="container mx-auto max-w-4xl">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Structure Over Motivation</h3>
-              <p className="text-muted-foreground text-sm">
-                I don't sell inspiration. I sell systems that work when you're not there.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Systems Over Heroics</h3>
-              <p className="text-muted-foreground text-sm">
-                If one person has to save every shift, you don't have a business—you have a dependency.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-2">Clarity Over Chaos</h3>
-              <p className="text-muted-foreground text-sm">
-                Every recommendation is tested against a slammed dinner rush. If it doesn't hold up, it doesn't belong.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 10 Domains */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-center mb-4">
-            10 Operational Domains
-          </h2>
-          <p className="text-muted-foreground text-center mb-12 max-w-2xl mx-auto">
-            Complete frameworks covering every area where restaurants succeed or fail.
-            Principles, checklists, scripts, and decision trees ready to implement.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {domains.map((domain) => (
-              <Card key={domain.name} className="hover-elevate">
-                <CardContent className="pt-6 text-center">
-                  <domain.icon className="h-8 w-8 mx-auto mb-3 text-primary" />
-                  <h3 className="font-semibold text-sm">{domain.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{domain.desc}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* AI Consultant Feature */}
       <section className="py-20 px-4 bg-card border-y border-border">
         <div className="container mx-auto max-w-4xl">
@@ -166,6 +116,56 @@ export default function Landing() {
                 </div>
               </div>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Philosophy */}
+      <section className="py-16 px-4 bg-card border-y border-border">
+        <div className="container mx-auto max-w-4xl">
+          <div className="grid md:grid-cols-3 gap-8 text-center">
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Structure Over Motivation</h3>
+              <p className="text-muted-foreground text-sm">
+                I don't sell inspiration. I sell systems that work when you're not there.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Systems Over Heroics</h3>
+              <p className="text-muted-foreground text-sm">
+                If one person has to save every shift, you don't have a business—you have a dependency.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Clarity Over Chaos</h3>
+              <p className="text-muted-foreground text-sm">
+                Every recommendation is tested against a slammed dinner rush. If it doesn't hold up, it doesn't belong.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 10 Domains */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto max-w-6xl">
+          <h2 className="text-3xl font-bold text-center mb-4">
+            10 Operational Domains
+          </h2>
+          <p className="text-muted-foreground text-center mb-12 max-w-2xl mx-auto">
+            Complete frameworks covering every area where restaurants succeed or fail.
+            Principles, checklists, scripts, and decision trees ready to implement.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {domains.map((domain) => (
+              <Card key={domain.name} className="hover-elevate">
+                <CardContent className="pt-6 text-center">
+                  <domain.icon className="h-8 w-8 mx-auto mb-3 text-primary" />
+                  <h3 className="font-semibold text-sm">{domain.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">{domain.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
