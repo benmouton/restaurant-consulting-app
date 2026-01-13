@@ -3,47 +3,92 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import OpenAI from "openai";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerChatRoutes } from "./replit_integrations/chat";
-import { registerImageRoutes } from "./replit_integrations/image";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+const CONSULTANT_SYSTEM_PROMPT = `You are a hands-on restaurant consultant built by real service, real payroll, real guests, and real consequences.
+
+Your approach is not theoretical. It is forged inside operating restaurants—through hiring and firing, service recovery, guest complaints, cost overruns, staffing shortages, health inspections, and Friday-night failures. Every recommendation is grounded in what survives a live floor, a busy kitchen, and a P&L that must close clean.
+
+CORE PHILOSOPHY:
+- Restaurants fail from lack of structure, not lack of effort
+- If it can't survive a slammed dinner rush, it doesn't belong
+- Systems beat heroics
+- Clarity reduces conflict
+- Documentation protects everyone
+- Consistency is the brand
+
+You help independent restaurants and small groups build repeatable systems that remove chaos and replace it with clarity:
+- Service standards that actually get followed
+- Training that produces consistency, not binders
+- Accountability that protects both the business and the staff
+- Guest-recovery frameworks that turn failures into loyalty
+- Operational discipline that scales without burning out the owner
+
+You do NOT sell motivation. You sell structure.
+You do NOT chase trends. You build durable operations.
+You do NOT fix symptoms. You design systems that prevent them.
+
+Every recommendation assumes:
+- Limited labor availability
+- Mixed skill levels
+- High turnover risk
+- Emotional pressure on owners
+- Guests who remember bad experiences more than good ones
+
+RESPONSE STYLE:
+- Be direct and practical, never vague or motivational
+- Give specific, actionable guidance
+- Use real restaurant language (tickets, covers, comps, 86'd, etc.)
+- When appropriate, provide scripts, checklists, or frameworks
+- Acknowledge the difficulty but don't dwell on it
+- Always tie recommendations back to protecting margins, guests, and staff
+
+If it wouldn't hold up during a slammed dinner rush, don't recommend it.`;
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup Integrations
+  // Setup Auth
   await setupAuth(app);
   registerAuthRoutes(app);
   registerChatRoutes(app);
-  registerImageRoutes(app);
 
-  // Manual Routes
-  app.get(api.manual.list.path, isAuthenticated, async (req, res) => {
-    const sections = await storage.getManualSections();
-    res.json(sections);
+  // Domain Routes
+  app.get(api.domains.list.path, async (req, res) => {
+    const domainsList = await storage.getDomains();
+    res.json(domainsList);
   });
 
-  app.get(api.manual.get.path, isAuthenticated, async (req, res) => {
-    const section = await storage.getManualSection(Number(req.params.id));
-    if (!section) {
-      return res.status(404).json({ message: 'Section not found' });
+  app.get(api.domains.get.path, async (req, res) => {
+    const domain = await storage.getDomainBySlug(req.params.slug);
+    if (!domain) {
+      return res.status(404).json({ message: 'Domain not found' });
     }
-    res.json(section);
+    const content = await storage.getContentByDomain(domain.id);
+    res.json({ domain, content });
   });
 
-  // Progress Routes
-  app.get(api.progress.list.path, isAuthenticated, async (req: any, res) => {
+  // Bookmark Routes (protected)
+  app.get(api.bookmarks.list.path, isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const progress = await storage.getUserProgress(userId);
-    res.json(progress);
+    const bookmarks = await storage.getUserBookmarks(userId);
+    res.json(bookmarks);
   });
 
-  app.post(api.progress.mark.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.bookmarks.add.path, isAuthenticated, async (req: any, res) => {
     try {
-      const { sectionId } = api.progress.mark.input.parse(req.body);
+      const { contentId } = api.bookmarks.add.input.parse(req.body);
       const userId = req.user.claims.sub;
-      const progress = await storage.markSectionAsRead(userId, sectionId);
-      res.status(201).json(progress);
+      const bookmark = await storage.addBookmark(userId, contentId);
+      res.status(201).json(bookmark);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({
@@ -55,6 +100,59 @@ export async function registerRoutes(
     }
   });
 
+  app.delete(api.bookmarks.remove.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    await storage.removeBookmark(userId, Number(req.params.contentId));
+    res.status(204).send();
+  });
+
+  // AI Consultant Route (streaming)
+  app.post(api.consultant.ask.path, async (req, res) => {
+    try {
+      const { question, context } = api.consultant.ask.input.parse(req.body);
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const messages: { role: "system" | "user"; content: string }[] = [
+        { role: "system", content: CONSULTANT_SYSTEM_PROMPT },
+      ];
+
+      if (context) {
+        messages.push({ role: "user", content: `Context: ${context}` });
+      }
+
+      messages.push({ role: "user", content: question });
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages,
+        stream: true,
+        max_tokens: 2048,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      console.error("Consultant error:", err);
+      res.status(500).json({ message: "Failed to get response" });
+    }
+  });
+
   // Seed Data
   await seedDatabase();
 
@@ -62,97 +160,322 @@ export async function registerRoutes(
 }
 
 async function seedDatabase() {
-  const existingSections = await storage.getManualSections();
-  if (existingSections.length > 0) return;
+  const existingDomains = await storage.getDomains();
+  if (existingDomains.length > 0) return;
 
-  const sections = [
+  const domainsData = [
     {
-      title: "SECTION 1: HOW WE THINK ABOUT THE JOB HERE",
-      content: `Our Core Rule\nYour job is not just to do tasks — it’s to protect the system.\nEvery role exists for one reason:\nTo give guests a consistent, smooth, and confident experience — even on bad days.\nIf something feels chaotic, slow, or unclear, it’s usually a system problem, not a people problem. Your responsibility is to follow the system exactly and flag breakdowns immediately.`,
-      category: "Core Philosophy",
+      name: "Ownership & Leadership",
+      slug: "leadership",
+      description: "Transition from operator-fixer to architect-leader. Define roles, decision rights, and leadership presence.",
+      icon: "Crown",
       sequenceOrder: 1,
-      role: "ALL"
     },
     {
-      title: "SECTION 2: EXECUTION FIRST, FIX LATER",
-      content: `Two-Speed Rule (Non-Negotiable)\nSpeed A: Guest Experience (FAST)\nGuests always come first\nWe do not argue, debate, or investigate while a guest is waiting\nFix the moment, not the mystery\n\nSpeed B: Corrections & Coaching (LATER)\nMistakes are reviewed after service\nSystems are adjusted outside guest view\nCoaching never happens in front of guests\n\nWhat This Means for You\nDuring service: execute\nAfter service: explain, report, improve`,
-      category: "Operations",
+      name: "Service Standards",
+      slug: "service",
+      description: "Clear, enforceable service standards—not vague hospitality language. Guest experience that protects margins.",
+      icon: "Users",
       sequenceOrder: 2,
-      role: "ALL"
     },
     {
-      title: "SECTION 3: FAILURE POINT AWARENESS",
-      content: `What We Train For\nWe do not assume perfect days.\nWe train for where things usually go wrong.\nCommon failure points:\nOrders not entered correctly or on time\nTickets dying in the kitchen window\nTables stalling without updates\nFood running without verification\nGuests feeling ignored during waits\n\nYour Responsibility\nIf you see a breakdown:\nStabilize the guest experience\nAlert a lead or manager\nDocument or communicate what failed\nDo not:\nCover up errors\nBlame coworkers\n“Hope it fixes itself”`,
-      category: "Problem Solving",
+      name: "Training Systems",
+      slug: "training",
+      description: "Training that works under pressure. Role-based paths, certification, and retraining protocols.",
+      icon: "GraduationCap",
       sequenceOrder: 3,
-      role: "ALL"
     },
     {
-      title: "SECTION 4: ROLE CLARITY & OWNERSHIP",
-      content: `One Role = One Outcome\nYou are responsible for:\nYour station\nYour tickets\nYour tables\nYour communication\n\nYou are not responsible for:\nFixing the entire restaurant\nDoing someone else’s job unless directed\nMaking judgment calls outside your role\nIf you’re unsure — ask early, not late.`,
-      category: "Roles",
+      name: "Staffing & Labor",
+      slug: "staffing",
+      description: "Labor is your largest controllable cost. Staffing models, scheduling, and accountability frameworks.",
+      icon: "CalendarDays",
       sequenceOrder: 4,
-      role: "ALL"
     },
     {
-      title: "SECTION 5: TIME = VALUE (WHY PACING MATTERS)",
-      content: `What We Sell\nWe don’t just sell food.\nWe sell time, flow, and comfort.\nEvery minute a guest waits without information:\nLowers trust\nIncreases frustration\nReduces return likelihood\n\nServer Expectations\nGreet promptly\nSet expectations early (“Food is about X minutes”)\nUpdate guests before they ask\nClose checks smoothly and confidently\nSilence feels like neglect to guests — even if the kitchen is busy.`,
-      category: "Service Standards",
+      name: "HR & Documentation",
+      slug: "hr",
+      description: "If it's not documented, it didn't happen. Progressive discipline, legal protection, and termination protocols.",
+      icon: "FileText",
       sequenceOrder: 5,
-      role: "FOH"
     },
     {
-      title: "SECTION 6: SYSTEMS OVER HEROICS",
-      content: `The Anti-Hero Rule\nWe do not rely on:\nMemory\nGuessing\n“I thought someone else did it”\nOne strong person saving the shift\n\nWe rely on:\nPOS accuracy\nChecklists\nClear handoffs\nVerbal confirmations\n\nIf the system says:\nEnter it → ENTER IT\nCheck it → CHECK IT\nCall it → CALL IT\nDoing it “your way” breaks consistency.`,
-      category: "Operations",
+      name: "Kitchen Operations",
+      slug: "kitchen",
+      description: "The kitchen is a system, not a personality contest. Prep discipline, ticket flow, and BOH accountability.",
+      icon: "ChefHat",
       sequenceOrder: 6,
-      role: "ALL"
     },
     {
-      title: "SECTION 7: COMMUNICATION STANDARDS",
-      content: `Clear Beats Clever\nUse:\nDirect language\nShort confirmations\nEye contact and verbal acknowledgment\nExamples:\n“Order is in.”\n“Table 12 needs a check.”\n“Running food for 14.”\n“Guest waiting on manager.”\n\nAvoid:\nVague signals\nAssumptions\nSide conversations during service`,
-      category: "Communication",
+      name: "Cost & Margin Control",
+      slug: "costs",
+      description: "Margins are protected before ordering—not after inventory shock. Portion control and waste management.",
+      icon: "DollarSign",
       sequenceOrder: 7,
-      role: "ALL"
     },
     {
-      title: "SECTION 8: AUTHORITY WITHOUT ATTITUDE",
-      content: `How Leadership Works Here\nAuthority comes from:\nSystems\nRoles\nResponsibility\n\nNot:\nVolume\nEmotion\nSeniority alone\n\nIf someone reminds you of a process:\nAcknowledge it\nCorrect it\nMove on\nDefensiveness slows the team.`,
-      category: "Culture",
+      name: "Reviews & Reputation",
+      slug: "reviews",
+      description: "Online reputation is managed inside the restaurant first. Prevention, response, and brand protection.",
+      icon: "Star",
       sequenceOrder: 8,
-      role: "ALL"
     },
     {
-      title: "SECTION 9: PROFESSIONALISM UNDER PRESSURE",
-      content: `Pressure Is Expected\nBusy nights are not emergencies.\nThey are planned stress.\nProfessional behavior means:\nCalm voice\nClean language\nFocused movement\nNo public frustration\nGuests judge the restaurant by how we act when it’s busy — not when it’s slow.`,
-      category: "Culture",
+      name: "SOPs & Scalability",
+      slug: "sops",
+      description: "Growth breaks weak systems. SOPs that don't become shelf décor. Repeatability across shifts.",
+      icon: "ClipboardList",
       sequenceOrder: 9,
-      role: "ALL"
     },
     {
-      title: "SECTION 10: REPORTING & CONTINUOUS IMPROVEMENT",
-      content: `What We Want You to Speak Up About\nRepeated guest complaints\nConfusing procedures\nBottlenecks\nEquipment issues\nMenu confusion\n\nHow to Report\nAfter service\nTo a lead or manager\nWith facts, not blame\nExample:\n“Table 23 waited because tickets backed up at expo — maybe we need clearer calls.”`,
-      category: "Feedback",
+      name: "Crisis Management",
+      slug: "crisis",
+      description: "Restaurants don't avoid failure—they recover from it. Playbooks for meltdowns, walkouts, and burnout.",
+      icon: "AlertTriangle",
       sequenceOrder: 10,
-      role: "ALL"
     },
-    {
-      title: "SECTION 11: THE STANDARD",
-      content: `We don’t aim for perfect.\nWe aim for repeatable excellence.\nThat means:\nSame experience on a Tuesday or Saturday\nSame confidence no matter who’s on shift\nSame professionalism even when things go wrong\nIf you follow the system, we have your back.`,
-      category: "Core Philosophy",
-      sequenceOrder: 11,
-      role: "ALL"
-    },
-    {
-      title: "FINAL EXPECTATION",
-      content: `Do the system right.\nCommunicate clearly.\nProtect the guest experience.\nImprove after the shift.`,
-      category: "Summary",
-      sequenceOrder: 12,
-      role: "ALL"
-    }
   ];
 
-  for (const section of sections) {
-    await storage.createManualSection(section);
+  for (const domain of domainsData) {
+    const createdDomain = await storage.createDomain(domain);
+    
+    // Add content for each domain
+    const content = getContentForDomain(domain.slug);
+    for (let i = 0; i < content.length; i++) {
+      await storage.createContent({
+        domainId: createdDomain.id,
+        title: content[i].title,
+        contentType: content[i].type,
+        content: content[i].content,
+        sequenceOrder: i + 1,
+      });
+    }
   }
+}
+
+function getContentForDomain(slug: string): { title: string; type: string; content: string }[] {
+  const contentMap: Record<string, { title: string; type: string; content: string }[]> = {
+    leadership: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "The owner's job is to build systems that run without them—not to be the system. Every hour you spend fixing what staff should handle is an hour stolen from building what only you can build."
+      },
+      {
+        title: "Role Clarity Framework",
+        type: "output",
+        content: "OWNER: Vision, culture, capital decisions, vendor relationships, menu direction\nGM: Daily operations, staff management, guest escalations, schedule approval\nKM: Food quality, prep standards, line discipline, BOH hiring input\nSHIFT LEAD: Real-time floor control, break management, immediate guest recovery"
+      },
+      {
+        title: "Decision Rights Matrix",
+        type: "checklist",
+        content: "WHO DECIDES WHAT:\n□ Comp under $25: Server with manager notification\n□ Comp $25-$100: Manager only\n□ Comp over $100: Owner approval\n□ Staff sent home early: Shift lead\n□ Staff termination: GM + Owner\n□ Menu 86: KM immediately, notify FOH\n□ Equipment repair under $500: GM\n□ Vendor change: Owner"
+      },
+      {
+        title: "What NOT to Carry Anymore",
+        type: "output",
+        content: "Stop carrying:\n• Every staff scheduling conflict\n• Minor guest complaints that managers can handle\n• Daily prep decisions\n• Register reconciliation\n• Opening/closing every shift\n\nStart delegating with accountability:\n• Clear expectations\n• Written authority\n• Consequences for failure\n• Recognition for success"
+      }
+    ],
+    service: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Service standards exist to protect consistency—not to create robots. Every guest should receive the same quality experience regardless of which server they get or whether it's Tuesday or Saturday."
+      },
+      {
+        title: "Server Timing Standards",
+        type: "checklist",
+        content: "NON-NEGOTIABLE TIMING:\n□ Greet within 60 seconds of seating\n□ Drink order taken within 2 minutes\n□ Drinks delivered within 4 minutes\n□ Food order taken within 8 minutes of seating (if ready)\n□ Check-back within 2 bites\n□ Check presented within 3 minutes of dessert decline or final plate clear\n□ Table reset within 5 minutes of departure"
+      },
+      {
+        title: "Guest Recovery Decision Tree",
+        type: "script",
+        content: "WHEN SOMETHING GOES WRONG:\n\n1. ACKNOWLEDGE immediately: \"I see the issue and I'm handling it.\"\n2. APOLOGIZE without excuses: \"I'm sorry this happened.\"\n3. ACT with appropriate comp authority:\n   - Wrong item: Replace + offer appetizer or dessert\n   - Long wait (15+ min over quote): Complimentary round or dessert\n   - Cold food: Replace + comp the item\n   - Bad attitude from staff: Manager visit + meaningful comp\n4. ASSURE: \"I want to make sure you leave happy.\"\n5. FOLLOW UP: Manager check before departure"
+      },
+      {
+        title: "Comp Authority Limits",
+        type: "output",
+        content: "SERVER: Free dessert, free drink (non-alcohol), item replacement\nBARTENDER: One round comped, free appetizer\nSHIFT LEAD: Up to $25 in comps without approval\nMANAGER: Up to $100, full meal if warranted\nOVER $100: Owner notification required (can approve after)"
+      }
+    ],
+    training: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Training fails when it's theoretical or overwhelming. If a new hire can't perform the basics under Friday-night pressure within two weeks, your training system is broken—not the hire."
+      },
+      {
+        title: "Shadow → Perform → Certify Model",
+        type: "output",
+        content: "PHASE 1: SHADOW (2-3 shifts)\n• Follow experienced staff, observe, ask questions\n• No guest interaction beyond greeting\n• Written notes required\n\nPHASE 2: PERFORM (3-5 shifts)\n• Handle own section/station with oversight\n• Trainer within arm's reach\n• Mistakes corrected in real-time\n\nPHASE 3: CERTIFY (1 shift)\n• Solo performance, trainer observes only\n• Must hit timing standards\n• Must handle one recovery situation\n• Signed off by trainer AND manager"
+      },
+      {
+        title: "Day 1 Minimum Viable Training",
+        type: "checklist",
+        content: "BEFORE THEY TOUCH A GUEST:\n□ Clock-in/clock-out procedure\n□ Where to put belongings\n□ Uniform standards\n□ Menu overview (not memorization)\n□ POS login and basic functions\n□ Who to ask for help\n□ Emergency exits and procedures\n□ Restroom locations\n□ \"I don't know, let me find out\" script"
+      },
+      {
+        title: "Retraining Protocol",
+        type: "script",
+        content: "WHEN SOMEONE FAILS A STANDARD:\n\n1. Identify specific failure (not vague \"do better\")\n2. Private conversation, not public correction\n3. Ask: \"What happened?\" before assuming\n4. Clarify the standard: \"Here's what should happen...\"\n5. Practice the correct behavior (role-play if needed)\n6. Document the conversation\n7. Set follow-up check: \"I'll be watching for this on your next three shifts\"\n8. Recognize when corrected\n\nThree documented failures on same issue = performance review"
+      }
+    ],
+    staffing: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Schedule based on projected covers and historical patterns—not staff requests. Labor cost is controllable only if scheduling is disciplined. Hope is not a staffing strategy."
+      },
+      {
+        title: "Staffing Matrix Template",
+        type: "output",
+        content: "BUILD YOUR MATRIX:\n\nCovers 0-50: 2 servers, 1 bartender, 1 host, 2 cooks\nCovers 51-80: 3 servers, 1 bartender, 1 host, 3 cooks\nCovers 81-120: 4 servers, 2 bartenders, 1 host, 4 cooks\nCovers 121-160: 5 servers, 2 bartenders, 2 hosts, 5 cooks\nCovers 161+: 6 servers, 2 bartenders, 2 hosts, 6 cooks + expo\n\nAdjust based on:\n• Menu complexity\n• Table turn expectations\n• Service style\n• Your kitchen layout"
+      },
+      {
+        title: "Cut Flow Logic",
+        type: "checklist",
+        content: "WHEN TO CUT STAFF:\n□ Covers tracking 20% below projection at midpoint\n□ Section consolidation possible without service impact\n□ Cut least senior first (unless performance issue)\n□ Never cut below safety minimum\n□ Document who was cut and why\n\nCUT CONVERSATION SCRIPT:\n\"We're slower than projected tonight. I need to cut you at [time]. Side work needs to be done, section closed properly. Thanks for understanding—this is just business, not personal.\""
+      },
+      {
+        title: "Call-Out Policy",
+        type: "output",
+        content: "CALL-OUT RULES:\n• Minimum 4 hours notice required\n• Staff must attempt to find own coverage first\n• Manager approval required for coverage swap\n• No-call/no-show = automatic write-up, second offense = termination\n• Sick calls: No doctor's note required for 1 day, required for 2+\n• Pattern call-outs (every Friday, after payday) trigger conversation\n\nDOCUMENT EVERY CALL-OUT WITH:\n• Date, time of call\n• Reason given\n• Coverage found? Y/N\n• Manager who received call"
+      }
+    ],
+    hr: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Documentation is not bureaucracy—it's protection. For you, for the employee, and for the business. If you ever need to terminate someone and you don't have documentation, you've already lost the unemployment claim."
+      },
+      {
+        title: "Progressive Discipline Framework",
+        type: "output",
+        content: "PERFORMANCE ISSUES (doing the job wrong):\n1. Verbal coaching (documented)\n2. Written warning\n3. Final written warning\n4. Termination\n\nMISCONDUCT (breaking rules):\n1. Written warning (may skip verbal)\n2. Final warning or suspension\n3. Termination\n\nGROSS MISCONDUCT (theft, violence, harassment):\nImmediate termination, no progression required"
+      },
+      {
+        title: "Written Warning Template",
+        type: "script",
+        content: "EMPLOYEE NAME: _______________\nDATE: _______________\nISSUE TYPE: □ Performance □ Conduct □ Attendance\n\nSPECIFIC INCIDENT(S):\n[Date, time, what happened, who witnessed]\n\nPREVIOUS CONVERSATIONS:\n[Dates of prior coaching on this issue]\n\nEXPECTED IMPROVEMENT:\n[Specific, measurable behavior required]\n\nTIMEFRAME:\n[When improvement must be demonstrated]\n\nCONSEQUENCE IF NOT IMPROVED:\n\"Failure to improve may result in further disciplinary action up to and including termination.\"\n\nEmployee Signature: _______________\n(Signature acknowledges receipt, not agreement)\n\nManager Signature: _______________"
+      },
+      {
+        title: "Termination Checklist",
+        type: "checklist",
+        content: "BEFORE TERMINATION:\n□ Documentation reviewed with owner/HR\n□ Final paycheck prepared (required same day in most states)\n□ Property to collect listed (keys, uniform, etc.)\n□ System access to revoke listed\n□ Witness arranged\n□ Private location secured\n□ Time chosen (end of shift preferred)\n\nDURING TERMINATION:\n□ Keep it brief and factual\n□ State decision is final\n□ Don't debate or argue\n□ Collect property\n□ Escort from premises\n\nAFTER TERMINATION:\n□ Document conversation\n□ Revoke all access immediately\n□ Notify staff only that \"[Name] is no longer with us\"\n□ File all documentation"
+      }
+    ],
+    kitchen: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "The kitchen is a system that produces consistent food under pressure—not a stage for personalities. When ego drives the kitchen, consistency dies. When systems drive the kitchen, the food speaks for itself."
+      },
+      {
+        title: "Prep Discipline Standards",
+        type: "checklist",
+        content: "DAILY PREP REQUIREMENTS:\n□ Par levels reviewed against reservations + walk-in history\n□ Prep list written by KM or sous before prep cook arrives\n□ FIFO rotation verified during prep\n□ All containers dated and labeled\n□ Prep completion signed off before service\n\nWEEKLY:\n□ Walk-in organized and deep-cleaned\n□ Par levels adjusted based on actual usage\n□ Waste log reviewed and discussed\n□ Equipment checklist completed"
+      },
+      {
+        title: "Ticket Flow Protocol",
+        type: "output",
+        content: "EXPO CONTROLS THE WINDOW:\n• Expo reads ticket, assigns to stations\n• Cooks confirm \"Heard\" for each item\n• Station calls \"Walking [item]\" when plating\n• Expo calls \"Pick up [table]\" when complete\n• Runner confirms ticket number\n\nTICKET TIMING STANDARDS:\n• Apps: 8-10 minutes\n• Entrees: 15-18 minutes after apps cleared\n• Desserts: 6-8 minutes\n\nDYING IN THE WINDOW:\n• Food waiting more than 90 seconds = quality issue\n• Expo calls for runner immediately\n• Third occurrence in service = runner counseling"
+      },
+      {
+        title: "BOH Performance Coaching Script",
+        type: "script",
+        content: "\"Hey, can we talk for a second off the line?\"\n\n\"Tonight I noticed [specific issue—e.g., 'tickets were sitting in the window for 3+ minutes multiple times']. \n\nHelp me understand what was happening.\"\n\n[Listen]\n\n\"Here's what I need going forward: [specific expectation]. Can you commit to that?\"\n\n\"Thanks. I know it's busy. Let's get back in there.\"\n\n[Document after service]"
+      }
+    ],
+    costs: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Food cost is decided before the order is placed, not after the inventory is counted. If you're shocked by your food cost, you weren't paying attention during prep, portioning, and plating."
+      },
+      {
+        title: "Portion Control Enforcement",
+        type: "checklist",
+        content: "DAILY ENFORCEMENT:\n□ Scales at every station that portions protein\n□ Portion guides posted (with photos)\n□ Spot-check 3 plates per service\n□ Portioning included in line checks\n\nWHEN OVER-PORTIONING OCCURS:\n1. Show the cook the spec vs. what they plated\n2. Calculate the cost difference (\"That 2oz extra costs $1.80\")\n3. Multiply by covers (\"At 100 covers, that's $180 lost\")\n4. Document if pattern continues\n\nRemember: Over-portioning is theft of margin. Treat it seriously."
+      },
+      {
+        title: "Waste Log That Works",
+        type: "output",
+        content: "WHAT TO TRACK:\n• Date\n• Item\n• Quantity\n• Reason (spoiled/dropped/returned/overcooked/overprepped)\n• Who logged it\n• Cost (assign weekly)\n\nWEEKLY REVIEW:\n• Total waste cost\n• Top 3 waste items\n• Root cause for each (Was it prep issue? Vendor quality? Training?)\n• Action item for each\n\nBenchmark: Waste should be under 2% of food cost. Over 3% = immediate investigation."
+      },
+      {
+        title: "Menu Complexity Warning Signs",
+        type: "output",
+        content: "YOUR MENU IS TOO COMPLEX IF:\n• Same ingredient appears in only one dish\n• Prep list has more than 30 items daily\n• Line cooks can't execute all dishes without reference\n• Food cost varies more than 3% month to month\n• Ticket times regularly exceed standards\n\nSIMPLIFICATION FRAMEWORK:\n1. Cross-utilize proteins (2-3 dishes each)\n2. Limit sauce varieties (5-7 maximum)\n3. Standardize base preparations (same mashed potato, three presentations)\n4. Cut lowest-selling 10% of menu quarterly"
+      }
+    ],
+    reviews: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Bad reviews are written inside your restaurant before they're posted online. Every negative review is a documentation of a system failure you could have caught first."
+      },
+      {
+        title: "Preventing Bad Reviews",
+        type: "checklist",
+        content: "DURING EVERY SERVICE:\n□ Manager touches every table before check\n□ \"Is everything perfect?\" asked with eye contact\n□ Any hesitation = probe deeper\n□ Recovery completed before guest leaves\n□ Incident documented same night\n\nTHE 10-MINUTE RULE:\nIf a complaint is made and resolved within 10 minutes, it almost never becomes a review. If it lingers unaddressed, it becomes a story they tell."
+      },
+      {
+        title: "Review Response Framework",
+        type: "script",
+        content: "NEGATIVE REVIEW RESPONSE TEMPLATE:\n\n\"Thank you for taking the time to share your feedback. We're sorry your experience didn't meet the standards we set for ourselves.\n\n[Acknowledge specific issue if mentioned—never argue facts]\n\nWe'd appreciate the opportunity to learn more and make this right. Please reach out to us at [email] at your convenience.\n\n- [First Name], [Title]\"\n\nRULES:\n• Respond within 24 hours\n• Never argue publicly\n• Never blame staff by name\n• Always offer offline conversation\n• Keep it brief—long responses look defensive"
+      },
+      {
+        title: "Staff Accountability for Reviews",
+        type: "output",
+        content: "WHEN A REVIEW MENTIONS SPECIFIC SERVICE FAILURE:\n\n1. Identify the shift and server/section\n2. Review POS data for table (time seated, ordered, paid)\n3. Cross-reference with incident log (was it documented?)\n4. Private conversation with staff: \"I saw this review. Walk me through what happened.\"\n5. If pattern emerges (3+ similar reviews): Performance documentation\n6. If isolated: Coaching conversation only\n\nNEVER:\n• Post reviews in break room with names\n• Publicly shame staff\n• Threaten jobs over single reviews\n\nDO:\n• Track patterns by individual\n• Use reviews as training examples (anonymized)\n• Recognize staff mentioned positively"
+      }
+    ],
+    sops: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "If it's not written down, it's not a system—it's a person. And people leave. Your SOPs should enable a reasonably competent person to perform the task without asking questions."
+      },
+      {
+        title: "Checklist-First System",
+        type: "output",
+        content: "EVERY SOP SHOULD HAVE A CHECKLIST VERSION:\n• Opening checklist (not a 10-page manual)\n• Closing checklist\n• Sidework checklist\n• Pre-service checklist\n• Daily cleaning checklist\n\nCHECKLIST RULES:\n• No more than 15 items per list\n• Checkboxes, not paragraphs\n• Posted where it's used (not in an office)\n• Initialed and timed\n• Reviewed by manager before shift change"
+      },
+      {
+        title: "Would This Survive a Second Location Test",
+        type: "checklist",
+        content: "ASK THESE QUESTIONS:\n□ Could a new manager run this system without calling me?\n□ Could a new hire learn this from the documentation alone?\n□ Does this rely on one specific person's knowledge?\n□ If I opened tomorrow somewhere else, would this transfer?\n□ Is this written down or just \"how we do it\"?\n\nIf you answer NO to any: That's not a system, it's a dependency. Fix it before you grow."
+      },
+      {
+        title: "Manager Daily Audit Questions",
+        type: "checklist",
+        content: "EVERY DAY, MANAGERS SHOULD VERIFY:\n□ Opening checklist completed and signed?\n□ Prep list completed and signed?\n□ Line check passed (taste, temp, presentation)?\n□ Reservations reviewed and sections assigned?\n□ Staff briefed on specials, 86s, VIPs?\n□ Previous shift issues addressed?\n□ Labor tracking against projection?\n□ Cash handled correctly?\n□ Closing checklist completed?\n□ Incidents documented?"
+      }
+    ],
+    crisis: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Restaurants don't avoid failure—they recover from it. The difference between a crisis that kills the business and one that makes it stronger is whether you have a playbook or you're improvising."
+      },
+      {
+        title: "Service Meltdown Playbook",
+        type: "script",
+        content: "WHEN THE WHEELS COME OFF:\n\n1. RECOGNIZE: Kitchen underwater, tickets dying, guests angry\n\n2. COMMAND: Manager takes control of expo\n   \"I'm running the window. Nobody plates without my call.\"\n\n3. TRIAGE: Stop seating new tables if necessary\n   \"Host, we're on a 15-minute wait even if tables are open.\"\n\n4. COMMUNICATE: Update every waiting table\n   \"Your food is coming. We hit a rush but I'm personally watching your order.\"\n\n5. RECOVER: Comp appropriately, touch every affected table\n\n6. DEBRIEF: After service, document:\n   • What broke?\n   • Why?\n   • What changes prevent recurrence?"
+      },
+      {
+        title: "Staff Walkout Protocol",
+        type: "output",
+        content: "IF SOMEONE WALKS OFF DURING SERVICE:\n\n1. Don't chase. Let them go.\n2. Assess coverage: Can remaining staff absorb sections?\n3. If no: Close sections, combine tables, call backup if available\n4. Communicate to remaining staff: \"[Name] left. Here's how we're adjusting.\"\n5. Thank staff for stepping up (during and after)\n6. Document the walkout immediately\n7. Process termination paperwork next business day\n8. Do NOT badmouth them to staff—stay professional\n\nPREVENTION:\n• Exit interviews with departing staff (what would have kept you?)\n• Regular check-ins with at-risk employees\n• Address conflicts before they explode"
+      },
+      {
+        title: "Owner Burnout Recovery",
+        type: "checklist",
+        content: "WARNING SIGNS:\n□ Dreading going to the restaurant\n□ Snapping at staff over minor issues\n□ Neglecting personal relationships\n□ Physical exhaustion despite adequate sleep\n□ Unable to delegate anything\n□ Feeling like \"nobody can do it right\"\n\nRECOVERY STEPS:\n□ Take 2 consecutive days off (actually off—no phone)\n□ Identify 3 things only YOU must do\n□ List 10 things you're doing that someone else could\n□ Pick 2 to delegate this week\n□ Schedule weekly off-site time (even 2 hours)\n□ Find one owner peer to talk to monthly\n\nTHE HARD TRUTH:\nIf the restaurant can't survive 48 hours without you, you don't own a business—you own a job."
+      }
+    ]
+  };
+
+  return contentMap[slug] || [];
 }

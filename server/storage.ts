@@ -1,56 +1,77 @@
 import { db } from "./db";
-import { manualSections, userProgress, type ManualSection, type UserProgress } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, type Domain, type FrameworkContent, type UserBookmark } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
-  // Manual Sections
-  getManualSections(): Promise<ManualSection[]>;
-  getManualSection(id: number): Promise<ManualSection | undefined>;
-  createManualSection(section: Omit<ManualSection, "id">): Promise<ManualSection>;
+  // Domains
+  getDomains(): Promise<Domain[]>;
+  getDomainBySlug(slug: string): Promise<Domain | undefined>;
+  createDomain(domain: Omit<Domain, "id">): Promise<Domain>;
   
-  // User Progress
-  getUserProgress(userId: string): Promise<UserProgress[]>;
-  markSectionAsRead(userId: string, sectionId: number): Promise<UserProgress>;
+  // Framework Content
+  getContentByDomain(domainId: number): Promise<FrameworkContent[]>;
+  createContent(content: Omit<FrameworkContent, "id">): Promise<FrameworkContent>;
+  
+  // User Bookmarks
+  getUserBookmarks(userId: string): Promise<UserBookmark[]>;
+  addBookmark(userId: string, contentId: number): Promise<UserBookmark>;
+  removeBookmark(userId: string, contentId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Manual Sections
-  async getManualSections(): Promise<ManualSection[]> {
-    return await db.select().from(manualSections).orderBy(manualSections.sequenceOrder);
+  // Domains
+  async getDomains(): Promise<Domain[]> {
+    return await db.select().from(domains).orderBy(domains.sequenceOrder);
   }
 
-  async getManualSection(id: number): Promise<ManualSection | undefined> {
-    const [section] = await db.select().from(manualSections).where(eq(manualSections.id, id));
-    return section;
+  async getDomainBySlug(slug: string): Promise<Domain | undefined> {
+    const [domain] = await db.select().from(domains).where(eq(domains.slug, slug));
+    return domain;
   }
 
-  async createManualSection(section: Omit<ManualSection, "id">): Promise<ManualSection> {
-    const [newSection] = await db.insert(manualSections).values(section).returning();
-    return newSection;
+  async createDomain(domain: Omit<Domain, "id">): Promise<Domain> {
+    const [newDomain] = await db.insert(domains).values(domain).returning();
+    return newDomain;
   }
 
-  // User Progress
-  async getUserProgress(userId: string): Promise<UserProgress[]> {
-    return await db.select().from(userProgress).where(eq(userProgress.userId, userId));
+  // Framework Content
+  async getContentByDomain(domainId: number): Promise<FrameworkContent[]> {
+    return await db.select().from(frameworkContent)
+      .where(eq(frameworkContent.domainId, domainId))
+      .orderBy(frameworkContent.sequenceOrder);
   }
 
-  async markSectionAsRead(userId: string, sectionId: number): Promise<UserProgress> {
-    const [progress] = await db
-      .insert(userProgress)
-      .values({ userId, sectionId })
-      .onConflictDoNothing() // Prevent duplicate acknowledgments
+  async createContent(content: Omit<FrameworkContent, "id">): Promise<FrameworkContent> {
+    const [newContent] = await db.insert(frameworkContent).values(content).returning();
+    return newContent;
+  }
+
+  // User Bookmarks
+  async getUserBookmarks(userId: string): Promise<UserBookmark[]> {
+    return await db.select().from(userBookmarks).where(eq(userBookmarks.userId, userId));
+  }
+
+  async addBookmark(userId: string, contentId: number): Promise<UserBookmark> {
+    const [bookmark] = await db
+      .insert(userBookmarks)
+      .values({ userId, contentId })
+      .onConflictDoNothing()
       .returning();
     
-    if (!progress) {
-      // If it already existed, fetch and return it
+    if (!bookmark) {
       const [existing] = await db
         .select()
-        .from(userProgress)
-        .where(and(eq(userProgress.userId, userId), eq(userProgress.sectionId, sectionId)));
+        .from(userBookmarks)
+        .where(and(eq(userBookmarks.userId, userId), eq(userBookmarks.contentId, contentId)));
       return existing;
     }
     
-    return progress;
+    return bookmark;
+  }
+
+  async removeBookmark(userId: string, contentId: number): Promise<void> {
+    await db.delete(userBookmarks)
+      .where(and(eq(userBookmarks.userId, userId), eq(userBookmarks.contentId, contentId)));
   }
 }
 

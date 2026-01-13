@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { manualSections, userProgress } from './schema';
+import { domains, frameworkContent, userBookmarks } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -15,37 +15,63 @@ export const errorSchemas = {
 };
 
 export const api = {
-  manual: {
+  domains: {
     list: {
       method: 'GET' as const,
-      path: '/api/manual',
+      path: '/api/domains',
       responses: {
-        200: z.array(z.custom<typeof manualSections.$inferSelect>()),
+        200: z.array(z.custom<typeof domains.$inferSelect>()),
       },
     },
     get: {
       method: 'GET' as const,
-      path: '/api/manual/:id',
+      path: '/api/domains/:slug',
       responses: {
-        200: z.custom<typeof manualSections.$inferSelect>(),
+        200: z.object({
+          domain: z.custom<typeof domains.$inferSelect>(),
+          content: z.array(z.custom<typeof frameworkContent.$inferSelect>()),
+        }),
         404: errorSchemas.notFound,
       },
     },
   },
-  progress: {
+  bookmarks: {
     list: {
       method: 'GET' as const,
-      path: '/api/progress',
+      path: '/api/bookmarks',
       responses: {
-        200: z.array(z.custom<typeof userProgress.$inferSelect>()),
+        200: z.array(z.custom<typeof userBookmarks.$inferSelect>()),
       },
     },
-    mark: {
+    add: {
       method: 'POST' as const,
-      path: '/api/progress',
-      input: z.object({ sectionId: z.number() }),
+      path: '/api/bookmarks',
+      input: z.object({ contentId: z.number() }),
       responses: {
-        201: z.custom<typeof userProgress.$inferSelect>(),
+        201: z.custom<typeof userBookmarks.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    remove: {
+      method: 'DELETE' as const,
+      path: '/api/bookmarks/:contentId',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  consultant: {
+    ask: {
+      method: 'POST' as const,
+      path: '/api/consultant/ask',
+      input: z.object({ 
+        question: z.string(),
+        context: z.string().optional(),
+      }),
+      streaming: true,
+      responses: {
+        200: z.object({ content: z.string().optional(), done: z.boolean().optional() }),
         400: errorSchemas.validation,
       },
     },

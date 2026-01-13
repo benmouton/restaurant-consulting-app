@@ -1,67 +1,31 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { Navigation } from "@/components/Navigation";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
-
-// Pages
-import Landing from "@/pages/Landing";
-import Dashboard from "@/pages/Dashboard";
-import Manual from "@/pages/Manual";
+import Landing from "@/pages/landing";
+import Dashboard from "@/pages/dashboard";
+import DomainPage from "@/pages/domain";
+import ConsultantPage from "@/pages/consultant";
 import NotFound from "@/pages/not-found";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function Router() {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary/20" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
-  if (!user) {
-    setLocation("/");
-    return null;
-  }
-
-  return (
-    <div className="min-h-screen bg-muted/10 lg:pl-72">
-      <Navigation />
-      <main className="container mx-auto max-w-7xl px-4 py-8 lg:px-8">
-        <Component />
-      </main>
-    </div>
-  );
-}
-
-function Router() {
   return (
     <Switch>
-      <Route path="/" component={Landing} />
-      {/* Protected Routes */}
-      <Route path="/dashboard">
-        <ProtectedRoute component={Dashboard} />
-      </Route>
-      <Route path="/manual">
-        <ProtectedRoute component={Manual} />
-      </Route>
-      
-      {/* Redirect logged in users from root if they land there and are authed is handled in Landing component logic */}
-      {/* But better UX: If at root and logged in -> Dashboard */}
-      <Route path="/">
-        {(params) => {
-           const { user, isLoading } = useAuth();
-           if (isLoading) return null;
-           if (user) return <ProtectedRoute component={Dashboard} />;
-           return <Landing />;
-        }}
-      </Route>
-
+      <Route path="/" component={user ? Dashboard : Landing} />
+      <Route path="/domain/:slug" component={user ? DomainPage : Landing} />
+      <Route path="/consultant" component={user ? ConsultantPage : Landing} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -70,8 +34,10 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster />
-      <Router />
+      <TooltipProvider>
+        <Toaster />
+        <Router />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

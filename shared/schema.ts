@@ -1,30 +1,42 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
 
 export * from "./models/auth";
 export * from "./models/chat";
 
-// Manual Sections
-export const manualSections = pgTable("manual_sections", {
+// Operational Domains (the 10 areas of the framework)
+export const domains = pgTable("domains", {
   id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  role: text("role").notNull().default("ALL"), // 'FOH', 'BOH', 'ALL'
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(), // lucide icon name
   sequenceOrder: integer("sequence_order").notNull(),
-  category: text("category").notNull(), // 'Core Rule', 'Execution', etc.
 });
 
-export const userProgress = pgTable("user_progress", {
+// Framework Content (principles, outputs, guidance within each domain)
+export const frameworkContent = pgTable("framework_content", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(), // Matches auth user id (string)
-  sectionId: integer("section_id").notNull().references(() => manualSections.id),
-  acknowledgedAt: timestamp("acknowledged_at").defaultNow(),
+  domainId: integer("domain_id").notNull().references(() => domains.id),
+  title: text("title").notNull(),
+  contentType: text("content_type").notNull(), // 'principle', 'output', 'checklist', 'script'
+  content: text("content").notNull(),
+  sequenceOrder: integer("sequence_order").notNull(),
 });
 
-export const insertManualSectionSchema = createInsertSchema(manualSections).omit({ id: true });
-export const insertUserProgressSchema = createInsertSchema(userProgress).omit({ id: true, acknowledgedAt: true });
+// User bookmarks/favorites
+export const userBookmarks = pgTable("user_bookmarks", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  contentId: integer("content_id").notNull().references(() => frameworkContent.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-export type ManualSection = typeof manualSections.$inferSelect;
-export type UserProgress = typeof userProgress.$inferSelect;
+export const insertDomainSchema = createInsertSchema(domains).omit({ id: true });
+export const insertFrameworkContentSchema = createInsertSchema(frameworkContent).omit({ id: true });
+export const insertUserBookmarkSchema = createInsertSchema(userBookmarks).omit({ id: true, createdAt: true });
+
+export type Domain = typeof domains.$inferSelect;
+export type FrameworkContent = typeof frameworkContent.$inferSelect;
+export type UserBookmark = typeof userBookmarks.$inferSelect;
