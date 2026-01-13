@@ -1,0 +1,184 @@
+The Restaurant Consultant
+Cost & Margin Control
+
+Margins are protected before ordering—not after inventory shock.
+
+Core Principle
+
+Food cost is decided before the order is placed, not after the inventory is counted.
+
+If you are shocked by your food cost, the failure did not happen in accounting.
+It happened during prep, portioning, plating, and menu design.
+
+Food cost is a design outcome, not a surprise.
+
+Framework: How to Calculate Food Cost (NON-NEGOTIABLE)
+1. Plate Cost Method (Primary Control Method)
+
+Every menu item must have a known plate cost.
+
+Formula:
+
+Ingredient Cost ÷ Yield = Usable Cost  
+Usable Cost × Portion Size = Plate Cost
+
+
+Example:
+
+Ribeye: $12.00 / lb
+
+Yield after trim: 80% → usable cost = $15.00 / lb
+
+Portion: 10 oz (0.625 lb)
+
+Plate cost = $9.38
+
+Rule:
+If you cannot state a plate cost within ±$0.25, you do not control food cost.
+
+2. Target Food Cost Method (Menu Design Control)
+
+Food cost targets are set before menu approval.
+
+Formula:
+
+Plate Cost ÷ Target Food Cost % = Menu Price
+
+
+Example:
+
+Plate cost: $6.00
+
+Target food cost: 28%
+
+Required price: $21.43 (round UP, never down)
+
+Rule:
+Never price emotionally. Price mathematically.
+
+3. The 1-Ounce Test (Line Reality Check)
+
+Every protein must pass the 1-oz deviation test.
+
+Formula:
+
+Cost per ounce × Extra ounces × Covers = Margin Loss
+
+
+Example:
+
+Protein cost: $0.90 / oz
+
+Over-portion: +2 oz
+
+Covers per shift: 100
+
+Loss = $180 per shift
+
+Rule:
+If cooks don’t understand this math, you haven’t trained them.
+
+Checklist: Portion Control Enforcement
+DAILY ENFORCEMENT
+
+□ Digital scales at every protein station
+□ Portion guides posted with photos and weights
+□ Manager spot-checks 3 plates per service
+□ Portion compliance included in line checks
+□ Expo authorized to reject plates off spec
+
+WHEN OVER-PORTIONING OCCURS
+
+Show the spec vs. what was plated
+
+State the cost difference clearly
+
+Multiply by covers (make it real)
+
+Correct immediately
+
+Document if pattern continues
+
+Reminder: Over-portioning is not generosity.
+It is theft of margin and must be treated seriously.
+
+Framework: Waste Log That Actually Works
+WHAT TO TRACK (MANDATORY)
+
+• Date
+• Item
+• Quantity
+• Reason (spoiled / dropped / returned / overcooked / overprepped)
+• Who logged it
+• Assigned cost (weekly, not optional)
+
+WEEKLY WASTE REVIEW (15 MINUTES, NO EXCUSES)
+
+• Total waste cost
+• Waste % of food cost
+• Top 3 waste items
+• Root cause for each
+• Corrective action assigned with owner
+
+Benchmark:
+
+Under 2% → acceptable
+
+2–3% → warning
+
+Over 3% → immediate investigation
+
+Waste without review is permission to repeat.
+
+Framework: Menu Complexity Warning Signs
+YOUR MENU IS TOO COMPLEX IF:
+
+• Ingredients appear in only one dish
+• Daily prep list exceeds 30 items
+• Line cooks need references during service
+• Food cost fluctuates more than 3% month-to-month
+• Ticket times regularly exceed standards
+
+SIMPLIFICATION FRAMEWORK
+
+Cross-utilize proteins (2–3 dishes minimum)
+
+Limit sauces (5–7 total)
+
+Standardize base preparations
+
+one mashed potato
+
+one rice
+
+one stock
+
+Remove the lowest-selling 10% of items quarterly
+
+Complexity hides waste. Simplicity exposes it.
+
+Verification Loop (THIS IS WHAT MOST OPERATORS MISS)
+
+Every cost control system must include:
+• Standard (spec, recipe, portion)
+• Training (shown, not explained)
+• Verification (daily checks)
+• Correction (real-time)
+• Documentation (patterns, not one-offs)
+
+If any step is missing, the system is broken.
+
+Consultant’s Bottom Line
+
+You do not “watch” food cost.
+You design it, train it, enforce it, and verify it.
+
+If margins are thin, the solution is almost never:
+
+higher prices
+
+better vendors
+
+more accounting
+
+It is tighter systems.

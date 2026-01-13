@@ -781,22 +781,47 @@ function getContentForDomain(slug: string): { title: string; type: string; conte
       {
         title: "Core Principle",
         type: "principle",
-        content: "Food cost is decided before the order is placed, not after the inventory is counted. If you're shocked by your food cost, you weren't paying attention during prep, portioning, and plating."
+        content: "Food cost is decided before the order is placed, not after the inventory is counted.\n\nIf you are shocked by your food cost, the failure did not happen in accounting. It happened during prep, portioning, plating, and menu design.\n\nFood cost is a design outcome, not a surprise."
+      },
+      {
+        title: "Plate Cost Method (Primary Control)",
+        type: "framework",
+        content: "Every menu item must have a known plate cost.\n\nFORMULA:\nIngredient Cost ÷ Yield = Usable Cost\nUsable Cost × Portion Size = Plate Cost\n\nEXAMPLE:\n• Ribeye: $12.00/lb\n• Yield after trim: 80% → usable cost = $15.00/lb\n• Portion: 10 oz (0.625 lb)\n• Plate cost = $9.38\n\nRULE: If you cannot state a plate cost within ±$0.25, you do not control food cost."
+      },
+      {
+        title: "Target Food Cost Method (Menu Design)",
+        type: "framework",
+        content: "Food cost targets are set before menu approval.\n\nFORMULA:\nPlate Cost ÷ Target Food Cost % = Menu Price\n\nEXAMPLE:\n• Plate cost: $6.00\n• Target food cost: 28%\n• Required price: $21.43 (round UP, never down)\n\nRULE: Never price emotionally. Price mathematically."
+      },
+      {
+        title: "The 1-Ounce Test (Line Reality Check)",
+        type: "framework",
+        content: "Every protein must pass the 1-oz deviation test.\n\nFORMULA:\nCost per ounce × Extra ounces × Covers = Margin Loss\n\nEXAMPLE:\n• Protein cost: $0.90/oz\n• Over-portion: +2 oz\n• Covers per shift: 100\n• Loss = $180 per shift\n\nRULE: If cooks don't understand this math, you haven't trained them."
       },
       {
         title: "Portion Control Enforcement",
         type: "checklist",
-        content: "DAILY ENFORCEMENT:\n□ Scales at every station that portions protein\n□ Portion guides posted (with photos)\n□ Spot-check 3 plates per service\n□ Portioning included in line checks\n\nWHEN OVER-PORTIONING OCCURS:\n1. Show the cook the spec vs. what they plated\n2. Calculate the cost difference (\"That 2oz extra costs $1.80\")\n3. Multiply by covers (\"At 100 covers, that's $180 lost\")\n4. Document if pattern continues\n\nRemember: Over-portioning is theft of margin. Treat it seriously."
+        content: "DAILY ENFORCEMENT:\n□ Digital scales at every protein station\n□ Portion guides posted with photos and weights\n□ Manager spot-checks 3 plates per service\n□ Portion compliance included in line checks\n□ Expo authorized to reject plates off spec\n\nWHEN OVER-PORTIONING OCCURS:\n1. Show the spec vs. what was plated\n2. State the cost difference clearly\n3. Multiply by covers (make it real)\n4. Correct immediately\n5. Document if pattern continues\n\nReminder: Over-portioning is not generosity. It is theft of margin and must be treated seriously."
       },
       {
-        title: "Waste Log That Works",
+        title: "Waste Log That Actually Works",
         type: "output",
-        content: "WHAT TO TRACK:\n• Date\n• Item\n• Quantity\n• Reason (spoiled/dropped/returned/overcooked/overprepped)\n• Who logged it\n• Cost (assign weekly)\n\nWEEKLY REVIEW:\n• Total waste cost\n• Top 3 waste items\n• Root cause for each (Was it prep issue? Vendor quality? Training?)\n• Action item for each\n\nBenchmark: Waste should be under 2% of food cost. Over 3% = immediate investigation."
+        content: "WHAT TO TRACK (MANDATORY):\n• Date\n• Item\n• Quantity\n• Reason (spoiled / dropped / returned / overcooked / overprepped)\n• Who logged it\n• Assigned cost (weekly, not optional)\n\nWEEKLY WASTE REVIEW (15 MINUTES, NO EXCUSES):\n• Total waste cost\n• Waste % of food cost\n• Top 3 waste items\n• Root cause for each\n• Corrective action assigned with owner\n\nBENCHMARK:\n• Under 2% → acceptable\n• 2–3% → warning\n• Over 3% → immediate investigation\n\nWaste without review is permission to repeat."
       },
       {
         title: "Menu Complexity Warning Signs",
         type: "output",
-        content: "YOUR MENU IS TOO COMPLEX IF:\n• Same ingredient appears in only one dish\n• Prep list has more than 30 items daily\n• Line cooks can't execute all dishes without reference\n• Food cost varies more than 3% month to month\n• Ticket times regularly exceed standards\n\nSIMPLIFICATION FRAMEWORK:\n1. Cross-utilize proteins (2-3 dishes each)\n2. Limit sauce varieties (5-7 maximum)\n3. Standardize base preparations (same mashed potato, three presentations)\n4. Cut lowest-selling 10% of menu quarterly"
+        content: "YOUR MENU IS TOO COMPLEX IF:\n• Ingredients appear in only one dish\n• Daily prep list exceeds 30 items\n• Line cooks need references during service\n• Food cost fluctuates more than 3% month-to-month\n• Ticket times regularly exceed standards\n\nSIMPLIFICATION FRAMEWORK:\n1. Cross-utilize proteins (2–3 dishes minimum)\n2. Limit sauces (5–7 total)\n3. Standardize base preparations (one mashed potato, one rice, one stock)\n4. Remove the lowest-selling 10% of items quarterly\n\nComplexity hides waste. Simplicity exposes it."
+      },
+      {
+        title: "Verification Loop",
+        type: "framework",
+        content: "THIS IS WHAT MOST OPERATORS MISS\n\nEvery cost control system must include:\n• Standard (spec, recipe, portion)\n• Training (shown, not explained)\n• Verification (daily checks)\n• Correction (real-time)\n• Documentation (patterns, not one-offs)\n\nIf any step is missing, the system is broken."
+      },
+      {
+        title: "Consultant's Bottom Line",
+        type: "principle",
+        content: "You do not \"watch\" food cost.\nYou design it, train it, enforce it, and verify it.\n\nIf margins are thin, the solution is almost never:\n• higher prices\n• better vendors\n• more accounting\n\nIt is tighter systems."
       }
     ],
     reviews: [
