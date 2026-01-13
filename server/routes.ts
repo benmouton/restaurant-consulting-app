@@ -682,22 +682,42 @@ function getContentForDomain(slug: string): { title: string; type: string; conte
       {
         title: "Core Principle",
         type: "principle",
-        content: "Service standards exist to protect consistency—not to create robots. Every guest should receive the same quality experience regardless of which server they get or whether it's Tuesday or Saturday."
+        content: "Consistency Is the Product\n\nService standards exist to protect consistency, not to create robots.\n\nEvery guest should receive the same quality experience:\n• Regardless of which server they get\n• Regardless of shift, volume, or day of week\n\nHospitality without structure feels good once.\nHospitality with structure builds a business."
+      },
+      {
+        title: "The Four-Point Greeting (MANDATORY)",
+        type: "framework",
+        content: "Every table receives the same opening sequence:\n\n1. IMMEDIATE ACKNOWLEDGMENT\n• Eye contact within 10 seconds\n• Verbal acknowledgment within 60 seconds\n\n2. WARM INTRODUCTION\n• Server name stated\n• Tone confident, not scripted\n\n3. EXPECTATION SETTING\n• \"I'll be right back with drinks\" or\n• \"Can I start you with something to drink while you look things over?\"\n\n4. MENU CONFIDENCE CUE\n• One relevant suggestion (not a full sales pitch)\n\nIf the greeting is rushed or skipped, the entire service feels broken—even if food is perfect."
       },
       {
         title: "Server Timing Standards",
         type: "checklist",
-        content: "NON-NEGOTIABLE TIMING:\n□ Greet within 60 seconds of seating\n□ Drink order taken within 2 minutes\n□ Drinks delivered within 4 minutes\n□ Food order taken within 8 minutes of seating (if ready)\n□ Check-back within 2 bites\n□ Check presented within 3 minutes of dessert decline or final plate clear\n□ Table reset within 5 minutes of departure"
+        content: "TIMING IS A STANDARD, NOT A SUGGESTION\n\n□ Greet table within 60 seconds of seating\n□ Drink order taken within 2 minutes\n□ Drinks delivered within 4 minutes\n□ Food order taken within 8 minutes (if guests are ready)\n□ Check-back within 2 bites or 2 minutes\n□ Mid-meal table touch before plates are half finished\n□ Check presented within 3 minutes of dessert decline or final plate clear\n□ Table reset within 5 minutes of departure\n\nTiming failures are service failures—even if guests don't complain."
+      },
+      {
+        title: "Table Touch Cadence",
+        type: "framework",
+        content: "Service Control System\n\nServers are expected to touch tables at intentional moments, not randomly.\n\nREQUIRED TOUCH POINTS:\n1. Post-drink delivery\n2. Two-bite / two-minute check\n3. Mid-meal quality check\n4. Pre-dessert / final clear\n5. Farewell & invitation back\n\nManagers observe cadence, not just friendliness."
       },
       {
         title: "Guest Recovery Decision Tree",
         type: "script",
-        content: "WHEN SOMETHING GOES WRONG:\n\n1. ACKNOWLEDGE immediately: \"I see the issue and I'm handling it.\"\n2. APOLOGIZE without excuses: \"I'm sorry this happened.\"\n3. ACT with appropriate comp authority:\n   - Wrong item: Replace + offer appetizer or dessert\n   - Long wait (15+ min over quote): Complimentary round or dessert\n   - Cold food: Replace + comp the item\n   - Bad attitude from staff: Manager visit + meaningful comp\n4. ASSURE: \"I want to make sure you leave happy.\"\n5. FOLLOW UP: Manager check before departure"
+        content: "ROAR / HEAT Aligned Recovery Protocol\n\nWhen something goes wrong, recovery follows a structured escalation, not improvisation.\n\nSTEP 1 — ACKNOWLEDGE (Immediately)\n\"I see the issue, and I'm handling it right now.\"\n\nSTEP 2 — APOLOGIZE (Without Excuses)\n\"I'm sorry this happened.\"\nNo explanations. No blame. No defensiveness.\n\nSTEP 3 — ACT (Within Authority Limits)\nCommon Scenarios:\n• Wrong item: Replace + offer appetizer or dessert\n• Long wait (15+ minutes over quote): Complimentary round or dessert\n• Cold food: Replace + comp item\n• Poor staff attitude: Manager visit + meaningful comp\n\nSTEP 4 — ASSURE\n\"I want to make sure you leave happy.\"\n\nSTEP 5 — FOLLOW-THROUGH\nManager check before departure, not after the complaint is over.\n\nRecovery without follow-up feels transactional.\nRecovery with follow-up rebuilds trust."
       },
       {
         title: "Comp Authority Limits",
-        type: "output",
-        content: "SERVER: Free dessert, free drink (non-alcohol), item replacement\nBARTENDER: One round comped, free appetizer\nSHIFT LEAD: Up to $25 in comps without approval\nMANAGER: Up to $100, full meal if warranted\nOVER $100: Owner notification required (can approve after)"
+        type: "framework",
+        content: "Margin Protection Built In\n\nAuthority must be clear or comps become emotional.\n\nSERVER\n• Free dessert\n• Free non-alcoholic drink\n• Item replacement\n\nBARTENDER\n• One round comped\n• Free appetizer\n\nSHIFT LEAD\n• Up to $25 in comps without approval\n\nMANAGER\n• Up to $100\n• Full meal if warranted\n\nOVER $100\n• Owner notification required (approval can be retroactive)\n\nComps are tools, not apologies.\nUse them intentionally."
+      },
+      {
+        title: "Enforcement Standard",
+        type: "checklist",
+        content: "What Managers Actually Check\n\nManagers are responsible for:\n□ Timing adherence\n□ Greeting quality\n□ Table touch cadence\n□ Recovery execution\n□ Comp justification\n\nServers are coached on patterns, not one-off mistakes."
+      },
+      {
+        title: "Consultant's Bottom Line",
+        type: "principle",
+        content: "Great service is not personality-dependent.\nIt is system-dependent.\n\nIf your best service only happens when your best server is on the floor, you don't have standards—you have luck."
       }
     ],
     training: [
