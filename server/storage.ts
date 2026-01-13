@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage } from "@shared/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Domains
@@ -21,6 +21,22 @@ export interface IStorage {
   getTrainingTemplates(): Promise<TrainingTemplate[]>;
   getTemplatesByCategory(category: string): Promise<TrainingTemplate[]>;
   createTemplate(template: Omit<TrainingTemplate, "id">): Promise<TrainingTemplate>;
+  
+  // Financial Documents
+  getFinancialDocuments(userId: string): Promise<FinancialDocument[]>;
+  getFinancialDocument(id: number, userId: string): Promise<FinancialDocument | undefined>;
+  createFinancialDocument(doc: Omit<FinancialDocument, "id" | "uploadedAt">): Promise<FinancialDocument>;
+  updateFinancialDocumentStatus(id: number, status: string): Promise<void>;
+  deleteFinancialDocument(id: number, userId: string): Promise<void>;
+  
+  // Financial Extracts
+  getFinancialExtract(documentId: number): Promise<FinancialExtract | undefined>;
+  createFinancialExtract(extract: Omit<FinancialExtract, "id" | "processedAt">): Promise<FinancialExtract>;
+  updateFinancialExtract(documentId: number, data: Partial<FinancialExtract>): Promise<void>;
+  
+  // Financial Messages
+  getFinancialMessages(userId: string, documentId?: number): Promise<FinancialMessage[]>;
+  createFinancialMessage(message: Omit<FinancialMessage, "id" | "createdAt">): Promise<FinancialMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -93,6 +109,68 @@ export class DatabaseStorage implements IStorage {
   async createTemplate(template: Omit<TrainingTemplate, "id">): Promise<TrainingTemplate> {
     const [newTemplate] = await db.insert(trainingTemplates).values(template).returning();
     return newTemplate;
+  }
+  
+  // Financial Documents
+  async getFinancialDocuments(userId: string): Promise<FinancialDocument[]> {
+    return await db.select().from(financialDocuments)
+      .where(eq(financialDocuments.userId, userId))
+      .orderBy(desc(financialDocuments.uploadedAt));
+  }
+  
+  async getFinancialDocument(id: number, userId: string): Promise<FinancialDocument | undefined> {
+    const [doc] = await db.select().from(financialDocuments)
+      .where(and(eq(financialDocuments.id, id), eq(financialDocuments.userId, userId)));
+    return doc;
+  }
+  
+  async createFinancialDocument(doc: Omit<FinancialDocument, "id" | "uploadedAt">): Promise<FinancialDocument> {
+    const [newDoc] = await db.insert(financialDocuments).values(doc).returning();
+    return newDoc;
+  }
+  
+  async updateFinancialDocumentStatus(id: number, status: string): Promise<void> {
+    await db.update(financialDocuments).set({ status }).where(eq(financialDocuments.id, id));
+  }
+  
+  async deleteFinancialDocument(id: number, userId: string): Promise<void> {
+    await db.delete(financialExtracts).where(eq(financialExtracts.documentId, id));
+    await db.delete(financialMessages).where(eq(financialMessages.documentId, id));
+    await db.delete(financialDocuments)
+      .where(and(eq(financialDocuments.id, id), eq(financialDocuments.userId, userId)));
+  }
+  
+  // Financial Extracts
+  async getFinancialExtract(documentId: number): Promise<FinancialExtract | undefined> {
+    const [extract] = await db.select().from(financialExtracts)
+      .where(eq(financialExtracts.documentId, documentId));
+    return extract;
+  }
+  
+  async createFinancialExtract(extract: Omit<FinancialExtract, "id" | "processedAt">): Promise<FinancialExtract> {
+    const [newExtract] = await db.insert(financialExtracts).values(extract).returning();
+    return newExtract;
+  }
+  
+  async updateFinancialExtract(documentId: number, data: Partial<FinancialExtract>): Promise<void> {
+    await db.update(financialExtracts).set(data).where(eq(financialExtracts.documentId, documentId));
+  }
+  
+  // Financial Messages
+  async getFinancialMessages(userId: string, documentId?: number): Promise<FinancialMessage[]> {
+    if (documentId) {
+      return await db.select().from(financialMessages)
+        .where(and(eq(financialMessages.userId, userId), eq(financialMessages.documentId, documentId)))
+        .orderBy(financialMessages.createdAt);
+    }
+    return await db.select().from(financialMessages)
+      .where(eq(financialMessages.userId, userId))
+      .orderBy(financialMessages.createdAt);
+  }
+  
+  async createFinancialMessage(message: Omit<FinancialMessage, "id" | "createdAt">): Promise<FinancialMessage> {
+    const [newMessage] = await db.insert(financialMessages).values(message).returning();
+    return newMessage;
   }
 }
 
