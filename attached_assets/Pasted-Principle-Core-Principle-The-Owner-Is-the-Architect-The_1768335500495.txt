@@ -1,0 +1,171 @@
+Principle
+Core Principle: The Owner Is the Architect
+
+The owner’s job is to design and protect systems that operate without their constant presence — not to personally execute them.
+
+Every hour the owner spends fixing problems that assigned leaders should handle is an hour stolen from:
+
+building durable systems
+
+developing leaders
+
+increasing leverage and enterprise value
+
+If the restaurant collapses when the owner steps away, the owner did not build a business — they built a dependency.
+
+Framework
+Role Clarity Framework (Non-Overlapping by Design)
+OWNER (Architect & Capital Steward)
+
+Owns:
+
+Vision and cultural standards
+
+Capital allocation and major financial decisions
+
+Vendor relationships and contracts
+
+Menu direction and pricing philosophy
+
+Leadership selection and removal
+
+Does NOT own:
+
+Daily execution
+
+Shift coverage
+
+Real-time guest issues
+
+Schedule mechanics
+
+GENERAL MANAGER (Operational Authority)
+
+Owns:
+
+Daily operations and floor stability
+
+Staff management, coaching, and discipline
+
+Guest escalations beyond frontline recovery
+
+Schedule approval and labor discipline
+
+Enforcement of systems and standards
+
+Escalates ONLY when:
+
+Financial exposure exceeds defined thresholds
+
+Legal or HR risk is present
+
+Pattern failures indicate a broken system
+
+KITCHEN MANAGER (Execution & Consistency)
+
+Owns:
+
+Food quality and plate consistency
+
+Prep systems and pars
+
+Line discipline and ticket flow
+
+BOH training and hiring input
+
+Immediate 86 decisions
+
+Does NOT own:
+
+Pricing decisions
+
+Vendor changes
+
+Menu expansion without approval
+
+SHIFT LEAD (Real-Time Control)
+
+Owns:
+
+Floor control during service
+
+Break execution and coverage
+
+Immediate guest recovery within limits
+
+Service pacing and table flow
+
+Escalation to manager when thresholds are exceeded
+
+Shift leads are control towers, not decision bottlenecks.
+
+Checklist
+Decision Rights Matrix (Written Authority Prevents Chaos)
+
+WHO DECIDES WHAT:
+
+□ Comp under $25 → Server (manager notified)
+□ Comp $25–$100 → Manager only
+□ Comp over $100 → Owner approval
+□ Staff sent home early → Shift lead
+□ Staff termination → GM + Owner
+□ Menu item 86 → KM immediately, FOH notified
+□ Equipment repair under $500 → GM
+□ Vendor change → Owner
+
+Rule: If authority is not written, it does not exist.
+
+Framework
+What the Owner Must Stop Carrying
+STOP CARRYING:
+
+Individual staff scheduling conflicts
+
+Minor guest complaints that managers can resolve
+
+Daily prep and line decisions
+
+Register reconciliation and close-out
+
+Opening or closing shifts out of habit
+
+Carrying these trains the organization to wait for you.
+
+START DELEGATING — WITH STRUCTURE:
+
+Clear expectations (written, not implied)
+
+Defined authority boundaries
+
+Verification cadence (not trust-only)
+
+Documented consequences for failure
+
+Public recognition for success
+
+Delegation without verification is abdication.
+Verification without trust is micromanagement.
+The goal is measured autonomy.
+
+Control Loop (What Makes This Work)
+
+Every delegated responsibility must include:
+
+Owner — who is accountable
+
+Authority — what decisions they can make
+
+Standard — what “right” looks like
+
+Verification — how it’s checked
+
+Correction — what happens when it fails
+
+If a task keeps coming back to the owner, the failure is not the person — it’s the system.
+
+Consultant’s Bottom Line
+
+The owner’s highest value work is not solving today’s problems.
+It is designing systems that prevent tomorrow’s problems.
+
+If you are still the safety net, you are not free — and neither is your business.

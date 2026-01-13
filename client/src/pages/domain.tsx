@@ -32,7 +32,10 @@ import {
   Star,
   Copy,
   Loader2,
-  Sparkles
+  Sparkles,
+  Calendar,
+  Clock,
+  RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
@@ -253,6 +256,138 @@ function FoodCostCalculator() {
             )}
           </TabsContent>
         </Tabs>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DailyTaskReminder() {
+  const { toast } = useToast();
+  const [tasks, setTasks] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastGenerated, setLastGenerated] = useState<string>("");
+
+  const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todayDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  const generateDailyTasks = async () => {
+    setIsLoading(true);
+    setTasks("");
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `As an experienced restaurant consultant, provide today's priority tasks for a restaurant owner/operator. Today is ${dayOfWeek}.
+
+Based on typical restaurant operations, provide specific, actionable tasks that should be prioritized on ${dayOfWeek}. Consider:
+
+MONDAY: Week setup, reviewing weekend performance, scheduling adjustments, inventory orders, staff meetings, P&L review from prior week
+TUESDAY: Training focus, vendor deliveries, prep for mid-week, checking reservations, marketing planning
+WEDNESDAY: Mid-week check-in, labor review, guest feedback review, equipment checks, menu adjustments
+THURSDAY: Weekend prep begins, confirming staffing, inventory check, reservations review, pre-weekend briefing prep
+FRIDAY: Peak service prep, final staffing confirmation, quality checks, team briefing, ensuring weekend readiness
+SATURDAY: Full service mode, floor presence, guest engagement, real-time problem solving, team support
+SUNDAY: Wrap-up day, week review, staff appreciation, next week planning, reset and recovery
+
+Format as a clear, prioritized list with 5-7 specific tasks for TODAY (${dayOfWeek}). Each task should be actionable and include the "why" behind it. Be specific to restaurant operations.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate tasks");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setTasks(content);
+              }
+            } catch {}
+          }
+        }
+        setLastGenerated(new Date().toLocaleTimeString());
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate tasks", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Daily Operator Priorities
+            </CardTitle>
+            <CardDescription className="mt-1">
+              <span className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                {dayOfWeek}, {todayDate}
+              </span>
+            </CardDescription>
+          </div>
+          {lastGenerated && (
+            <span className="text-xs text-muted-foreground">
+              Generated at {lastGenerated}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Get AI-powered task recommendations based on what successful restaurant operators typically prioritize on {dayOfWeek}s.
+        </p>
+
+        <Button 
+          onClick={generateDailyTasks} 
+          disabled={isLoading}
+          className="w-full"
+          data-testid="btn-generate-daily-tasks"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating your {dayOfWeek} priorities...
+            </>
+          ) : tasks ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Today's Priorities
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Get Today's Priorities
+            </>
+          )}
+        </Button>
+
+        {tasks && (
+          <div className="mt-4 p-4 bg-accent/50 rounded-lg">
+            <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+              {tasks}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -554,6 +689,9 @@ export default function DomainPage() {
           <h1 className="text-3xl font-bold mb-2">{domain.name}</h1>
           <p className="text-muted-foreground">{domain.description}</p>
         </div>
+
+        {/* Daily Task Reminder - only show for leadership domain */}
+        {slug === "leadership" && <DailyTaskReminder />}
 
         {/* Food Cost Calculator - only show for costs domain */}
         {slug === "costs" && <FoodCostCalculator />}
