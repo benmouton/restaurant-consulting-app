@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { domains, frameworkContent, userBookmarks } from './schema';
+import { domains, frameworkContent, userBookmarks, trainingTemplates } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -73,6 +73,23 @@ export const api = {
       responses: {
         200: z.object({ content: z.string().optional(), done: z.boolean().optional() }),
         400: errorSchemas.validation,
+      },
+    },
+  },
+  templates: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/templates',
+      responses: {
+        200: z.array(z.custom<typeof trainingTemplates.$inferSelect>()),
+      },
+    },
+    byCategory: {
+      method: 'GET' as const,
+      path: '/api/templates/:category',
+      responses: {
+        200: z.array(z.custom<typeof trainingTemplates.$inferSelect>()),
+        404: errorSchemas.notFound,
       },
     },
   },

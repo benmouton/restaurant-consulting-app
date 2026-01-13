@@ -33,10 +33,24 @@ export const userBookmarks = pgTable("user_bookmarks", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Training Templates (real examples from Mouton's Bistro)
+export const trainingTemplates = pgTable("training_templates", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  category: text("category").notNull(), // 'server' or 'kitchen'
+  section: text("section").notNull(), // e.g., 'Day 1: Orientation', 'Policies'
+  contentType: text("content_type").notNull(), // 'overview', 'checklist', 'procedure', 'assessment'
+  content: text("content").notNull(),
+  keyPoints: text("key_points").array(),
+  sequenceOrder: integer("sequence_order").notNull(),
+});
+
 export const insertDomainSchema = createInsertSchema(domains).omit({ id: true });
 export const insertFrameworkContentSchema = createInsertSchema(frameworkContent).omit({ id: true });
 export const insertUserBookmarkSchema = createInsertSchema(userBookmarks).omit({ id: true, createdAt: true });
+export const insertTrainingTemplateSchema = createInsertSchema(trainingTemplates).omit({ id: true });
 
 export type Domain = typeof domains.$inferSelect;
 export type FrameworkContent = typeof frameworkContent.$inferSelect;
 export type UserBookmark = typeof userBookmarks.$inferSelect;
+export type TrainingTemplate = typeof trainingTemplates.$inferSelect;

@@ -153,8 +153,20 @@ export async function registerRoutes(
     }
   });
 
+  // Template Routes
+  app.get(api.templates.list.path, async (req, res) => {
+    const templates = await storage.getTrainingTemplates();
+    res.json(templates);
+  });
+
+  app.get(api.templates.byCategory.path, async (req, res) => {
+    const templates = await storage.getTemplatesByCategory(req.params.category);
+    res.json(templates);
+  });
+
   // Seed Data
   await seedDatabase();
+  await seedTrainingTemplates();
 
   return httpServer;
 }
@@ -478,4 +490,241 @@ function getContentForDomain(slug: string): { title: string; type: string; conte
   };
 
   return contentMap[slug] || [];
+}
+
+async function seedTrainingTemplates() {
+  const existingTemplates = await storage.getTrainingTemplates();
+  if (existingTemplates.length > 0) return;
+
+  const serverTemplates = [
+    {
+      title: "Server Training Manual Overview",
+      category: "server",
+      section: "Introduction",
+      contentType: "overview",
+      content: "At Mouton's Bistro & Bar, we're not just serving meals—we're crafting experiences that linger long after the last bite. Our guests are the heartbeat of this place, and you, as a server, are the passionate artisan who brings our vision to life. This manual equips you with the tools, knowledge, and skills to deliver exceptional service, rooted in Southern hospitality and relentless dedication.",
+      keyPoints: ["Fast and Flavorful motto", "7-day training program", "Shadow → Perform → Certify model", "Southern hospitality focus"],
+      sequenceOrder: 1,
+    },
+    {
+      title: "Day 1: Orientation",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Welcome new team members and introduce them to Mouton's culture, layout, policies, and training expectations.\n\nDuration: 6–8 Hours\n\nKey Components:\n• Mission & Values: Understanding commitment to Southern hospitality\n• Cultural Motto: \"Fast and Flavorful\"\n• Meet the Team: Introductions to GM, Kitchen Manager, Executive Chef, Floor Manager\n• Restaurant Layout Tour: Dining Room, Side Room, Patio, Kitchen, Expo Station, Bar\n• Menu Overview: Signature dishes, daily specials, dietary options\n• Policies: Uniform standards, attendance, cell phones, breaks\n• Health & Safety: Handwashing, spill cleanup, emergency procedures",
+      keyPoints: ["Team introductions", "Layout tour", "Policy review", "Menu overview", "Health & safety basics"],
+      sequenceOrder: 2,
+    },
+    {
+      title: "Day 2: Menu Knowledge (Food Focus)",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Deepen understanding of Mouton's food offerings through tasting, study, and hands-on learning.\n\nDuration: 6–8 Hours\n\nCore Focus Areas:\n1. In-Depth Menu Study\n   • Signature Dishes: Shrimp & Grits (creamy grits, sautéed shrimp, Cajun sauce), Chicken Fried Steak (hand-breaded, white gravy)\n   • Weekly Specials: Gumbo Fridays (rich roux, shrimp, sausage, trinity)\n   • Dietary Needs: Gluten-free options (basmati rice substitution), vegetarian, allergy-sensitive\n\n2. Kitchen & Expo Integration\n   • Key Terms: \"Fresh,\" \"Made to Order,\" \"Order In,\" \"Order Up\"\n   • MOD/Expo Shadowing\n\n3. Taste & Describe\n   • Sample key dishes\n   • Use Southern-inspired language and storytelling\n\n4. Upselling with Hospitality\n   • Suggestive selling with confidence\n   • Pairing tips and highlighting promotions",
+      keyPoints: ["Menu tasting session", "Kitchen terminology", "Allergen awareness", "Upselling techniques", "90% written quiz pass rate"],
+      sequenceOrder: 3,
+    },
+    {
+      title: "Day 3: Beverage Menu Knowledge",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Build mastery of Mouton's beverage offerings while learning TABC laws and guest service techniques.\n\nDuration: 6–8 Hours\n\nBeverage Categories:\n• Beer: Draft (seasonal), Bottled/Canned (Abita Amber, Shiner Bock, Guinness)\n• Wine: Reds, whites, rosé, champagne\n• Cocktails: 50+ signature and classic (Bayou Mule, Mint Julep, Vieux Carré)\n• Spirits & Cordials: Vodka, gin, rum, tequila, whiskey, bourbon, cognac\n• Non-Alcoholic: House-made lemonade, Virgin Bayou Mule\n\nTABC Compliance:\n• Must be 18+ to serve alcohol; 21+ to verify IDs\n• Know signs of intoxication\n• How to legally refuse service\n• Document refusals in manager log",
+      keyPoints: ["50+ cocktails", "TABC compliance", "Pairing basics", "Glassware knowledge", "Bar terminology"],
+      sequenceOrder: 4,
+    },
+    {
+      title: "Day 3.5: Beverage Prep (Hands-On)",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Develop practical bartending techniques for confidence behind the bar.\n\nDuration: 3–4 Hours\n\nCore Training:\n• Cocktail Techniques:\n  - Shaking: Vodka Martini\n  - Stirring: Gin Martini\n  - Muddling: Mojito\n  - Free Pouring: 1 sec ≈ ¼ oz\n\n• Tools & Equipment: Jiggers, shakers, bar spoons, chill glasses\n\n• Practice Cocktails:\n  - Margarita, Bayou Mule, Old Fashioned, Mint Julep, Moscow Mule\n  - Draft Beer: Perfect pour with ideal head",
+      keyPoints: ["Shaking technique", "Stirring technique", "Muddling", "Free pouring", "5 signature cocktails"],
+      sequenceOrder: 5,
+    },
+    {
+      title: "Day 4: Service Steps - Basics",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Learn the foundation of Mouton's guest service flow and confidently manage your first table.\n\nDuration: 6–8 Hours\n\nSteps of Service:\n1. Greeting & Seating: Deliver Four-Point Greeting\n2. Order Taking: Accurately record, communicate special requests in POS\n3. Serving: Left Side Serve (food from guest's left), Right Side Clear\n4. Payment & Farewell: Prompt, polite check drop; thank and invite back\n\nFour-Point Greeting:\n1. \"Welcome to Mouton's Bistro & Bar! We're so glad y'all are here today.\"\n2. \"My name is [Your Name], and I'll be taking care of you this evening.\"\n3. \"Have y'all dined with us before? We've got a [Special] today...\"\n4. \"I'll give you a minute to check out the menu and be back shortly.\"",
+      keyPoints: ["Four-Point Greeting", "Left serve/right clear", "POS basics", "First table management", "Tray handling"],
+      sequenceOrder: 6,
+    },
+    {
+      title: "Day 5: Service Steps - Advanced",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Refine service skills, apply ROAR task consolidation, and manage two tables independently.\n\nDuration: 6–8 Hours\n\nROAR Framework:\n• R – Review: Recall service steps for each table\n• O – Organize: Group tasks (orders, refills for both tables in one pass)\n• A – Act: Serve efficiently and professionally\n• R – Reassess: Check needs post-service (refills, dessert menus)\n\nAdvanced Skills:\n• Special Requests & Modifications: Handle dietary needs, communicate via POS\n• POS Proficiency: Happy Hour buttons, check splitting, modifiers\n• Section Setup & Close-Down: Opening prep, closing checklist within 15 minutes",
+      keyPoints: ["ROAR framework", "Two-table management", "Special request handling", "Happy Hour POS codes", "Section close-down"],
+      sequenceOrder: 7,
+    },
+    {
+      title: "Day 6: Advanced Guest Experience",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Master complex service scenarios with grace, confidence, and Southern charm.\n\nDuration: 6–8 Hours\n\nHEAT Method for Complaints:\n• H – Hear: Listen fully and respectfully\n• E – Empathize: Show you understand their frustration\n• A – Apologize: Genuine and professional apology\n• T – Take Action: Resolve quickly (recook, comp item, manager support)\n\nDisruptive/Intoxicated Guests:\n• Follow TABC refusal protocol respectfully\n• Get manager involved when needed\n• Prioritize guest and staff safety\n\nPeak Service:\n• Manage three tables during rush using ROAR\n• Team communication with kitchen\n• Emergency preparedness (fire protocol, first aid)",
+      keyPoints: ["HEAT complaint method", "Three-table management", "Upselling with charm", "Event promotion", "Emergency protocols"],
+      sequenceOrder: 8,
+    },
+    {
+      title: "Day 7: Final Evaluation",
+      category: "server",
+      section: "Training Schedule",
+      contentType: "assessment",
+      content: "Objective: Confirm readiness for independent service through full-shift performance review.\n\nDuration: 6–8 Hours\n\nEvaluation Requirements:\n• Manage Three Tables Solo: Apply all service steps from greeting to check drop\n• Four-Point Greeting: Use consistently with every table\n• ROAR: Consolidate steps efficiently\n• HEAT: Handle one staged complaint\n• POS Mastery: Enter orders, apply Happy Hour discounts, split checks\n• Section Setup & Close-Down: Complete within 15 minutes\n\nAssessments:\n• Written Test: 10 questions, 90% minimum pass rate\n• Practical Performance: Live service evaluation\n• Guest Interaction: Friendly tone, proactive service, personalized approach\n• Teamwork: Kitchen communication, peer support\n\nUpon Completion: Approved for solo shifts or additional training days assigned",
+      keyPoints: ["Three-table solo management", "90% written test pass", "Complaint resolution demo", "POS proficiency verified", "Manager sign-off required"],
+      sequenceOrder: 9,
+    },
+    {
+      title: "Trainer Checklist Template",
+      category: "server",
+      section: "Trainer Tools",
+      contentType: "checklist",
+      content: "DAILY TRAINER VERIFICATION:\n\n□ Trainee arrived on time and in uniform\n□ Previous day's content reviewed\n□ Day's objectives clearly communicated\n□ Hands-on activities completed\n□ Written assessment administered (if applicable)\n□ Practical skills observed and evaluated\n□ Constructive feedback provided\n□ Questions answered and concerns addressed\n□ Next day's expectations set\n□ Trainee confidence level assessed\n\nFINAL SIGN-OFF:\n□ All 7 days completed\n□ Written tests passed (90%+)\n□ Practical evaluations passed\n□ Self-reflections collected\n□ Ready for solo shifts: YES / NEEDS ADDITIONAL TRAINING IN: _______",
+      keyPoints: ["Daily verification", "Progress tracking", "Feedback documentation", "Final approval process"],
+      sequenceOrder: 10,
+    },
+    {
+      title: "Section Setup & Close-Down",
+      category: "server",
+      section: "Operations",
+      contentType: "procedure",
+      content: "START OF SHIFT:\n• Dress Code: Arrive in uniform with apron, 2+ working pens, bank (if applicable)\n• Check-In Tasks:\n  - Review message board for 86'd items, specials, events\n  - 5-minute section check:\n    □ Stock & clean condiments (ketchup, Tabasco, sugar caddies)\n    □ Wipe tables, chairs, ledges, tent cards, windowsills\n\nEND OF SHIFT:\n• Section Close-Down:\n  - Restock condiments\n  - Wipe and sanitize tables\n  - Align chairs neatly\n• Checkout Process:\n  - Confirm with MOD\n  - Tip Out: 1% of food sales to Expo, optional to Hostess\n  - Review upcoming schedule",
+      keyPoints: ["15-minute early arrival", "Section check routine", "Tip-out procedures", "Manager checkout required"],
+      sequenceOrder: 11,
+    },
+    {
+      title: "Weekly Cleaning Schedule",
+      category: "server",
+      section: "Operations",
+      contentType: "checklist",
+      content: "DAILY BY SHIFT:\n• First Cut: Fill shakers/caddies, sweep/mop, restock to-go containers, roll silverware\n• Second Cut: Wipe tables/bar, refill coffee & tea, sweep front entrance\n• Closer #1: Clean ketchup/Tabasco, sweep/mop\n• Closer #2: Clean tea/coffee station, bathrooms, menus\n• Closer #3: Clean soda fountain, ice bin, bar sinks\n• Closer #4: Clean windows/doors, restock beer\n\nWEEKLY:\n• Monday AM: Sauces | PM: Sugar caddies\n• Tuesday AM: Deck sweep/mop | PM: Salt/pepper shakers\n• Wednesday AM: Tea/Coffee station | PM: Podium\n• Thursday AM: Glassware & bar mats | PM: Walls, doors, fans\n• Friday AM: Expo station | PM: Beer cooler, bar sink",
+      keyPoints: ["Shift-based task assignment", "Weekly deep clean rotation", "Accountability by day"],
+      sequenceOrder: 12,
+    },
+  ];
+
+  const kitchenTemplates = [
+    {
+      title: "Kitchen Training Manual Overview",
+      category: "kitchen",
+      section: "Introduction",
+      contentType: "overview",
+      content: "Welcome to the kitchen team at Mouton's Bistro & Bar, where Southern culinary tradition meets excellence. As a key contributor, you ensure every dish embodies our \"Fast and Flavorful\" motto. This manual outlines policies, procedures, and a comprehensive training program to prepare you for success. Let's cook with passion and precision!",
+      keyPoints: ["Fast and Flavorful motto", "7-day training program", "5 staff per dinner shift", "Station-based system"],
+      sequenceOrder: 1,
+    },
+    {
+      title: "Kitchen Roles & Hierarchy",
+      category: "kitchen",
+      section: "Organization",
+      contentType: "overview",
+      content: "Staff Structure:\n• Executive Chef: Oversees all kitchen operations, recipe development, and staff training\n• Sous Chef (Line Cooks): Supports Executive Chef, manages daily production, supervises line cooks\n• Prep Cooks, Dishwashers: Ingredient preparation and cleaning under Sous Chef's direction\n• Kitchen Manager: Manages operational oversight\n\nStaffing:\n• 5 staff members on duty per dinner shift\n• 1 on each station: expo, sauté, fry, salad, dish\n• Executive Chef oversees all staff\n• Kitchen Manager and Sous Chef handle daily supervision",
+      keyPoints: ["Clear chain of command", "5 stations covered", "Dual supervision model"],
+      sequenceOrder: 2,
+    },
+    {
+      title: "Day 1: Orientation and Safety",
+      category: "kitchen",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Introduce kitchen layout, safety, and roles.\n\nDuration: 6–8 Hours\n\nKey Components:\n• Welcome and team introductions\n• Tour: grill, sauté, fry, salad, prep, walk-in coolers, dish area\n• Safety:\n  - Handwashing (20 seconds)\n  - Texas Food Handler's Permit (within 30 days)\n  - Cold storage: 40°F\n  - Hot holding: 165°F\n• Equipment: griddles, fryers, ovens, knives\n\nActivities:\n• Tour and safety demo\n• Practice handwashing technique\n\nAssessment: Verbal safety quiz",
+      keyPoints: ["Kitchen layout tour", "Temperature requirements", "Handwashing protocol", "Equipment orientation"],
+      sequenceOrder: 3,
+    },
+    {
+      title: "Day 2: Prep and Inventory",
+      category: "kitchen",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Master prep and inventory management.\n\nDuration: 6–8 Hours\n\nKey Components:\n• Prep: Chop trinity for Grillades & Grits\n• Inventory: FIFO (First In, First Out), label low stock items\n• Storage: Date and organize all items\n• Cleaning: Sanitize workstations\n\nActivities:\n• Prep Maque Choux ingredients\n• Mock inventory check\n\nAssessment: Practical prep test",
+      keyPoints: ["FIFO rotation", "Trinity prep", "Labeling requirements", "Station sanitation"],
+      sequenceOrder: 4,
+    },
+    {
+      title: "Day 3: Cooking Stations",
+      category: "kitchen",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Learn station techniques.\n\nDuration: 6–8 Hours\n\nStations:\n• Grill: Big Easy Steak\n• Sauté: Chicken Piccata\n• Fry: Chicken Fried Steak\n\nKey Components:\n• Recipe: Cook Shrimp & Grits\n• Timing: Coordinate with expo\n• Plating: Ensure consistency\n\nActivities:\n• Cook and plate per station\n• Station rotation practice\n\nAssessment: Cooking and plating test",
+      keyPoints: ["Station-specific techniques", "Expo coordination", "Plating consistency", "Speed focus"],
+      sequenceOrder: 5,
+    },
+    {
+      title: "Day 4: Advanced Techniques",
+      category: "kitchen",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Handle complex orders.\n\nDuration: 6–8 Hours\n\nKey Components:\n• Special Diets: Gluten-free Jambalaya Pasta (use basmati rice)\n• High-Volume: Scale recipes for large parties\n• Emergencies: Burns (cool, cover), equipment issues\n\nActivities:\n• Simulate rush with special orders\n• Scale a recipe exercise\n\nAssessment: Multitasking evaluation",
+      keyPoints: ["Dietary modifications", "Recipe scaling", "Emergency response", "Rush simulation"],
+      sequenceOrder: 6,
+    },
+    {
+      title: "Day 5: Event Prep",
+      category: "kitchen",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Prepare for special events.\n\nDuration: 6–8 Hours\n\nKey Components:\n• Event: Crawfish Boils (pre-order crawfish)\n• Happy Hour: Quick appetizer prep\n• Coordination: Align with front-of-house timing\n\nActivities:\n• Mock Crawfish Boil prep\n• Batch appetizers for Happy Hour\n\nAssessment: Event prep test",
+      keyPoints: ["Crawfish Boil execution", "Happy Hour efficiency", "FOH coordination", "Batch preparation"],
+      sequenceOrder: 7,
+    },
+    {
+      title: "Day 6: Team Coordination",
+      category: "kitchen",
+      section: "Training Schedule",
+      contentType: "procedure",
+      content: "Objective: Enhance teamwork.\n\nDuration: 6–8 Hours\n\nKey Components:\n• Communication: Verbal calls (\"order in,\" \"heard,\" \"behind\")\n• Support: Assist dishwashers during rush\n• Conflict: Report issues to Kitchen Manager\n\nActivities:\n• Simulate team shift with communication focus\n• Role-play conflict resolution\n\nAssessment: Teamwork evaluation",
+      keyPoints: ["Kitchen calls", "Cross-station support", "Conflict escalation", "Team cohesion"],
+      sequenceOrder: 8,
+    },
+    {
+      title: "Day 7: Final Evaluation",
+      category: "kitchen",
+      section: "Training Schedule",
+      contentType: "assessment",
+      content: "Objective: Confirm readiness for independent kitchen work.\n\nDuration: 6–8 Hours\n\nKey Components:\n• Full shift simulation\n• Review: Safety, recipes, teamwork\n• Feedback session with Kitchen Manager\n\nActivities:\n• Mock shift covering all stations\n• Complete closing checklist\n\nAssessment:\n• Written test: 90% pass rate required\n• Practical review by Executive Chef/Kitchen Manager\n\nNote: 90-day probationary period follows successful completion",
+      keyPoints: ["Full shift demonstration", "90% written test", "All stations covered", "90-day probation"],
+      sequenceOrder: 9,
+    },
+    {
+      title: "Kitchen Policies Summary",
+      category: "kitchen",
+      section: "Policies",
+      contentType: "checklist",
+      content: "ATTENDANCE:\n□ Arrive 15 minutes early\n□ Notify Kitchen Manager 4 hours in advance for absences\n□ Unexcused absences: verbal warning → written warning → termination\n\nHEALTH & SAFETY:\n□ Cold storage: 40°F\n□ Hot holding: 165°F\n□ Gloves for ready-to-eat food\n□ Wash hands after handling raw items\n□ New cutting boards for raw vs. cooked\n□ Texas Food Handler's Permit within 30 days\n□ Sani buckets at each station\n\nBREAKS:\n□ One 30-minute unpaid break per shift over 6 hours\n□ One free meal per shift (eat away from prep areas)\n\nCELL PHONES:\n□ No phones in kitchen\n□ Use restaurant phone for emergencies",
+      keyPoints: ["15-minute early arrival", "4-hour call-out notice", "Temperature standards", "30-day permit deadline"],
+      sequenceOrder: 10,
+    },
+    {
+      title: "Station Setup & Closing",
+      category: "kitchen",
+      section: "Operations",
+      contentType: "procedure",
+      content: "STATION SETUP:\n• Arrive in full uniform\n• Check prep list\n• Stock stations with required items\n• Verify mise en place\n\nEND-OF-SHIFT:\n• Sanitize all stations\n• Store leftovers properly (labeled, dated)\n• Sweep and mop area\n• Check out with Kitchen Manager\n\nCLEANING SCHEDULES:\n• Daily Morning: Griddles\n• Daily Evening: Fryers, floors\n• Weekly Monday: Cooler deep clean\n• Weekly Friday: Ovens\n• Monthly: Fryer filter changes",
+      keyPoints: ["Prep list verification", "Proper storage", "Manager checkout", "Cleaning rotation"],
+      sequenceOrder: 11,
+    },
+    {
+      title: "Kitchen Assessment Questions",
+      category: "kitchen",
+      section: "Assessments",
+      contentType: "assessment",
+      content: "FOOD SAFETY:\n• Cold storage temperature? (40°F)\n• Cross-contamination prevention? (Separate cutting boards)\n• Pest control protocol? (Report to management)\n\nRECIPE KNOWLEDGE:\n• Key ingredients in Shrimp & Grits?\n• Prep steps for Chicken Fried Steak?\n• Sauce for Cajun Colette?\n\nOPERATIONS:\n• Fryer failure protocol?\n• Crawfish Boil prep sequence?\n• End-of-shift closing steps?\n\nTEAMWORK:\n• How to support during rush?\n• Proper verbal call for orders?\n• How to report conflicts?",
+      keyPoints: ["Safety standards", "Recipe execution", "Equipment protocols", "Communication"],
+      sequenceOrder: 12,
+    },
+  ];
+
+  // Seed server templates
+  for (const template of serverTemplates) {
+    await storage.createTemplate(template);
+  }
+
+  // Seed kitchen templates
+  for (const template of kitchenTemplates) {
+    await storage.createTemplate(template);
+  }
 }

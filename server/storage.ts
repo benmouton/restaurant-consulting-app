@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, type Domain, type FrameworkContent, type UserBookmark } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
@@ -16,6 +16,11 @@ export interface IStorage {
   getUserBookmarks(userId: string): Promise<UserBookmark[]>;
   addBookmark(userId: string, contentId: number): Promise<UserBookmark>;
   removeBookmark(userId: string, contentId: number): Promise<void>;
+  
+  // Training Templates
+  getTrainingTemplates(): Promise<TrainingTemplate[]>;
+  getTemplatesByCategory(category: string): Promise<TrainingTemplate[]>;
+  createTemplate(template: Omit<TrainingTemplate, "id">): Promise<TrainingTemplate>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -72,6 +77,22 @@ export class DatabaseStorage implements IStorage {
   async removeBookmark(userId: string, contentId: number): Promise<void> {
     await db.delete(userBookmarks)
       .where(and(eq(userBookmarks.userId, userId), eq(userBookmarks.contentId, contentId)));
+  }
+  
+  // Training Templates
+  async getTrainingTemplates(): Promise<TrainingTemplate[]> {
+    return await db.select().from(trainingTemplates).orderBy(trainingTemplates.category, trainingTemplates.sequenceOrder);
+  }
+  
+  async getTemplatesByCategory(category: string): Promise<TrainingTemplate[]> {
+    return await db.select().from(trainingTemplates)
+      .where(eq(trainingTemplates.category, category))
+      .orderBy(trainingTemplates.sequenceOrder);
+  }
+  
+  async createTemplate(template: Omit<TrainingTemplate, "id">): Promise<TrainingTemplate> {
+    const [newTemplate] = await db.insert(trainingTemplates).values(template).returning();
+    return newTemplate;
   }
 }
 
