@@ -1,0 +1,179 @@
+Kitchen Operations
+
+The kitchen is a system, not a personality contest.
+Prep discipline, ticket flow, and BOH accountability produce consistency under pressure.
+
+⸻
+
+Principle
+
+Core Principle: The Kitchen Is a Production System
+
+The kitchen exists to produce consistent food at speed, under pressure, every shift.
+
+It is not:
+	•	a platform for ego
+	•	a democracy during service
+	•	a place where talent overrides standards
+
+When personalities drive the kitchen, consistency dies.
+When systems drive the kitchen, food quality becomes predictable.
+
+If results change based on who’s on the line, the system is broken.
+
+⸻
+
+Checklist
+
+Prep Discipline Standards (Non-Negotiable)
+
+DAILY PREP REQUIREMENTS
+
+□ Par levels reviewed against reservations + historical walk-ins
+□ Prep list written by KM or Sous before prep cook arrives
+□ FIFO rotation verified during prep, not after
+□ All containers dated, labeled, and legible
+□ Prep completion signed off before service begins
+
+Rule:
+If prep is not signed off, it is not complete.
+Unfinished prep discovered during service = planning failure.
+
+⸻
+
+WEEKLY CONTROLS
+
+□ Walk-in fully organized and deep-cleaned
+□ Par levels adjusted using actual usage, not habit
+□ Waste log reviewed with top 3 causes identified
+□ Equipment checklist completed and deficiencies logged
+
+Repeating shortages are never a cook problem — they are a system failure.
+
+⸻
+
+Framework
+
+Ticket Flow Protocol
+
+Expo Is the Control Tower
+
+EXPO CONTROLS THE WINDOW. PERIOD.
+
+There is one voice at the pass.
+Chaos at the window = leadership failure, not effort failure.
+
+⸻
+
+STANDARD FLOW
+
+• Expo reads ticket and assigns stations
+• Stations verbally confirm with “Heard”
+• Station calls “Walking [item]” when plating
+• Expo calls “Pick up [table]” when complete
+• Runner confirms table number, not plates
+
+Silent kitchens create slow kitchens.
+
+⸻
+
+TICKET TIMING STANDARDS
+
+• Appetizers: 8–10 minutes
+• Entrées: 15–18 minutes after apps clear
+• Desserts: 6–8 minutes
+
+Consistency matters more than occasional speed.
+
+⸻
+
+DYING IN THE WINDOW (QUALITY CONTROL RULE)
+
+• Food waiting over 90 seconds = quality failure
+• Expo immediately calls for runner
+• Third occurrence in one service = runner coaching required
+
+Food dying in the window counts as a BOH miss — not FOH.
+
+⸻
+
+Framework
+
+Line Discipline Rules
+
+• One voice at the window: Expo
+• No arguing during service — resolve after
+• Missed calls are acknowledged and corrected immediately
+• Repeated breakdowns trigger post-shift review
+
+The line is not a debate stage.
+Service time is execution time.
+
+⸻
+
+Script
+
+BOH Performance Coaching Script
+
+(Private. Specific. Calm. Documented when patterned.)
+
+“Hey, can we step off the line for a minute?”
+
+“Tonight I noticed [specific behavior] — for example,
+‘tickets sat in the window over 90 seconds multiple times.’”
+
+“Help me understand what was happening.”
+
+[Listen fully. Do not interrupt.]
+
+“Here’s what needs to happen going forward:
+[clear, observable expectation].”
+
+“Can you commit to that?”
+
+“Thanks. I know it’s busy. Let’s get back in there.”
+
+Document after service if the issue repeats.
+
+⸻
+
+Enforcement & Accountability Loop
+
+(This is what makes the system real.)
+
+Every BOH standard must include:
+	1.	Owner (KM / Expo / Runner)
+	2.	Expectation (written, observable)
+	3.	Verification (when/how it’s checked)
+	4.	Correction (real-time)
+	5.	Documentation (patterns, not one-offs)
+
+If the same issue repeats:
+	•	redesign the system first
+	•	retrain second
+	•	discipline only when standards are clear and ignored
+
+⸻
+
+Consultant’s Bottom Line
+
+Great kitchens don’t rely on heroes.
+They rely on boring, disciplined systems executed every shift.
+
+If your food quality depends on personalities, you don’t have operations — you have risk.
+
+⸻
+
+Optional AI Tool Tie-In (Perfect for This Section)
+
+Kitchen Execution Compliance Engine
+	•	Flags prep misses before service
+	•	Tracks ticket timing vs standards
+	•	Identifies window bottlenecks
+	•	Generates KM coaching focus for next shift
+
+If you want, I can:
+	•	convert this into KM audit checklists
+	•	wire it into POS ticket-time data
+	•	build the AI Expo Coach
+	•	add weekly BOH performance dashboards

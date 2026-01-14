@@ -264,6 +264,292 @@ function FoodCostCalculator() {
   );
 }
 
+function KitchenComplianceEngine() {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<"preservice" | "postservice">("preservice");
+  const [prepIssues, setPrepIssues] = useState<string>("");
+  const [ticketTimes, setTicketTimes] = useState<string>("");
+  const [windowIssues, setWindowIssues] = useState<string>("");
+  const [staffingNotes, setStaffingNotes] = useState<string>("");
+  const [serviceVolume, setServiceVolume] = useState<string>("");
+  const [analysis, setAnalysis] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const generateAnalysis = async () => {
+    setIsGenerating(true);
+    setAnalysis("");
+
+    try {
+      const prompt = mode === "preservice"
+        ? `Generate a pre-service kitchen readiness check and focus areas.
+
+PREP STATUS/ISSUES NOTED:
+${prepIssues || "No issues reported"}
+
+STAFFING NOTES:
+${staffingNotes || "Standard staffing"}
+
+EXPECTED SERVICE VOLUME:
+${serviceVolume || "Normal volume"}
+
+Based on kitchen operations best practices, provide:
+
+PRE-SERVICE READINESS CHECK:
+□ [Critical items to verify before doors open]
+□ [Station-specific checks]
+□ [Communication points for expo]
+
+RISK AREAS FOR THIS SERVICE:
+• [Identify potential bottlenecks based on prep status]
+• [Flag any staffing concerns]
+• [Note timing risks]
+
+EXPO FOCUS POINTS:
+• [What expo should watch for tonight]
+• [Communication reminders]
+• [Quality checkpoints]
+
+KM PRE-SHIFT BRIEFING NOTES:
+[2-3 key messages for the team]
+
+Be specific and actionable. This is for a real service.`
+        : `Generate a post-service kitchen performance analysis and coaching focus.
+
+TICKET TIMING OBSERVATIONS:
+${ticketTimes || "Not specified"}
+
+WINDOW/EXPO ISSUES:
+${windowIssues || "None reported"}
+
+PREP ISSUES DISCOVERED DURING SERVICE:
+${prepIssues || "None"}
+
+SERVICE VOLUME:
+${serviceVolume || "Normal"}
+
+Based on kitchen operations standards:
+• Appetizers: 8–10 minutes
+• Entrées: 15–18 minutes after apps clear  
+• Desserts: 6–8 minutes
+• Window time max: 90 seconds
+
+Provide a structured post-service analysis:
+
+PERFORMANCE SUMMARY:
+[Overall assessment of tonight's execution]
+
+TICKET TIMING ANALYSIS:
+✅ [What hit standards]
+❌ [What missed and by how much]
+
+WINDOW EFFICIENCY:
+• Food dying in window occurrences: [estimate based on notes]
+• Root cause: [BOH timing / FOH runner response / communication]
+
+SYSTEM FAILURES IDENTIFIED:
+[Issues that are system problems, not people problems]
+
+COACHING FOCUS FOR NEXT SHIFT:
+• Station: [which station needs attention]
+• Issue: [specific, observable behavior]
+• Standard: [what should happen instead]
+
+KM ACTION ITEMS:
+□ [Specific follow-ups before next service]
+□ [Prep adjustments needed]
+□ [Training or coaching required]
+
+If patterns repeat, redesign the system first, retrain second, discipline only when standards are clear and ignored.`;
+
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: prompt }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate analysis");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setAnalysis(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate analysis", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(analysis);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          Kitchen Execution Compliance Engine
+        </CardTitle>
+        <CardDescription>
+          Pre-service readiness checks and post-service performance analysis. Systems over personalities.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "preservice" | "postservice")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="preservice" data-testid="tab-preservice">Pre-Service Check</TabsTrigger>
+            <TabsTrigger value="postservice" data-testid="tab-postservice">Post-Service Analysis</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="preservice" className="space-y-4 mt-4">
+            <div>
+              <Label htmlFor="prepIssuesPre">Prep Status / Issues Noted</Label>
+              <Textarea
+                id="prepIssuesPre"
+                placeholder="e.g., Behind on sauces, short on salmon portions, new prep cook on station..."
+                className="mt-1 min-h-[80px]"
+                value={prepIssues}
+                onChange={(e) => setPrepIssues(e.target.value)}
+                data-testid="input-prep-issues-pre"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="staffingNotes">Staffing Notes</Label>
+                <Textarea
+                  id="staffingNotes"
+                  placeholder="e.g., Down one line cook, new expo training..."
+                  className="mt-1 min-h-[60px]"
+                  value={staffingNotes}
+                  onChange={(e) => setStaffingNotes(e.target.value)}
+                  data-testid="input-staffing-notes"
+                />
+              </div>
+              <div>
+                <Label htmlFor="serviceVolumePre">Expected Volume</Label>
+                <Textarea
+                  id="serviceVolumePre"
+                  placeholder="e.g., 120 covers, large party at 7:30..."
+                  className="mt-1 min-h-[60px]"
+                  value={serviceVolume}
+                  onChange={(e) => setServiceVolume(e.target.value)}
+                  data-testid="input-service-volume-pre"
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="postservice" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="ticketTimes">Ticket Timing Observations</Label>
+                <Textarea
+                  id="ticketTimes"
+                  placeholder="e.g., Apps running 12-15 min, grill station backed up during 7pm push..."
+                  className="mt-1 min-h-[80px]"
+                  value={ticketTimes}
+                  onChange={(e) => setTicketTimes(e.target.value)}
+                  data-testid="input-ticket-times"
+                />
+              </div>
+              <div>
+                <Label htmlFor="windowIssues">Window / Expo Issues</Label>
+                <Textarea
+                  id="windowIssues"
+                  placeholder="e.g., Food dying in window 4-5 times, runners slow to respond, miscommunication on table 12..."
+                  className="mt-1 min-h-[80px]"
+                  value={windowIssues}
+                  onChange={(e) => setWindowIssues(e.target.value)}
+                  data-testid="input-window-issues"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="prepIssuesPost">Prep Issues During Service</Label>
+                <Textarea
+                  id="prepIssuesPost"
+                  placeholder="e.g., Ran out of risotto base, mislabeled containers..."
+                  className="mt-1 min-h-[60px]"
+                  value={prepIssues}
+                  onChange={(e) => setPrepIssues(e.target.value)}
+                  data-testid="input-prep-issues-post"
+                />
+              </div>
+              <div>
+                <Label htmlFor="serviceVolumePost">Actual Volume</Label>
+                <Textarea
+                  id="serviceVolumePost"
+                  placeholder="e.g., 98 covers, steady but manageable..."
+                  className="mt-1 min-h-[60px]"
+                  value={serviceVolume}
+                  onChange={(e) => setServiceVolume(e.target.value)}
+                  data-testid="input-service-volume-post"
+                />
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <Button 
+          onClick={generateAnalysis} 
+          disabled={isGenerating}
+          className="w-full"
+          data-testid="btn-generate-kitchen"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating {mode === "preservice" ? "readiness check" : "performance analysis"}...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {mode === "preservice" ? "Generate Pre-Service Check" : "Generate Post-Service Analysis"}
+            </>
+          )}
+        </Button>
+
+        {analysis && (
+          <div className="mt-4 space-y-4">
+            <div className="p-4 bg-accent/50 rounded-lg">
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                {analysis}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-kitchen">
+              <Copy className="h-4 w-4 mr-2" />
+              Copy to Clipboard
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function HRComplianceEngine() {
   const { toast } = useToast();
   const [issueType, setIssueType] = useState<string>("");
@@ -2172,6 +2458,9 @@ export default function DomainPage() {
 
         {/* HR Compliance Engine - only show for hr domain */}
         {slug === "hr" && <HRComplianceEngine />}
+
+        {/* Kitchen Compliance Engine - only show for kitchen domain */}
+        {slug === "kitchen" && <KitchenComplianceEngine />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">
