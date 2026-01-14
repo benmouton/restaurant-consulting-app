@@ -266,12 +266,13 @@ function FoodCostCalculator() {
 
 function KitchenComplianceEngine() {
   const { toast } = useToast();
-  const [mode, setMode] = useState<"preservice" | "postservice">("preservice");
-  const [prepIssues, setPrepIssues] = useState<string>("");
+  const [mode, setMode] = useState<"readiness" | "alerts" | "debrief" | "coaching">("readiness");
+  const [prepCompletion, setPrepCompletion] = useState<string>("");
+  const [wasteNotes, setWasteNotes] = useState<string>("");
   const [ticketTimes, setTicketTimes] = useState<string>("");
-  const [windowIssues, setWindowIssues] = useState<string>("");
-  const [staffingNotes, setStaffingNotes] = useState<string>("");
-  const [serviceVolume, setServiceVolume] = useState<string>("");
+  const [windowDelays, setWindowDelays] = useState<string>("");
+  const [volumeStaffing, setVolumeStaffing] = useState<string>("");
+  const [managerNotes, setManagerNotes] = useState<string>("");
   const [analysis, setAnalysis] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -280,86 +281,209 @@ function KitchenComplianceEngine() {
     setAnalysis("");
 
     try {
-      const prompt = mode === "preservice"
-        ? `Generate a pre-service kitchen readiness check and focus areas.
+      let prompt = "";
+      
+      if (mode === "readiness") {
+        prompt = `Generate a Kitchen Readiness Score for pre-service assessment.
 
-PREP STATUS/ISSUES NOTED:
-${prepIssues || "No issues reported"}
+PREP COMPLETION STATUS:
+${prepCompletion || "Not specified"}
 
-STAFFING NOTES:
-${staffingNotes || "Standard staffing"}
+WASTE LOG TRENDS:
+${wasteNotes || "No waste issues noted"}
 
-EXPECTED SERVICE VOLUME:
-${serviceVolume || "Normal volume"}
+VOLUME VS STAFFING:
+${volumeStaffing || "Standard"}
 
-Based on kitchen operations best practices, provide:
+MANAGER NOTES:
+${managerNotes || "None"}
 
-PRE-SERVICE READINESS CHECK:
-□ [Critical items to verify before doors open]
-□ [Station-specific checks]
-□ [Communication points for expo]
+Analyze and produce a structured readiness assessment:
 
-RISK AREAS FOR THIS SERVICE:
-• [Identify potential bottlenecks based on prep status]
-• [Flag any staffing concerns]
-• [Note timing risks]
+KITCHEN READINESS SCORE: [XX/100]
 
-EXPO FOCUS POINTS:
-• [What expo should watch for tonight]
-• [Communication reminders]
-• [Quality checkpoints]
+Based on:
+• Prep completion timing and quality
+• Par level accuracy
+• Waste pattern analysis
+• Staffing vs projected volume
 
-KM PRE-SHIFT BRIEFING NOTES:
-[2-3 key messages for the team]
+RISK FACTORS:
+• [Flag specific risks before doors open]
+• [Identify stations at risk]
+• [Note any repeating patterns]
 
-Be specific and actionable. This is for a real service.`
-        : `Generate a post-service kitchen performance analysis and coaching focus.
+STATION-BY-STATION CHECK:
+□ Grill: [status]
+□ Sauté: [status]
+□ Pantry/Cold: [status]
+□ Fry: [status]
+□ Expo: [status]
+
+PRE-SERVICE ACTIONS REQUIRED:
+1. [Immediate priority]
+2. [Secondary priority]
+3. [Watch items]
+
+KM BRIEFING POINTS:
+[2-3 specific messages for the team based on risk areas]
+
+Flag risks before they become service failures.`;
+      } else if (mode === "alerts") {
+        prompt = `Generate Service Execution Alerts based on during-service observations.
+
+TICKET TIMING DATA:
+${ticketTimes || "Not specified"}
+
+WINDOW/EXPO DELAYS:
+${windowDelays || "None noted"}
+
+VOLUME VS STAFFING:
+${volumeStaffing || "Standard"}
+
+MANAGER NOTES:
+${managerNotes || "None"}
+
+Standards for reference:
+• Appetizers: 8–10 minutes
+• Entrées: 15–18 minutes after apps clear
+• Desserts: 6–8 minutes
+• Window dwell max: 90 seconds
+
+Generate real-time style alerts:
+
+ACTIVE ALERTS:
+
+🔴 CRITICAL (Immediate action required):
+[e.g., "Entrée tickets exceeding 18 minutes. Check grill station pacing."]
+
+🟡 WARNING (Monitor closely):
+[e.g., "Window dwell approaching 90 seconds on 3 tickets. Call runners."]
+
+🟢 ON TRACK:
+[What's working well]
+
+BOTTLENECK ANALYSIS:
+• Primary bottleneck: [station/position]
+• Root cause: [system issue, not person]
+• Immediate fix: [specific action]
+
+EXPO COMMUNICATION CHECK:
+• Are "heard" calls happening? [Yes/No/Partial]
+• Are "walking" calls clear? [Yes/No/Partial]
+• Are "pick up" calls timely? [Yes/No/Partial]
+
+RUNNER DEPLOYMENT:
+[Recommendation for runner positioning based on flow]
+
+These are real-time corrections, not post-shift analysis.`;
+      } else if (mode === "debrief") {
+        prompt = `Generate a Post-Shift KM Debrief based on service performance.
 
 TICKET TIMING OBSERVATIONS:
 ${ticketTimes || "Not specified"}
 
 WINDOW/EXPO ISSUES:
-${windowIssues || "None reported"}
+${windowDelays || "None noted"}
 
-PREP ISSUES DISCOVERED DURING SERVICE:
-${prepIssues || "None"}
+PREP ISSUES DISCOVERED:
+${prepCompletion || "None"}
 
-SERVICE VOLUME:
-${serviceVolume || "Normal"}
+WASTE DURING SERVICE:
+${wasteNotes || "None noted"}
 
-Based on kitchen operations standards:
-• Appetizers: 8–10 minutes
-• Entrées: 15–18 minutes after apps clear  
-• Desserts: 6–8 minutes
-• Window time max: 90 seconds
+VOLUME VS STAFFING:
+${volumeStaffing || "Standard"}
 
-Provide a structured post-service analysis:
+MANAGER NOTES:
+${managerNotes || "None"}
 
-PERFORMANCE SUMMARY:
-[Overall assessment of tonight's execution]
+Generate a structured KM debrief:
 
-TICKET TIMING ANALYSIS:
-✅ [What hit standards]
-❌ [What missed and by how much]
+SERVICE SUMMARY:
+[Overall assessment - 2-3 sentences]
 
-WINDOW EFFICIENCY:
-• Food dying in window occurrences: [estimate based on notes]
-• Root cause: [BOH timing / FOH runner response / communication]
+WHAT BROKE:
+1. [Primary breakdown]
+2. [Secondary breakdown]
+3. [Third issue if applicable]
 
-SYSTEM FAILURES IDENTIFIED:
-[Issues that are system problems, not people problems]
+WHY IT BROKE (System-Level Analysis):
+• [Root cause 1 - focus on system, not person]
+• [Root cause 2]
+• [Root cause 3]
 
-COACHING FOCUS FOR NEXT SHIFT:
-• Station: [which station needs attention]
-• Issue: [specific, observable behavior]
-• Standard: [what should happen instead]
+WHAT TO FIX TOMORROW:
+□ [Specific prep adjustment]
+□ [Staffing/positioning change]
+□ [Communication improvement]
+□ [Equipment or par level fix]
 
-KM ACTION ITEMS:
-□ [Specific follow-ups before next service]
-□ [Prep adjustments needed]
-□ [Training or coaching required]
+TOP BREAKDOWN DETAIL:
+• Issue: [specific description]
+• Root Cause: [system-level why]
+• Fix: [concrete action for next shift]
 
-If patterns repeat, redesign the system first, retrain second, discipline only when standards are clear and ignored.`;
+PATTERN WATCH:
+[Any issues that have occurred multiple shifts - flag for system redesign]
+
+DOCUMENTATION REQUIRED:
+[Any incidents that need formal documentation]
+
+Focus on systems, not personalities. If the same issue repeats, redesign first.`;
+      } else {
+        prompt = `Generate a BOH Coaching Focus recommendation based on service observations.
+
+TICKET TIMING DATA:
+${ticketTimes || "Not specified"}
+
+WINDOW/EXPO ISSUES:
+${windowDelays || "None noted"}
+
+MANAGER NOTES:
+${managerNotes || "None"}
+
+Identify ONE specific coaching focus to prevent scattershot corrections:
+
+BOH COACHING FOCUS
+
+TARGET: [Station or Position]
+
+BEHAVIOR TO COACH:
+[Specific, observable behavior - not attitude or effort]
+
+STANDARD BEING MISSED:
+[What should happen instead]
+
+EVIDENCE:
+[Specific observations that support this focus]
+• [Example 1]
+• [Example 2]
+
+COACHING SCRIPT:
+"Hey, can I grab you for a second?"
+
+[Opening - acknowledge the work]
+
+[Specific observation - no accusations]
+
+[Standard reminder - what we need]
+
+[Commitment ask]
+
+[Close - back to work]
+
+WHY THIS MATTERS:
+[Connect to guest experience or team impact]
+
+VERIFICATION:
+[How to check if coaching worked next shift]
+
+DO NOT COACH:
+[Other issues to ignore for now - one focus at a time]
+
+One behavior. One conversation. Consistent follow-up.`;
+      }
 
       const res = await fetch("/api/consultant/ask", {
         method: "POST",
@@ -405,110 +529,210 @@ If patterns repeat, redesign the system first, retrain second, discipline only w
     toast({ title: "Copied to clipboard!" });
   };
 
+  const modeLabels = {
+    readiness: "Readiness Score",
+    alerts: "Service Alerts",
+    debrief: "KM Debrief",
+    coaching: "Coaching Focus"
+  };
+
   return (
     <Card className="mb-8">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          Kitchen Execution Compliance Engine
+          Kitchen Execution & Line Discipline Engine
         </CardTitle>
         <CardDescription>
-          Pre-service readiness checks and post-service performance analysis. Systems over personalities.
+          Turn prep, ticket flow, and window discipline into measurable standards. Where is the system failing — not who?
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Tabs value={mode} onValueChange={(v) => setMode(v as "preservice" | "postservice")} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="preservice" data-testid="tab-preservice">Pre-Service Check</TabsTrigger>
-            <TabsTrigger value="postservice" data-testid="tab-postservice">Post-Service Analysis</TabsTrigger>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="readiness" data-testid="tab-readiness">Readiness</TabsTrigger>
+            <TabsTrigger value="alerts" data-testid="tab-alerts">Alerts</TabsTrigger>
+            <TabsTrigger value="debrief" data-testid="tab-debrief">Debrief</TabsTrigger>
+            <TabsTrigger value="coaching" data-testid="tab-coaching">Coaching</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="preservice" className="space-y-4 mt-4">
+          <TabsContent value="readiness" className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">Pre-service readiness check. Are we actually prepared?</p>
             <div>
-              <Label htmlFor="prepIssuesPre">Prep Status / Issues Noted</Label>
+              <Label htmlFor="prepCompletion">Prep Completion Status</Label>
               <Textarea
-                id="prepIssuesPre"
-                placeholder="e.g., Behind on sauces, short on salmon portions, new prep cook on station..."
+                id="prepCompletion"
+                placeholder="e.g., Prep signed off at 4:45 (15 min late), protein par adjusted down yesterday, sauté station behind on mise..."
                 className="mt-1 min-h-[80px]"
-                value={prepIssues}
-                onChange={(e) => setPrepIssues(e.target.value)}
-                data-testid="input-prep-issues-pre"
+                value={prepCompletion}
+                onChange={(e) => setPrepCompletion(e.target.value)}
+                data-testid="input-prep-completion"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="staffingNotes">Staffing Notes</Label>
+                <Label htmlFor="wasteNotes">Waste Log Trends</Label>
                 <Textarea
-                  id="staffingNotes"
-                  placeholder="e.g., Down one line cook, new expo training..."
+                  id="wasteNotes"
+                  placeholder="e.g., Repeating waste on sauté station, over-prepped garnishes last 3 days..."
                   className="mt-1 min-h-[60px]"
-                  value={staffingNotes}
-                  onChange={(e) => setStaffingNotes(e.target.value)}
-                  data-testid="input-staffing-notes"
+                  value={wasteNotes}
+                  onChange={(e) => setWasteNotes(e.target.value)}
+                  data-testid="input-waste-notes"
                 />
               </div>
               <div>
-                <Label htmlFor="serviceVolumePre">Expected Volume</Label>
+                <Label htmlFor="volumeStaffingReadiness">Volume vs Staffing</Label>
                 <Textarea
-                  id="serviceVolumePre"
-                  placeholder="e.g., 120 covers, large party at 7:30..."
+                  id="volumeStaffingReadiness"
+                  placeholder="e.g., 130 covers projected, full staff, large party at 7..."
                   className="mt-1 min-h-[60px]"
-                  value={serviceVolume}
-                  onChange={(e) => setServiceVolume(e.target.value)}
-                  data-testid="input-service-volume-pre"
+                  value={volumeStaffing}
+                  onChange={(e) => setVolumeStaffing(e.target.value)}
+                  data-testid="input-volume-staffing-readiness"
                 />
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="postservice" className="space-y-4 mt-4">
+          <TabsContent value="alerts" className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">During-service execution alerts. Is ticket flow breaking down?</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="ticketTimes">Ticket Timing Observations</Label>
+                <Label htmlFor="ticketTimesAlerts">Ticket Timing Observations</Label>
                 <Textarea
-                  id="ticketTimes"
-                  placeholder="e.g., Apps running 12-15 min, grill station backed up during 7pm push..."
+                  id="ticketTimesAlerts"
+                  placeholder="e.g., Apps at 12 min, entrées pushing 20 min, grill backed up..."
                   className="mt-1 min-h-[80px]"
                   value={ticketTimes}
                   onChange={(e) => setTicketTimes(e.target.value)}
-                  data-testid="input-ticket-times"
+                  data-testid="input-ticket-times-alerts"
                 />
               </div>
               <div>
-                <Label htmlFor="windowIssues">Window / Expo Issues</Label>
+                <Label htmlFor="windowDelaysAlerts">Window / Expo Delays</Label>
                 <Textarea
-                  id="windowIssues"
-                  placeholder="e.g., Food dying in window 4-5 times, runners slow to respond, miscommunication on table 12..."
+                  id="windowDelaysAlerts"
+                  placeholder="e.g., Food sitting 2+ min multiple times, runners not responding to calls..."
                   className="mt-1 min-h-[80px]"
-                  value={windowIssues}
-                  onChange={(e) => setWindowIssues(e.target.value)}
-                  data-testid="input-window-issues"
+                  value={windowDelays}
+                  onChange={(e) => setWindowDelays(e.target.value)}
+                  data-testid="input-window-delays-alerts"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="volumeStaffingAlerts">Current Volume vs Staffing</Label>
+              <Input
+                id="volumeStaffingAlerts"
+                placeholder="e.g., 85 covers in, 4 servers, 3 cooks"
+                className="mt-1"
+                value={volumeStaffing}
+                onChange={(e) => setVolumeStaffing(e.target.value)}
+                data-testid="input-volume-staffing-alerts"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="debrief" className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">Post-shift analysis. What broke, why, and what to fix tomorrow.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="ticketTimesDebrief">Ticket Timing Issues</Label>
+                <Textarea
+                  id="ticketTimesDebrief"
+                  placeholder="e.g., Entrées averaged 22 min during 7-8pm push..."
+                  className="mt-1 min-h-[80px]"
+                  value={ticketTimes}
+                  onChange={(e) => setTicketTimes(e.target.value)}
+                  data-testid="input-ticket-times-debrief"
+                />
+              </div>
+              <div>
+                <Label htmlFor="windowDelaysDebrief">Window Problems</Label>
+                <Textarea
+                  id="windowDelaysDebrief"
+                  placeholder="e.g., Window congestion 7:15-8:00, 6 instances of food dying..."
+                  className="mt-1 min-h-[80px]"
+                  value={windowDelays}
+                  onChange={(e) => setWindowDelays(e.target.value)}
+                  data-testid="input-window-delays-debrief"
                 />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="prepIssuesPost">Prep Issues During Service</Label>
+                <Label htmlFor="prepIssuesDebrief">Prep Issues Discovered</Label>
                 <Textarea
-                  id="prepIssuesPost"
-                  placeholder="e.g., Ran out of risotto base, mislabeled containers..."
+                  id="prepIssuesDebrief"
+                  placeholder="e.g., Ran out of compound butter, mislabeled containers..."
                   className="mt-1 min-h-[60px]"
-                  value={prepIssues}
-                  onChange={(e) => setPrepIssues(e.target.value)}
-                  data-testid="input-prep-issues-post"
+                  value={prepCompletion}
+                  onChange={(e) => setPrepCompletion(e.target.value)}
+                  data-testid="input-prep-issues-debrief"
                 />
               </div>
               <div>
-                <Label htmlFor="serviceVolumePost">Actual Volume</Label>
+                <Label htmlFor="wasteDebrief">Service Waste</Label>
                 <Textarea
-                  id="serviceVolumePost"
-                  placeholder="e.g., 98 covers, steady but manageable..."
+                  id="wasteDebrief"
+                  placeholder="e.g., 4 remakes on grill, 2 wrong-plate fires..."
                   className="mt-1 min-h-[60px]"
-                  value={serviceVolume}
-                  onChange={(e) => setServiceVolume(e.target.value)}
-                  data-testid="input-service-volume-post"
+                  value={wasteNotes}
+                  onChange={(e) => setWasteNotes(e.target.value)}
+                  data-testid="input-waste-debrief"
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="managerNotesDebrief">Manager Notes</Label>
+              <Textarea
+                id="managerNotesDebrief"
+                placeholder="e.g., Runner coverage insufficient, new cook struggled on grill..."
+                className="mt-1 min-h-[60px]"
+                value={managerNotes}
+                onChange={(e) => setManagerNotes(e.target.value)}
+                data-testid="input-manager-notes-debrief"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="coaching" className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">Identify ONE behavior to coach. Prevents scattershot corrections.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="ticketTimesCoaching">Ticket/Timing Observations</Label>
+                <Textarea
+                  id="ticketTimesCoaching"
+                  placeholder="e.g., Consistent delays from sauté, grill timing off..."
+                  className="mt-1 min-h-[80px]"
+                  value={ticketTimes}
+                  onChange={(e) => setTicketTimes(e.target.value)}
+                  data-testid="input-ticket-times-coaching"
+                />
+              </div>
+              <div>
+                <Label htmlFor="windowDelaysCoaching">Communication Issues</Label>
+                <Textarea
+                  id="windowDelaysCoaching"
+                  placeholder="e.g., Missed 'pick up' calls, no 'heard' confirmations..."
+                  className="mt-1 min-h-[80px]"
+                  value={windowDelays}
+                  onChange={(e) => setWindowDelays(e.target.value)}
+                  data-testid="input-window-delays-coaching"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="managerNotesCoaching">Specific Observations</Label>
+              <Textarea
+                id="managerNotesCoaching"
+                placeholder="e.g., Expo not calling clear pick-ups, delays correlated with expo silence..."
+                className="mt-1 min-h-[60px]"
+                value={managerNotes}
+                onChange={(e) => setManagerNotes(e.target.value)}
+                data-testid="input-manager-notes-coaching"
+              />
             </div>
           </TabsContent>
         </Tabs>
@@ -522,12 +746,12 @@ If patterns repeat, redesign the system first, retrain second, discipline only w
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating {mode === "preservice" ? "readiness check" : "performance analysis"}...
+              Generating {modeLabels[mode]}...
             </>
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
-              {mode === "preservice" ? "Generate Pre-Service Check" : "Generate Post-Service Analysis"}
+              Generate {modeLabels[mode]}
             </>
           )}
         </Button>
