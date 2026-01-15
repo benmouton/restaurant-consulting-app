@@ -5,13 +5,25 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { OnboardingModal } from "@/components/onboarding-modal";
+import { SubscriptionGate } from "@/components/subscription-gate";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import DomainPage from "@/pages/domain";
 import ConsultantPage from "@/pages/consultant";
 import TemplatesPage from "@/pages/templates";
 import FinancialPage from "@/pages/financial";
+import SubscriptionPage from "@/pages/subscription";
+import SubscriptionSuccessPage from "@/pages/subscription-success";
+import SubscriptionCancelPage from "@/pages/subscription-cancel";
 import NotFound from "@/pages/not-found";
+
+function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
+  return (
+    <SubscriptionGate>
+      <Component />
+    </SubscriptionGate>
+  );
+}
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -29,10 +41,21 @@ function Router() {
       {user && <OnboardingModal user={user} />}
       <Switch>
         <Route path="/" component={user ? Dashboard : Landing} />
-        <Route path="/domain/:slug" component={user ? DomainPage : Landing} />
-        <Route path="/consultant" component={user ? ConsultantPage : Landing} />
-        <Route path="/templates" component={user ? TemplatesPage : Landing} />
-        <Route path="/financial" component={user ? FinancialPage : Landing} />
+        <Route path="/subscribe" component={SubscriptionPage} />
+        <Route path="/subscription/success" component={SubscriptionSuccessPage} />
+        <Route path="/subscription/cancel" component={SubscriptionCancelPage} />
+        <Route path="/domain/:slug">
+          {user ? <ProtectedPage component={DomainPage} /> : <Landing />}
+        </Route>
+        <Route path="/consultant">
+          {user ? <ProtectedPage component={ConsultantPage} /> : <Landing />}
+        </Route>
+        <Route path="/templates">
+          {user ? <ProtectedPage component={TemplatesPage} /> : <Landing />}
+        </Route>
+        <Route path="/financial">
+          {user ? <ProtectedPage component={FinancialPage} /> : <Landing />}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </>

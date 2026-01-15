@@ -10,6 +10,10 @@ import fs from "fs";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { parseDocument, type FinancialMetrics } from "./document-parser";
 import { registerChatRoutes } from "./replit_integrations/chat";
+import { stripeService } from "./stripeService";
+import { getStripePublishableKey } from "./stripeClient";
+import { sql } from "drizzle-orm";
+import { db } from "./db";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -100,6 +104,113 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
   registerChatRoutes(app);
+
+  // Stripe / Subscription Routes
+  app.get("/api/stripe/config", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get Stripe config" });
+    }
+  });
+
+  app.get("/api/subscription/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      
+      if (!user) {
+        return res.json({ hasSubscription: false });
+      }
+
+      if (user.stripeCustomerId) {
+        const subscription = await stripeService.getActiveSubscriptionForCustomer(user.stripeCustomerId);
+        if (subscription) {
+          await storage.updateUserStripeInfo(userId, {
+            stripeSubscriptionId: subscription.id as string,
+            subscriptionStatus: subscription.status as string,
+          });
+          return res.json({ 
+            hasSubscription: subscription.status === 'active',
+            subscriptionStatus: subscription.status,
+            subscriptionId: subscription.id
+          });
+        }
+      }
+
+      res.json({ 
+        hasSubscription: user.subscriptionStatus === 'active',
+        subscriptionStatus: user.subscriptionStatus 
+      });
+    } catch (error) {
+      console.error('Subscription status error:', error);
+      res.status(500).json({ error: "Failed to check subscription status" });
+    }
+  });
+
+  app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripeService.createCustomer(user.email || '', userId);
+        await storage.updateUserStripeInfo(userId, { stripeCustomerId: customer.id });
+        customerId = customer.id;
+      }
+
+      const prices = await db.execute(
+        sql`SELECT id FROM stripe.prices WHERE active = true ORDER BY unit_amount ASC LIMIT 1`
+      );
+      
+      if (!prices.rows || prices.rows.length === 0) {
+        return res.status(400).json({ error: "No subscription price available. Please run the product seed script." });
+      }
+
+      const priceId = prices.rows[0].id as string;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      const session = await stripeService.createCheckoutSession(
+        customerId,
+        priceId,
+        `${baseUrl}/subscription/success`,
+        `${baseUrl}/subscription/cancel`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error('Checkout error:', error);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  app.post("/api/subscription/portal", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      
+      if (!user?.stripeCustomerId) {
+        return res.status(400).json({ error: "No subscription found" });
+      }
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const session = await stripeService.createCustomerPortalSession(
+        user.stripeCustomerId,
+        `${baseUrl}/`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error('Portal error:', error);
+      res.status(500).json({ error: "Failed to create portal session" });
+    }
+  });
 
   // Domain Routes
   app.get(api.domains.list.path, async (req, res) => {
