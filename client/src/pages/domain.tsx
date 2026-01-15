@@ -354,13 +354,13 @@ Generate real-time style alerts:
 
 ACTIVE ALERTS:
 
-🔴 CRITICAL (Immediate action required):
+[CRITICAL] Immediate action required:
 [e.g., "Entrée tickets exceeding 18 minutes. Check grill station pacing."]
 
-🟡 WARNING (Monitor closely):
+[WARNING] Monitor closely:
 [e.g., "Window dwell approaching 90 seconds on 3 tickets. Call runners."]
 
-🟢 ON TRACK:
+[ON TRACK]:
 [What's working well]
 
 BOTTLENECK ANALYSIS:
