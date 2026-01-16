@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useAdmin } from "@/hooks/use-admin";
 
 interface SubscriptionStatus {
   hasSubscription: boolean;
@@ -10,6 +11,7 @@ interface SubscriptionStatus {
 
 export function useSubscription() {
   const { user, isLoading: authLoading } = useAuth();
+  const { isAdmin, isLoading: adminLoading } = useAdmin();
   
   const { data, isLoading, error } = useQuery<SubscriptionStatus>({
     queryKey: ["/api/subscription/status"],
@@ -42,15 +44,19 @@ export function useSubscription() {
     },
   });
 
+  // Admins get automatic access without subscription
+  const hasAccess = isAdmin || (data?.hasSubscription ?? false);
+
   return {
-    hasSubscription: data?.hasSubscription ?? false,
+    hasSubscription: hasAccess,
     subscriptionStatus: data?.subscriptionStatus,
-    isLoading,
+    isLoading: isLoading || adminLoading,
     error,
     checkout: checkoutMutation.mutate,
     isCheckingOut: checkoutMutation.isPending,
     openPortal: portalMutation.mutate,
     isOpeningPortal: portalMutation.isPending,
     refetch: () => queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] }),
+    isAdmin,
   };
 }
