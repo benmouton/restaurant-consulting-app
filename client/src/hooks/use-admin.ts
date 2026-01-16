@@ -1,23 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 
 export function useAdmin() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   
-  const { data, isLoading, error, isFetching } = useQuery<{ isAdmin: boolean }>({
-    queryKey: ["/api/admin/check"],
-    enabled: !!user && !authLoading,
-    retry: 2,
-    staleTime: 30000,
-  });
-
-  // If there's an error or still loading, treat as loading state
-  // This prevents showing subscription prompt before admin check completes
-  const stillLoading = authLoading || isLoading || (!data && isFetching);
+  // Use isAdmin directly from user data instead of separate API call
+  // This is more reliable since user data is already fetched
+  const isAdmin = user?.isAdmin === "true";
 
   return {
-    isAdmin: data?.isAdmin ?? false,
-    isLoading: stillLoading,
-    error,
+    isAdmin,
+    isLoading,
+    error: null,
   };
 }
