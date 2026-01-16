@@ -45,11 +45,25 @@ Preferred communication style: Simple, everyday language.
 - **Migrations**: Drizzle Kit with `db:push` command
 
 **Core Tables**:
-- `users` and `sessions`: Replit Auth user management
+- `users` and `sessions`: Replit Auth user management with role-based access
 - `conversations` and `messages`: AI chat history
 - `domains` and `framework_content`: Operational framework structure
 - `user_bookmarks`: User-saved content
 - `training_templates`: Staff training materials (FOH/BOH)
+
+### Role-Based Access Control (RBAC)
+The application implements a three-tier role hierarchy:
+- **Owner**: Full access to all features including financial analysis, P&L tools, strategic planning, and staff management
+- **General Manager**: Access to operations, training, AI consulting, and staff management. Cannot access financial tools
+- **Manager**: Access to shift operations, checklists, training, and AI consulting. Cannot access financials or send to staff features
+
+**Key Implementation Details**:
+- Role is selected during onboarding and cannot be changed afterward (security measure)
+- `useRole` hook provides permissions and role checking throughout the app
+- `RoleGate` component protects routes/features requiring specific roles
+- Default role is "manager" (lowest privilege) for security when role is undefined
+- Role constants defined in `shared/models/auth.ts` (USER_ROLES)
+- Permissions mapped per role in `client/src/hooks/use-role.ts`
 
 ### AI Integration
 - **Provider**: OpenAI API via Replit AI Integrations
