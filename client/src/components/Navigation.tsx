@@ -25,6 +25,7 @@ export function Navigation() {
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/manual", label: "Operations Manual", icon: BookOpen },
+    ...(isAdmin ? [{ href: "/admin", label: "Admin Dashboard", icon: Settings }] : []),
   ];
 
   return (
