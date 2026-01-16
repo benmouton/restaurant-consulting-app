@@ -2,10 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
+import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { 
   Crown, 
   Users, 
@@ -41,6 +43,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 export default function Dashboard() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const { isAdmin } = useAdmin();
+  const { roleLabel, permissions } = useRole();
   
   const { data: domains, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
@@ -70,12 +73,14 @@ export default function Dashboard() {
                 Templates
               </Button>
             </Link>
-            <Link href="/financial">
-              <Button variant="outline" size="sm" data-testid="button-financial-nav">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Financial
-              </Button>
-            </Link>
+            {permissions.canAccessFinancials && (
+              <Link href="/financial">
+                <Button variant="outline" size="sm" data-testid="button-financial-nav">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Financial
+                </Button>
+              </Link>
+            )}
             <Link href="/consultant">
               <Button variant="outline" size="sm" data-testid="button-consultant-nav">
                 <MessageSquare className="h-4 w-4 mr-2" />
@@ -97,9 +102,14 @@ export default function Dashboard() {
                   {user?.firstName?.[0] || user?.email?.[0] || "U"}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm hidden md:inline">
-                {user?.firstName || user?.email || "User"}
-              </span>
+              <div className="hidden md:flex flex-col items-start">
+                <span className="text-sm">
+                  {user?.firstName || user?.email || "User"}
+                </span>
+                <Badge variant="secondary" className="text-xs" data-testid="badge-user-role">
+                  {roleLabel}
+                </Badge>
+              </div>
             </div>
             <Button 
               variant="ghost" 

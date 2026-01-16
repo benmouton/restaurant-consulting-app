@@ -2,10 +2,12 @@ import type { Express } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import { z } from "zod";
+import { USER_ROLES, type UserRole } from "@shared/models/auth";
 
 const updateProfileSchema = z.object({
   firstName: z.string().min(1, "Name is required"),
   restaurantName: z.string().min(1, "Restaurant name is required"),
+  role: z.enum([USER_ROLES.OWNER, USER_ROLES.GENERAL_MANAGER, USER_ROLES.MANAGER]).optional(),
 });
 
 // Register auth-specific routes
@@ -32,8 +34,14 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).json({ message: result.error.errors[0].message });
       }
 
-      const { firstName, restaurantName } = result.data;
-      const updatedUser = await authStorage.updateUserProfile(userId, firstName, restaurantName);
+      const { firstName, restaurantName, role } = result.data;
+      
+      // Security: Only allow role to be set during initial onboarding (when restaurantName is not yet set)
+      // After onboarding, role changes are restricted to prevent privilege escalation
+      const currentUser = await authStorage.getUser(userId);
+      const allowedRole = !currentUser?.restaurantName ? (role as UserRole | undefined) : undefined;
+      
+      const updatedUser = await authStorage.updateUserProfile(userId, firstName, restaurantName, allowedRole);
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating user:", error);

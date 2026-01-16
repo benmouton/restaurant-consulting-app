@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { SubscriptionGate } from "@/components/subscription-gate";
+import { RoleGate } from "@/components/role-gate";
+import { USER_ROLES } from "@shared/models/auth";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import DomainPage from "@/pages/domain";
@@ -55,7 +57,13 @@ function Router() {
           {user ? <ProtectedPage component={TemplatesPage} /> : <Landing />}
         </Route>
         <Route path="/financial">
-          {user ? <ProtectedPage component={FinancialPage} /> : <Landing />}
+          {user ? (
+            <SubscriptionGate>
+              <RoleGate requiredRole={USER_ROLES.OWNER}>
+                <FinancialPage />
+              </RoleGate>
+            </SubscriptionGate>
+          ) : <Landing />}
         </Route>
         <Route path="/admin" component={AdminDashboard} />
         <Route component={NotFound} />

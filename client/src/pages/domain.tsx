@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
@@ -2117,6 +2118,7 @@ Keep the response practical and immediately actionable. This is real-time guidan
 
 function DailyTaskReminder() {
   const { toast } = useToast();
+  const { permissions } = useRole();
   const [tasks, setTasks] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [lastGenerated, setLastGenerated] = useState<string>("");
@@ -2320,7 +2322,7 @@ Generate ONLY the staff message, nothing else.`,
           </div>
         )}
 
-        {tasks && (
+        {tasks && permissions.canSendToStaff && (
           <div className="mt-6 pt-4 border-t border-border">
             <div className="flex items-center gap-2 mb-3">
               <Users className="h-4 w-4 text-muted-foreground" />
