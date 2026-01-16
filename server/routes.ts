@@ -124,6 +124,15 @@ export async function registerRoutes(
         return res.json({ hasSubscription: false });
       }
 
+      // Admin users bypass subscription requirement
+      if (user.isAdmin === "true") {
+        return res.json({ 
+          hasSubscription: true,
+          subscriptionStatus: "admin",
+          isAdmin: true
+        });
+      }
+
       if (user.stripeCustomerId) {
         const subscription = await stripeService.getActiveSubscriptionForCustomer(user.stripeCustomerId);
         if (subscription) {
