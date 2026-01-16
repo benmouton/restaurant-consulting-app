@@ -12,7 +12,7 @@ interface SubscriptionStatus {
 
 export function useSubscription() {
   const { user, isLoading: authLoading } = useAuth();
-  const { isAdmin, isLoading: adminLoading } = useAdmin();
+  const { isAdmin, isLoading: adminLoading, error: adminError } = useAdmin();
   const { toast } = useToast();
   
   const { data, isLoading, error } = useQuery<SubscriptionStatus>({
