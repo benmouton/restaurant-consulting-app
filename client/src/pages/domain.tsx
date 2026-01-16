@@ -38,7 +38,8 @@ import {
   RefreshCw,
   Image,
   X,
-  Upload
+  Upload,
+  Users
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
@@ -2119,6 +2120,8 @@ function DailyTaskReminder() {
   const [tasks, setTasks] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [lastGenerated, setLastGenerated] = useState<string>("");
+  const [staffMessage, setStaffMessage] = useState<string>("");
+  const [isGeneratingStaffMessage, setIsGeneratingStaffMessage] = useState(false);
 
   const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const todayDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -2182,6 +2185,81 @@ Format as a clear, prioritized list with 5-7 specific tasks for TODAY (${dayOfWe
     }
   };
 
+  const generateStaffMessage = async () => {
+    if (!tasks) return;
+    
+    setIsGeneratingStaffMessage(true);
+    setStaffMessage("");
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `Convert the following operator priorities into a friendly, motivational message for restaurant staff. 
+
+The message should:
+- Be warm and encouraging in tone
+- Focus on what the TEAM needs to accomplish today
+- Remove any management-only details (like P&L review, vendor negotiations, etc.)
+- Be concise and easy to read on a phone
+- Start with a greeting like "Hey team!" or "Good morning team!"
+- End with something motivational
+- Use simple bullet points for key priorities
+- Keep it under 200 words
+
+Here are today's operator priorities to convert:
+
+${tasks}
+
+Generate ONLY the staff message, nothing else.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate staff message");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setStaffMessage(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate staff message", variant: "destructive" });
+    } finally {
+      setIsGeneratingStaffMessage(false);
+    }
+  };
+
+  const copyStaffMessageToClipboard = async () => {
+    if (!staffMessage) return;
+    
+    try {
+      await navigator.clipboard.writeText(staffMessage);
+      toast({ title: "Copied to clipboard!", description: "Ready to paste into your staff messaging app" });
+    } catch (err) {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+
   return (
     <Card className="mb-8">
       <CardHeader>
@@ -2239,6 +2317,70 @@ Format as a clear, prioritized list with 5-7 specific tasks for TODAY (${dayOfWe
             <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
               {tasks}
             </div>
+          </div>
+        )}
+
+        {tasks && (
+          <div className="mt-6 pt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Send to Staff</span>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Convert today's priorities into a friendly team message ready to share.
+            </p>
+            
+            {!staffMessage ? (
+              <Button 
+                onClick={generateStaffMessage} 
+                disabled={isGeneratingStaffMessage}
+                variant="outline"
+                className="w-full"
+                data-testid="btn-generate-staff-message"
+              >
+                {isGeneratingStaffMessage ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating team message...
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Generate Staff Message
+                  </>
+                )}
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                  <div className="text-sm whitespace-pre-wrap">
+                    {staffMessage}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={copyStaffMessageToClipboard}
+                    className="flex-1"
+                    data-testid="btn-copy-staff-message"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy to Clipboard
+                  </Button>
+                  <Button 
+                    onClick={generateStaffMessage} 
+                    disabled={isGeneratingStaffMessage}
+                    variant="outline"
+                    data-testid="btn-regenerate-staff-message"
+                  >
+                    {isGeneratingStaffMessage ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
