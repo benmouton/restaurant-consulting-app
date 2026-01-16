@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // Domains
@@ -185,6 +185,27 @@ export class DatabaseStorage implements IStorage {
   }): Promise<User | undefined> {
     const [user] = await db.update(users).set(stripeInfo).where(eq(users.id, userId)).returning();
     return user;
+  }
+
+  async getAllUsersWithSubscriptions(): Promise<User[]> {
+    return await db.select().from(users)
+      .where(isNotNull(users.stripeCustomerId))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getSubscriptionStats(): Promise<{
+    totalUsers: number;
+    activeSubscribers: number;
+    totalRevenue: number;
+  }> {
+    const allUsers = await db.select().from(users);
+    const activeSubscribers = allUsers.filter(u => u.subscriptionStatus === 'active');
+    
+    return {
+      totalUsers: allUsers.length,
+      activeSubscribers: activeSubscribers.length,
+      totalRevenue: activeSubscribers.length * 10,
+    };
   }
 }
 

@@ -212,6 +212,45 @@ export async function registerRoutes(
     }
   });
 
+  // Admin middleware
+  const isAdmin = async (req: any, res: any, next: any) => {
+    if (!req.user?.claims?.sub) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const user = await storage.getUserById(req.user.claims.sub);
+    if (!user || user.isAdmin !== "true") {
+      return res.status(403).json({ error: "Forbidden - Admin access required" });
+    }
+    next();
+  };
+
+  // Admin Routes
+  app.get("/api/admin/check", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await storage.getUserById(userId);
+    res.json({ isAdmin: user?.isAdmin === "true" });
+  });
+
+  app.get("/api/admin/subscribers", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const subscribers = await storage.getAllUsersWithSubscriptions();
+      res.json(subscribers);
+    } catch (error) {
+      console.error('Admin subscribers error:', error);
+      res.status(500).json({ error: "Failed to fetch subscribers" });
+    }
+  });
+
+  app.get("/api/admin/stats", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const stats = await storage.getSubscriptionStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Admin stats error:', error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
   // Domain Routes
   app.get(api.domains.list.path, async (req, res) => {
     const domainsList = await storage.getDomains();

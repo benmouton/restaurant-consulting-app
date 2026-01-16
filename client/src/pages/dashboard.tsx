@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useAdmin } from "@/hooks/use-admin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,7 +20,8 @@ import {
   LogOut,
   MessageSquare,
   ArrowRight,
-  BarChart3
+  BarChart3,
+  Shield
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 
@@ -38,6 +40,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export default function Dashboard() {
   const { user, logout, isLoading: authLoading } = useAuth();
+  const { isAdmin } = useAdmin();
   
   const { data: domains, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
@@ -79,6 +82,14 @@ export default function Dashboard() {
                 Ask Consultant
               </Button>
             </Link>
+            {isAdmin && (
+              <Link href="/admin">
+                <Button variant="outline" size="sm" data-testid="button-admin-nav">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Admin
+                </Button>
+              </Link>
+            )}
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.profileImageUrl || undefined} />

@@ -15,6 +15,7 @@ import FinancialPage from "@/pages/financial";
 import SubscriptionPage from "@/pages/subscription";
 import SubscriptionSuccessPage from "@/pages/subscription-success";
 import SubscriptionCancelPage from "@/pages/subscription-cancel";
+import AdminDashboard from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
@@ -56,6 +57,7 @@ function Router() {
         <Route path="/financial">
           {user ? <ProtectedPage component={FinancialPage} /> : <Landing />}
         </Route>
+        <Route path="/admin" component={AdminDashboard} />
         <Route component={NotFound} />
       </Switch>
     </>
