@@ -1,11 +1,26 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useRole } from "@/hooks/use-role";
+import { useAdmin } from "@/hooks/use-admin";
+import { useSubscription } from "@/hooks/use-subscription";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, LogOut, UtensilsCrossed } from "lucide-react";
+import { LayoutDashboard, BookOpen, LogOut, UtensilsCrossed, User, Building2, Mail, Shield, CreditCard, Settings, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 export function Navigation() {
   const [location] = useLocation();
   const { logout, user } = useAuth();
+  const { roleLabel } = useRole();
+  const { isAdmin } = useAdmin();
+  const { subscriptionStatus } = useSubscription();
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -50,28 +65,77 @@ export function Navigation() {
 
       {/* User & Logout */}
       <div className="hidden w-full border-t pt-6 lg:mt-auto lg:block">
-        <div className="mb-4 flex items-center gap-3 px-2">
-          <div className="h-10 w-10 overflow-hidden rounded-full border border-border bg-muted">
-             {user?.profileImageUrl ? (
-               <img src={user.profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
-             ) : (
-               <div className="flex h-full w-full items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
-                 {user?.firstName?.[0]}{user?.lastName?.[0]}
-               </div>
-             )}
-          </div>
-          <div className="overflow-hidden">
-            <p className="truncate text-sm font-semibold text-foreground">{user?.firstName} {user?.lastName}</p>
-            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-          </div>
-        </div>
-        <button
-          onClick={() => logout()}
-          className="flex w-full items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button 
+              className="flex w-full items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-muted"
+              data-testid="button-user-menu"
+            >
+              <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border border-border bg-muted">
+                {user?.profileImageUrl ? (
+                  <img src={user.profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
+                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 overflow-hidden text-left">
+                <p className="truncate text-sm font-semibold text-foreground">{user?.firstName} {user?.lastName}</p>
+                <p className="truncate text-xs text-muted-foreground">{roleLabel}</p>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            <div className="px-2 py-2 space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Restaurant:</span>
+                <span className="font-medium truncate">{user?.restaurantName || "Not set"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Shield className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Role:</span>
+                <Badge variant="secondary" className="text-xs">{roleLabel}</Badge>
+              </div>
+              {isAdmin && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Status:</span>
+                  <Badge variant="default" className="text-xs">Admin</Badge>
+                </div>
+              )}
+              {subscriptionStatus && (
+                <div className="flex items-center gap-2 text-sm">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Subscription:</span>
+                  <Badge variant={subscriptionStatus === "active" ? "default" : "secondary"} className="text-xs capitalize">
+                    {subscriptionStatus}
+                  </Badge>
+                </div>
+              )}
+            </div>
+            
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => logout()}
+              className="text-destructive focus:text-destructive cursor-pointer"
+              data-testid="button-logout"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </nav>
   );
