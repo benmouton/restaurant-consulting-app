@@ -34,7 +34,7 @@ const allowlist = [
 // Libraries that should NOT be bundled due to dynamic requires or native modules
 const forceExternal = [
   "pdf-parse",
-  "xlsx",
+  "exceljs",
   "papaparse",
 ];
 

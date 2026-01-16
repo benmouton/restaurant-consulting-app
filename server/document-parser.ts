@@ -1,5 +1,5 @@
 import * as Papa from "papaparse";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -82,7 +82,7 @@ export async function parseDocument(
       filename.endsWith(".xlsx") ||
       filename.endsWith(".xls")
     ) {
-      return parseExcel(buffer);
+      return await parseExcel(buffer);
     } else {
       return {
         rawText: buffer.toString("utf-8"),
@@ -128,19 +128,38 @@ function parseCSV(buffer: Buffer): ParsedDocument {
   };
 }
 
-function parseExcel(buffer: Buffer): ParsedDocument {
-  const workbook = XLSX.read(buffer, { type: "buffer" });
+async function parseExcel(buffer: Buffer): Promise<ParsedDocument> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  
   const allData: Record<string, unknown>[] = [];
   const textParts: string[] = [];
   
-  for (const sheetName of workbook.SheetNames) {
-    const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-    allData.push(...(data as Record<string, unknown>[]));
+  workbook.eachSheet((worksheet, sheetId) => {
+    const sheetName = worksheet.name;
+    const rows: string[] = [];
+    let headers: string[] = [];
     
-    const text = XLSX.utils.sheet_to_csv(sheet);
-    textParts.push(`=== ${sheetName} ===\n${text}`);
-  }
+    worksheet.eachRow((row, rowNumber) => {
+      const rowValues = row.values as (string | number | boolean | Date | null | undefined)[];
+      const values = rowValues.slice(1);
+      
+      if (rowNumber === 1) {
+        headers = values.map((v) => String(v ?? ""));
+        rows.push(headers.join(","));
+      } else {
+        const rowData: Record<string, unknown> = {};
+        values.forEach((value, index) => {
+          const header = headers[index] || `col${index}`;
+          rowData[header] = value ?? "";
+        });
+        allData.push(rowData);
+        rows.push(values.map((v) => String(v ?? "")).join(","));
+      }
+    });
+    
+    textParts.push(`=== ${sheetName} ===\n${rows.join("\n")}`);
+  });
   
   const rawText = textParts.join("\n\n");
   const metrics = extractMetricsFromRows(allData);
