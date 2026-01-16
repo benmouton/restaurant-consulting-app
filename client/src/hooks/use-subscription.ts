@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
+import { useToast } from "@/hooks/use-toast";
 
 interface SubscriptionStatus {
   hasSubscription: boolean;
@@ -12,6 +13,7 @@ interface SubscriptionStatus {
 export function useSubscription() {
   const { user, isLoading: authLoading } = useAuth();
   const { isAdmin, isLoading: adminLoading } = useAdmin();
+  const { toast } = useToast();
   
   const { data, isLoading, error } = useQuery<SubscriptionStatus>({
     queryKey: ["/api/subscription/status"],
@@ -28,7 +30,21 @@ export function useSubscription() {
     onSuccess: (data) => {
       if (data.url) {
         window.location.href = data.url;
+      } else {
+        toast({
+          title: "Error",
+          description: "No checkout URL received. Please try again.",
+          variant: "destructive",
+        });
       }
+    },
+    onError: (error: Error) => {
+      console.error("Checkout error:", error);
+      toast({
+        title: "Checkout Failed",
+        description: error.message || "Unable to start checkout. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
