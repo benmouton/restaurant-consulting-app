@@ -1,16 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useRole } from "@/hooks/use-role";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { 
   ArrowLeft, 
   User, 
@@ -36,6 +46,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+const profileFormSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  restaurantName: z.string().optional(),
+});
+
+type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 interface ProfileData {
   id: string;
@@ -63,12 +83,6 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const { roleLabel } = useRole();
   const { toast } = useToast();
-  
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [restaurantName, setRestaurantName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
   const { data: profile, isLoading } = useQuery<ProfileData>({
@@ -76,9 +90,38 @@ export default function ProfilePage() {
     enabled: !!user,
   });
 
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      address: "",
+      restaurantName: "",
+    },
+  });
+
+  useEffect(() => {
+    if (profile && isEditing) {
+      form.reset({
+        firstName: profile.firstName || "",
+        lastName: profile.lastName || "",
+        phone: profile.phone || "",
+        address: profile.address || "",
+        restaurantName: profile.restaurantName || "",
+      });
+    }
+  }, [profile, isEditing, form]);
+
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { firstName?: string; lastName?: string; phone?: string; address?: string; restaurantName?: string }) => {
-      const response = await apiRequest("PATCH", "/api/user/profile", data);
+    mutationFn: async (data: ProfileFormValues) => {
+      const response = await apiRequest("PATCH", "/api/user/profile", {
+        firstName: data.firstName || undefined,
+        lastName: data.lastName || undefined,
+        phone: data.phone || undefined,
+        address: data.address || undefined,
+        restaurantName: data.restaurantName || undefined,
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -118,26 +161,23 @@ export default function ProfilePage() {
   });
 
   const handleEdit = () => {
-    setFirstName(profile?.firstName || "");
-    setLastName(profile?.lastName || "");
-    setPhone(profile?.phone || "");
-    setAddress(profile?.address || "");
-    setRestaurantName(profile?.restaurantName || "");
-    setIsEditing(true);
-  };
-
-  const handleSave = () => {
-    updateProfileMutation.mutate({
-      firstName: firstName || undefined,
-      lastName: lastName || undefined,
-      phone: phone || undefined,
-      address: address || undefined,
-      restaurantName: restaurantName || undefined,
+    form.reset({
+      firstName: profile?.firstName || "",
+      lastName: profile?.lastName || "",
+      phone: profile?.phone || "",
+      address: profile?.address || "",
+      restaurantName: profile?.restaurantName || "",
     });
+    setIsEditing(true);
   };
 
   const handleCancel = () => {
     setIsEditing(false);
+    form.reset();
+  };
+
+  const onSubmit = (data: ProfileFormValues) => {
+    updateProfileMutation.mutate(data);
   };
 
   const formatDate = (timestamp: number) => {
@@ -183,7 +223,7 @@ export default function ProfilePage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <User className="h-5 w-5" />
@@ -201,7 +241,7 @@ export default function ProfilePage() {
                       Cancel
                     </Button>
                     <Button 
-                      onClick={handleSave} 
+                      onClick={form.handleSubmit(onSubmit)} 
                       disabled={updateProfileMutation.isPending}
                       data-testid="btn-save-profile"
                     >
@@ -220,59 +260,96 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {isEditing ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Enter first name"
-                      data-testid="input-first-name"
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter first name" 
+                              data-testid="input-first-name"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Enter last name"
-                      data-testid="input-last-name"
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter last name" 
+                              data-testid="input-last-name"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="Enter phone number"
-                      data-testid="input-phone"
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="tel"
+                              placeholder="Enter phone number" 
+                              data-testid="input-phone"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="restaurantName">Restaurant Name</Label>
-                    <Input
-                      id="restaurantName"
-                      value={restaurantName}
-                      onChange={(e) => setRestaurantName(e.target.value)}
-                      placeholder="Enter restaurant name"
-                      data-testid="input-restaurant"
+                    <FormField
+                      control={form.control}
+                      name="restaurantName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Restaurant Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter restaurant name" 
+                              data-testid="input-restaurant"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Enter address"
-                      data-testid="input-address"
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem className="sm:col-span-2">
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter address" 
+                              data-testid="input-address"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                </div>
+                  </form>
+                </Form>
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
@@ -368,7 +445,7 @@ export default function ProfilePage() {
                   </div>
                   
                   {profile.subscriptionDetails.cancelAtPeriodEnd && (
-                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 dark:bg-amber-950 p-3 rounded-lg">
+                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 dark:bg-amber-950 p-3 rounded-lg" data-testid="alert-cancel-pending">
                       <AlertTriangle className="h-4 w-4" />
                       <span className="text-sm">
                         Your subscription will cancel on {formatDate(profile.subscriptionDetails.currentPeriodEnd)}
@@ -394,8 +471,7 @@ export default function ProfilePage() {
                     <AlertDialogTrigger asChild>
                       <Button 
                         variant="outline" 
-                        className="text-destructive border-destructive"
-                        data-testid="btn-cancel-subscription"
+                        data-testid="btn-manage-subscription"
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Manage Subscription
@@ -452,7 +528,7 @@ export default function ProfilePage() {
               <CardTitle>Account Information</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground" data-testid="text-member-since">
                 Member since: {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "long",

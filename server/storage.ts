@@ -37,6 +37,23 @@ export interface IStorage {
   // Financial Messages
   getFinancialMessages(userId: string, documentId?: number): Promise<FinancialMessage[]>;
   createFinancialMessage(message: Omit<FinancialMessage, "id" | "createdAt">): Promise<FinancialMessage>;
+  
+  // User Profile
+  getUserById(userId: string): Promise<User | undefined>;
+  updateUserProfile(userId: string, profile: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    address?: string;
+    restaurantName?: string;
+  }): Promise<User | undefined>;
+  updateUserStripeInfo(userId: string, stripeInfo: {
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    subscriptionStatus?: string;
+  }): Promise<User | undefined>;
+  getAllUsersWithSubscriptions(): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {

@@ -234,14 +234,19 @@ export async function registerRoutes(
       // Get subscription details including next billing date
       let subscriptionDetails = null;
       if (user.stripeSubscriptionId) {
-        const subscription = await stripeService.getSubscription(user.stripeSubscriptionId);
-        if (subscription) {
-          subscriptionDetails = {
-            id: subscription.id,
-            status: subscription.status,
-            currentPeriodEnd: subscription.current_period_end,
-            cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          };
+        try {
+          const subscription = await stripeService.getSubscription(user.stripeSubscriptionId);
+          if (subscription) {
+            subscriptionDetails = {
+              id: subscription.id,
+              status: subscription.status,
+              currentPeriodEnd: subscription.current_period_end,
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            };
+          }
+        } catch (subError) {
+          console.error('Failed to fetch subscription details:', subError);
+          // Continue without subscription details rather than failing the whole request
         }
       }
 
