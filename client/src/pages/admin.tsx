@@ -8,12 +8,13 @@ import { Loader2, Users, DollarSign, TrendingUp, Shield, ArrowLeft } from "lucid
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 
-interface Subscriber {
+interface UserInfo {
   id: string;
   email: string | null;
   firstName: string | null;
   lastName: string | null;
   restaurantName: string | null;
+  role: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   subscriptionStatus: string | null;
@@ -31,8 +32,8 @@ export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
 
-  const { data: subscribers, isLoading: subscribersLoading } = useQuery<Subscriber[]>({
-    queryKey: ["/api/admin/subscribers"],
+  const { data: allUsers, isLoading: usersLoading } = useQuery<UserInfo[]>({
+    queryKey: ["/api/admin/users"],
     enabled: isAdmin,
   });
 
@@ -40,6 +41,8 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/stats"],
     enabled: isAdmin,
   });
+
+  const subscribers = allUsers?.filter(u => u.stripeCustomerId) || [];
 
   if (authLoading || adminLoading) {
     return (
@@ -127,17 +130,86 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Subscribers</CardTitle>
-            <CardDescription>All users who have initiated a subscription</CardDescription>
+            <CardTitle>All Registered Users ({allUsers?.length || 0})</CardTitle>
+            <CardDescription>Everyone who has signed up for the platform</CardDescription>
           </CardHeader>
           <CardContent>
-            {subscribersLoading ? (
+            {usersLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : !subscribers?.length ? (
+            ) : !allUsers?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No users yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">User</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Restaurant</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Role</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Subscription</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Joined</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allUsers.map((u) => (
+                      <tr key={u.id} className="border-b last:border-0" data-testid={`row-user-${u.id}`}>
+                        <td className="py-3 px-4">
+                          <div className="font-medium">
+                            {u.firstName || u.lastName 
+                              ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() 
+                              : 'Unknown User'}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{u.email || 'No email'}</div>
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {u.restaurantName || '—'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant="outline" data-testid={`badge-role-${u.id}`}>
+                            {u.role || 'Not set'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          {u.stripeCustomerId ? (
+                            <Badge 
+                              variant={u.subscriptionStatus === 'active' ? 'default' : 'secondary'}
+                              data-testid={`badge-status-${u.id}`}
+                            >
+                              {u.subscriptionStatus || 'pending'}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">No subscription</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {u.createdAt ? format(new Date(u.createdAt), 'MMM d, yyyy') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Subscribers ({subscribers.length})</CardTitle>
+            <CardDescription>Users who have subscribed to the platform</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {usersLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !subscribers.length ? (
               <div className="text-center py-8 text-muted-foreground">
                 No subscribers yet
               </div>
@@ -169,7 +241,7 @@ export default function AdminDashboard() {
                         <td className="py-3 px-4">
                           <Badge 
                             variant={sub.subscriptionStatus === 'active' ? 'default' : 'secondary'}
-                            data-testid={`badge-status-${sub.id}`}
+                            data-testid={`badge-sub-status-${sub.id}`}
                           >
                             {sub.subscriptionStatus || 'pending'}
                           </Badge>

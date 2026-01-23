@@ -193,6 +193,10 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(users.createdAt));
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
   async getSubscriptionStats(): Promise<{
     totalUsers: number;
     activeSubscribers: number;

@@ -260,6 +260,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/users", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers);
+    } catch (error) {
+      console.error('Admin users error:', error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
   // Domain Routes
   app.get(api.domains.list.path, async (req, res) => {
     const domainsList = await storage.getDomains();
