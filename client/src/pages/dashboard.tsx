@@ -24,22 +24,10 @@ import {
   ArrowRight,
   BarChart3,
   Shield,
-  Clock,
   Calendar,
-  Bell,
-  Briefcase,
   Wrench
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
-
-interface SchedulingStats {
-  totalStaff: number;
-  totalPositions: number;
-  openShifts: number;
-  unreadAnnouncements: number;
-  todayShifts: number;
-  weekShifts: number;
-}
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Crown,
@@ -62,10 +50,6 @@ export default function Dashboard() {
   
   const { data: domains, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
-  });
-
-  const { data: schedulingStats, isLoading: schedulingLoading } = useQuery<SchedulingStats>({
-    queryKey: ["/api/scheduling/stats"],
   });
 
   if (authLoading) {
@@ -195,105 +179,26 @@ export default function Dashboard() {
         </div>
 
         {/* Scheduling Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Staff Scheduling</h2>
+        <Card className="mb-8 bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Staff Scheduling
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Manage your team schedule, staff roster, positions, and announcements. 
+              Build shifts, track open coverage, and keep your team informed.
+            </p>
             <Link href="/scheduling">
-              <Button variant="outline" size="sm" data-testid="button-view-schedule">
-                <Calendar className="h-4 w-4 mr-2" />
-                View Schedule
+              <Button data-testid="button-open-scheduling">
+                Open Scheduling
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-          </div>
-          
-          {schedulingLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="pt-4 pb-4">
-                    <Skeleton className="h-8 w-8 rounded-full mb-2" />
-                    <Skeleton className="h-6 w-12 mb-1" />
-                    <Skeleton className="h-3 w-16" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <Link href="/scheduling?tab=staff">
-                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-staff">
-                  <CardContent className="pt-4 pb-4 text-center">
-                    <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Users className="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div className="text-2xl font-bold">{schedulingStats?.totalStaff || 0}</div>
-                    <div className="text-xs text-muted-foreground">Employees</div>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/scheduling?tab=positions">
-                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-positions">
-                  <CardContent className="pt-4 pb-4 text-center">
-                    <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Briefcase className="h-5 w-5 text-purple-500" />
-                    </div>
-                    <div className="text-2xl font-bold">{schedulingStats?.totalPositions || 0}</div>
-                    <div className="text-xs text-muted-foreground">Positions</div>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/scheduling?tab=schedule">
-                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-today">
-                  <CardContent className="pt-4 pb-4 text-center">
-                    <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Clock className="h-5 w-5 text-green-500" />
-                    </div>
-                    <div className="text-2xl font-bold">{schedulingStats?.todayShifts || 0}</div>
-                    <div className="text-xs text-muted-foreground">Today's Shifts</div>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/scheduling?tab=schedule">
-                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-week">
-                  <CardContent className="pt-4 pb-4 text-center">
-                    <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-2">
-                      <CalendarDays className="h-5 w-5 text-amber-500" />
-                    </div>
-                    <div className="text-2xl font-bold">{schedulingStats?.weekShifts || 0}</div>
-                    <div className="text-xs text-muted-foreground">This Week</div>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/scheduling?tab=schedule">
-                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-open">
-                  <CardContent className="pt-4 pb-4 text-center">
-                    <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-2">
-                      <AlertTriangle className="h-5 w-5 text-orange-500" />
-                    </div>
-                    <div className="text-2xl font-bold">{schedulingStats?.openShifts || 0}</div>
-                    <div className="text-xs text-muted-foreground">Open Shifts</div>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/scheduling?tab=announcements">
-                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-announcements">
-                  <CardContent className="pt-4 pb-4 text-center">
-                    <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Bell className="h-5 w-5 text-red-500" />
-                    </div>
-                    <div className="text-2xl font-bold">{schedulingStats?.unreadAnnouncements || 0}</div>
-                    <div className="text-xs text-muted-foreground">Announcements</div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Quick Access: AI Consultant */}
         <Card className="bg-card">
