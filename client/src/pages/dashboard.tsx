@@ -36,7 +36,8 @@ import {
   Wrench,
   UserCog,
   ChevronDown,
-  Menu
+  Menu,
+  Share2
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 
@@ -52,6 +53,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   ClipboardList,
   AlertTriangle,
   Wrench,
+  Share2,
 };
 
 export default function Dashboard() {

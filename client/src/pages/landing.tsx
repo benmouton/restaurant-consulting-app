@@ -14,7 +14,8 @@ import {
   CheckCircle,
   ArrowRight,
   MessageSquare,
-  Wrench
+  Wrench,
+  Share2
 } from "lucide-react";
 
 const domains = [
@@ -29,6 +30,7 @@ const domains = [
   { name: "SOPs", icon: ClipboardList, desc: "Scalable systems" },
   { name: "Crisis", icon: AlertTriangle, desc: "Recovery playbooks" },
   { name: "Facilities", icon: Wrench, desc: "Asset protection" },
+  { name: "Social Media", icon: Share2, desc: "Platform strategy" },
 ];
 
 export default function Landing() {
@@ -152,7 +154,7 @@ export default function Landing() {
       <section className="py-20 px-4">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold text-center mb-4">
-            11 Operational Domains
+            12 Operational Domains
           </h2>
           <p className="text-muted-foreground text-center mb-12 max-w-2xl mx-auto">
             Complete frameworks covering every area where restaurants succeed or fail.
