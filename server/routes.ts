@@ -120,12 +120,19 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const user = await storage.getUserById(userId);
       
+      console.log("[subscription/status] userId:", userId);
+      console.log("[subscription/status] user found:", !!user);
+      console.log("[subscription/status] user.isAdmin:", user?.isAdmin, "type:", typeof user?.isAdmin);
+      
       if (!user) {
         return res.json({ hasSubscription: false });
       }
 
-      // Admin users bypass subscription requirement
-      if (user.isAdmin === "true") {
+      // Admin users bypass subscription requirement - check both string and boolean
+      const isAdminUser = user.isAdmin === "true" || (user.isAdmin as any) === true;
+      console.log("[subscription/status] isAdminUser:", isAdminUser);
+      
+      if (isAdminUser) {
         return res.json({ 
           hasSubscription: true,
           subscriptionStatus: "admin",
