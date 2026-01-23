@@ -42,7 +42,8 @@ import {
   Upload,
   Users,
   AlertTriangle,
-  Shield
+  Shield,
+  Wrench
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
@@ -3390,6 +3391,492 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
   );
 }
 
+function FacilityCommandCenter() {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<"breakdown" | "pm" | "log">("breakdown");
+  const [inActiveService, setInActiveService] = useState<string>("no");
+  const [safetyRisk, setSafetyRisk] = useState<string>("no");
+  const [equipmentType, setEquipmentType] = useState<string>("");
+  const [issueGoal, setIssueGoal] = useState<string>("");
+  const [equipmentName, setEquipmentName] = useState<string>("");
+  const [lastServiceDate, setLastServiceDate] = useState<string>("");
+  const [symptoms, setSymptoms] = useState<string>("");
+  const [failSilentMonitors, setFailSilentMonitors] = useState<string[]>([]);
+  const [response, setResponse] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const equipmentTypes = [
+    { value: "refrigeration", label: "Refrigeration / Ice" },
+    { value: "cooking", label: "Cooking Equipment" },
+    { value: "dish", label: "Dish Machine" },
+    { value: "hvac", label: "HVAC" },
+    { value: "plumbing", label: "Plumbing" },
+    { value: "electrical", label: "Electrical" },
+    { value: "pos", label: "POS & Network" },
+    { value: "other", label: "Other" },
+  ];
+
+  const failSilentOptions = [
+    { value: "temps", label: "Temps (walk-in, reach-in)" },
+    { value: "ice-sanitation", label: "Ice machine sanitation interval" },
+    { value: "hood-ansul", label: "Hood/ANSUL checks" },
+    { value: "hvac-filters", label: "HVAC filter cadence" },
+    { value: "dish-sanitizer", label: "Dish machine sanitizer ppm/temp log" },
+  ];
+
+  const toggleFailSilent = (value: string) => {
+    setFailSilentMonitors(prev => 
+      prev.includes(value) 
+        ? prev.filter(v => v !== value)
+        : [...prev, value]
+    );
+  };
+
+  const generateResponse = async () => {
+    if (mode === "breakdown" && !issueGoal) {
+      toast({ title: "Please describe the issue", variant: "destructive" });
+      return;
+    }
+    if (mode === "pm" && !equipmentType) {
+      toast({ title: "Please select equipment type", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    setResponse("");
+
+    try {
+      const equipmentLabel = equipmentTypes.find(e => e.value === equipmentType)?.label || equipmentType;
+      const failSilentLabels = failSilentMonitors.map(f => 
+        failSilentOptions.find(o => o.value === f)?.label || f
+      ).join(", ");
+
+      let prompt = "";
+      
+      if (mode === "breakdown") {
+        prompt = `You are "Facility Command Center," an AI maintenance operations assistant for a live restaurant.
+Your job is to prevent downtime, control repair costs, and keep the restaurant service-ready.
+
+SITUATION:
+- Equipment/Problem: ${issueGoal}
+- Equipment Type: ${equipmentLabel || "Not specified"}
+- Currently in active service: ${inActiveService === "yes" ? "YES" : "NO"}
+- Safety risk present: ${safetyRisk === "yes" ? "YES - PRIORITIZE SAFETY" : "No"}
+${equipmentName ? `- Equipment name/model: ${equipmentName}` : ""}
+${lastServiceDate ? `- Last service date: ${lastServiceDate}` : ""}
+${symptoms ? `- Symptoms: ${symptoms}` : ""}
+
+Follow this order: Recognize → Contain → Triage → Decide → Document.
+
+Provide response in this EXACT format:
+
+A) SITUATION SUMMARY (1-2 lines)
+
+B) PRIORITY LEVEL
+Tier 1 (service-critical) / Tier 2 (service-impacting) / Tier 3 (non-critical)
+Service Impact: [describe]
+
+C) IMMEDIATE ACTIONS (numbered list, max 7 items)
+${inActiveService === "yes" ? "PRIORITIZE containment and service continuity" : ""}
+
+D) VENDOR / REPAIR SCRIPT
+- Who to call
+- What to say
+- Authorization limit language
+- Questions to ask
+
+E) LOG ENTRY
+Date: [today]
+Issue: 
+Action Taken:
+Next Step:
+Owner:
+
+IMPORTANT: Never recommend unsafe workarounds for gas, electrical, refrigeration, or fire suppression.`;
+      } else if (mode === "pm") {
+        prompt = `You are "Facility Command Center," an AI maintenance operations assistant for a live restaurant.
+Build a comprehensive preventative maintenance plan.
+
+EQUIPMENT FOCUS: ${equipmentLabel}
+${equipmentName ? `Equipment name/model: ${equipmentName}` : ""}
+${lastServiceDate ? `Last service date: ${lastServiceDate}` : ""}
+${failSilentMonitors.length > 0 ? `Fail-Silent Monitors requested: ${failSilentLabels}` : ""}
+
+Provide response in this EXACT format:
+
+A) EQUIPMENT TIER CLASSIFICATION
+Classify into Tier 1 (service-critical), Tier 2 (service-impacting), Tier 3 (non-critical)
+
+B) PREVENTATIVE MAINTENANCE SCHEDULE
+
+DAILY (opening/closing):
+- [max 5 items with specific action verbs]
+
+WEEKLY:
+- [max 5 items with day to perform]
+
+MONTHLY:
+- [max 5 items with week of month]
+
+QUARTERLY:
+- [max 3 items with professional service needs]
+
+C) POSTED CHECKLIST (max 15 items)
+Format each as: ☐ [Action verb] [specific task] - [time/initials required]
+
+D) MANAGER VERIFICATION ROUTINE
+- Who checks
+- When they check
+- What "pass" means
+
+${failSilentMonitors.length > 0 ? `E) FAIL-SILENT MONITORING LOG
+For each monitored item (${failSilentLabels}):
+- Acceptable range
+- Check frequency
+- Escalation threshold ("if X, then Y")
+- Log format` : ""}`;
+      } else {
+        prompt = `You are "Facility Command Center," an AI maintenance operations assistant for a live restaurant.
+Create an equipment log entry and maintenance history template.
+
+EQUIPMENT: ${equipmentName || equipmentLabel || "General Equipment"}
+Type: ${equipmentLabel}
+${lastServiceDate ? `Last service date: ${lastServiceDate}` : ""}
+${symptoms ? `Current issues/symptoms: ${symptoms}` : ""}
+${issueGoal ? `Notes: ${issueGoal}` : ""}
+
+Provide response in this EXACT format:
+
+A) EQUIPMENT LOG ENTRY
+
+Equipment ID: [suggest format]
+Name/Model: ${equipmentName || "[To be filled]"}
+Location: [To be filled]
+Category: ${equipmentLabel}
+Tier: [1/2/3 with justification]
+Install Date: [To be filled]
+Warranty Expires: [To be filled]
+Service Contract: [Yes/No, vendor name]
+
+B) MAINTENANCE HISTORY TEMPLATE
+| Date | Issue | Action | Cost | Technician | Next Due |
+|------|-------|--------|------|------------|----------|
+| | | | | | |
+
+C) RECURRING FAILURE TRACKING
+- Common failure modes for this equipment type
+- Warning signs to watch for
+- Preventive measures
+
+D) VENDOR CONTACTS TEMPLATE
+Primary Vendor:
+- Company:
+- Phone:
+- Account #:
+- Typical response time:
+- Authorization limit:
+
+Emergency After-Hours:
+- Contact:
+- Phone:`;
+      }
+
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: prompt }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate response");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setResponse(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate response", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(response);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  const clearForm = () => {
+    setIssueGoal("");
+    setEquipmentName("");
+    setLastServiceDate("");
+    setSymptoms("");
+    setResponse("");
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Wrench className="h-5 w-5 text-primary" />
+          Facility Command Center
+        </CardTitle>
+        <CardDescription>
+          Prevent downtime. Track repairs. Enforce PM schedules.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Tabs value={mode} onValueChange={(v) => { setMode(v as "breakdown" | "pm" | "log"); clearForm(); }}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="breakdown" data-testid="tab-breakdown">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Breakdown
+            </TabsTrigger>
+            <TabsTrigger value="pm" data-testid="tab-pm">
+              <Calendar className="h-4 w-4 mr-2" />
+              PM Schedule
+            </TabsTrigger>
+            <TabsTrigger value="log" data-testid="tab-log">
+              <FileOutput className="h-4 w-4 mr-2" />
+              Equipment Log
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="breakdown" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="activeService">Are we in active service?</Label>
+                <Select value={inActiveService} onValueChange={setInActiveService}>
+                  <SelectTrigger id="activeService" className="mt-1" data-testid="select-active-service">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no">No - Not in service</SelectItem>
+                    <SelectItem value="yes">Yes - Currently serving guests</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="safetyRisk">Safety risk present?</Label>
+                <Select value={safetyRisk} onValueChange={setSafetyRisk}>
+                  <SelectTrigger id="safetyRisk" className="mt-1" data-testid="select-safety-risk">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no">No safety risk</SelectItem>
+                    <SelectItem value="yes">Yes - Safety hazard present</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="equipmentType">Equipment Type</Label>
+              <Select value={equipmentType} onValueChange={setEquipmentType}>
+                <SelectTrigger id="equipmentType" className="mt-1" data-testid="select-equipment-type">
+                  <SelectValue placeholder="Select equipment type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {equipmentTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="issueGoal">Issue / Problem Description</Label>
+              <Textarea
+                id="issueGoal"
+                placeholder="e.g., Walk-in cooler reading 45°F, ice machine not producing, fryer won't heat..."
+                className="mt-1 min-h-[80px]"
+                value={issueGoal}
+                onChange={(e) => setIssueGoal(e.target.value)}
+                data-testid="textarea-issue"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="equipmentName">Equipment Name/Model (optional)</Label>
+                <Input
+                  id="equipmentName"
+                  placeholder="e.g., True T-49 Reach-in"
+                  className="mt-1"
+                  value={equipmentName}
+                  onChange={(e) => setEquipmentName(e.target.value)}
+                  data-testid="input-equipment-name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="symptoms">Symptoms (optional)</Label>
+                <Input
+                  id="symptoms"
+                  placeholder="e.g., temp high, leaking, error code E5"
+                  className="mt-1"
+                  value={symptoms}
+                  onChange={(e) => setSymptoms(e.target.value)}
+                  data-testid="input-symptoms"
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="pm" className="space-y-4 mt-4">
+            <div>
+              <Label htmlFor="pmEquipmentType">Equipment Type</Label>
+              <Select value={equipmentType} onValueChange={setEquipmentType}>
+                <SelectTrigger id="pmEquipmentType" className="mt-1" data-testid="select-pm-equipment-type">
+                  <SelectValue placeholder="Select equipment type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {equipmentTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="pmEquipmentName">Specific Equipment (optional)</Label>
+              <Input
+                id="pmEquipmentName"
+                placeholder="e.g., Walk-in cooler, All fryers, Ice machine"
+                className="mt-1"
+                value={equipmentName}
+                onChange={(e) => setEquipmentName(e.target.value)}
+                data-testid="input-pm-equipment-name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fail-Silent Monitors (optional)</Label>
+              <p className="text-sm text-muted-foreground">Select items to include monitoring logs and escalation thresholds</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {failSilentOptions.map(option => (
+                  <Badge
+                    key={option.value}
+                    variant={failSilentMonitors.includes(option.value) ? "default" : "outline"}
+                    className="cursor-pointer toggle-elevate"
+                    onClick={() => toggleFailSilent(option.value)}
+                    data-testid={`badge-fail-silent-${option.value}`}
+                  >
+                    {option.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="log" className="space-y-4 mt-4">
+            <div>
+              <Label htmlFor="logEquipmentType">Equipment Type</Label>
+              <Select value={equipmentType} onValueChange={setEquipmentType}>
+                <SelectTrigger id="logEquipmentType" className="mt-1" data-testid="select-log-equipment-type">
+                  <SelectValue placeholder="Select equipment type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {equipmentTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="logEquipmentName">Equipment Name/Model</Label>
+              <Input
+                id="logEquipmentName"
+                placeholder="e.g., Hoshizaki KM-320MAJ Ice Machine"
+                className="mt-1"
+                value={equipmentName}
+                onChange={(e) => setEquipmentName(e.target.value)}
+                data-testid="input-log-equipment-name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="lastService">Last Service Date (optional)</Label>
+              <Input
+                id="lastService"
+                type="date"
+                className="mt-1"
+                value={lastServiceDate}
+                onChange={(e) => setLastServiceDate(e.target.value)}
+                data-testid="input-last-service"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="logNotes">Notes / Current Issues (optional)</Label>
+              <Textarea
+                id="logNotes"
+                placeholder="Any notes about this equipment, recurring issues, or maintenance history..."
+                className="mt-1 min-h-[80px]"
+                value={issueGoal}
+                onChange={(e) => setIssueGoal(e.target.value)}
+                data-testid="textarea-log-notes"
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <Button 
+          onClick={generateResponse} 
+          disabled={isGenerating || (mode === "breakdown" && !issueGoal) || (mode === "pm" && !equipmentType)}
+          className="w-full"
+          data-testid="btn-generate-facility"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {mode === "breakdown" ? "Generating triage response..." : mode === "pm" ? "Building PM schedule..." : "Creating equipment log..."}
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {mode === "breakdown" ? "Log an Issue" : mode === "pm" ? "Build PM Schedule" : "Generate Equipment Log"}
+            </>
+          )}
+        </Button>
+
+        {response && (
+          <div className="mt-4 space-y-4">
+            <div className="p-4 bg-accent/50 rounded-lg">
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                {response}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-facility">
+              <Copy className="h-4 w-4 mr-2" />
+              Copy to Clipboard
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const contentTypeConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   principle: { icon: Lightbulb, label: "Principle", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
   output: { icon: FileOutput, label: "Framework", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
@@ -3513,6 +4000,9 @@ export default function DomainPage() {
 
         {/* Crisis Response Engine - only show for crisis domain */}
         {slug === "crisis" && <CrisisResponseEngine />}
+
+        {/* Facility Command Center - only show for facilities domain */}
+        {slug === "facilities" && <FacilityCommandCenter />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">
