@@ -1,0 +1,274 @@
+The two ways to build “Buffer inside my app”
+Option A — Direct integrations (harder, more control)
+
+You integrate each platform’s API yourself (Meta, X, LinkedIn, Google, TikTok).
+
+Option B — Use an “aggregation API” (easier, faster)
+
+A third-party handles the OAuth + posting APIs, and you call one unified endpoint.
+
+Faster time-to-market
+
+Less app-review pain
+
+You pay for it
+
+If you truly want “like Buffer,” Option B is how most small teams ship it.
+
+(If you tell me whether you want fast ship vs full control, I can tailor it—but below is the direct-integration build.)
+
+1) What platforms you can realistically support
+✅ Good “post directly” candidates
+
+Facebook Pages via Pages API
+
+Instagram professional accounts (business/creator) via Instagram Content Publishing
+
+X (tweet/post) via POST /2/tweets
+
+LinkedIn via Posts API
+
+Google Business Profile Posts
+
+TikTok via Content Posting “Direct Post” API (if approved/eligible)
+
+⚠️ Important reality check
+
+Instagram posting requires a professional account tied to a Facebook Page (not personal IG).
+
+Meta permissions often require App Review / advanced access before you can let any customer connect and post.
+
+X API access depends on your plan/permissions; POST /2/tweets requires user-context auth.
+
+2) Replit architecture (what to build)
+Recommended stack (works great on Replit)
+
+Frontend: Next.js
+
+Backend: Next.js API routes or separate Express server
+
+DB: Postgres (Supabase/Neon)
+
+Queue/Workers: BullMQ + Redis (Upstash Redis works well)
+
+File storage: S3-compatible (Cloudflare R2 / AWS S3) for images/videos
+
+Scheduler: queue “delayed jobs” + a worker
+
+Why you need a queue: posting must be reliable, retried, logged, and not depend on a user’s browser tab being open.
+
+3) Core data model (minimum tables)
+connected_accounts
+
+id
+
+client_id (your restaurant client)
+
+provider (facebook | instagram | x | linkedin | google_business | tiktok)
+
+provider_account_id
+
+display_name
+
+scopes
+
+access_token_encrypted
+
+refresh_token_encrypted (if provider issues one)
+
+token_expires_at
+
+meta JSON (page_id, ig_user_id, location_id, etc.)
+
+status (active / needs_reauth / revoked)
+
+timestamps
+
+media_library
+
+id
+
+client_id
+
+file_url
+
+mime_type
+
+tags[]
+
+orientation
+
+last_used_at
+
+scheduled_posts
+
+id
+
+client_id
+
+platform_targets[] (references connected_accounts.id)
+
+caption
+
+media_ids[]
+
+scheduled_for
+
+status (draft / scheduled / posting / posted / failed)
+
+error_last
+
+timestamps
+
+post_results
+
+scheduled_post_id
+
+provider
+
+provider_post_id
+
+posted_at
+
+raw_response JSON (for debugging)
+
+4) The flow you build (Buffer-style)
+Step A — “Connect account” (OAuth)
+
+User clicks Connect Facebook / Instagram / X / LinkedIn / Google / TikTok
+
+Redirect to provider OAuth consent screen
+
+Provider redirects back to your app: /oauth/callback/{provider}
+
+You exchange code → tokens
+
+Store tokens encrypted
+
+Fetch account identity details (page, IG user, LinkedIn org, GBP location, etc.)
+
+Save to connected_accounts
+
+Critical: never store tokens in localStorage. Store server-side encrypted.
+
+Step B — “Compose”
+
+Choose platforms (only show those connected)
+
+Validate constraints per platform (text length, media type)
+
+Select media from your library
+
+Generate caption (your AI tool)
+
+Preview per platform
+
+Step C — “Schedule”
+
+Save scheduled_posts
+
+Enqueue a job in Redis queue to run at scheduled_for
+
+Step D — Worker executes job
+
+Refresh token if needed
+
+Upload media (if required)
+
+Call provider “create post”
+
+Save result + status
+
+Retry on transient failures
+
+5) Platform-specific implementation notes (the stuff that bites teams)
+Facebook Pages
+
+You post to a Page, not a personal profile.
+
+You’ll typically need Page-related permissions like “manage posts” and “read engagement,” and may need app review for production use.
+
+Instagram
+
+Uses Instagram Content Publishing for professional accounts.
+
+Posting is generally a 2-step flow (create media container → publish).
+
+X (Twitter)
+
+Posting uses POST /2/tweets and requires user context auth (OAuth).
+
+LinkedIn
+
+Posting uses LinkedIn’s Posts API; you’ll be dealing with org/user identity and permissions.
+
+Google Business Profile
+
+Supports creating “Posts” on Google Search/Maps via the API.
+
+TikTok
+
+“Direct Post” API exists, but it’s not “just call an endpoint”—it has prerequisites and posting flow requirements.
+
+6) Replit-specific build directions (practical)
+In Replit, create these services/dirs
+
+/app (Next.js UI)
+
+/app/api/oauth/[provider]/route.ts (start OAuth)
+
+/app/api/oauth/[provider]/callback/route.ts (OAuth callback)
+
+/app/api/posts/create (create draft)
+
+/app/api/posts/schedule (schedule + enqueue)
+
+/workers/poster.ts (queue worker)
+
+Secrets to set in Replit “Secrets”
+
+META_APP_ID, META_APP_SECRET
+
+X_CLIENT_ID, X_CLIENT_SECRET
+
+LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET
+
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+
+TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET
+
+ENCRYPTION_KEY (for token encryption)
+
+REDIS_URL
+
+DATABASE_URL
+
+S3_ACCESS_KEY, S3_SECRET, S3_BUCKET, S3_ENDPOINT
+
+Token encryption
+
+Use server-side encryption (AES-GCM) with a single ENCRYPTION_KEY rotated periodically.
+
+7) The compliance checklist (don’t skip this)
+
+To let clients connect their accounts and post from your app, you’ll need:
+
+Privacy policy + terms pages (providers often require)
+
+OAuth verification + App Review submissions (especially Meta)
+
+Clear “what your app does” screencasts for permission requests (Meta is strict here)
+
+This is where many apps stall—plan for it early.
+
+8) What I’d ship first (restaurant-optimized MVP)
+
+To get value fast, start with:
+
+Facebook Pages
+
+Instagram professional
+
+Google Business Profile Posts
+
+Those 3 drive real local traffic and reviews, and they’re the most “restaurant ROI” channels.

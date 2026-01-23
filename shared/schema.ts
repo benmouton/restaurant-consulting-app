@@ -154,6 +154,86 @@ export const announcementReads = pgTable("announcement_reads", {
   readAt: timestamp("read_at").defaultNow(),
 });
 
+// Social Media Content Library - Folders
+export const socialMediaFolders = pgTable("social_media_folders", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Social Media Content Library - Assets (photos/videos)
+export const socialMediaAssets = pgTable("social_media_assets", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  folderId: integer("folder_id").references(() => socialMediaFolders.id),
+  fileUrl: text("file_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  tags: text("tags").array(),
+  orientation: text("orientation"), // square, portrait, landscape
+  season: text("season"), // spring, summer, fall, winter
+  notes: text("notes"),
+  usageCount: integer("usage_count").default(0),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Brand Voice Settings
+export const brandVoiceSettings = pgTable("brand_voice_settings", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  voiceAdjectives: text("voice_adjectives").array(), // warm, confident, welcoming, premium, playful
+  defaultCta: text("default_cta").default("reserve"), // reserve, walk-ins, order online
+  neverSayList: text("never_say_list").array(), // words to avoid
+  emojiLevel: text("emoji_level").default("light"), // none, light, normal
+  hashtagStyle: text("hashtag_style").default("minimal"), // none, minimal, local-focused
+  restaurantName: text("restaurant_name"),
+  location: text("location"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Social Media Posts (saved drafts and generated posts)
+export const socialMediaPosts = pgTable("social_media_posts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  postType: text("post_type").notNull(), // event_promo, special, menu_feature, live_music, happy_hour, catering, hiring, community, tonight_vibe, holiday
+  platforms: text("platforms").array(), // instagram_feed, instagram_story, facebook, google_business
+  outputStyle: text("output_style"), // short_punchy, warm_hospitality, premium, straight_info
+  eventName: text("event_name"),
+  eventDate: text("event_date"),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  promotionDetails: text("promotion_details"),
+  targetAudience: text("target_audience"), // date_night, families, lunch_crowd, bar_crowd, music_lovers, brunch
+  tone: text("tone"), // fun, classy, high_energy, low_key, community
+  cta: text("cta"), // reserve_now, walk_ins, order_online, call_to_book, rsvp, come_early
+  selectedAssetIds: integer("selected_asset_ids").array(),
+  holidayName: text("holiday_name"),
+  generatedCaption: text("generated_caption"),
+  shortCaption: text("short_caption"),
+  storyOverlays: text("story_overlays").array(),
+  hashtags: text("hashtags").array(),
+  suggestedPostTime: text("suggested_post_time"),
+  replyPack: text("reply_pack").array(),
+  status: text("status").default("draft"), // draft, scheduled, posted
+  scheduledFor: timestamp("scheduled_for"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Restaurant Holidays / National Days
+export const restaurantHolidays = pgTable("restaurant_holidays", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  date: text("date").notNull(), // MM-DD format for recurring
+  category: text("category").notNull(), // food, hospitality, community, family, sports
+  suggestedAngle: text("suggested_angle"),
+  suggestedTags: text("suggested_tags").array(),
+  relevanceScore: integer("relevance_score").default(5), // 1-10
+});
+
 export const insertDomainSchema = createInsertSchema(domains).omit({ id: true });
 export const insertFrameworkContentSchema = createInsertSchema(frameworkContent).omit({ id: true });
 export const insertUserBookmarkSchema = createInsertSchema(userBookmarks).omit({ id: true, createdAt: true });
@@ -167,6 +247,11 @@ export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true, cre
 export const insertShiftApplicationSchema = createInsertSchema(shiftApplications).omit({ id: true, appliedAt: true });
 export const insertStaffAnnouncementSchema = createInsertSchema(staffAnnouncements).omit({ id: true, createdAt: true });
 export const insertAnnouncementReadSchema = createInsertSchema(announcementReads).omit({ id: true, readAt: true });
+export const insertSocialMediaFolderSchema = createInsertSchema(socialMediaFolders).omit({ id: true, createdAt: true });
+export const insertSocialMediaAssetSchema = createInsertSchema(socialMediaAssets).omit({ id: true, createdAt: true });
+export const insertBrandVoiceSettingsSchema = createInsertSchema(brandVoiceSettings).omit({ id: true, updatedAt: true });
+export const insertSocialMediaPostSchema = createInsertSchema(socialMediaPosts).omit({ id: true, createdAt: true });
+export const insertRestaurantHolidaySchema = createInsertSchema(restaurantHolidays).omit({ id: true });
 
 export type Domain = typeof domains.$inferSelect;
 export type FrameworkContent = typeof frameworkContent.$inferSelect;
@@ -187,3 +272,13 @@ export type InsertStaffMember = z.infer<typeof insertStaffMemberSchema>;
 export type InsertShift = z.infer<typeof insertShiftSchema>;
 export type InsertShiftApplication = z.infer<typeof insertShiftApplicationSchema>;
 export type InsertStaffAnnouncement = z.infer<typeof insertStaffAnnouncementSchema>;
+export type SocialMediaFolder = typeof socialMediaFolders.$inferSelect;
+export type SocialMediaAsset = typeof socialMediaAssets.$inferSelect;
+export type BrandVoiceSettings = typeof brandVoiceSettings.$inferSelect;
+export type SocialMediaPost = typeof socialMediaPosts.$inferSelect;
+export type RestaurantHoliday = typeof restaurantHolidays.$inferSelect;
+export type InsertSocialMediaFolder = z.infer<typeof insertSocialMediaFolderSchema>;
+export type InsertSocialMediaAsset = z.infer<typeof insertSocialMediaAssetSchema>;
+export type InsertBrandVoiceSettings = z.infer<typeof insertBrandVoiceSettingsSchema>;
+export type InsertSocialMediaPost = z.infer<typeof insertSocialMediaPostSchema>;
+export type InsertRestaurantHoliday = z.infer<typeof insertRestaurantHolidaySchema>;

@@ -1,0 +1,402 @@
+AI TOOL: Social Media Post Builder
+“Content Library + Guided Prompts + Holiday Suggestions”
+Purpose
+
+Create consistent, on-brand posts fast—without hunting for photos or reinventing what to say. This tool turns:
+
+your photo library +
+
+a few key inputs +
+
+upcoming relevant “national day” prompts
+into finished posts for IG/FB (and optionally Stories/Reels captions).
+
+1) Tool Layout (Screen-by-Screen)
+A) Top Bar
+
+Create Post (primary)
+
+Content Library (tab)
+
+Calendar & Holidays (tab)
+
+Brand Voice Settings (tab)
+
+History / Saved Drafts (tab)
+
+B) Create Post (Main Flow)
+Step 1 — Choose Post Type
+
+Post Type (dropdown):
+
+Event Promo
+
+Special / Limited Time
+
+Menu Feature
+
+Live Music / Entertainment
+
+Happy Hour / Bar Feature
+
+Catering / Large Party
+
+Hiring
+
+Community / Charity
+
+“Tonight’s Vibe” (quick post)
+
+Holiday / National Day
+
+Platform Output (multi-select):
+
+Instagram Feed
+
+Instagram Story
+
+Facebook Page Post
+
+Google Business Profile (optional)
+
+Output Style (dropdown):
+
+Short & punchy
+
+Warm & hospitality-forward
+
+Premium / elevated
+
+Straight info / no fluff
+
+Step 2 — Photo & Asset Picker (Your Folder Database)
+
+Photo Source:
+
+Upload new photos/videos
+
+Choose from library
+
+Library Filters:
+
+Folder (Food / Cocktails / Staff / Dining Room / Live Music / Specials / Holidays / Catering / Behind-the-scenes)
+
+Tags (e.g., “burger”, “brunch”, “margarita”, “boudin balls”, “patio”, “band”, “family-friendly”)
+
+Orientation (square / portrait / landscape)
+
+Season (spring/summer/fall/winter)
+
+Last used (hide recently used)
+
+Smart Suggestions (AI-assisted):
+
+“Best 6 photos for Event Promo”
+
+“Best 6 photos for Food Proof”
+
+“Photos that match holiday: ___”
+
+“Photos that haven’t been used in 30 days”
+
+Optional: “Auto-crop guidance” (not editing, just recommendations):
+
+“Use portrait for story”
+
+“This photo is dark—choose a brighter alternative”
+
+Step 3 — Guided Questions (Fast Intake)
+
+These are the “basic questions” you mentioned, plus a few high-impact ones.
+
+Required fields (keep it light):
+
+What are you promoting? (text)
+
+Event name (text, optional if not event)
+
+Date (date picker)
+
+Start time / End time (time pickers)
+
+Location (auto-filled; editable)
+
+Call to action (dropdown)
+
+Reserve now
+
+Walk-ins welcome
+
+Order online
+
+Call to book
+
+RSVP / Ticket link
+
+Come early / limited seating
+
+Recommended (high leverage):
+
+Who is it for? (dropdown)
+
+Date night / Families / Lunch crowd / Bar crowd / Music lovers / Brunch
+
+Offer details (text)
+
+Special pricing, limited quantity, feature item, etc.
+
+Tone (dropdown)
+
+Fun / Classy / High energy / Low key / Community
+
+Must-include lines (checkboxes)
+
+Mention hours
+
+Mention reservation link
+
+Mention live music details
+
+Mention kids-friendly
+
+Mention parking
+
+Guardrails (your brand rules):
+
+Toggle: “No discounts language” (optional)
+
+Toggle: “No menu item list” (optional)
+
+Toggle: “No over-promising ticket times” (optional)
+
+Step 4 — Holiday Suggestion (Today + Next 5 Days)
+
+This is a widget that appears automatically.
+
+Widget Title: “Upcoming National Days (Next 5 Days)”
+
+Shows a list of suggested holidays for:
+
+Today
+
+Tomorrow
+
++2 days
+
++3 days
+
++4 days
+
++5 days
+
+Each holiday entry includes:
+
+Holiday name (e.g., “National Hamburger Day”)
+
+Date
+
+Suggested post angle (1-liner)
+
+Suggested photo tags (“burger”, “fries”, “patio”, “beer”)
+
+Controls:
+
+Dropdown: “Select a holiday to generate a post”
+
+Toggle: “Only show food & hospitality related holidays”
+
+Toggle: “Only show holidays we can credibly support”
+
+Option: “Hide this holiday” (if it’s irrelevant)
+
+Important note (quality control):
+National “day” sources vary. Your tool should:
+
+Use a consistent source
+
+Allow an override (“Custom holiday”)
+
+Avoid weird or off-brand holidays by default
+
+Step 5 — Generate Content (Outputs)
+
+One click: Generate Post.
+
+AI returns:
+
+A) Primary Caption (platform-optimized length)
+B) Short Caption Variant
+C) Story Text Overlay Suggestions (3 options)
+D) Hashtags (3–8, local + category)
+E) Posting Time Suggestion (based on your best windows)
+F) Optional Reply Pack (2–3 quick responses to comments)
+
+Posting Time Engine (simple but effective):
+
+Weekdays: 10:30–11:30 AM and 4:30–5:30 PM
+
+Weekends: 9:00–10:30 AM and 4:00–5:00 PM
+
+“If event is tonight” → pushes to afternoon window automatically
+
+2) Content Library Database (Specs)
+Folder Structure
+
+Food
+
+Cocktails / Bar
+
+Dining Room / Atmosphere
+
+Staff / Culture
+
+Events / Live Music
+
+Specials / Limited Time
+
+Catering / Private Dining
+
+Holidays
+
+Behind-the-Scenes
+
+Photo Metadata (stored per asset)
+
+asset_id
+
+file_url
+
+thumbnail_url
+
+folder_id
+
+tags[] (user + AI-suggested)
+
+orientation
+
+created_at
+
+uploaded_by
+
+last_used_at
+
+usage_count
+
+notes (optional: “best for story”, “winter vibe”, etc.)
+
+Smart Rules
+
+“Avoid using same photo twice within X days”
+
+“Boost underused assets”
+
+“Suggest best assets based on post type + tags + season”
+
+3) Holiday Module (Specs)
+What it needs to do
+
+On tool open, compute today + next 5 days
+
+Query a holiday dataset/API for those dates
+
+Filter to “relevant” categories by default:
+
+Food
+
+Hospitality
+
+Community
+
+Family
+
+Sports/events (optional)
+
+Data model
+
+holiday_id
+
+name
+
+date
+
+category
+
+relevance_score
+
+suggested_angle (optional)
+
+suggested_tags[] (optional)
+
+UI Behavior
+
+If no relevant holidays found → show:
+
+“No strong national day prompts in the next 5 days.”
+
+Suggest: “Use ‘Tonight’s vibe’ or ‘Food proof’ instead.”
+
+4) The AI Prompt Logic (How it should think)
+Inputs to the AI
+
+Post type + platform targets
+
+Event fields (name/date/time/details)
+
+What you’re promoting
+
+Selected photos’ tags + context (not the image content unless you add vision later)
+
+Selected holiday (optional)
+
+Brand voice settings (tone, do/don’t rules)
+
+CTA preference
+
+Output constraints
+
+No long paragraphs
+
+Clear CTA
+
+No cringe marketing language
+
+Local-first language (Cedar Park / Austin area if relevant)
+
+Optional: never list menu items if you set that rule
+
+5) Brand Voice Settings (Owner Controls)
+
+A settings page that lets you lock standards:
+
+Voice adjectives: warm / confident / welcoming / premium / playful
+
+Default CTA: reserve / walk-ins / order online
+
+“Never say” list (e.g., “cheap”, “best ever”, “guaranteed”)
+
+Emoji level: none / light / normal
+
+Hashtag style: none / minimal / local-focused
+
+This makes posts consistent even if a manager generates them.
+
+6) Bonus Feature (Worth Adding)
+“Campaign Mode”
+
+Create a 7–14 day content run:
+
+3 posts/week
+
+1 story set/week
+
+Auto-pulls from your library and rotates buckets:
+
+Food proof
+
+Atmosphere
+
+Event
+
+Holiday (if relevant)
+
+This prevents the “post when we remember” problem.

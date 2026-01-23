@@ -49,6 +49,7 @@ import {
   ChevronLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
 import type { Domain, FrameworkContent } from "@shared/schema";
 
 function FoodCostCalculator() {
@@ -4136,6 +4137,9 @@ export default function DomainPage() {
 
         {/* Facility Command Center - only show for facilities domain */}
         {slug === "facilities" && <FacilityCommandCenter />}
+
+        {/* Social Media Post Builder - only show for social-media domain */}
+        {slug === "social-media" && <SocialPostBuilder />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">

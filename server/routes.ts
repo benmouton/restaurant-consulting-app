@@ -951,6 +951,107 @@ export async function registerRoutes(
     }
   });
 
+  // Social Media Post Builder Routes
+  app.get("/api/social-media/holidays/upcoming", isAuthenticated, async (req: any, res) => {
+    try {
+      const holidays = await storage.getUpcomingHolidays();
+      res.json(holidays);
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
+      res.status(500).json({ message: "Failed to fetch holidays" });
+    }
+  });
+
+  app.get("/api/social-media/brand-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getBrandVoiceSettings(userId);
+      res.json(settings || null);
+    } catch (error) {
+      console.error("Error fetching brand settings:", error);
+      res.status(500).json({ message: "Failed to fetch brand settings" });
+    }
+  });
+
+  app.post("/api/social-media/brand-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.saveBrandVoiceSettings(userId, req.body);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error saving brand settings:", error);
+      res.status(500).json({ message: "Failed to save brand settings" });
+    }
+  });
+
+  app.post("/api/social-media/generate-post", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { postType, platforms, outputStyle, eventName, eventDate, startTime, endTime, 
+              promotionDetails, targetAudience, tone, cta, selectedHoliday } = req.body;
+      
+      const brandSettings = await storage.getBrandVoiceSettings(userId);
+      
+      const platformsStr = platforms.join(", ");
+      const voiceAdj = brandSettings?.voiceAdjectives?.join(", ") || "warm, welcoming";
+      const neverSay = brandSettings?.neverSayList?.length ? `Avoid these words: ${brandSettings.neverSayList.join(", ")}` : "";
+      const emojiGuidance = brandSettings?.emojiLevel === "none" 
+        ? "Do not use any emojis." 
+        : brandSettings?.emojiLevel === "light" 
+          ? "Use emojis sparingly, 1-2 max."
+          : "Use emojis naturally.";
+      
+      const prompt = `Generate social media content for a restaurant:
+
+POST TYPE: ${postType}
+PLATFORMS: ${platformsStr}
+STYLE: ${outputStyle}
+${eventName ? `EVENT NAME: ${eventName}` : ""}
+${eventDate ? `DATE: ${eventDate}` : ""}
+${startTime ? `TIME: ${startTime}${endTime ? ` - ${endTime}` : ""}` : ""}
+${promotionDetails ? `WHAT WE'RE PROMOTING: ${promotionDetails}` : ""}
+${targetAudience ? `TARGET AUDIENCE: ${targetAudience}` : ""}
+TONE: ${tone || "classy"}
+CALL TO ACTION: ${cta || "reserve"}
+${selectedHoliday ? `HOLIDAY TIE-IN: ${selectedHoliday}` : ""}
+${brandSettings?.restaurantName ? `RESTAURANT: ${brandSettings.restaurantName}` : ""}
+${brandSettings?.location ? `LOCATION: ${brandSettings.location}` : ""}
+
+BRAND VOICE: ${voiceAdj}
+${neverSay}
+${emojiGuidance}
+
+Generate JSON with:
+1. primaryCaption: 2-4 engaging sentences
+2. shortCaption: 1-2 sentences
+3. storyOverlays: 3 short text overlays (max 5 words each)
+4. hashtags: 4-6 relevant hashtags with # symbol
+5. suggestedPostTime: Best time (e.g., "Today 4:30 PM")
+6. replyPack: 2-3 quick responses for comments`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a social media expert for restaurants. Generate engaging, authentic content. Always respond with valid JSON." },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1000,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("No content generated");
+      }
+
+      const generatedPost = JSON.parse(content);
+      res.json(generatedPost);
+    } catch (error) {
+      console.error("Error generating post:", error);
+      res.status(500).json({ message: "Failed to generate post" });
+    }
+  });
+
   // Template Routes
   app.get(api.templates.list.path, async (req, res) => {
     const templates = await storage.getTrainingTemplates();

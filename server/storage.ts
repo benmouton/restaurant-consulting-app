@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or } from "drizzle-orm";
 
 export interface IStorage {
@@ -437,6 +437,34 @@ export class DatabaseStorage implements IStorage {
       todayShifts: todayShiftsList.length,
       weekShifts: weekShiftsList.length,
     };
+  }
+
+  // Social Media - Holidays
+  async getUpcomingHolidays(): Promise<RestaurantHoliday[]> {
+    return await db.select().from(restaurantHolidays).orderBy(restaurantHolidays.date);
+  }
+
+  // Social Media - Brand Voice Settings
+  async getBrandVoiceSettings(userId: string): Promise<BrandVoiceSettings | undefined> {
+    const [settings] = await db.select().from(brandVoiceSettings)
+      .where(eq(brandVoiceSettings.userId, userId));
+    return settings;
+  }
+
+  async saveBrandVoiceSettings(userId: string, data: Partial<BrandVoiceSettings>): Promise<BrandVoiceSettings> {
+    const existing = await this.getBrandVoiceSettings(userId);
+    if (existing) {
+      const [updated] = await db.update(brandVoiceSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(brandVoiceSettings.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(brandVoiceSettings)
+        .values({ userId, ...data })
+        .returning();
+      return created;
+    }
   }
 }
 
