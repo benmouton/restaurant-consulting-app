@@ -1734,7 +1734,6 @@ RESPONSE STYLE:
 
 async function seedDatabase() {
   const existingDomains = await storage.getDomains();
-  if (existingDomains.length > 0) return;
 
   const domainsData = [
     {
@@ -1814,9 +1813,22 @@ async function seedDatabase() {
       icon: "Wrench",
       sequenceOrder: 11,
     },
+    {
+      name: "Social Media",
+      slug: "social-media",
+      description: "Platform strategy, content planning, and engagement rules for restaurant visibility",
+      icon: "Share2",
+      sequenceOrder: 12,
+    },
   ];
 
+  // Get existing domain slugs to avoid duplicates
+  const existingSlugs = new Set(existingDomains.map(d => d.slug));
+
   for (const domain of domainsData) {
+    // Skip if domain already exists
+    if (existingSlugs.has(domain.slug)) continue;
+    
     const createdDomain = await storage.createDomain(domain);
     
     // Add content for each domain
@@ -2150,6 +2162,38 @@ function getContentForDomain(slug: string): { title: string; type: string; conte
         title: "The Standard",
         type: "principle",
         content: "Emergency repairs are expensive.\nPreventative maintenance is boring.\n\nBoring is profitable.\n\nRestaurants that control their facilities:\n• Spend less on repairs\n• Panic less during service\n• Recover faster from failures\n• Protect brand trust\n\nBOTTOM LINE:\nYou don't own a restaurant—you own a collection of assets that must perform under stress.\n\nControl the assets. Control the nights."
+      }
+    ],
+    "social-media": [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Social Media Is Reputation Amplification\n\nYour restaurant already has a reputation—social media just broadcasts it. Before you post, fix what you'd be hiding.\n\nGuests don't follow restaurants. They follow:\n• Personality\n• Consistency\n• Behind-the-scenes authenticity\n\nIf your feed looks like a stock photo gallery, you've already lost.\n\nElite operators use social media to extend hospitality—not replace it."
+      },
+      {
+        title: "Platform Strategy Matrix",
+        type: "framework",
+        content: "NOT ALL PLATFORMS ARE EQUAL\n\nMatch your content to where your guests actually are:\n\nINSTAGRAM\nBest for: Visual storytelling, food photography, behind-the-scenes\nPost frequency: 3-5x per week\nContent mix: 60% food/drinks, 20% team/culture, 20% guest moments\n\nFACEBOOK\nBest for: Events, announcements, community engagement\nPost frequency: 2-3x per week\nContent mix: Events, specials, reviews, local partnerships\n\nGOOGLE BUSINESS PROFILE\nBest for: Local search, hours, menu updates, reviews\nPost frequency: 1-2x per week\nContent: Specials, events, photos, response to reviews\n\nTIKTOK (if applicable)\nBest for: Viral moments, kitchen content, personality\nPost frequency: 3-7x per week\nContent: Trends, day-in-the-life, food prep\n\nRULE: Master one platform before expanding to others."
+      },
+      {
+        title: "Content Planning Framework",
+        type: "checklist",
+        content: "WEEKLY CONTENT CALENDAR\n\nPLAN AHEAD:\n□ Review upcoming events, holidays, specials\n□ Identify 3-5 content themes for the week\n□ Assign shooting days (best: slower service hours)\n□ Schedule posts in advance when possible\n\nCONTENT PILLARS:\n□ FOOD: Hero dishes, specials, seasonal items\n□ TEAM: Staff spotlights, kitchen action, celebrations\n□ ATMOSPHERE: Dining room, bar, outdoor space\n□ COMMUNITY: Local events, partnerships, guest features\n□ BEHIND-THE-SCENES: Prep, sourcing, owner insights\n\nCAPTION GUIDELINES:\n□ Lead with hook (first line matters most)\n□ Include clear call-to-action\n□ Use location tags and relevant hashtags\n□ Keep brand voice consistent\n\nIf content isn't planned, it won't happen."
+      },
+      {
+        title: "Response Protocol",
+        type: "framework",
+        content: "ENGAGEMENT IS NOT OPTIONAL\n\nRESPONSE TIME TARGETS:\n• Positive comments: Within 24 hours\n• Questions: Within 4 hours during business hours\n• Negative comments: Within 2 hours (see escalation)\n• DMs: Within 24 hours\n\nPOSITIVE ENGAGEMENT:\n• Personalized responses (use their name if visible)\n• Express genuine gratitude\n• Invite them back with specifics\n\nNEGATIVE ENGAGEMENT:\n• Acknowledge the concern\n• Move to DM for resolution\n• Never argue publicly\n• Document for internal review\n\nRULE: Every unanswered comment is a missed connection."
+      },
+      {
+        title: "Photo & Video Standards",
+        type: "checklist",
+        content: "CONTENT QUALITY STANDARDS\n\nPHOTO REQUIREMENTS:\n□ Natural lighting preferred (window light > flash)\n□ Clean backgrounds (clear table clutter)\n□ Garnish and plate before shooting\n□ Multiple angles per dish\n□ Consistent editing style/filters\n\nVIDEO REQUIREMENTS:\n□ Horizontal for YouTube/Facebook, vertical for Stories/Reels/TikTok\n□ Stable footage (tripod or steady hands)\n□ Clean audio or music overlay\n□ Keep under 60 seconds for social\n□ Captions for silent viewing\n\nWHAT NOT TO POST:\n□ Blurry or dark photos\n□ Empty dining room shots\n□ Visible mess or clutter\n□ Anything that doesn't represent your standards\n\nIf you wouldn't frame it, don't post it."
+      },
+      {
+        title: "The Social Media Reality",
+        type: "principle",
+        content: "Posting more doesn't mean winning more.\nEngagement beats reach.\n\nRestaurants that control their social presence:\n• Post with purpose, not panic\n• Respond faster than competitors\n• Show the real work behind the food\n• Build community, not just followers\n\nBOTTOM LINE:\nSocial media is an extension of your hospitality. If you wouldn't say it to a guest's face, don't post it.\n\nBe real. Be consistent. Be present."
       }
     ]
   };
