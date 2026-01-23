@@ -324,11 +324,13 @@ export default function SchedulingPage() {
     for (const shift of dayShifts) {
       if (shift.staffMemberId) {
         const member = staff.find(s => s.id === shift.staffMemberId);
-        if (member && (member as any).hourlyRate) {
-          hasRates = true;
-          const hours = calculateShiftHours(shift.startTime, shift.endTime);
-          const rate = parseFloat((member as any).hourlyRate);
-          totalCost += hours * rate;
+        if (member && member.hourlyRate) {
+          const rate = parseFloat(member.hourlyRate);
+          if (!isNaN(rate) && rate > 0) {
+            hasRates = true;
+            const hours = calculateShiftHours(shift.startTime, shift.endTime);
+            totalCost += hours * rate;
+          }
         }
       }
     }
@@ -532,7 +534,7 @@ export default function SchedulingPage() {
                     {dayShifts.length > 0 && hasRates && (
                       <div className="mt-2 pt-2 border-t border-dashed text-center" data-testid={`labor-cost-${dateStr}`}>
                         <div className="text-xs text-muted-foreground">Labor Cost</div>
-                        <div className="text-sm font-semibold text-primary">${totalCost.toFixed(2)}</div>
+                        <div className="text-sm font-semibold text-green-600 dark:text-green-500" data-testid={`labor-cost-value-${dateStr}`}>${totalCost.toFixed(2)}</div>
                       </div>
                     )}
                   </div>
@@ -672,13 +674,13 @@ export default function SchedulingPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold">{member.firstName} {member.lastName}</h3>
-                          {(member as any).inviteStatus === "accepted" && (
+                          {member.inviteStatus === "accepted" && (
                             <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
                               <Check className="h-3 w-3 mr-1" />
                               Active
                             </Badge>
                           )}
-                          {(member as any).inviteStatus === "pending" && (
+                          {member.inviteStatus === "pending" && (
                             <Badge variant="outline" className="text-amber-600 border-amber-600 text-xs">
                               Pending
                             </Badge>
@@ -688,10 +690,10 @@ export default function SchedulingPage() {
                           {member.positionId && (
                             <Badge variant="secondary">{getPositionName(member.positionId)}</Badge>
                           )}
-                          {(member as any).hourlyRate && (
-                            <Badge variant="outline" className="text-green-600 border-green-600">
+                          {member.hourlyRate && (
+                            <Badge variant="outline" className="text-green-600 border-green-600" data-testid={`badge-hourly-rate-${member.id}`}>
                               <DollarSign className="h-3 w-3 mr-0.5" />
-                              {parseFloat((member as any).hourlyRate).toFixed(2)}/hr
+                              {parseFloat(member.hourlyRate).toFixed(2)}/hr
                             </Badge>
                           )}
                         </div>
@@ -699,7 +701,7 @@ export default function SchedulingPage() {
                         {member.phone && <p className="text-sm text-muted-foreground">{member.phone}</p>}
                       </div>
                       <div className="flex items-center gap-1">
-                        {(member as any).inviteStatus !== "accepted" && (
+                        {member.inviteStatus !== "accepted" && (
                           <Button
                             variant="ghost"
                             size="icon"

@@ -60,8 +60,10 @@ Preferred communication style: Simple, everyday language.
 ### Staff Scheduling System
 A Sling-style scheduling system for managing restaurant shifts:
 - **Weekly Calendar View**: Visual shift display with position-based color coding
-- **Staff Management**: Add/edit staff members with position assignments
+- **Staff Management**: Add/edit staff members with position assignments and hourly pay rates
 - **Position Management**: Define positions (Server, Bartender, Line Cook, etc.) with custom colors
+- **Pay Rate Tracking**: Staff members have hourly rates stored for labor cost calculation
+- **Daily Labor Cost**: Schedule view shows estimated labor cost per day based on scheduled shifts and staff pay rates
 - **Open Shift Tracking**: Mark shifts as open and allow staff to apply
 - **Announcements**: Post team announcements with priority levels (low, normal, high, urgent)
 - **Dashboard Integration**: Quick stats showing staff count, positions, today's shifts, week shifts, open shifts, and unread announcements
