@@ -25,6 +25,7 @@ import EmployeePortalPage from "@/pages/employee-portal";
 import ProfilePage from "@/pages/profile";
 import PrivacyPolicy from "@/pages/privacy";
 import DataDeletion from "@/pages/data-deletion";
+import TermsOfService from "@/pages/terms";
 import NotFound from "@/pages/not-found";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
@@ -82,6 +83,7 @@ function Router() {
         {/* Public Pages */}
         <Route path="/privacy" component={PrivacyPolicy} />
         <Route path="/data-deletion" component={DataDeletion} />
+        <Route path="/terms" component={TermsOfService} />
         {/* Employee Portal Routes - separate from main app auth */}
         <Route path="/employee/login" component={EmployeeLoginPage} />
         <Route path="/employee/accept-invite" component={EmployeeAcceptInvitePage} />

@@ -1,0 +1,200 @@
+Below is a clean, Meta-safe, SaaS-appropriate Terms of Service you can publish immediately for The Restaurant Consultant.
+It’s written to pass platform review (Meta, Google, etc.), protect you legally, and stay readable for operators.
+
+You can paste this directly onto a /terms page and adjust the bracketed fields if needed.
+
+Terms of Service
+
+The Restaurant Consultant
+
+Effective Date: January 23, 2026
+
+These Terms of Service (“Terms”) govern your access to and use of The Restaurant Consultant (the “App,” “Service,” “Platform”), operated by The Restaurant Consultant (“we,” “us,” or “our”).
+
+By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.
+
+1. Description of the Service
+
+The Restaurant Consultant provides restaurant operators with tools, guidance, automation, and AI-assisted features related to operations, training, marketing, scheduling, social media, and business management.
+
+The Service may include:
+
+AI-generated recommendations and content
+
+Templates, checklists, and frameworks
+
+Social media planning and posting tools
+
+Account integrations with third-party platforms (e.g., Facebook, Instagram)
+
+Educational and advisory content
+
+The Service is advisory and operational in nature, not legal, financial, or medical advice.
+
+2. Eligibility
+
+You must be at least 18 years old and have the authority to operate a business or act on behalf of a business to use the Service.
+
+By using the Service, you represent that you meet these requirements.
+
+3. Account Registration
+
+To access certain features, you may be required to create an account.
+
+You agree to:
+
+Provide accurate and complete information
+
+Maintain the security of your account credentials
+
+Accept responsibility for all activity under your account
+
+You are responsible for any actions taken through your account, whether by you or by authorized users.
+
+4. Third-Party Integrations
+
+The Service may allow you to connect third-party platforms (such as Facebook, Instagram, or other social media services).
+
+By connecting a third-party account, you authorize us to:
+
+Access permitted data from that platform
+
+Perform actions on your behalf (such as publishing posts), as explicitly authorized by you
+
+We are not responsible for:
+
+Changes, outages, or restrictions imposed by third-party platforms
+
+Actions taken by those platforms
+
+Loss of access due to third-party policy changes
+
+Your use of third-party services remains subject to their own terms and policies.
+
+5. Acceptable Use
+
+You agree not to use the Service to:
+
+Violate any laws or regulations
+
+Infringe on the rights of others
+
+Post or distribute unlawful, misleading, defamatory, or harmful content
+
+Abuse, interfere with, or disrupt the Service or its infrastructure
+
+Attempt to reverse-engineer or misuse the platform or AI features
+
+We reserve the right to suspend or terminate access for violations of these Terms.
+
+6. AI-Generated Content Disclaimer
+
+The Service may generate content using artificial intelligence.
+
+You acknowledge and agree that:
+
+AI outputs may be inaccurate, incomplete, or inappropriate for your specific situation
+
+You are responsible for reviewing, verifying, and approving all outputs before use
+
+Final decisions and actions remain your responsibility
+
+The Restaurant Consultant is not liable for decisions made based on AI-generated content.
+
+7. Fees and Subscriptions (If Applicable)
+
+Some features may require payment or a subscription.
+
+All fees:
+
+Are disclosed before purchase
+
+Are non-refundable unless otherwise stated
+
+May change with reasonable notice
+
+Failure to pay may result in suspension or termination of access.
+
+8. Intellectual Property
+
+All content, software, designs, text, graphics, and features of the Service are owned by or licensed to The Restaurant Consultant and are protected by intellectual property laws.
+
+You are granted a limited, non-exclusive, non-transferable license to use the Service for your internal business purposes.
+
+You may not:
+
+Copy, resell, or redistribute the Service
+
+Use the Service to build a competing product
+
+Remove or obscure proprietary notices
+
+9. Data and Privacy
+
+Your use of the Service is subject to our Privacy Policy, which explains how we collect, use, and protect your data.
+
+By using the Service, you consent to the collection and use of information as described in the Privacy Policy.
+
+10. Data Deletion
+
+You may request deletion of your data at any time by following the instructions on our Data Deletion page or by contacting us directly.
+
+Certain data may be retained as required by law or for legitimate business purposes.
+
+11. Service Availability
+
+We strive to provide reliable service but do not guarantee uninterrupted or error-free operation.
+
+The Service may be modified, suspended, or discontinued at any time without liability.
+
+12. Limitation of Liability
+
+To the maximum extent permitted by law:
+
+The Restaurant Consultant shall not be liable for:
+
+Indirect, incidental, or consequential damages
+
+Loss of profits, revenue, data, or business opportunities
+
+Errors or omissions in content or recommendations
+
+Actions taken by third-party platforms
+
+Your sole remedy for dissatisfaction with the Service is to stop using it.
+
+13. Indemnification
+
+You agree to indemnify and hold harmless The Restaurant Consultant from any claims, damages, losses, or expenses arising from:
+
+Your use of the Service
+
+Your content or actions
+
+Your violation of these Terms or applicable laws
+
+14. Termination
+
+We may suspend or terminate your access at any time for violations of these Terms or misuse of the Service.
+
+You may stop using the Service at any time.
+
+Upon termination, your right to use the Service ends immediately.
+
+15. Changes to These Terms
+
+We may update these Terms from time to time.
+
+Changes will be effective when posted. Continued use of the Service after changes constitutes acceptance of the updated Terms.
+
+16. Governing Law
+
+These Terms are governed by the laws of the State of Texas, without regard to conflict of law principles.
+
+17. Contact Information
+
+If you have questions about these Terms, contact us at:
+
+Email: ben@moutonsbistro.com
+
+Website: https://restaurantai.consulting
