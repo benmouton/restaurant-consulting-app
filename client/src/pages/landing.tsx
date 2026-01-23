@@ -17,6 +17,7 @@ import {
   Wrench,
   Share2
 } from "lucide-react";
+import logoImage from "@/assets/logo.png";
 
 const domains = [
   { name: "Leadership", icon: Crown, desc: "Owner to architect transition" },
@@ -40,8 +41,8 @@ export default function Landing() {
       <header className="border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ChefHat className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">The Restaurant Consultant</span>
+            <img src={logoImage} alt="The AI Restaurant Consultant" className="h-10 w-10 rounded-lg object-contain" />
+            <span className="text-xl font-bold">The AI Restaurant Consultant</span>
           </div>
           <Button asChild data-testid="button-login-header">
             <a href="/api/login">Sign In</a>

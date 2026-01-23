@@ -40,6 +40,7 @@ import {
   Share2
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
+import logoImage from "@/assets/logo.png";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Crown,
@@ -80,8 +81,8 @@ export default function Dashboard() {
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <ChefHat className="h-6 w-6 text-primary flex-shrink-0" />
-            <span className="font-bold text-sm sm:text-base truncate">The Restaurant Consultant</span>
+            <img src={logoImage} alt="The AI Restaurant Consultant" className="h-8 w-8 rounded-lg object-contain flex-shrink-0" />
+            <span className="font-bold text-sm sm:text-base truncate">The AI Restaurant Consultant</span>
           </div>
           <div className="flex items-center gap-2">
             {/* Desktop Navigation */}
