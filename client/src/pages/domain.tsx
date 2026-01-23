@@ -43,7 +43,8 @@ import {
   Users,
   AlertTriangle,
   Shield,
-  Wrench
+  Wrench,
+  Printer
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
@@ -3249,6 +3250,43 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
     toast({ title: "Copied to clipboard!" });
   };
 
+  const printChecklist = () => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      const title = taskName || (mode === "capture" ? "SOP Document" : mode === "checklist" ? "Checklist" : "Audit Report");
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${title}</title>
+            <style>
+              body {
+                font-family: 'Courier New', Courier, monospace;
+                padding: 40px;
+                max-width: 800px;
+                margin: 0 auto;
+                line-height: 1.6;
+              }
+              pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                font-size: 12px;
+              }
+              @media print {
+                body { padding: 20px; }
+              }
+            </style>
+          </head>
+          <body>
+            <pre>${result}</pre>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
   return (
     <Card className="mb-8">
       <CardHeader>
@@ -3374,12 +3412,18 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
 
         {result && (
           <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <Label>Generated {mode === "capture" ? "SOP" : mode === "checklist" ? "Checklist" : "Audit Report"}</Label>
-              <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-sop">
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={printChecklist} data-testid="btn-print-sop">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </Button>
+                <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-sop">
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy
+                </Button>
+              </div>
             </div>
             <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm font-mono">
               {result}
