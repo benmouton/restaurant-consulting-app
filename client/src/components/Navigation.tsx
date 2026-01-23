@@ -61,27 +61,25 @@ export function Navigation() {
 
       {/* User & Logout */}
       <div className="lg:mt-auto lg:w-full lg:border-t lg:pt-6">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button 
-              className="flex w-full items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-muted"
-              data-testid="button-user-menu"
-            >
-              <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border border-border bg-muted">
-                {user?.profileImageUrl ? (
-                  <img src={user.profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
-                    {user?.firstName?.[0]}{user?.lastName?.[0]}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 overflow-hidden text-left">
-                <p className="truncate text-sm font-semibold text-foreground">{user?.firstName} {user?.lastName}</p>
-                <p className="truncate text-xs text-muted-foreground">{roleLabel}</p>
-              </div>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </button>
+        <DropdownMenu modal={true}>
+          <DropdownMenuTrigger 
+            className="flex w-full items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-muted cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+            data-testid="button-user-menu"
+          >
+            <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border border-border bg-muted">
+              {user?.profileImageUrl ? (
+                <img src={user.profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
+                  {user?.firstName?.[0]}{user?.lastName?.[0]}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 overflow-hidden text-left">
+              <p className="truncate text-sm font-semibold text-foreground">{user?.firstName} {user?.lastName}</p>
+              <p className="truncate text-xs text-muted-foreground">{roleLabel}</p>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel className="font-normal">
