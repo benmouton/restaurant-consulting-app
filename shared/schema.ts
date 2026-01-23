@@ -81,6 +81,71 @@ export const financialMessages = pgTable("financial_messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Staff Positions (roles like Server, Bartender, Host, etc.)
+export const staffPositions = pgTable("staff_positions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#3B82F6"), // hex color for display
+  department: text("department").notNull().default("FOH"), // FOH or BOH
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Staff Members (employees)
+export const staffMembers = pgTable("staff_members", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"), // links to auth user if they have an account
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  positionId: integer("position_id").references(() => staffPositions.id),
+  status: text("status").notNull().default("active"), // active, inactive, terminated
+  hireDate: text("hire_date"), // YYYY-MM-DD
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Shifts (scheduled work times)
+export const shifts = pgTable("shifts", {
+  id: serial("id").primaryKey(),
+  staffMemberId: integer("staff_member_id").references(() => staffMembers.id),
+  positionId: integer("position_id").references(() => staffPositions.id),
+  date: text("date").notNull(), // YYYY-MM-DD
+  startTime: text("start_time").notNull(), // HH:MM (24hr)
+  endTime: text("end_time").notNull(), // HH:MM (24hr)
+  status: text("status").notNull().default("scheduled"), // scheduled, open, completed, no_show
+  notes: text("notes"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Shift Applications (for open shifts)
+export const shiftApplications = pgTable("shift_applications", {
+  id: serial("id").primaryKey(),
+  shiftId: integer("shift_id").notNull().references(() => shifts.id),
+  staffMemberId: integer("staff_member_id").notNull().references(() => staffMembers.id),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  appliedAt: timestamp("applied_at").defaultNow(),
+});
+
+// Staff Announcements
+export const staffAnnouncements = pgTable("staff_announcements", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
+  createdBy: text("created_by").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Announcement Read Status
+export const announcementReads = pgTable("announcement_reads", {
+  id: serial("id").primaryKey(),
+  announcementId: integer("announcement_id").notNull().references(() => staffAnnouncements.id),
+  userId: text("user_id").notNull(),
+  readAt: timestamp("read_at").defaultNow(),
+});
+
 export const insertDomainSchema = createInsertSchema(domains).omit({ id: true });
 export const insertFrameworkContentSchema = createInsertSchema(frameworkContent).omit({ id: true });
 export const insertUserBookmarkSchema = createInsertSchema(userBookmarks).omit({ id: true, createdAt: true });
@@ -88,6 +153,12 @@ export const insertTrainingTemplateSchema = createInsertSchema(trainingTemplates
 export const insertFinancialDocumentSchema = createInsertSchema(financialDocuments).omit({ id: true, uploadedAt: true });
 export const insertFinancialExtractSchema = createInsertSchema(financialExtracts).omit({ id: true, processedAt: true });
 export const insertFinancialMessageSchema = createInsertSchema(financialMessages).omit({ id: true, createdAt: true });
+export const insertStaffPositionSchema = createInsertSchema(staffPositions).omit({ id: true, createdAt: true });
+export const insertStaffMemberSchema = createInsertSchema(staffMembers).omit({ id: true, createdAt: true });
+export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true, createdAt: true });
+export const insertShiftApplicationSchema = createInsertSchema(shiftApplications).omit({ id: true, appliedAt: true });
+export const insertStaffAnnouncementSchema = createInsertSchema(staffAnnouncements).omit({ id: true, createdAt: true });
+export const insertAnnouncementReadSchema = createInsertSchema(announcementReads).omit({ id: true, readAt: true });
 
 export type Domain = typeof domains.$inferSelect;
 export type FrameworkContent = typeof frameworkContent.$inferSelect;
@@ -96,3 +167,15 @@ export type TrainingTemplate = typeof trainingTemplates.$inferSelect;
 export type FinancialDocument = typeof financialDocuments.$inferSelect;
 export type FinancialExtract = typeof financialExtracts.$inferSelect;
 export type FinancialMessage = typeof financialMessages.$inferSelect;
+export type StaffPosition = typeof staffPositions.$inferSelect;
+export type StaffMember = typeof staffMembers.$inferSelect;
+export type Shift = typeof shifts.$inferSelect;
+export type ShiftApplication = typeof shiftApplications.$inferSelect;
+export type StaffAnnouncement = typeof staffAnnouncements.$inferSelect;
+export type AnnouncementRead = typeof announcementReads.$inferSelect;
+
+export type InsertStaffPosition = z.infer<typeof insertStaffPositionSchema>;
+export type InsertStaffMember = z.infer<typeof insertStaffMemberSchema>;
+export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type InsertShiftApplication = z.infer<typeof insertShiftApplicationSchema>;
+export type InsertStaffAnnouncement = z.infer<typeof insertStaffAnnouncementSchema>;
