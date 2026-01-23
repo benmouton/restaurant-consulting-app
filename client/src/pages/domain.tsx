@@ -2712,6 +2712,353 @@ Generate ONLY the response text, nothing else.`,
   );
 }
 
+function SOPCaptureEngine() {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<"capture" | "checklist" | "audit">("capture");
+  const [workflowDescription, setWorkflowDescription] = useState<string>("");
+  const [taskName, setTaskName] = useState<string>("");
+  const [roleOwner, setRoleOwner] = useState<string>("");
+  const [trigger, setTrigger] = useState<string>("");
+  const [result, setResult] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const generateSOP = async () => {
+    if (!workflowDescription.trim()) {
+      toast({ title: "Please describe the workflow first", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    setResult("");
+
+    try {
+      let prompt = "";
+      
+      if (mode === "capture") {
+        prompt = `You are an expert restaurant operations consultant specializing in SOP documentation.
+
+Convert the following workflow description into a structured, professional SOP document.
+
+TASK/PROCEDURE NAME: ${taskName || "Not specified"}
+ROLE OWNER: ${roleOwner || "To be assigned"}
+TRIGGER: ${trigger || "As needed"}
+
+WORKFLOW DESCRIPTION:
+${workflowDescription}
+
+Generate a complete SOP in this EXACT format:
+
+═══════════════════════════════════════════
+SOP: ${taskName || "[Task Name]"}
+═══════════════════════════════════════════
+
+PURPOSE:
+[One clear sentence explaining why this procedure exists]
+
+OWNER:
+${roleOwner || "[Role - not person name]"}
+
+TRIGGER:
+${trigger || "[When this procedure is initiated]"}
+
+CHECKLIST:
+□ Step 1: [Action verb] [specific action]
+□ Step 2: [Action verb] [specific action]
+□ Step 3: [Action verb] [specific action]
+[Continue with all steps - max 15 items]
+
+VERIFICATION:
+[How a manager confirms this was done correctly]
+
+FAILURE PROTOCOL:
+[What to do if steps cannot be completed or issues arise]
+
+NOTES:
+• [Any important reminders or common mistakes]
+• [Equipment or supplies needed]
+• [Time estimates if applicable]
+
+═══════════════════════════════════════════
+
+Make it practical, actionable, and ready to post at the workstation. Use clear action verbs. No fluff.`;
+      } else if (mode === "checklist") {
+        prompt = `You are an expert restaurant operations consultant.
+
+Convert this workflow description into a CLEAN, PRINTABLE CHECKLIST ONLY.
+
+TASK: ${taskName || "Daily Task"}
+WORKFLOW DESCRIPTION:
+${workflowDescription}
+
+Generate a checklist following these rules:
+- Maximum 15 items
+- Actionable verbs only ("Verify," "Stock," "Confirm," "Check," "Clean," "Count")
+- Checkboxes only - no explanations
+- Ready to be posted at point of use
+- Include space for initials and time
+
+FORMAT:
+
+═══════════════════════════════════════════
+${taskName || "CHECKLIST"}
+Date: _______ Shift: _______ Manager: _______
+═══════════════════════════════════════════
+
+□ _________________________ Initials: ___ Time: ___
+□ _________________________ Initials: ___ Time: ___
+[Fill in all steps from the workflow]
+
+═══════════════════════════════════════════
+VERIFIED BY: _____________ TIME: ___________
+═══════════════════════════════════════════
+
+Make it clean enough to print and post.`;
+      } else {
+        prompt = `You are an expert restaurant operations consultant.
+
+Audit this workflow description against the "Second Location Test" standards.
+
+WORKFLOW DESCRIPTION:
+${workflowDescription}
+
+Evaluate against these criteria:
+
+THE SECOND LOCATION TEST:
+□ Could a new manager run this without calling the owner?
+□ Could a new hire execute this using only what's written?
+□ Does this rely on one person's memory or judgment?
+□ Would this work tomorrow in a different building?
+□ Is this documented — or just "how we do it"?
+
+Generate an audit report:
+
+═══════════════════════════════════════════
+SOP SCALABILITY AUDIT
+═══════════════════════════════════════════
+
+OVERALL RATING: [READY / NEEDS WORK / NOT SCALABLE]
+
+SECOND LOCATION TEST RESULTS:
+
+1. New manager independence: [PASS/FAIL]
+   • [Explanation]
+
+2. New hire execution: [PASS/FAIL]
+   • [Explanation]
+
+3. Memory dependency: [PASS/FAIL]
+   • [Explanation]
+
+4. Location portability: [PASS/FAIL]
+   • [Explanation]
+
+5. Proper documentation: [PASS/FAIL]
+   • [Explanation]
+
+GAPS IDENTIFIED:
+• [List specific missing elements]
+• [List ambiguous instructions]
+• [List person-dependent steps]
+
+RECOMMENDATIONS TO FIX:
+1. [Specific action to improve]
+2. [Specific action to improve]
+3. [Specific action to improve]
+
+VERDICT:
+[Is this a system or a dependency? One clear statement]
+
+═══════════════════════════════════════════
+
+Be honest. If it's not scalable, say so. Dependencies don't scale.`;
+      }
+
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: prompt }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate SOP");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setResult(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate SOP", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(result);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          AI-Powered SOP Capture
+        </CardTitle>
+        <CardDescription>
+          Describe how a task is actually performed. The AI converts it into standardized, transferable documentation.
+          No theory. No guessing. Capture reality.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="capture" data-testid="tab-sop-capture">Capture SOP</TabsTrigger>
+            <TabsTrigger value="checklist" data-testid="tab-sop-checklist">Quick Checklist</TabsTrigger>
+            <TabsTrigger value="audit" data-testid="tab-sop-audit">Audit</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="capture" className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">
+              Describe how your best performer does this task. The AI will convert it into a structured SOP.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="taskName">Task/Procedure Name</Label>
+                <Input
+                  id="taskName"
+                  placeholder="e.g., Opening Cash Drawer"
+                  className="mt-1"
+                  value={taskName}
+                  onChange={(e) => setTaskName(e.target.value)}
+                  data-testid="input-task-name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="roleOwner">Role Owner</Label>
+                <Input
+                  id="roleOwner"
+                  placeholder="e.g., Shift Lead"
+                  className="mt-1"
+                  value={roleOwner}
+                  onChange={(e) => setRoleOwner(e.target.value)}
+                  data-testid="input-role-owner"
+                />
+              </div>
+              <div>
+                <Label htmlFor="trigger">Trigger (When?)</Label>
+                <Input
+                  id="trigger"
+                  placeholder="e.g., Start of every shift"
+                  className="mt-1"
+                  value={trigger}
+                  onChange={(e) => setTrigger(e.target.value)}
+                  data-testid="input-trigger"
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="checklist" className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">
+              Get a clean, printable checklist ready to post at the workstation.
+            </p>
+            <div>
+              <Label htmlFor="checklistTaskName">Checklist Name</Label>
+              <Input
+                id="checklistTaskName"
+                placeholder="e.g., Closing Checklist, Pre-Service Checklist"
+                className="mt-1"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                data-testid="input-checklist-task-name"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="audit" className="space-y-4 mt-4">
+            <p className="text-sm text-muted-foreground">
+              Test your workflow against the "Second Location Test." Would this survive turnover and expansion?
+            </p>
+          </TabsContent>
+        </Tabs>
+
+        <div>
+          <Label htmlFor="workflowDescription">
+            {mode === "capture" ? "Describe the Workflow" : mode === "checklist" ? "List the Steps" : "Paste Your Current SOP or Describe the Process"}
+          </Label>
+          <Textarea
+            id="workflowDescription"
+            placeholder={mode === "capture" 
+              ? "e.g., First thing in the morning, the shift lead goes to the office and gets the cash drawer from the safe. They count it twice to verify the starting amount matches the log. Then they take it to the register, open the drawer, and do a test transaction to make sure the system is working..."
+              : mode === "checklist"
+              ? "e.g., Count starting cash, verify safe log, transport to register, test POS system, verify receipt printer, stock register tape..."
+              : "Paste your existing SOP or describe how the process currently works. The AI will audit it for scalability..."
+            }
+            className="mt-1 min-h-[150px]"
+            value={workflowDescription}
+            onChange={(e) => setWorkflowDescription(e.target.value)}
+            data-testid="textarea-workflow-description"
+          />
+        </div>
+
+        <Button 
+          onClick={generateSOP} 
+          disabled={isGenerating || !workflowDescription.trim()}
+          className="w-full"
+          data-testid="btn-generate-sop"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {mode === "capture" ? "Generating SOP..." : mode === "checklist" ? "Creating Checklist..." : "Auditing..."}
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {mode === "capture" ? "Generate SOP" : mode === "checklist" ? "Generate Checklist" : "Run Scalability Audit"}
+            </>
+          )}
+        </Button>
+
+        {result && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Generated {mode === "capture" ? "SOP" : mode === "checklist" ? "Checklist" : "Audit Report"}</Label>
+              <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-sop">
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+            <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm font-mono">
+              {result}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const contentTypeConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   principle: { icon: Lightbulb, label: "Principle", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
   output: { icon: FileOutput, label: "Framework", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
@@ -2829,6 +3176,9 @@ export default function DomainPage() {
 
         {/* Kitchen Compliance Engine - only show for kitchen domain */}
         {slug === "kitchen" && <KitchenComplianceEngine />}
+
+        {/* SOP Capture Engine - only show for sops domain */}
+        {slug === "sops" && <SOPCaptureEngine />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">

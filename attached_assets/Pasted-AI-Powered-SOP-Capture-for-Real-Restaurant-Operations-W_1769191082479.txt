@@ -1,0 +1,168 @@
+AI-Powered SOP Capture for Real Restaurant Operations
+What It Is
+
+Scribe is an AI-based process documentation tool that records real work as it happens and automatically converts it into clear, step-by-step SOPs and checklists.
+
+Instead of asking managers to write procedures from memory, Scribe captures actual execution—clicks, actions, sequences—and turns them into standardized documentation.
+
+No theory. No guessing. No “this is how I think it works.”
+
+Why It Works in Restaurants
+
+Restaurants don’t fail because people don’t care.
+They fail because critical knowledge lives in people’s heads.
+
+Scribe removes:
+
+Memory dependency
+
+Personality-based execution
+
+“Ask Sarah how to do it” systems
+
+And replaces them with:
+
+Transferable procedures
+
+Checklist-first execution
+
+Repeatability across shifts and locations
+
+This makes it ideal for high-turnover, high-pressure environments.
+
+What Scribe Does (In Plain Terms)
+1. Captures Real Workflows
+
+A manager or lead performs a task once:
+
+Opening procedures
+
+Cash handling
+
+Inventory counts
+
+Ordering
+
+Closing duties
+
+Manager audits
+
+Scribe records the steps exactly as performed.
+
+No rewriting. No summarizing.
+
+2. Auto-Creates SOPs
+
+Scribe converts that workflow into:
+
+Step-by-step instructions
+
+Clean checklists
+
+Visual references (when needed)
+
+This becomes the official process, not someone’s interpretation.
+
+3. Standardizes Without Overwriting Reality
+
+Unlike traditional SOP writing:
+
+It doesn’t “optimize” prematurely
+
+It documents what actually works today
+
+You can refine later — but first you lock consistency.
+
+Where Scribe Fits in a Scalable SOP System
+
+Scribe is not your whole system.
+It is your capture engine.
+
+Best Uses
+
+Opening & closing procedures
+
+Cash handling SOPs
+
+Inventory & prep workflows
+
+Manager audits
+
+POS procedures
+
+Vendor ordering
+
+New-location documentation
+
+What It Should NOT Replace
+
+Accountability
+
+Manager verification
+
+Posted checklists
+
+Daily audits
+
+Scribe documents the system.
+Managers enforce it.
+
+How Top Operators Quietly Use It
+
+Step 1:
+Have your best manager perform the task once.
+
+Step 2:
+Capture it with Scribe.
+
+Step 3:
+That version becomes the baseline SOP — not “the way Joe does it.”
+
+Step 4:
+Convert it into:
+
+Printed checklists
+
+In-app SOPs
+
+Training modules
+
+Step 5:
+Audit execution daily.
+
+This eliminates:
+
+“No one showed me”
+
+“That’s not how I was trained”
+
+“That’s how we used to do it”
+
+Strengths (Why It’s Powerful)
+
+✔ Captures reality, not intention
+✔ Eliminates SOP writing bottlenecks
+✔ Reduces reliance on key individuals
+✔ Speeds onboarding dramatically
+✔ Makes second locations viable
+✔ Creates transfer-ready documentation
+
+Limitations (Important to Be Honest)
+
+Scribe:
+
+Does not enforce execution
+
+Does not verify completion
+
+Does not replace leadership
+
+Without audits and accountability, it can still become shelf décor.
+
+That’s why it works best when paired with:
+
+Posted checklists
+
+Manager sign-offs
+
+Daily verification discipline
