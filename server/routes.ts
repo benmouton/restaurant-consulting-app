@@ -14,6 +14,7 @@ import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
+import { restaurantHolidays } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -1583,6 +1584,7 @@ Generate JSON with:
   // Seed Data
   await seedDatabase();
   await seedTrainingTemplates();
+  await seedRestaurantHolidays();
 
   return httpServer;
 }
@@ -2435,5 +2437,103 @@ async function seedTrainingTemplates() {
   // Seed kitchen templates
   for (const template of kitchenTemplates) {
     await storage.createTemplate(template);
+  }
+}
+
+async function seedRestaurantHolidays() {
+  const existingHolidays = await storage.getUpcomingHolidays();
+  const existingNames = new Set(existingHolidays.map(h => h.name));
+
+  const holidaysData = [
+    // January
+    { name: "National Pie Day", date: "01-23", category: "food", suggestedAngle: "Feature your signature pie or create a special pie dessert", suggestedTags: ["NationalPieDay", "PieLovers", "Dessert"], relevanceScore: 8 },
+    { name: "National Peanut Butter Day", date: "01-24", category: "food", suggestedAngle: "Highlight dishes with peanut butter or create a special dessert", suggestedTags: ["NationalPeanutButterDay", "PeanutButter"], relevanceScore: 6 },
+    { name: "National Compliment Day", date: "01-24", category: "community", suggestedAngle: "Encourage guests to compliment staff or share kind words", suggestedTags: ["NationalComplimentDay", "SpreadKindness"], relevanceScore: 5 },
+    { name: "National Irish Coffee Day", date: "01-25", category: "food", suggestedAngle: "Feature Irish coffee specials at the bar", suggestedTags: ["IrishCoffeeDay", "CoffeeCocktails"], relevanceScore: 7 },
+    { name: "National Peanut Brittle Day", date: "01-26", category: "food", suggestedAngle: "Offer peanut brittle as a complimentary treat or dessert garnish", suggestedTags: ["PeanutBrittle", "SweetTreats"], relevanceScore: 5 },
+    { name: "National Chocolate Cake Day", date: "01-27", category: "food", suggestedAngle: "Spotlight your chocolate cake or create a special version", suggestedTags: ["ChocolateCakeDay", "Dessert"], relevanceScore: 8 },
+    { name: "National Blueberry Pancake Day", date: "01-28", category: "food", suggestedAngle: "Perfect for brunch service - feature blueberry pancakes", suggestedTags: ["BlueberryPancakes", "Brunch"], relevanceScore: 7 },
+    { name: "National Corn Chip Day", date: "01-29", category: "food", suggestedAngle: "Highlight your chips and salsa or nachos", suggestedTags: ["CornChips", "Appetizers"], relevanceScore: 5 },
+    { name: "National Croissant Day", date: "01-30", category: "food", suggestedAngle: "Feature croissants at brunch or breakfast service", suggestedTags: ["NationalCroissantDay", "Pastry", "Brunch"], relevanceScore: 7 },
+    { name: "National Hot Chocolate Day", date: "01-31", category: "food", suggestedAngle: "Offer hot chocolate specials, spiked versions for adults", suggestedTags: ["HotChocolateDay", "WinterDrinks"], relevanceScore: 8 },
+    { name: "National Restaurant Week", date: "01-20", category: "hospitality", suggestedAngle: "Promote prix fixe menus and special offerings", suggestedTags: ["RestaurantWeek", "DineOut"], relevanceScore: 10 },
+    
+    // February
+    { name: "National Pizza Day", date: "02-09", category: "food", suggestedAngle: "Pizza specials, behind-the-scenes of pizza making", suggestedTags: ["NationalPizzaDay", "Pizza"], relevanceScore: 9 },
+    { name: "Super Bowl Sunday", date: "02-09", category: "sports", suggestedAngle: "Game day specials, watch party promotions", suggestedTags: ["SuperBowl", "GameDay", "BigGame"], relevanceScore: 10 },
+    { name: "Valentines Day", date: "02-14", category: "family", suggestedAngle: "Romantic dinner specials, couples packages", suggestedTags: ["ValentinesDay", "DateNight", "RomanticDinner"], relevanceScore: 10 },
+    { name: "National Margarita Day", date: "02-22", category: "food", suggestedAngle: "Margarita specials, happy hour promotions", suggestedTags: ["NationalMargaritaDay", "Margarita", "HappyHour"], relevanceScore: 9 },
+    { name: "National Pancake Day", date: "02-25", category: "food", suggestedAngle: "Pancake specials for brunch", suggestedTags: ["NationalPancakeDay", "Brunch"], relevanceScore: 7 },
+    
+    // March
+    { name: "National Frozen Food Day", date: "03-06", category: "food", suggestedAngle: "Behind-the-scenes of your freezer prep or frozen desserts", suggestedTags: ["FrozenFoodDay"], relevanceScore: 4 },
+    { name: "National Meatball Day", date: "03-09", category: "food", suggestedAngle: "Feature meatball dishes or appetizers", suggestedTags: ["NationalMeatballDay", "Meatballs"], relevanceScore: 6 },
+    { name: "St. Patricks Day", date: "03-17", category: "community", suggestedAngle: "Irish-themed specials, green drinks, festive atmosphere", suggestedTags: ["StPatricksDay", "Irish", "GreenBeer"], relevanceScore: 10 },
+    { name: "National Corn Dog Day", date: "03-21", category: "food", suggestedAngle: "Fun bar snack feature or kids menu highlight", suggestedTags: ["CornDogDay", "BarSnacks"], relevanceScore: 5 },
+    
+    // April
+    { name: "National Burrito Day", date: "04-03", category: "food", suggestedAngle: "Burrito specials, build-your-own promotions", suggestedTags: ["NationalBurritoDay", "Burritos"], relevanceScore: 8 },
+    { name: "National Beer Day", date: "04-07", category: "food", suggestedAngle: "Craft beer features, beer flights, brewery partnerships", suggestedTags: ["NationalBeerDay", "CraftBeer"], relevanceScore: 9 },
+    { name: "National Grilled Cheese Day", date: "04-12", category: "food", suggestedAngle: "Elevated grilled cheese specials, comfort food focus", suggestedTags: ["GrilledCheeseDay", "ComfortFood"], relevanceScore: 8 },
+    { name: "Easter Sunday", date: "04-05", category: "family", suggestedAngle: "Easter brunch, family dining specials", suggestedTags: ["Easter", "EasterBrunch", "FamilyDining"], relevanceScore: 9 },
+    { name: "National Pretzel Day", date: "04-26", category: "food", suggestedAngle: "Pretzel appetizers, beer pairings", suggestedTags: ["NationalPretzelDay", "Pretzels"], relevanceScore: 6 },
+    
+    // May
+    { name: "Cinco de Mayo", date: "05-05", category: "community", suggestedAngle: "Mexican-inspired specials, margaritas, festive atmosphere", suggestedTags: ["CincoDeMayo", "Fiesta", "Margaritas"], relevanceScore: 10 },
+    { name: "Mothers Day", date: "05-11", category: "family", suggestedAngle: "Special brunch, prix fixe dinner, treat mom right", suggestedTags: ["MothersDay", "Brunch", "TreatMom"], relevanceScore: 10 },
+    { name: "National Shrimp Day", date: "05-10", category: "food", suggestedAngle: "Seafood specials, shrimp appetizers", suggestedTags: ["NationalShrimpDay", "Seafood"], relevanceScore: 7 },
+    { name: "National BBQ Day", date: "05-16", category: "food", suggestedAngle: "BBQ specials, smoked meats, outdoor grilling", suggestedTags: ["NationalBBQDay", "BBQ", "Grill"], relevanceScore: 9 },
+    { name: "National Waiter Day", date: "05-21", category: "hospitality", suggestedAngle: "Staff appreciation post, tip your server", suggestedTags: ["NationalWaiterDay", "ServerLife"], relevanceScore: 7 },
+    { name: "National Wine Day", date: "05-25", category: "food", suggestedAngle: "Wine specials, wine pairing dinners, sommelier picks", suggestedTags: ["NationalWineDay", "WineLovers"], relevanceScore: 9 },
+    { name: "Memorial Day", date: "05-26", category: "community", suggestedAngle: "Honor and remember, special hours, patriotic specials", suggestedTags: ["MemorialDay", "Remember"], relevanceScore: 8 },
+    { name: "National Burger Day", date: "05-28", category: "food", suggestedAngle: "Burger specials, signature burger spotlight", suggestedTags: ["NationalBurgerDay", "Burgers"], relevanceScore: 9 },
+    
+    // June
+    { name: "National Cheese Day", date: "06-04", category: "food", suggestedAngle: "Cheese boards, cheese-forward dishes", suggestedTags: ["NationalCheeseDay", "Cheese"], relevanceScore: 7 },
+    { name: "National Donut Day", date: "06-06", category: "food", suggestedAngle: "Donut desserts, brunch donuts", suggestedTags: ["NationalDonutDay", "Donuts"], relevanceScore: 8 },
+    { name: "National Iced Tea Day", date: "06-10", category: "food", suggestedAngle: "Iced tea specials, sweet tea, Arnold Palmers", suggestedTags: ["NationalIcedTeaDay", "IcedTea"], relevanceScore: 6 },
+    { name: "Fathers Day", date: "06-15", category: "family", suggestedAngle: "Dad-friendly specials, steak dinner, whiskey flights", suggestedTags: ["FathersDay", "TreatDad"], relevanceScore: 10 },
+    { name: "National Martini Day", date: "06-19", category: "food", suggestedAngle: "Martini specials, classic cocktails", suggestedTags: ["NationalMartiniDay", "Martini"], relevanceScore: 8 },
+    
+    // July
+    { name: "July 4th", date: "07-04", category: "community", suggestedAngle: "Independence Day specials, patriotic theme, BBQ", suggestedTags: ["July4th", "IndependenceDay", "BBQ"], relevanceScore: 10 },
+    { name: "National French Fry Day", date: "07-13", category: "food", suggestedAngle: "Fry specials, loaded fries, fry flights", suggestedTags: ["NationalFrenchFryDay", "Fries"], relevanceScore: 8 },
+    { name: "National Ice Cream Day", date: "07-20", category: "food", suggestedAngle: "Ice cream desserts, sundae specials", suggestedTags: ["NationalIceCreamDay", "IceCream"], relevanceScore: 8 },
+    { name: "National Tequila Day", date: "07-24", category: "food", suggestedAngle: "Tequila flights, margarita specials, mezcal features", suggestedTags: ["NationalTequilaDay", "Tequila"], relevanceScore: 8 },
+    
+    // August
+    { name: "National Oyster Day", date: "08-05", category: "food", suggestedAngle: "Oyster specials, raw bar features", suggestedTags: ["NationalOysterDay", "Oysters"], relevanceScore: 7 },
+    { name: "National Rum Day", date: "08-16", category: "food", suggestedAngle: "Rum cocktails, tropical drinks", suggestedTags: ["NationalRumDay", "Rum"], relevanceScore: 7 },
+    { name: "National Waffle Day", date: "08-24", category: "food", suggestedAngle: "Waffle brunch specials, chicken and waffles", suggestedTags: ["NationalWaffleDay", "Waffles", "Brunch"], relevanceScore: 7 },
+    
+    // September
+    { name: "Labor Day", date: "09-01", category: "community", suggestedAngle: "End of summer specials, holiday hours", suggestedTags: ["LaborDay", "EndOfSummer"], relevanceScore: 8 },
+    { name: "National Cheeseburger Day", date: "09-18", category: "food", suggestedAngle: "Cheeseburger specials, burger features", suggestedTags: ["NationalCheeseburgerDay", "Cheeseburger"], relevanceScore: 9 },
+    { name: "National Seafood Day", date: "09-22", category: "food", suggestedAngle: "Seafood specials, catch of the day", suggestedTags: ["NationalSeafoodDay", "Seafood"], relevanceScore: 8 },
+    { name: "National Coffee Day", date: "09-29", category: "food", suggestedAngle: "Coffee specials, espresso martinis", suggestedTags: ["NationalCoffeeDay", "Coffee"], relevanceScore: 8 },
+    
+    // October
+    { name: "National Taco Day", date: "10-04", category: "food", suggestedAngle: "Taco specials, taco bar, Taco Tuesday amplified", suggestedTags: ["NationalTacoDay", "Tacos"], relevanceScore: 9 },
+    { name: "National Pasta Day", date: "10-17", category: "food", suggestedAngle: "Pasta specials, Italian features", suggestedTags: ["NationalPastaDay", "Pasta"], relevanceScore: 8 },
+    { name: "National Chicken Wing Day", date: "10-22", category: "food", suggestedAngle: "Wing specials, new flavors, wing eating challenges", suggestedTags: ["NationalWingDay", "Wings"], relevanceScore: 8 },
+    { name: "Halloween", date: "10-31", category: "community", suggestedAngle: "Spooky specials, costume contests, themed drinks", suggestedTags: ["Halloween", "SpookySeason"], relevanceScore: 9 },
+    
+    // November
+    { name: "National Sandwich Day", date: "11-03", category: "food", suggestedAngle: "Sandwich specials, signature sandwich spotlight", suggestedTags: ["NationalSandwichDay", "Sandwiches"], relevanceScore: 7 },
+    { name: "National Cappuccino Day", date: "11-08", category: "food", suggestedAngle: "Coffee drink specials, after-dinner drinks", suggestedTags: ["NationalCappuccinoDay", "Coffee"], relevanceScore: 6 },
+    { name: "Thanksgiving", date: "11-27", category: "family", suggestedAngle: "Thanksgiving dinner, family gatherings, gratitude posts", suggestedTags: ["Thanksgiving", "GiveThanks", "FamilyDining"], relevanceScore: 10 },
+    
+    // December
+    { name: "National Bartender Day", date: "12-06", category: "hospitality", suggestedAngle: "Bartender spotlight, mixology features", suggestedTags: ["NationalBartenderDay", "Mixology"], relevanceScore: 7 },
+    { name: "National Brownie Day", date: "12-08", category: "food", suggestedAngle: "Brownie dessert specials", suggestedTags: ["NationalBrownieDay", "Brownies", "Dessert"], relevanceScore: 6 },
+    { name: "National Cocoa Day", date: "12-13", category: "food", suggestedAngle: "Hot cocoa specials, winter warmers", suggestedTags: ["NationalCocoaDay", "HotCocoa"], relevanceScore: 7 },
+    { name: "Christmas Eve", date: "12-24", category: "family", suggestedAngle: "Special hours, holiday dining, festive atmosphere", suggestedTags: ["ChristmasEve", "HolidayDining"], relevanceScore: 9 },
+    { name: "Christmas Day", date: "12-25", category: "family", suggestedAngle: "Holiday greetings, special hours", suggestedTags: ["Christmas", "MerryChristmas"], relevanceScore: 9 },
+    { name: "New Years Eve", date: "12-31", category: "community", suggestedAngle: "NYE specials, champagne toasts, countdown celebrations", suggestedTags: ["NewYearsEve", "NYE", "Celebrate"], relevanceScore: 10 },
+  ];
+
+  for (const holiday of holidaysData) {
+    if (existingNames.has(holiday.name)) continue;
+    await db.insert(restaurantHolidays).values(holiday);
   }
 }
