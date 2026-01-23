@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -58,7 +58,19 @@ function formatTime(time: string): string {
 export default function SchedulingPage() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("schedule");
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const initialTab = urlParams.get("tab") || "schedule";
+  const [activeTab, setActiveTab] = useState(initialTab);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const tabParam = params.get("tab");
+    if (tabParam && ["schedule", "staff", "positions", "announcements"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchString]);
+  
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
     today.setDate(today.getDate() - today.getDay());

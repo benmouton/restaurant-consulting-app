@@ -220,65 +220,77 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-stat-staff">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
-                    <Users className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{schedulingStats?.totalStaff || 0}</div>
-                  <div className="text-xs text-muted-foreground">Employees</div>
-                </CardContent>
-              </Card>
+              <Link href="/scheduling?tab=staff">
+                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-staff">
+                  <CardContent className="pt-4 pb-4 text-center">
+                    <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-2">
+                      <Users className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="text-2xl font-bold">{schedulingStats?.totalStaff || 0}</div>
+                    <div className="text-xs text-muted-foreground">Employees</div>
+                  </CardContent>
+                </Card>
+              </Link>
               
-              <Card className="hover-elevate cursor-pointer" data-testid="card-stat-positions">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
-                    <Briefcase className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{schedulingStats?.totalPositions || 0}</div>
-                  <div className="text-xs text-muted-foreground">Positions</div>
-                </CardContent>
-              </Card>
+              <Link href="/scheduling?tab=positions">
+                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-positions">
+                  <CardContent className="pt-4 pb-4 text-center">
+                    <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
+                      <Briefcase className="h-5 w-5 text-purple-500" />
+                    </div>
+                    <div className="text-2xl font-bold">{schedulingStats?.totalPositions || 0}</div>
+                    <div className="text-xs text-muted-foreground">Positions</div>
+                  </CardContent>
+                </Card>
+              </Link>
               
-              <Card className="hover-elevate cursor-pointer" data-testid="card-stat-today">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
-                    <Clock className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{schedulingStats?.todayShifts || 0}</div>
-                  <div className="text-xs text-muted-foreground">Today's Shifts</div>
-                </CardContent>
-              </Card>
+              <Link href="/scheduling?tab=schedule">
+                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-today">
+                  <CardContent className="pt-4 pb-4 text-center">
+                    <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
+                      <Clock className="h-5 w-5 text-green-500" />
+                    </div>
+                    <div className="text-2xl font-bold">{schedulingStats?.todayShifts || 0}</div>
+                    <div className="text-xs text-muted-foreground">Today's Shifts</div>
+                  </CardContent>
+                </Card>
+              </Link>
               
-              <Card className="hover-elevate cursor-pointer" data-testid="card-stat-week">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-2">
-                    <CalendarDays className="h-5 w-5 text-amber-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{schedulingStats?.weekShifts || 0}</div>
-                  <div className="text-xs text-muted-foreground">This Week</div>
-                </CardContent>
-              </Card>
+              <Link href="/scheduling?tab=schedule">
+                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-week">
+                  <CardContent className="pt-4 pb-4 text-center">
+                    <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-2">
+                      <CalendarDays className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <div className="text-2xl font-bold">{schedulingStats?.weekShifts || 0}</div>
+                    <div className="text-xs text-muted-foreground">This Week</div>
+                  </CardContent>
+                </Card>
+              </Link>
               
-              <Card className="hover-elevate cursor-pointer" data-testid="card-stat-open">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-2">
-                    <AlertTriangle className="h-5 w-5 text-orange-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{schedulingStats?.openShifts || 0}</div>
-                  <div className="text-xs text-muted-foreground">Open Shifts</div>
-                </CardContent>
-              </Card>
+              <Link href="/scheduling?tab=schedule">
+                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-open">
+                  <CardContent className="pt-4 pb-4 text-center">
+                    <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-2">
+                      <AlertTriangle className="h-5 w-5 text-orange-500" />
+                    </div>
+                    <div className="text-2xl font-bold">{schedulingStats?.openShifts || 0}</div>
+                    <div className="text-xs text-muted-foreground">Open Shifts</div>
+                  </CardContent>
+                </Card>
+              </Link>
               
-              <Card className="hover-elevate cursor-pointer" data-testid="card-stat-announcements">
-                <CardContent className="pt-4 pb-4 text-center">
-                  <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-2">
-                    <Bell className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div className="text-2xl font-bold">{schedulingStats?.unreadAnnouncements || 0}</div>
-                  <div className="text-xs text-muted-foreground">Announcements</div>
-                </CardContent>
-              </Card>
+              <Link href="/scheduling?tab=announcements">
+                <Card className="hover-elevate cursor-pointer" data-testid="card-stat-announcements">
+                  <CardContent className="pt-4 pb-4 text-center">
+                    <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-2">
+                      <Bell className="h-5 w-5 text-red-500" />
+                    </div>
+                    <div className="text-2xl font-bold">{schedulingStats?.unreadAnnouncements || 0}</div>
+                    <div className="text-xs text-muted-foreground">Announcements</div>
+                  </CardContent>
+                </Card>
+              </Link>
             </div>
           )}
         </div>
