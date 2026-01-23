@@ -50,6 +50,21 @@ Preferred communication style: Simple, everyday language.
 - `domains` and `framework_content`: Operational framework structure
 - `user_bookmarks`: User-saved content
 - `training_templates`: Staff training materials (FOH/BOH)
+- `staff_positions`: Staff positions with color coding (FOH/BOH departments)
+- `staff_members`: Employee records linked to positions
+- `shifts`: Weekly shift scheduling with status (scheduled/open/completed)
+- `shift_applications`: Staff applications for open shifts
+- `staff_announcements`: Team announcements with priority levels
+- `announcement_reads`: Tracking which users have read announcements
+
+### Staff Scheduling System
+A Sling-style scheduling system for managing restaurant shifts:
+- **Weekly Calendar View**: Visual shift display with position-based color coding
+- **Staff Management**: Add/edit staff members with position assignments
+- **Position Management**: Define positions (Server, Bartender, Line Cook, etc.) with custom colors
+- **Open Shift Tracking**: Mark shifts as open and allow staff to apply
+- **Announcements**: Post team announcements with priority levels (low, normal, high, urgent)
+- **Dashboard Integration**: Quick stats showing staff count, positions, today's shifts, week shifts, open shifts, and unread announcements
 
 ### Role-Based Access Control (RBAC)
 The application implements a three-tier role hierarchy:

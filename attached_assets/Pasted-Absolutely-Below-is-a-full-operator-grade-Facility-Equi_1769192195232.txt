@@ -1,0 +1,339 @@
+Absolutely. Below is a full, operator-grade Facility, Equipment & Preventative Maintenance section, written in the same doctrine-level style as your Crisis Management module.
+
+This is not “maintenance tips.”
+This is asset protection, downtime prevention, and chaos avoidance—the way serious operators handle facilities.
+
+You can drop this directly into The Restaurant Consultant as a standalone domain.
+
+Facility, Equipment & Preventative Maintenance
+Prevent Failure. Control Downtime. Protect the Asset.
+
+Restaurants don’t fail because equipment breaks.
+They fail because breakdowns turn into service chaos, emergency spending, and reputation damage.
+
+Elite operators don’t “fix things fast.”
+They prevent failures quietly and respond decisively when prevention fails.
+
+Core Principle: Maintenance Is Risk Management
+
+Every piece of equipment is either:
+
+Producing revenue
+
+Or threatening it
+
+If you don’t control your assets, they control your nights.
+
+Preventative maintenance exists to:
+
+Reduce emergency repairs
+
+Protect service flow
+
+Control costs
+
+Eliminate surprise downtime
+
+Equipment Risk Classification
+
+(Not All Equipment Is Equal)
+
+Every restaurant must classify equipment into three risk tiers.
+
+Tier 1 – Service-Critical (Failure = Immediate Crisis)
+
+Failure stops service or creates safety risk.
+
+Examples:
+
+Refrigeration
+
+Cooking line (grills, fryers, ranges)
+
+POS / network hardware
+
+Dish machine (in full-service)
+
+HVAC in extreme weather
+
+Rule:
+Tier 1 equipment gets scheduled preventative maintenance. No exceptions.
+
+Tier 2 – Service-Impacting (Failure = Degraded Experience)
+
+Failure slows service or increases labor.
+
+Examples:
+
+Prep equipment
+
+Ice machines
+
+Coffee systems
+
+Smallwares critical to volume
+
+Rule:
+Tier 2 equipment gets routine inspection and cleaning schedules.
+
+Tier 3 – Non-Critical (Failure = Inconvenience)
+
+Failure does not immediately impact guests.
+
+Examples:
+
+Office equipment
+
+Decorative lighting
+
+Non-essential fixtures
+
+Rule:
+Fix when practical. Do not prioritize during service.
+
+Preventative Maintenance System
+
+(This Is Where Money Is Saved)
+
+Required Maintenance Cadence
+
+Daily
+
+Visual inspections
+
+Temperature checks
+
+Unusual noises, leaks, smells logged
+
+Clean-as-you-go enforcement
+
+Weekly
+
+Deep cleaning of Tier 1 & Tier 2 equipment
+
+Gasket checks
+
+Drain lines flushed
+
+Filters inspected
+
+Monthly
+
+Preventative service on Tier 1 equipment
+
+Calibration checks
+
+HVAC filter changes
+
+Ice machine sanitation
+
+Quarterly
+
+Professional servicing as required
+
+Fire suppression checks
+
+Hood system inspection
+
+Electrical and plumbing review
+
+If it’s not scheduled, it won’t happen.
+
+The “Fail Loud vs Fail Silent” Rule
+
+Fail Loud Equipment
+
+Breaks obviously
+
+Forces immediate action
+
+Easier to control
+
+Fail Silent Equipment
+
+Degrades slowly
+
+Creates hidden losses
+
+Destroys margins quietly
+
+Examples of silent failures:
+
+Refrigeration running warm
+
+Ice machines growing biofilm
+
+Dish machines under-sanitizing
+
+HVAC inefficiency driving energy cost
+
+Rule:
+Fail silent equipment must be monitored, logged, and verified — not trusted.
+
+Repair Triage Protocol
+
+(When Something Breaks)
+
+When equipment fails, do not panic. Execute the triage.
+
+Step 1: Classify the Failure
+
+Is this Tier 1, 2, or 3?
+
+Does service stop?
+
+Is there a safety risk?
+
+Step 2: Stabilize Service
+
+Adjust menu if needed
+
+Reassign stations
+
+Communicate clearly to staff
+
+Never troubleshoot emotionally during service.
+
+Step 3: Decide Repair Path
+
+Ask:
+
+Can we operate safely tonight?
+
+Is temporary mitigation acceptable?
+
+Does this require emergency service?
+
+Rule:
+Emergency repairs are for service continuity, not convenience.
+
+Step 4: Document Immediately
+
+What failed?
+
+When was last maintenance?
+
+Was this preventable?
+
+What changes reduce recurrence?
+
+Undocumented failures repeat.
+
+Vendor Control & Repair Discipline
+
+(Vendors Work for You)
+
+Approved Vendor List
+
+Every restaurant must maintain:
+
+Primary vendor
+
+Secondary backup
+
+Emergency contact
+
+No random calls during service.
+
+Repair Authorization Rules
+
+Who can approve repairs?
+
+Dollar limits per role?
+
+When does owner approval trigger?
+
+Undefined authority = overspending.
+
+Post-Repair Review
+
+After every repair:
+
+Was this preventative failure?
+
+Was vendor response acceptable?
+
+Do we adjust maintenance cadence?
+
+Repairs should improve the system, not just fix the problem.
+
+Maintenance Documentation
+
+(This Protects You Legally and Financially)
+
+Every location must maintain:
+
+Equipment inventory
+
+Serial numbers
+
+Service logs
+
+Warranty details
+
+Repair history
+
+This protects against:
+
+Vendor disputes
+
+Insurance claims
+
+Health department issues
+
+Buyer due diligence
+
+If it’s not documented, it didn’t happen.
+
+Manager Accountability
+
+Managers are not mechanics.
+They are asset guardians.
+
+Managers are responsible for:
+
+Daily inspections
+
+Logging anomalies
+
+Scheduling maintenance
+
+Escalating risks early
+
+Ignoring equipment issues is a management failure, not bad luck.
+
+Owner Asset Protection Checklist
+
+□ Preventative maintenance schedule exists
+□ Equipment classified by risk tier
+□ Repair authorization rules defined
+□ Approved vendor list maintained
+□ Maintenance logs current
+□ Silent failures monitored
+□ Emergency protocols documented
+
+If any are missing, downtime is coming.
+
+The Standard
+
+Emergency repairs are expensive.
+Preventative maintenance is boring.
+
+Boring is profitable.
+
+Restaurants that control their facilities:
+
+Spend less
+
+Panic less
+
+Recover faster
+
+Protect brand trust
+
+Bottom Line
+
+You don’t own a restaurant — you own a collection of assets that must perform under stress.
+
+Control the assets.
+Control the nights.

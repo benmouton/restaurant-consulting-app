@@ -1,0 +1,797 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  ChefHat, 
+  LogOut, 
+  ArrowLeft,
+  Calendar,
+  Users,
+  Plus,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
+  Briefcase,
+  Trash2,
+  Edit,
+  AlertTriangle
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { StaffPosition, StaffMember, Shift, StaffAnnouncement } from "@shared/schema";
+
+function getWeekDates(startDate: Date): Date[] {
+  const dates = [];
+  const start = new Date(startDate);
+  start.setDate(start.getDate() - start.getDay());
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    dates.push(date);
+  }
+  return dates;
+}
+
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function formatTime(time: string): string {
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
+}
+
+export default function SchedulingPage() {
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("schedule");
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    const today = new Date();
+    today.setDate(today.getDate() - today.getDay());
+    return today;
+  });
+  
+  const [showAddShift, setShowAddShift] = useState(false);
+  const [showAddStaff, setShowAddStaff] = useState(false);
+  const [showAddPosition, setShowAddPosition] = useState(false);
+  const [showAddAnnouncement, setShowAddAnnouncement] = useState(false);
+  
+  const [newShift, setNewShift] = useState({ date: "", startTime: "09:00", endTime: "17:00", staffMemberId: "", positionId: "", notes: "" });
+  const [newStaff, setNewStaff] = useState({ firstName: "", lastName: "", email: "", phone: "", positionId: "" });
+  const [newPosition, setNewPosition] = useState({ name: "", color: "#3B82F6", department: "FOH" });
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: "", content: "", priority: "normal" });
+
+  const weekDates = getWeekDates(currentWeekStart);
+  const startDate = formatDate(weekDates[0]);
+  const endDate = formatDate(weekDates[6]);
+
+  const { data: positions = [] } = useQuery<StaffPosition[]>({
+    queryKey: ["/api/scheduling/positions"],
+  });
+
+  const { data: staff = [] } = useQuery<StaffMember[]>({
+    queryKey: ["/api/scheduling/staff"],
+  });
+
+  const { data: shifts = [] } = useQuery<Shift[]>({
+    queryKey: ["/api/scheduling/shifts", startDate, endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/scheduling/shifts?start=${startDate}&end=${endDate}`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch shifts");
+      return res.json();
+    },
+  });
+
+  const { data: openShifts = [] } = useQuery<Shift[]>({
+    queryKey: ["/api/scheduling/shifts/open"],
+  });
+
+  const { data: announcements = [] } = useQuery<StaffAnnouncement[]>({
+    queryKey: ["/api/scheduling/announcements"],
+  });
+
+  const createShiftMutation = useMutation({
+    mutationFn: async (data: typeof newShift) => {
+      return apiRequest("POST", "/api/scheduling/shifts", {
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        staffMemberId: data.staffMemberId ? parseInt(data.staffMemberId) : null,
+        positionId: data.positionId ? parseInt(data.positionId) : null,
+        notes: data.notes || null,
+        status: data.staffMemberId ? "scheduled" : "open",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/shifts/open"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      setShowAddShift(false);
+      setNewShift({ date: "", startTime: "09:00", endTime: "17:00", staffMemberId: "", positionId: "", notes: "" });
+      toast({ title: "Shift created successfully" });
+    },
+    onError: () => toast({ title: "Failed to create shift", variant: "destructive" }),
+  });
+
+  const deleteShiftMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/scheduling/shifts/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/shifts/open"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      toast({ title: "Shift deleted" });
+    },
+  });
+
+  const createStaffMutation = useMutation({
+    mutationFn: async (data: typeof newStaff) => {
+      return apiRequest("POST", "/api/scheduling/staff", {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email || null,
+        phone: data.phone || null,
+        positionId: data.positionId ? parseInt(data.positionId) : null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      setShowAddStaff(false);
+      setNewStaff({ firstName: "", lastName: "", email: "", phone: "", positionId: "" });
+      toast({ title: "Staff member added" });
+    },
+    onError: () => toast({ title: "Failed to add staff member", variant: "destructive" }),
+  });
+
+  const deleteStaffMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/scheduling/staff/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      toast({ title: "Staff member removed" });
+    },
+  });
+
+  const createPositionMutation = useMutation({
+    mutationFn: async (data: typeof newPosition) => {
+      return apiRequest("POST", "/api/scheduling/positions", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/positions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      setShowAddPosition(false);
+      setNewPosition({ name: "", color: "#3B82F6", department: "FOH" });
+      toast({ title: "Position created" });
+    },
+    onError: () => toast({ title: "Failed to create position", variant: "destructive" }),
+  });
+
+  const deletePositionMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/scheduling/positions/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/positions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      toast({ title: "Position deleted" });
+    },
+  });
+
+  const createAnnouncementMutation = useMutation({
+    mutationFn: async (data: typeof newAnnouncement) => {
+      return apiRequest("POST", "/api/scheduling/announcements", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/announcements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      setShowAddAnnouncement(false);
+      setNewAnnouncement({ title: "", content: "", priority: "normal" });
+      toast({ title: "Announcement created" });
+    },
+    onError: () => toast({ title: "Failed to create announcement", variant: "destructive" }),
+  });
+
+  const deleteAnnouncementMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/scheduling/announcements/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/announcements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
+      toast({ title: "Announcement deleted" });
+    },
+  });
+
+  const navigateWeek = (direction: number) => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(newStart.getDate() + (direction * 7));
+    setCurrentWeekStart(newStart);
+  };
+
+  const getStaffName = (staffMemberId: number | null) => {
+    if (!staffMemberId) return "Open Shift";
+    const member = staff.find(s => s.id === staffMemberId);
+    return member ? `${member.firstName} ${member.lastName}` : "Unknown";
+  };
+
+  const getPositionName = (positionId: number | null) => {
+    if (!positionId) return "";
+    const position = positions.find(p => p.id === positionId);
+    return position?.name || "";
+  };
+
+  const getPositionColor = (positionId: number | null) => {
+    if (!positionId) return "#6B7280";
+    const position = positions.find(p => p.id === positionId);
+    return position?.color || "#6B7280";
+  };
+
+  const getShiftsForDate = (date: string) => {
+    return shifts.filter(s => s.date === date);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2">
+              <ChefHat className="h-6 w-6 text-primary" />
+              <span className="font-bold hidden sm:inline">Staff Scheduling</span>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => logout()} data-testid="button-logout">
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="schedule" data-testid="tab-schedule">
+              <Calendar className="h-4 w-4 mr-2" />
+              Schedule
+            </TabsTrigger>
+            <TabsTrigger value="staff" data-testid="tab-staff">
+              <Users className="h-4 w-4 mr-2" />
+              Staff
+            </TabsTrigger>
+            <TabsTrigger value="positions" data-testid="tab-positions">
+              <Briefcase className="h-4 w-4 mr-2" />
+              Positions
+            </TabsTrigger>
+            <TabsTrigger value="announcements" data-testid="tab-announcements">
+              <Bell className="h-4 w-4 mr-2" />
+              Announcements
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="schedule" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)} data-testid="btn-prev-week">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-medium min-w-[200px] text-center">
+                  {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+                <Button variant="outline" size="icon" onClick={() => navigateWeek(1)} data-testid="btn-next-week">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <Dialog open={showAddShift} onOpenChange={setShowAddShift}>
+                <DialogTrigger asChild>
+                  <Button data-testid="btn-add-shift">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Shift
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Shift</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label>Date</Label>
+                      <Input 
+                        type="date" 
+                        value={newShift.date} 
+                        onChange={(e) => setNewShift(s => ({ ...s, date: e.target.value }))}
+                        className="mt-1"
+                        data-testid="input-shift-date"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Start Time</Label>
+                        <Input 
+                          type="time" 
+                          value={newShift.startTime}
+                          onChange={(e) => setNewShift(s => ({ ...s, startTime: e.target.value }))}
+                          className="mt-1"
+                          data-testid="input-shift-start"
+                        />
+                      </div>
+                      <div>
+                        <Label>End Time</Label>
+                        <Input 
+                          type="time" 
+                          value={newShift.endTime}
+                          onChange={(e) => setNewShift(s => ({ ...s, endTime: e.target.value }))}
+                          className="mt-1"
+                          data-testid="input-shift-end"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Position</Label>
+                      <Select value={newShift.positionId} onValueChange={(v) => setNewShift(s => ({ ...s, positionId: v }))}>
+                        <SelectTrigger className="mt-1" data-testid="select-shift-position">
+                          <SelectValue placeholder="Select position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {positions.map(p => (
+                            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Assign To (leave empty for open shift)</Label>
+                      <Select value={newShift.staffMemberId} onValueChange={(v) => setNewShift(s => ({ ...s, staffMemberId: v }))}>
+                        <SelectTrigger className="mt-1" data-testid="select-shift-staff">
+                          <SelectValue placeholder="Leave open or assign..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Open Shift</SelectItem>
+                          {staff.map(s => (
+                            <SelectItem key={s.id} value={String(s.id)}>{s.firstName} {s.lastName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Notes (optional)</Label>
+                      <Textarea 
+                        value={newShift.notes}
+                        onChange={(e) => setNewShift(s => ({ ...s, notes: e.target.value }))}
+                        className="mt-1"
+                        placeholder="Any special instructions..."
+                        data-testid="input-shift-notes"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowAddShift(false)}>Cancel</Button>
+                    <Button 
+                      onClick={() => createShiftMutation.mutate(newShift)}
+                      disabled={!newShift.date || createShiftMutation.isPending}
+                      data-testid="btn-save-shift"
+                    >
+                      {createShiftMutation.isPending ? "Saving..." : "Save Shift"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2">
+              {weekDates.map((date, i) => {
+                const dateStr = formatDate(date);
+                const dayShifts = getShiftsForDate(dateStr);
+                const isToday = dateStr === formatDate(new Date());
+                
+                return (
+                  <div key={i} className={`min-h-[200px] border rounded-lg p-2 ${isToday ? 'border-primary bg-primary/5' : ''}`}>
+                    <div className="text-center mb-2">
+                      <div className="text-xs text-muted-foreground">
+                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </div>
+                      <div className={`text-lg font-semibold ${isToday ? 'text-primary' : ''}`}>
+                        {date.getDate()}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      {dayShifts.map(shift => (
+                        <div 
+                          key={shift.id}
+                          className="text-xs p-2 rounded cursor-pointer group relative"
+                          style={{ backgroundColor: `${getPositionColor(shift.positionId)}20`, borderLeft: `3px solid ${getPositionColor(shift.positionId)}` }}
+                          data-testid={`shift-${shift.id}`}
+                        >
+                          <div className="font-medium truncate">{getStaffName(shift.staffMemberId)}</div>
+                          <div className="text-muted-foreground">{formatTime(shift.startTime)} - {formatTime(shift.endTime)}</div>
+                          {shift.status === "open" && (
+                            <Badge variant="outline" className="text-[10px] mt-1 bg-orange-500/10 text-orange-600">Open</Badge>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100"
+                            onClick={() => deleteShiftMutation.mutate(shift.id)}
+                            data-testid={`btn-delete-shift-${shift.id}`}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {openShifts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-orange-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    Open Shifts ({openShifts.length})
+                  </CardTitle>
+                  <CardDescription>These shifts need to be filled</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {openShifts.map(shift => (
+                      <div key={shift.id} className="p-3 border rounded-lg flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{new Date(shift.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                          <div className="text-sm text-muted-foreground">{formatTime(shift.startTime)} - {formatTime(shift.endTime)}</div>
+                          {shift.positionId && <Badge variant="secondary" className="mt-1">{getPositionName(shift.positionId)}</Badge>}
+                        </div>
+                        <Button variant="outline" size="sm">Fill</Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="staff" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Staff Members ({staff.length})</h2>
+              <Dialog open={showAddStaff} onOpenChange={setShowAddStaff}>
+                <DialogTrigger asChild>
+                  <Button data-testid="btn-add-staff">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Staff
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Staff Member</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>First Name</Label>
+                        <Input 
+                          value={newStaff.firstName}
+                          onChange={(e) => setNewStaff(s => ({ ...s, firstName: e.target.value }))}
+                          className="mt-1"
+                          data-testid="input-staff-first-name"
+                        />
+                      </div>
+                      <div>
+                        <Label>Last Name</Label>
+                        <Input 
+                          value={newStaff.lastName}
+                          onChange={(e) => setNewStaff(s => ({ ...s, lastName: e.target.value }))}
+                          className="mt-1"
+                          data-testid="input-staff-last-name"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Email (optional)</Label>
+                      <Input 
+                        type="email"
+                        value={newStaff.email}
+                        onChange={(e) => setNewStaff(s => ({ ...s, email: e.target.value }))}
+                        className="mt-1"
+                        data-testid="input-staff-email"
+                      />
+                    </div>
+                    <div>
+                      <Label>Phone (optional)</Label>
+                      <Input 
+                        value={newStaff.phone}
+                        onChange={(e) => setNewStaff(s => ({ ...s, phone: e.target.value }))}
+                        className="mt-1"
+                        data-testid="input-staff-phone"
+                      />
+                    </div>
+                    <div>
+                      <Label>Position</Label>
+                      <Select value={newStaff.positionId} onValueChange={(v) => setNewStaff(s => ({ ...s, positionId: v }))}>
+                        <SelectTrigger className="mt-1" data-testid="select-staff-position">
+                          <SelectValue placeholder="Select position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {positions.map(p => (
+                            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowAddStaff(false)}>Cancel</Button>
+                    <Button 
+                      onClick={() => createStaffMutation.mutate(newStaff)}
+                      disabled={!newStaff.firstName || !newStaff.lastName || createStaffMutation.isPending}
+                      data-testid="btn-save-staff"
+                    >
+                      {createStaffMutation.isPending ? "Saving..." : "Add Staff"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {staff.map(member => (
+                <Card key={member.id} className="relative group" data-testid={`staff-card-${member.id}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold">{member.firstName} {member.lastName}</h3>
+                        {member.positionId && (
+                          <Badge variant="secondary" className="mt-1">{getPositionName(member.positionId)}</Badge>
+                        )}
+                        {member.email && <p className="text-sm text-muted-foreground mt-2">{member.email}</p>}
+                        {member.phone && <p className="text-sm text-muted-foreground">{member.phone}</p>}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100"
+                        onClick={() => deleteStaffMutation.mutate(member.id)}
+                        data-testid={`btn-delete-staff-${member.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {staff.length === 0 && (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  No staff members yet. Add your first team member!
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="positions" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Positions ({positions.length})</h2>
+              <Dialog open={showAddPosition} onOpenChange={setShowAddPosition}>
+                <DialogTrigger asChild>
+                  <Button data-testid="btn-add-position">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Position
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Position</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label>Position Name</Label>
+                      <Input 
+                        value={newPosition.name}
+                        onChange={(e) => setNewPosition(p => ({ ...p, name: e.target.value }))}
+                        placeholder="e.g., Server, Bartender, Line Cook"
+                        className="mt-1"
+                        data-testid="input-position-name"
+                      />
+                    </div>
+                    <div>
+                      <Label>Department</Label>
+                      <Select value={newPosition.department} onValueChange={(v) => setNewPosition(p => ({ ...p, department: v }))}>
+                        <SelectTrigger className="mt-1" data-testid="select-position-department">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="FOH">Front of House (FOH)</SelectItem>
+                          <SelectItem value="BOH">Back of House (BOH)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Color</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Input 
+                          type="color"
+                          value={newPosition.color}
+                          onChange={(e) => setNewPosition(p => ({ ...p, color: e.target.value }))}
+                          className="w-12 h-10 p-1"
+                          data-testid="input-position-color"
+                        />
+                        <span className="text-sm text-muted-foreground">Used for schedule display</span>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowAddPosition(false)}>Cancel</Button>
+                    <Button 
+                      onClick={() => createPositionMutation.mutate(newPosition)}
+                      disabled={!newPosition.name || createPositionMutation.isPending}
+                      data-testid="btn-save-position"
+                    >
+                      {createPositionMutation.isPending ? "Saving..." : "Add Position"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {positions.map(position => (
+                <Card key={position.id} className="relative group" data-testid={`position-card-${position.id}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: position.color }}
+                        />
+                        <div>
+                          <h3 className="font-semibold">{position.name}</h3>
+                          <Badge variant="outline" className="mt-1">{position.department}</Badge>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100"
+                        onClick={() => deletePositionMutation.mutate(position.id)}
+                        data-testid={`btn-delete-position-${position.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {positions.length === 0 && (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  No positions yet. Add positions like Server, Bartender, Line Cook, etc.
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="announcements" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Announcements ({announcements.length})</h2>
+              <Dialog open={showAddAnnouncement} onOpenChange={setShowAddAnnouncement}>
+                <DialogTrigger asChild>
+                  <Button data-testid="btn-add-announcement">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Announcement
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Announcement</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label>Title</Label>
+                      <Input 
+                        value={newAnnouncement.title}
+                        onChange={(e) => setNewAnnouncement(a => ({ ...a, title: e.target.value }))}
+                        placeholder="e.g., Staff Meeting Friday"
+                        className="mt-1"
+                        data-testid="input-announcement-title"
+                      />
+                    </div>
+                    <div>
+                      <Label>Message</Label>
+                      <Textarea 
+                        value={newAnnouncement.content}
+                        onChange={(e) => setNewAnnouncement(a => ({ ...a, content: e.target.value }))}
+                        placeholder="Enter your announcement..."
+                        className="mt-1 min-h-[100px]"
+                        data-testid="input-announcement-content"
+                      />
+                    </div>
+                    <div>
+                      <Label>Priority</Label>
+                      <Select value={newAnnouncement.priority} onValueChange={(v) => setNewAnnouncement(a => ({ ...a, priority: v }))}>
+                        <SelectTrigger className="mt-1" data-testid="select-announcement-priority">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowAddAnnouncement(false)}>Cancel</Button>
+                    <Button 
+                      onClick={() => createAnnouncementMutation.mutate(newAnnouncement)}
+                      disabled={!newAnnouncement.title || !newAnnouncement.content || createAnnouncementMutation.isPending}
+                      data-testid="btn-save-announcement"
+                    >
+                      {createAnnouncementMutation.isPending ? "Posting..." : "Post Announcement"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="space-y-4">
+              {announcements.map(announcement => {
+                const priorityColors: Record<string, string> = {
+                  low: "bg-gray-100 text-gray-700",
+                  normal: "bg-blue-100 text-blue-700",
+                  high: "bg-orange-100 text-orange-700",
+                  urgent: "bg-red-100 text-red-700",
+                };
+                return (
+                  <Card key={announcement.id} className="relative group" data-testid={`announcement-card-${announcement.id}`}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold">{announcement.title}</h3>
+                            <Badge className={priorityColors[announcement.priority]}>{announcement.priority}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{announcement.content}</p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {announcement.createdAt && new Date(announcement.createdAt).toLocaleDateString('en-US', { 
+                              month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100"
+                          onClick={() => deleteAnnouncementMutation.mutate(announcement.id)}
+                          data-testid={`btn-delete-announcement-${announcement.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {announcements.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No announcements yet. Create one to communicate with your team!
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
+}

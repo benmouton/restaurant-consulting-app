@@ -14,6 +14,7 @@ import DomainPage from "@/pages/domain";
 import ConsultantPage from "@/pages/consultant";
 import TemplatesPage from "@/pages/templates";
 import FinancialPage from "@/pages/financial";
+import SchedulingPage from "@/pages/scheduling";
 import SubscriptionPage from "@/pages/subscription";
 import SubscriptionSuccessPage from "@/pages/subscription-success";
 import SubscriptionCancelPage from "@/pages/subscription-cancel";
@@ -55,6 +56,9 @@ function Router() {
         </Route>
         <Route path="/templates">
           {user ? <ProtectedPage component={TemplatesPage} /> : <Landing />}
+        </Route>
+        <Route path="/scheduling">
+          {user ? <ProtectedPage component={SchedulingPage} /> : <Landing />}
         </Route>
         <Route path="/financial">
           {user ? (

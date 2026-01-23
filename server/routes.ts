@@ -363,6 +363,195 @@ export async function registerRoutes(
     }
   });
 
+  // ===== SCHEDULING ROUTES =====
+
+  // Staff Positions
+  app.get("/api/scheduling/positions", isAuthenticated, async (req, res) => {
+    const positions = await storage.getStaffPositions();
+    res.json(positions);
+  });
+
+  app.post("/api/scheduling/positions", isAuthenticated, async (req: any, res) => {
+    try {
+      const position = await storage.createStaffPosition(req.body);
+      res.status(201).json(position);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create position" });
+    }
+  });
+
+  app.put("/api/scheduling/positions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const position = await storage.updateStaffPosition(Number(req.params.id), req.body);
+      res.json(position);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update position" });
+    }
+  });
+
+  app.delete("/api/scheduling/positions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteStaffPosition(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete position" });
+    }
+  });
+
+  // Staff Members
+  app.get("/api/scheduling/staff", isAuthenticated, async (req, res) => {
+    const staff = await storage.getStaffMembers();
+    res.json(staff);
+  });
+
+  app.get("/api/scheduling/staff/:id", isAuthenticated, async (req, res) => {
+    const member = await storage.getStaffMember(Number(req.params.id));
+    if (!member) {
+      return res.status(404).json({ message: "Staff member not found" });
+    }
+    res.json(member);
+  });
+
+  app.post("/api/scheduling/staff", isAuthenticated, async (req: any, res) => {
+    try {
+      const member = await storage.createStaffMember(req.body);
+      res.status(201).json(member);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create staff member" });
+    }
+  });
+
+  app.put("/api/scheduling/staff/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const member = await storage.updateStaffMember(Number(req.params.id), req.body);
+      res.json(member);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update staff member" });
+    }
+  });
+
+  app.delete("/api/scheduling/staff/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteStaffMember(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete staff member" });
+    }
+  });
+
+  // Shifts
+  app.get("/api/scheduling/shifts", isAuthenticated, async (req, res) => {
+    const startDate = req.query.start as string || new Date().toISOString().split('T')[0];
+    const endDate = req.query.end as string || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const shifts = await storage.getShifts(startDate, endDate);
+    res.json(shifts);
+  });
+
+  app.get("/api/scheduling/shifts/open", isAuthenticated, async (req, res) => {
+    const shifts = await storage.getOpenShifts();
+    res.json(shifts);
+  });
+
+  app.post("/api/scheduling/shifts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const shift = await storage.createShift({ ...req.body, createdBy: userId });
+      res.status(201).json(shift);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create shift" });
+    }
+  });
+
+  app.put("/api/scheduling/shifts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const shift = await storage.updateShift(Number(req.params.id), req.body);
+      res.json(shift);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update shift" });
+    }
+  });
+
+  app.delete("/api/scheduling/shifts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteShift(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete shift" });
+    }
+  });
+
+  // Shift Applications
+  app.get("/api/scheduling/shifts/:shiftId/applications", isAuthenticated, async (req, res) => {
+    const applications = await storage.getShiftApplications(Number(req.params.shiftId));
+    res.json(applications);
+  });
+
+  app.post("/api/scheduling/shifts/:shiftId/apply", isAuthenticated, async (req: any, res) => {
+    try {
+      const application = await storage.createShiftApplication({
+        shiftId: Number(req.params.shiftId),
+        staffMemberId: req.body.staffMemberId,
+      });
+      res.status(201).json(application);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to apply for shift" });
+    }
+  });
+
+  app.put("/api/scheduling/applications/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const application = await storage.updateShiftApplication(Number(req.params.id), req.body.status);
+      res.json(application);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update application" });
+    }
+  });
+
+  // Staff Announcements
+  app.get("/api/scheduling/announcements", isAuthenticated, async (req, res) => {
+    const announcements = await storage.getStaffAnnouncements();
+    res.json(announcements);
+  });
+
+  app.post("/api/scheduling/announcements", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const announcement = await storage.createStaffAnnouncement({ ...req.body, createdBy: userId });
+      res.status(201).json(announcement);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create announcement" });
+    }
+  });
+
+  app.delete("/api/scheduling/announcements/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteStaffAnnouncement(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete announcement" });
+    }
+  });
+
+  app.post("/api/scheduling/announcements/:id/read", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.markAnnouncementRead(Number(req.params.id), userId);
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to mark as read" });
+    }
+  });
+
+  // Scheduling Stats (for dashboard)
+  app.get("/api/scheduling/stats", isAuthenticated, async (req, res) => {
+    try {
+      const stats = await storage.getSchedulingStats();
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get scheduling stats" });
+    }
+  });
+
   // Template Routes
   app.get(api.templates.list.path, async (req, res) => {
     const templates = await storage.getTrainingTemplates();
