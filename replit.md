@@ -66,6 +66,21 @@ A Sling-style scheduling system for managing restaurant shifts:
 - **Announcements**: Post team announcements with priority levels (low, normal, high, urgent)
 - **Dashboard Integration**: Quick stats showing staff count, positions, today's shifts, week shifts, open shifts, and unread announcements
 
+### Employee Portal System
+Separate authentication system for staff members to access scheduling without full platform access:
+- **Invite System**: Owners/GMs generate unique invite links for staff members via "Send Invite" button
+- **Employee Authentication**: Email/password login separate from Replit Auth, stored in staff_members table
+- **Restricted Access**: Employees can only view their schedule, announcements, and apply for open shifts
+- **Billing Integration**: Each employee with portal access adds $5/month to the subscription
+
+**Key Implementation Details**:
+- `inviteToken`: Unique one-time token for invite links
+- `inviteStatus`: Tracks "none", "pending", or "accepted" status
+- `passwordHash`: bcrypt-hashed passwords for employee login
+- `ownerId`: Links staff member to subscription owner for billing
+- Employee routes under `/employee/*` with dedicated session management
+- Stripe subscription automatically updated when employees accept invites or are removed
+
 ### Role-Based Access Control (RBAC)
 The application implements a three-tier role hierarchy:
 - **Owner**: Full access to all features including financial analysis, P&L tools, strategic planning, and staff management
