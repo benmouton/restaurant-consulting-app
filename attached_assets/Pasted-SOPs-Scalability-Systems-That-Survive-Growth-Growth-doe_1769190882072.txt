@@ -1,0 +1,150 @@
+SOPs & Scalability
+Systems That Survive Growth
+
+Growth doesn’t break restaurants.
+Unwritten systems do.
+
+If a process only works because one person knows it, it’s not a system — it’s a liability.
+SOPs exist to make performance transferable, repeatable, and boring.
+
+Boring is good. Boring scales.
+
+Core Principle: Documentation Over Memory
+
+If it’s not written down:
+
+It won’t be followed consistently
+
+It won’t survive turnover
+
+It won’t transfer to a second location
+
+A proper SOP allows a reasonably competent person to execute the task without asking questions.
+
+If someone has to “figure it out,” the SOP has already failed.
+
+The Checklist-First Rule
+
+Every SOP must have a checklist version.
+Not a manual. Not a paragraph. A checklist.
+
+Required Checklists
+
+Opening checklist
+
+Closing checklist
+
+Pre-service checklist
+
+Sidework checklist
+
+Daily cleaning checklist
+
+Checklist Design Rules
+
+Max 15 items per checklist
+
+Actionable verbs only (“Verify,” “Stock,” “Confirm”)
+
+Checkboxes, not explanations
+
+Posted at point of use (never buried in an office)
+
+Initialed and time-stamped
+
+Reviewed by a manager before shift change
+
+If it can’t be checked off in real time, it doesn’t belong on a checklist.
+
+SOP Structure (The Only Acceptable Format)
+
+Every SOP follows this order:
+
+Purpose – Why this exists (one sentence)
+
+Owner – Who is responsible (role, not name)
+
+Trigger – When this process starts
+
+Checklist – The execution steps
+
+Verification – How a manager confirms it was done
+
+Failure Protocol – What to do when it doesn’t happen
+
+If any of these are missing, the SOP is incomplete.
+
+The Second Location Test
+
+(Non-Negotiable)
+
+Before calling anything an SOP, ask:
+
+□ Could a new manager run this without calling the owner?
+□ Could a new hire execute this using only what’s written?
+□ Does this rely on one person’s memory or judgment?
+□ Would this work tomorrow in a different building?
+□ Is this documented — or just “how we do it”?
+
+If you answer NO to any of these, it’s not a system.
+It’s a dependency. Dependencies do not scale.
+
+Manager Daily Audit (Required Discipline)
+
+Managers are not here to “float.”
+They are here to verify systems.
+
+Every day, managers must confirm:
+
+□ Opening checklist completed and signed
+□ Prep list completed and signed
+□ Line check passed (taste, temp, presentation)
+□ Reservations reviewed and sections assigned
+□ Staff briefed on specials, 86s, and priorities
+□ Issues from previous shift addressed
+□ Labor tracked vs projection
+□ Cash handled and documented correctly
+□ Closing checklist completed
+□ Incidents logged and escalated if needed
+
+If it’s not verified, it’s assumed not done.
+
+Shelf-Decor SOPs Are Failure
+
+SOPs that live in binders fail.
+SOPs that live at the workstation succeed.
+
+If a process requires:
+
+A meeting to explain
+
+A reminder to follow
+
+A specific person to enforce
+
+…it’s not finished yet.
+
+The Standard
+
+We do not build systems for perfect days.
+We build them for:
+
+Turnover
+
+Call-outs
+
+Slams
+
+Bad nights
+
+Expansion
+
+A system that only works when things are calm is not a system.
+
+Bottom Line
+
+Write it so it survives you.
+Design it so it enforces itself.
+Verify it every day.
+
+That’s how restaurants scale without chaos.
