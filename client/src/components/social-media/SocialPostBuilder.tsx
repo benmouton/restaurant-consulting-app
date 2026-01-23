@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -33,8 +34,25 @@ import {
   Loader2,
   PartyPopper,
   Wand2,
+  Link2,
+  Unlink,
+  Send,
+  MapPin,
+  ExternalLink,
+  AlertCircle,
+  CheckCircle2,
+  History,
 } from "lucide-react";
-import type { RestaurantHoliday, BrandVoiceSettings } from "@shared/schema";
+import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
+
+interface SafeConnectedAccount {
+  id: number;
+  provider: string;
+  displayName: string;
+  profilePictureUrl?: string;
+  status: string;
+  createdAt: string;
+}
 
 const POST_TYPES = [
   { value: "event_promo", label: "Event Promo" },
@@ -122,6 +140,16 @@ export default function SocialPostBuilder() {
     queryKey: ["/api/social-media/brand-settings"],
   });
 
+  const { data: connectedAccounts, isLoading: accountsLoading } = useQuery<SafeConnectedAccount[]>({
+    queryKey: ["/api/social-media/accounts"],
+  });
+
+  const { data: postHistory } = useQuery<ScheduledPost[]>({
+    queryKey: ["/api/social-media/posts"],
+  });
+
+  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
+
   const generateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const response = await apiRequest("POST", "/api/social-media/generate-post", data);
@@ -136,6 +164,96 @@ export default function SocialPostBuilder() {
       toast({ title: "Error", description: "Failed to generate post. Please try again.", variant: "destructive" });
     },
   });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async (accountId: number) => {
+      await apiRequest("DELETE", `/api/social-media/accounts/${accountId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-media/accounts"] });
+      toast({ title: "Disconnected", description: "Account has been disconnected." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to disconnect account.", variant: "destructive" });
+    },
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: async (data: { caption: string; platformTargets: number[]; postNow: boolean; generatedContent?: object }) => {
+      const response = await apiRequest("POST", "/api/social-media/posts", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-media/posts"] });
+      toast({ title: "Published!", description: "Your post has been sent to the selected platforms." });
+      setStep(1);
+      setGeneratedPost(null);
+      setSelectedAccountIds([]);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to publish post. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const handleConnectMeta = async () => {
+    try {
+      const response = await fetch("/api/oauth/meta/start");
+      const data = await response.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
+    }
+  };
+
+  const handleConnectGoogle = async () => {
+    try {
+      const response = await fetch("/api/oauth/google/start");
+      const data = await response.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
+    }
+  };
+
+  const handlePublish = () => {
+    if (selectedAccountIds.length === 0) {
+      toast({ title: "Select accounts", description: "Please select at least one account to publish to.", variant: "destructive" });
+      return;
+    }
+    if (!generatedPost) return;
+
+    publishMutation.mutate({
+      caption: generatedPost.primaryCaption,
+      platformTargets: selectedAccountIds,
+      postNow: true,
+      generatedContent: generatedPost,
+    });
+  };
+
+  const toggleAccountSelection = (accountId: number) => {
+    setSelectedAccountIds(prev =>
+      prev.includes(accountId)
+        ? prev.filter(id => id !== accountId)
+        : [...prev, accountId]
+    );
+  };
+
+  const getProviderIcon = (provider: string) => {
+    switch (provider) {
+      case 'facebook':
+        return <Facebook className="h-4 w-4 text-blue-600" />;
+      case 'instagram':
+        return <Instagram className="h-4 w-4 text-pink-600" />;
+      case 'google_business':
+        return <MapPin className="h-4 w-4 text-red-500" />;
+      default:
+        return <Link2 className="h-4 w-4" />;
+    }
+  };
 
   const handlePlatformToggle = (platform: string) => {
     setFormData((prev) => ({
@@ -190,18 +308,22 @@ export default function SocialPostBuilder() {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-4">
+          <TabsList className="grid w-full grid-cols-5 mb-4">
             <TabsTrigger value="create" className="text-xs sm:text-sm" data-testid="tab-create-post">
               <Wand2 className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Create</span>
+            </TabsTrigger>
+            <TabsTrigger value="accounts" className="text-xs sm:text-sm" data-testid="tab-accounts">
+              <Link2 className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Accounts</span>
             </TabsTrigger>
             <TabsTrigger value="holidays" className="text-xs sm:text-sm" data-testid="tab-holidays">
               <PartyPopper className="h-4 w-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Holidays</span>
             </TabsTrigger>
-            <TabsTrigger value="library" className="text-xs sm:text-sm" data-testid="tab-library">
-              <Image className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Library</span>
+            <TabsTrigger value="history" className="text-xs sm:text-sm" data-testid="tab-history">
+              <History className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">History</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="text-xs sm:text-sm" data-testid="tab-settings">
               <Settings className="h-4 w-4 mr-1 sm:mr-2" />
@@ -571,10 +693,79 @@ export default function SocialPostBuilder() {
                   </span>
                 </div>
 
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="font-medium mb-2 flex items-center gap-2">
+                    <Send className="h-4 w-4" />
+                    Publish to Connected Accounts
+                  </h3>
+                  {connectedAccounts && connectedAccounts.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Select which accounts to publish this post to:
+                      </p>
+                      <div className="space-y-2">
+                        {connectedAccounts.filter(a => a.status === 'active').map((account) => (
+                          <div
+                            key={account.id}
+                            className={`flex items-center gap-3 p-2 border rounded-lg cursor-pointer transition-colors ${
+                              selectedAccountIds.includes(account.id)
+                                ? 'border-primary bg-primary/5'
+                                : 'hover:bg-muted/50'
+                            }`}
+                            onClick={() => toggleAccountSelection(account.id)}
+                            data-testid={`account-select-${account.id}`}
+                          >
+                            <Checkbox
+                              checked={selectedAccountIds.includes(account.id)}
+                              onCheckedChange={() => toggleAccountSelection(account.id)}
+                            />
+                            <div className="flex items-center gap-2">
+                              {getProviderIcon(account.provider)}
+                              <span className="text-sm">{account.displayName}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <Button
+                        onClick={handlePublish}
+                        disabled={selectedAccountIds.length === 0 || publishMutation.isPending}
+                        className="w-full"
+                        data-testid="button-publish-now"
+                      >
+                        {publishMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Publishing...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Publish Now to {selectedAccountIds.length} Account{selectedAccountIds.length !== 1 ? 's' : ''}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 border rounded-lg bg-muted/30">
+                      <Link2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm text-muted-foreground">No accounts connected</p>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => setActiveTab("accounts")}
+                        className="mt-1"
+                      >
+                        Connect accounts to publish
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 <Button
                   onClick={() => {
                     setStep(1);
                     setGeneratedPost(null);
+                    setSelectedAccountIds([]);
                     setFormData({
                       postType: "",
                       platforms: [],
@@ -598,6 +789,85 @@ export default function SocialPostBuilder() {
                 </Button>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="accounts" className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium mb-2">Connect Your Accounts</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Connect your social media accounts to post directly from this tool.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={handleConnectMeta} variant="outline" data-testid="button-connect-meta">
+                    <Facebook className="h-4 w-4 mr-2 text-blue-600" />
+                    Connect Facebook / Instagram
+                  </Button>
+                  <Button onClick={handleConnectGoogle} variant="outline" data-testid="button-connect-google">
+                    <MapPin className="h-4 w-4 mr-2 text-red-500" />
+                    Connect Google Business
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-medium mb-2">Connected Accounts</h3>
+                {accountsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : connectedAccounts && connectedAccounts.length > 0 ? (
+                  <div className="space-y-2">
+                    {connectedAccounts.map((account) => (
+                      <div
+                        key={account.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            {account.profilePictureUrl ? (
+                              <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
+                            ) : null}
+                            <AvatarFallback>
+                              {getProviderIcon(account.provider)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{account.displayName}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              {getProviderIcon(account.provider)}
+                              <span className="capitalize">{account.provider.replace('_', ' ')}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={account.status === 'active' ? 'default' : 'destructive'}>
+                            {account.status}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => disconnectMutation.mutate(account.id)}
+                            disabled={disconnectMutation.isPending}
+                            data-testid={`button-disconnect-${account.id}`}
+                          >
+                            <Unlink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Link2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No accounts connected yet</p>
+                    <p className="text-sm">Connect your social media accounts above to start posting</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="holidays">
@@ -656,16 +926,46 @@ export default function SocialPostBuilder() {
             </div>
           </TabsContent>
 
-          <TabsContent value="library">
-            <div className="text-center py-8">
-              <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-medium mb-2">Content Library</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Upload and organize photos for your social posts. Coming soon!
+          <TabsContent value="history" className="space-y-4">
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                View your recent posts and their status across platforms.
               </p>
-              <Button variant="outline" disabled>
-                Upload Photos
-              </Button>
+              {postHistory && postHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {postHistory.slice(0, 10).map((post) => (
+                    <div key={post.id} className="p-3 border rounded-lg">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm line-clamp-2">{post.caption}</p>
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Unknown'}
+                          </div>
+                        </div>
+                        <Badge
+                          variant={
+                            post.status === 'posted' ? 'default' :
+                            post.status === 'failed' ? 'destructive' :
+                            post.status === 'partial' ? 'secondary' :
+                            'outline'
+                          }
+                        >
+                          {post.status === 'posted' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                          {post.status === 'failed' && <AlertCircle className="h-3 w-3 mr-1" />}
+                          {post.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <History className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No posts yet</p>
+                  <p className="text-sm">Your published posts will appear here</p>
+                </div>
+              )}
             </div>
           </TabsContent>
 

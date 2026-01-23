@@ -1087,6 +1087,295 @@ Generate JSON with:
     }
   });
 
+  // Social Media OAuth Routes
+  const { socialMediaService } = await import('./socialMediaService');
+
+  // Get connected accounts
+  app.get("/api/social-media/accounts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const accounts = await storage.getConnectedAccounts(userId);
+      const safeAccounts = accounts.map(a => ({
+        id: a.id,
+        provider: a.provider,
+        displayName: a.displayName,
+        profilePictureUrl: a.profilePictureUrl,
+        status: a.status,
+        createdAt: a.createdAt,
+      }));
+      res.json(safeAccounts);
+    } catch (error) {
+      console.error("Error fetching connected accounts:", error);
+      res.status(500).json({ message: "Failed to fetch connected accounts" });
+    }
+  });
+
+  // Disconnect account
+  app.delete("/api/social-media/accounts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const accountId = parseInt(req.params.id);
+      const account = await storage.getConnectedAccountById(accountId);
+      if (!account || account.userId !== userId) {
+        res.status(404).json({ message: "Account not found" });
+        return;
+      }
+      await storage.deleteConnectedAccount(accountId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting account:", error);
+      res.status(500).json({ message: "Failed to disconnect account" });
+    }
+  });
+
+  // Start Meta OAuth (Facebook + Instagram)
+  app.get("/api/oauth/meta/start", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { authUrl } = socialMediaService.startMetaOAuth(userId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Meta OAuth:", error);
+      res.status(500).json({ message: "Failed to start Meta OAuth" });
+    }
+  });
+
+  // Meta OAuth callback
+  app.get("/api/oauth/meta/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        res.redirect("/domain/social-media?error=missing_params");
+        return;
+      }
+
+      const stateData = socialMediaService.validateAndConsumeState(state as string);
+      if (!stateData || stateData.provider !== 'meta') {
+        res.redirect("/domain/social-media?error=invalid_state");
+        return;
+      }
+      const userId = stateData.userId;
+
+      const shortToken = await socialMediaService.exchangeMetaCode(code as string);
+      const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
+      const pages = await socialMediaService.getFacebookPages(longToken.accessToken);
+
+      for (const page of pages) {
+        await socialMediaService.saveConnectedAccount(
+          userId,
+          'facebook',
+          page.id,
+          page.name,
+          page.access_token,
+          undefined,
+          60 * 60 * 24 * 60,
+          { pageId: page.id },
+          page.picture?.data?.url
+        );
+
+        const igAccounts = await socialMediaService.getInstagramAccounts(page.id, page.access_token);
+        for (const ig of igAccounts) {
+          await socialMediaService.saveConnectedAccount(
+            userId,
+            'instagram',
+            ig.id,
+            ig.username,
+            page.access_token,
+            undefined,
+            60 * 60 * 24 * 60,
+            { igUserId: ig.id, pageId: page.id },
+            ig.profile_picture_url
+          );
+        }
+      }
+
+      res.redirect("/domain/social-media?connected=meta");
+    } catch (error) {
+      console.error("Meta OAuth callback error:", error);
+      res.redirect("/domain/social-media?error=oauth_failed");
+    }
+  });
+
+  // Start Google OAuth
+  app.get("/api/oauth/google/start", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { authUrl } = socialMediaService.startGoogleOAuth(userId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Google OAuth:", error);
+      res.status(500).json({ message: "Failed to start Google OAuth" });
+    }
+  });
+
+  // Google OAuth callback
+  app.get("/api/oauth/google/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        res.redirect("/domain/social-media?error=missing_params");
+        return;
+      }
+
+      const stateData = socialMediaService.validateAndConsumeState(state as string);
+      if (!stateData || stateData.provider !== 'google') {
+        res.redirect("/domain/social-media?error=invalid_state");
+        return;
+      }
+      const userId = stateData.userId;
+
+      const tokens = await socialMediaService.exchangeGoogleCode(code as string);
+      const locations = await socialMediaService.getGoogleBusinessLocations(tokens.accessToken);
+
+      for (const location of locations) {
+        await socialMediaService.saveConnectedAccount(
+          userId,
+          'google_business',
+          location.name,
+          location.title,
+          tokens.accessToken,
+          tokens.refreshToken,
+          tokens.expiresIn,
+          { locationName: location.name }
+        );
+      }
+
+      res.redirect("/domain/social-media?connected=google");
+    } catch (error) {
+      console.error("Google OAuth callback error:", error);
+      res.redirect("/domain/social-media?error=oauth_failed");
+    }
+  });
+
+  // Create and schedule a post
+  app.post("/api/social-media/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { caption, platformTargets, mediaUrls, scheduledFor, postType, generatedContent, postNow } = req.body;
+
+      if (!caption || !platformTargets || platformTargets.length === 0) {
+        res.status(400).json({ message: "Caption and at least one platform target required" });
+        return;
+      }
+
+      const post = await storage.createScheduledPost({
+        userId,
+        caption,
+        platformTargets,
+        mediaUrls,
+        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+        status: postNow ? 'posting' : (scheduledFor ? 'scheduled' : 'draft'),
+        postType,
+        generatedContent,
+      });
+
+      if (postNow) {
+        await executePost(post.id);
+      }
+
+      res.json(post);
+    } catch (error) {
+      console.error("Error creating post:", error);
+      res.status(500).json({ message: "Failed to create post" });
+    }
+  });
+
+  // Get user's posts
+  app.get("/api/social-media/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const posts = await storage.getScheduledPosts(userId);
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      res.status(500).json({ message: "Failed to fetch posts" });
+    }
+  });
+
+  // Get post results
+  app.get("/api/social-media/posts/:id/results", isAuthenticated, async (req: any, res) => {
+    try {
+      const postId = parseInt(req.params.id);
+      const results = await storage.getPostResults(postId);
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching post results:", error);
+      res.status(500).json({ message: "Failed to fetch post results" });
+    }
+  });
+
+  // Execute post immediately
+  async function executePost(postId: number) {
+    const post = await storage.getScheduledPostById(postId);
+    if (!post || !post.platformTargets) return;
+
+    await storage.updateScheduledPost(postId, { status: 'posting' });
+
+    let allSuccess = true;
+    let anySuccess = false;
+
+    for (const accountId of post.platformTargets) {
+      const account = await storage.getConnectedAccountById(accountId);
+      if (!account) continue;
+
+      try {
+        const token = socialMediaService.getDecryptedToken(account);
+        let result: any;
+
+        if (account.provider === 'facebook') {
+          const meta = account.meta as any;
+          result = await socialMediaService.postToFacebook(
+            meta.pageId,
+            token,
+            post.caption,
+            post.mediaUrls?.[0]
+          );
+        } else if (account.provider === 'instagram') {
+          if (!post.mediaUrls?.[0]) {
+            throw new Error('Instagram requires an image');
+          }
+          const meta = account.meta as any;
+          result = await socialMediaService.postToInstagram(
+            meta.igUserId,
+            token,
+            post.caption,
+            post.mediaUrls[0]
+          );
+        } else if (account.provider === 'google_business') {
+          const meta = account.meta as any;
+          result = await socialMediaService.postToGoogleBusiness(
+            meta.locationName,
+            token,
+            post.caption
+          );
+        }
+
+        await storage.createPostResult({
+          scheduledPostId: postId,
+          connectedAccountId: accountId,
+          provider: account.provider,
+          providerPostId: result?.id || result?.name,
+          status: 'success',
+          rawResponse: result,
+          postedAt: new Date(),
+        });
+        anySuccess = true;
+      } catch (error: any) {
+        allSuccess = false;
+        await storage.createPostResult({
+          scheduledPostId: postId,
+          connectedAccountId: accountId,
+          provider: account.provider,
+          status: 'failed',
+          errorMessage: error.message,
+        });
+      }
+    }
+
+    const finalStatus = allSuccess ? 'posted' : (anySuccess ? 'partial' : 'failed');
+    await storage.updateScheduledPost(postId, { status: finalStatus });
+  }
+
   // Template Routes
   app.get(api.templates.list.path, async (req, res) => {
     const templates = await storage.getTrainingTemplates();

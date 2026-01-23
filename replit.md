@@ -109,18 +109,30 @@ The application implements a three-tier role hierarchy:
 AI-powered social media content creation tool available in the Social Media domain:
 - **Multi-step Wizard**: Post type selection → Platforms → Event details → Tone/style → AI generation
 - **Post Types**: Event promotion, Menu feature, Staff spotlight, Holiday tie-in, Weekly special, General engagement
-- **Platform Support**: Instagram, Facebook, TikTok with platform-specific caption optimization
+- **Platform Support**: Instagram, Facebook, Google Business Profile with platform-specific caption optimization
 - **Brand Voice Settings**: Restaurant name, voice adjectives, emoji level, hashtag style, never-say list
-- **Content Library**: Photo folders, asset tagging, and saved drafts
 - **Holiday Calendar**: 25 seeded restaurant holidays (National Pizza Day, Valentine's Day, etc.) with suggested content angles
+
+**Direct Posting Integration**:
+- **OAuth Flows**: Meta (Facebook Pages + Instagram) and Google Business Profile OAuth with secure state validation
+- **Token Encryption**: AES-256-GCM encryption for secure access token storage
+- **Posting APIs**: Direct posting to Facebook Pages, Instagram Content Publishing, and Google Business Profile
+- **Post History**: Track status of published posts across all platforms
 
 **Database Tables**:
 - `brand_voice_settings`: User-specific brand voice configuration
 - `restaurant_holidays`: Seeded calendar of national food days and holidays
-- `social_media_posts`: Saved generated content
-- `social_media_folders` / `social_media_assets`: Content library organization
+- `connected_accounts`: OAuth tokens (encrypted) for social media platforms
+- `scheduled_posts`: Posts created by users with scheduling support
+- `post_results`: Per-platform posting results with status tracking
+
+**Required Environment Variables for Social Posting**:
+- `ENCRYPTION_KEY`: Key for AES-256-GCM token encryption
+- `META_APP_ID` / `META_APP_SECRET`: Meta (Facebook/Instagram) OAuth credentials
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: Google Business Profile OAuth credentials
 
 **Component Location**: `client/src/components/social-media/SocialPostBuilder.tsx`
+**Service Location**: `server/socialMediaService.ts`
 
 ## External Dependencies
 
