@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -44,7 +44,9 @@ import {
   AlertTriangle,
   Shield,
   Wrench,
-  Printer
+  Printer,
+  Send,
+  ChevronLeft
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
@@ -2723,165 +2725,136 @@ const CRISIS_TYPES = [
   { id: "walkout", label: "Walkout or call-off mid-shift", icon: AlertTriangle },
   { id: "system_failure", label: "POS / system failure", icon: AlertTriangle },
   { id: "owner_overwhelmed", label: "Owner or manager overwhelmed", icon: AlertTriangle },
+  { id: "health_inspector", label: "Health inspector / surprise visit", icon: AlertTriangle },
+  { id: "food_safety", label: "Food safety / contamination issue", icon: AlertTriangle },
 ];
+
+const SEVERITY_LEVELS = [
+  { id: "mild", label: "Manageable", description: "We can handle this, need guidance", color: "bg-yellow-500" },
+  { id: "moderate", label: "Serious", description: "Things are getting out of control", color: "bg-orange-500" },
+  { id: "critical", label: "Critical", description: "Full emergency, need help NOW", color: "bg-red-600" },
+];
+
+interface CrisisMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: Date;
+}
+
+const CRISIS_SYSTEM_PROMPT = `You are an elite restaurant crisis response AI operating in REAL-TIME COMMAND MODE. You are calm, direct, and immediately actionable. You speak like a seasoned restaurant GM who has seen everything.
+
+CRITICAL RULES:
+1. Keep responses SHORT and ACTIONABLE - max 3-4 sentences per response unless you need to give a protocol
+2. ASK FOLLOW-UP QUESTIONS to understand the situation better
+3. CHECK IN on progress - "Did that work?" "What's happening now?" "Has the situation changed?"
+4. ADAPT your guidance based on their updates
+5. Be calm but urgent - this is a real crisis happening NOW
+6. Never lecture or over-explain - they don't have time
+7. Provide EXACT scripts they can use word-for-word with guests and staff
+8. If things escalate, escalate your response. If things calm down, shift to recovery mode.
+
+YOUR PERSONALITY:
+- Confident and decisive - "Here's what you do right now..."
+- Supportive but not soft - "You've got this. Focus."
+- Practical - scripts, numbers, specific actions
+- Aware this is happening in real-time - "How are things looking now?" "Update me when you've done that."
+
+RESPONSE FORMAT:
+- Start with the most critical action first
+- Use bullet points for multiple steps
+- End with a check-in question when appropriate
+- If they report improvement, acknowledge and shift to recovery/prevention
+
+Remember: They are IN THE CRISIS RIGHT NOW. Every word must earn its place.`;
 
 function CrisisResponseEngine() {
   const { toast } = useToast();
-  const [selectedCrises, setSelectedCrises] = useState<string[]>([]);
-  const [otherDescription, setOtherDescription] = useState<string>("");
-  const [additionalContext, setAdditionalContext] = useState<string>("");
-  const [response, setResponse] = useState<string>("");
+  const [messages, setMessages] = useState<CrisisMessage[]>([]);
+  const [inputValue, setInputValue] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [step, setStep] = useState<"intake" | "response">("intake");
+  const [mode, setMode] = useState<"start" | "severity" | "chat">("start");
+  const [selectedCrisis, setSelectedCrisis] = useState<string | null>(null);
+  const [severity, setSeverity] = useState<string | null>(null);
+  const [crisisStartTime, setCrisisStartTime] = useState<Date | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const toggleCrisis = (id: string) => {
-    setSelectedCrises(prev => 
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
-    );
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const getCrisisResponse = async () => {
-    if (selectedCrises.length === 0 && !otherDescription.trim()) {
-      toast({ title: "Please select what's happening", variant: "destructive" });
-      return;
-    }
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
+  const startCrisis = (crisisId: string) => {
+    setSelectedCrisis(crisisId);
+    setMode("severity");
+  };
+
+  const selectSeverity = async (severityId: string) => {
+    setSeverity(severityId);
+    setMode("chat");
+    setCrisisStartTime(new Date());
+    
+    const crisis = CRISIS_TYPES.find(c => c.id === selectedCrisis);
+    const sev = SEVERITY_LEVELS.find(s => s.id === severityId);
+    
+    const initialMessage = `${crisis?.label || selectedCrisis} - ${sev?.label} severity`;
+    
+    const userMessage: CrisisMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: initialMessage,
+      timestamp: new Date(),
+    };
+    
+    setMessages([userMessage]);
+    await sendToAI(initialMessage, [userMessage], severityId);
+  };
+
+  const sendToAI = async (userInput: string, allMessages: CrisisMessage[], currentSeverity?: string) => {
     setIsGenerating(true);
-    setResponse("");
-    setStep("response");
+    
+    const crisis = CRISIS_TYPES.find(c => c.id === selectedCrisis);
+    const sev = SEVERITY_LEVELS.find(s => s.id === (currentSeverity || severity));
+    
+    const contextPrompt = `
+CURRENT CRISIS: ${crisis?.label || selectedCrisis}
+SEVERITY: ${sev?.label || severity} - ${sev?.description || ""}
+${crisisStartTime ? `TIME IN CRISIS: ${Math.round((Date.now() - crisisStartTime.getTime()) / 60000)} minutes` : ""}
 
-    const crisisLabels = selectedCrises.map(id => 
-      CRISIS_TYPES.find(c => c.id === id)?.label
-    ).filter(Boolean);
+CONVERSATION HISTORY:
+${allMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
 
-    const prompt = `You are an elite restaurant crisis response AI. You follow military-grade protocols adapted from luxury hospitality incident playbooks and airline cockpit crisis procedures.
+USER'S LATEST UPDATE: ${userInput}
 
-A manager just reported the following crisis situation:
-
-ACTIVE ISSUES:
-${crisisLabels.map(l => `• ${l}`).join('\n')}
-${otherDescription ? `• Other: ${otherDescription}` : ''}
-
-${additionalContext ? `ADDITIONAL CONTEXT:\n${additionalContext}` : ''}
-
-RESPOND IN THIS EXACT STRUCTURE AND ORDER:
-
-═══════════════════════════════════════════
-1. NAME THE MOMENT
-═══════════════════════════════════════════
-
-Start with: "Understood. You are in recovery mode. We're stabilizing first, then fixing."
-
-Then provide ONE calming statement that tells them they are executing a plan, not failing.
-
-═══════════════════════════════════════════
-2. TAKE COMMAND
-═══════════════════════════════════════════
-
-Start with: "One person must take control right now."
-
-Then issue 2-3 direct instructions. No options. No debate. Examples:
-• "You are running expo. Nothing plates without your call."
-• "Pause seating immediately."
-• "Reduce menu complexity if needed."
-
-═══════════════════════════════════════════
-3. CONTAIN THE DAMAGE
-═══════════════════════════════════════════
-
-Ask ONE critical containment question, then provide IF YES and IF NO responses.
-
-Example: "Can current staff absorb this volume if seating pauses for 15 minutes?"
-• IF YES: "Proceed. Do not reopen sections until ticket flow stabilizes."
-• IF NO: "Close sections. Combine tables. Communicate the adjustment now."
-
-═══════════════════════════════════════════
-4. GUEST COMMUNICATION SCRIPT
-═══════════════════════════════════════════
-
-Provide EXACT language to use with guests (not guidance):
-
-Primary script: "We hit an unexpected rush and are slightly behind. I'm personally tracking your order and will update you before you have to ask."
-
-If anger escalates: "Thank you for your patience. We value your time, and I'm making this right."
-
-═══════════════════════════════════════════
-5. STAFF STABILIZATION
-═══════════════════════════════════════════
-
-Provide leadership behavior prompts:
-• "Speak calmly. Short instructions only. No side conversations."
-${selectedCrises.includes('walkout') ? `
-WALKOUT PROTOCOL:
-• "Do not chase. Reassign sections. Thank remaining staff out loud."
-• This is disruptive — not catastrophic. Adjust coverage now.` : ''}
-${selectedCrises.includes('owner_overwhelmed') ? `
-OWNER OVERWHELM PROTOCOL:
-• "You are not the emergency. The system is."
-• Delegate one decision immediately
-• Focus on guest-facing stability only` : ''}
-
-═══════════════════════════════════════════
-6. RECOVERY ACTIONS
-═══════════════════════════════════════════
-
-"Has ticket flow returned to manageable pace?"
-
-IF YES:
-• Touch all affected tables
-• Comp strategically, not emotionally
-• Thank guests for patience
-
-IF NO:
-• Maintain containment
-• Do not reopen sections
-• Maintain communication cadence every 10 minutes
-
-═══════════════════════════════════════════
-7. POST-SHIFT DEBRIEF
-═══════════════════════════════════════════
-
-End with: "After service, document this incident. Answer these exactly:"
-
-• What broke first?
-• Why did it break?
-• What system failed?
-• What change prevents recurrence?
-
-"If it's not written down, it will happen again."
-
-═══════════════════════════════════════════
-FINAL MESSAGE
-═══════════════════════════════════════════
-
-"Crisis handled. Stability restored or contained.
-Debrief after service. Systems improve tomorrow."
-
-SAFETY RULES - NEVER:
-• Assign blame
-• Suggest yelling, threats, or discipline during service
-• Recommend chasing staff
-• Encourage public arguments
-• Escalate emotionally
-
-ALWAYS:
-• Default to containment
-• Protect guest perception
-• Preserve staff dignity
-• Reinforce leadership authority`;
+Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-up questions to understand and help.`;
 
     try {
       const res = await fetch("/api/consultant/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: prompt }),
+        body: JSON.stringify({ 
+          question: contextPrompt,
+          systemPrompt: CRISIS_SYSTEM_PROMPT,
+        }),
         credentials: "include",
       });
 
-      if (!res.ok) throw new Error("Failed to get crisis response");
+      if (!res.ok) throw new Error("Failed to get response");
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
+
+      const assistantMessage: CrisisMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "",
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
 
       if (reader) {
         let content = "";
@@ -2897,148 +2870,264 @@ ALWAYS:
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 content += data.content;
-                setResponse(content);
+                setMessages(prev => 
+                  prev.map(m => m.id === assistantMessage.id ? { ...m, content } : m)
+                );
               }
             } catch {}
           }
         }
       }
     } catch (err) {
-      toast({ title: "Failed to get crisis response", variant: "destructive" });
-      setStep("intake");
+      toast({ title: "Failed to get response", variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(response);
-    toast({ title: "Copied to clipboard!" });
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isGenerating) return;
+
+    const userMessage: CrisisMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: inputValue.trim(),
+      timestamp: new Date(),
+    };
+
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInputValue("");
+    
+    await sendToAI(userMessage.content, updatedMessages);
   };
 
-  const resetIntake = () => {
-    setStep("intake");
-    setResponse("");
-    setSelectedCrises([]);
-    setOtherDescription("");
-    setAdditionalContext("");
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const resetCrisis = () => {
+    setMode("start");
+    setSelectedCrisis(null);
+    setSeverity(null);
+    setMessages([]);
+    setCrisisStartTime(null);
+    setInputValue("");
+  };
+
+  const getElapsedTime = () => {
+    if (!crisisStartTime) return "";
+    const minutes = Math.round((Date.now() - crisisStartTime.getTime()) / 60000);
+    return `${minutes}m`;
   };
 
   return (
     <Card className="mb-8 border-destructive/30">
       <CardHeader className="bg-destructive/5">
-        <CardTitle className="flex items-center gap-2 text-destructive">
-          <Shield className="h-5 w-5" />
-          Crisis Response Command Center
-        </CardTitle>
-        <CardDescription>
-          Control the moment. Protect the system. Get immediate crisis playbook guidance.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6 space-y-4">
-        {step === "intake" ? (
-          <>
-            <div>
-              <Label className="text-base font-semibold">What's happening right now?</Label>
-              <p className="text-sm text-muted-foreground mb-3">Select all that apply</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {CRISIS_TYPES.map((crisis) => {
-                  const isSelected = selectedCrises.includes(crisis.id);
-                  return (
-                    <Button
-                      key={crisis.id}
-                      type="button"
-                      variant={isSelected ? "destructive" : "outline"}
-                      onClick={() => toggleCrisis(crisis.id)}
-                      className="flex items-center justify-start gap-3 h-auto py-3 text-left"
-                      data-testid={`crisis-option-${crisis.id}`}
-                    >
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? 'border-destructive-foreground bg-destructive-foreground/20' : 'border-muted-foreground'
-                      }`}>
-                        {isSelected && <CheckSquare className="h-3 w-3" />}
-                      </div>
-                      <crisis.icon className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm">{crisis.label}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="otherDescription">Other (describe in one sentence)</Label>
-              <Input
-                id="otherDescription"
-                placeholder="e.g., Health inspector arrived unexpectedly..."
-                className="mt-1"
-                value={otherDescription}
-                onChange={(e) => setOtherDescription(e.target.value)}
-                data-testid="input-other-crisis"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="additionalContext">Additional context (optional)</Label>
-              <Textarea
-                id="additionalContext"
-                placeholder="Any other details that would help... How long has this been going on? What have you tried?"
-                className="mt-1 min-h-[80px]"
-                value={additionalContext}
-                onChange={(e) => setAdditionalContext(e.target.value)}
-                data-testid="textarea-crisis-context"
-              />
-            </div>
-
-            <Button 
-              onClick={getCrisisResponse} 
-              disabled={isGenerating || (selectedCrises.length === 0 && !otherDescription.trim())}
-              variant="destructive"
-              className="w-full"
-              data-testid="btn-get-crisis-response"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating Crisis Protocol...
-                </>
-              ) : (
-                <>
-                  <Shield className="h-4 w-4 mr-2" />
-                  Get Crisis Response Protocol
-                </>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <Shield className="h-5 w-5" />
+              Crisis Command Center
+              {mode === "chat" && crisisStartTime && (
+                <Badge variant="outline" className="ml-2 text-destructive border-destructive/50">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {getElapsedTime()} active
+                </Badge>
               )}
+            </CardTitle>
+            <CardDescription>
+              {mode === "start" && "Real-time crisis support. I'll guide you through it."}
+              {mode === "severity" && "How serious is the situation right now?"}
+              {mode === "chat" && "I'm here with you. Update me as things change."}
+            </CardDescription>
+          </div>
+          {mode === "chat" && (
+            <Button variant="outline" size="sm" onClick={resetCrisis} data-testid="btn-end-crisis">
+              <X className="h-4 w-4 mr-2" />
+              End Session
             </Button>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={resetIntake} data-testid="btn-new-crisis">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  New Crisis
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-6">
+        {mode === "start" && (
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">What's happening?</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {CRISIS_TYPES.map((crisis) => (
+                <Button
+                  key={crisis.id}
+                  variant="outline"
+                  onClick={() => startCrisis(crisis.id)}
+                  className="flex items-center justify-start gap-3 h-auto py-4 text-left"
+                  data-testid={`crisis-start-${crisis.id}`}
+                >
+                  <crisis.icon className="h-5 w-5 text-destructive flex-shrink-0" />
+                  <span className="text-sm">{crisis.label}</span>
                 </Button>
-              </div>
-              {response && (
-                <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-crisis-response">
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy
+              ))}
+            </div>
+            <div className="pt-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSelectedCrisis("custom");
+                  setMode("severity");
+                }}
+                className="w-full text-muted-foreground"
+                data-testid="crisis-start-other"
+              >
+                Something else not listed above
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {mode === "severity" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Button variant="ghost" size="sm" onClick={() => setMode("start")} data-testid="btn-crisis-back">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {CRISIS_TYPES.find(c => c.id === selectedCrisis)?.label || "Custom crisis"}
+              </span>
+            </div>
+            <Label className="text-base font-semibold">How serious is it right now?</Label>
+            <div className="grid gap-3">
+              {SEVERITY_LEVELS.map((sev) => (
+                <Button
+                  key={sev.id}
+                  variant="outline"
+                  onClick={() => selectSeverity(sev.id)}
+                  className="flex items-center justify-start gap-4 h-auto py-4 text-left"
+                  data-testid={`severity-${sev.id}`}
+                >
+                  <div className={`w-3 h-3 rounded-full ${sev.color} flex-shrink-0`} />
+                  <div>
+                    <div className="font-medium">{sev.label}</div>
+                    <div className="text-sm text-muted-foreground">{sev.description}</div>
+                  </div>
                 </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mode === "chat" && (
+          <div className="space-y-4">
+            <div className="h-[400px] overflow-y-auto border rounded-lg p-4 bg-accent/20">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`mb-4 ${message.role === "user" ? "text-right" : "text-left"}`}
+                >
+                  <div
+                    className={`inline-block max-w-[85%] p-3 rounded-lg ${
+                      message.role === "user"
+                        ? "bg-destructive text-destructive-foreground"
+                        : "bg-card border"
+                    }`}
+                  >
+                    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                    <div className={`text-xs mt-1 ${
+                      message.role === "user" ? "text-destructive-foreground/70" : "text-muted-foreground"
+                    }`}>
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isGenerating && messages[messages.length - 1]?.role === "user" && (
+                <div className="text-left mb-4">
+                  <div className="inline-block p-3 rounded-lg bg-card border">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
 
-            {isGenerating && !response && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-destructive" />
-              </div>
-            )}
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="Update me... What's happening now? Did that work?"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="min-h-[60px] resize-none"
+                disabled={isGenerating}
+                data-testid="crisis-chat-input"
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isGenerating}
+                variant="destructive"
+                size="icon"
+                data-testid="crisis-chat-send"
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
 
-            {response && (
-              <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm font-mono border border-destructive/20">
-                {response}
-              </div>
-            )}
-          </>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setInputValue("Things are getting worse");
+                }}
+                disabled={isGenerating}
+                className="text-xs"
+                data-testid="quick-escalate"
+              >
+                Things are getting worse
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setInputValue("It's starting to calm down");
+                }}
+                disabled={isGenerating}
+                className="text-xs"
+                data-testid="quick-improving"
+              >
+                It's starting to calm down
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setInputValue("I did what you said. Now what?");
+                }}
+                disabled={isGenerating}
+                className="text-xs"
+                data-testid="quick-next"
+              >
+                Did it. Now what?
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setInputValue("Give me a script for what to say to guests");
+                }}
+                disabled={isGenerating}
+                className="text-xs"
+                data-testid="quick-script"
+              >
+                Need a guest script
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
