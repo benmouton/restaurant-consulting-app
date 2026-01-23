@@ -59,13 +59,8 @@ export function Navigation() {
         })}
       </div>
 
-      {/* Mobile Menu Placeholder (simplified for this generation) */}
-      <div className="lg:hidden">
-        {/* Mobile menu trigger would go here */}
-      </div>
-
       {/* User & Logout */}
-      <div className="hidden w-full border-t pt-6 lg:mt-auto lg:block">
+      <div className="lg:mt-auto lg:w-full lg:border-t lg:pt-6">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button 
