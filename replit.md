@@ -102,7 +102,25 @@ The application implements a three-tier role hierarchy:
 - **Use Cases**: 
   - Restaurant consultant chat with streaming responses
   - Image generation for operational materials
+  - Social media post generation with platform-specific captions
 - **System Prompt**: Extensive domain-specific prompt for restaurant operations consulting, including proven frameworks like SHADOW → PERFORM → CERTIFY training model and ROAR task management
+
+### Social Media Post Builder
+AI-powered social media content creation tool available in the Social Media domain:
+- **Multi-step Wizard**: Post type selection → Platforms → Event details → Tone/style → AI generation
+- **Post Types**: Event promotion, Menu feature, Staff spotlight, Holiday tie-in, Weekly special, General engagement
+- **Platform Support**: Instagram, Facebook, TikTok with platform-specific caption optimization
+- **Brand Voice Settings**: Restaurant name, voice adjectives, emoji level, hashtag style, never-say list
+- **Content Library**: Photo folders, asset tagging, and saved drafts
+- **Holiday Calendar**: 25 seeded restaurant holidays (National Pizza Day, Valentine's Day, etc.) with suggested content angles
+
+**Database Tables**:
+- `brand_voice_settings`: User-specific brand voice configuration
+- `restaurant_holidays`: Seeded calendar of national food days and holidays
+- `social_media_posts`: Saved generated content
+- `social_media_folders` / `social_media_assets`: Content library organization
+
+**Component Location**: `client/src/components/social-media/SocialPostBuilder.tsx`
 
 ## External Dependencies
 
