@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 // Admin emails that automatically get admin access
 const ADMIN_EMAILS = [
   "benmouton@gmail.com",
+  "rick@saucedwingbar.com",
+  "alysha.r.wilson@gmail.com",
 ];
 
 // Interface for auth storage operations
