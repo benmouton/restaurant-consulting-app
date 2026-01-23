@@ -40,7 +40,9 @@ import {
   Image,
   X,
   Upload,
-  Users
+  Users,
+  AlertTriangle,
+  Shield
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Domain, FrameworkContent } from "@shared/schema";
@@ -2712,6 +2714,335 @@ Generate ONLY the response text, nothing else.`,
   );
 }
 
+const CRISIS_TYPES = [
+  { id: "kitchen_backed_up", label: "Kitchen backed up / ticket times blown", icon: Clock },
+  { id: "guests_angry", label: "Guests angry / multiple complaints", icon: MessageSquare },
+  { id: "staff_conflict", label: "Staff conflict or panic", icon: Users },
+  { id: "walkout", label: "Walkout or call-off mid-shift", icon: AlertTriangle },
+  { id: "system_failure", label: "POS / system failure", icon: AlertTriangle },
+  { id: "owner_overwhelmed", label: "Owner or manager overwhelmed", icon: AlertTriangle },
+];
+
+function CrisisResponseEngine() {
+  const { toast } = useToast();
+  const [selectedCrises, setSelectedCrises] = useState<string[]>([]);
+  const [otherDescription, setOtherDescription] = useState<string>("");
+  const [additionalContext, setAdditionalContext] = useState<string>("");
+  const [response, setResponse] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [step, setStep] = useState<"intake" | "response">("intake");
+
+  const toggleCrisis = (id: string) => {
+    setSelectedCrises(prev => 
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
+  const getCrisisResponse = async () => {
+    if (selectedCrises.length === 0 && !otherDescription.trim()) {
+      toast({ title: "Please select what's happening", variant: "destructive" });
+      return;
+    }
+
+    setIsGenerating(true);
+    setResponse("");
+    setStep("response");
+
+    const crisisLabels = selectedCrises.map(id => 
+      CRISIS_TYPES.find(c => c.id === id)?.label
+    ).filter(Boolean);
+
+    const prompt = `You are an elite restaurant crisis response AI. You follow military-grade protocols adapted from luxury hospitality incident playbooks and airline cockpit crisis procedures.
+
+A manager just reported the following crisis situation:
+
+ACTIVE ISSUES:
+${crisisLabels.map(l => `• ${l}`).join('\n')}
+${otherDescription ? `• Other: ${otherDescription}` : ''}
+
+${additionalContext ? `ADDITIONAL CONTEXT:\n${additionalContext}` : ''}
+
+RESPOND IN THIS EXACT STRUCTURE AND ORDER:
+
+═══════════════════════════════════════════
+1. NAME THE MOMENT
+═══════════════════════════════════════════
+
+Start with: "Understood. You are in recovery mode. We're stabilizing first, then fixing."
+
+Then provide ONE calming statement that tells them they are executing a plan, not failing.
+
+═══════════════════════════════════════════
+2. TAKE COMMAND
+═══════════════════════════════════════════
+
+Start with: "One person must take control right now."
+
+Then issue 2-3 direct instructions. No options. No debate. Examples:
+• "You are running expo. Nothing plates without your call."
+• "Pause seating immediately."
+• "Reduce menu complexity if needed."
+
+═══════════════════════════════════════════
+3. CONTAIN THE DAMAGE
+═══════════════════════════════════════════
+
+Ask ONE critical containment question, then provide IF YES and IF NO responses.
+
+Example: "Can current staff absorb this volume if seating pauses for 15 minutes?"
+• IF YES: "Proceed. Do not reopen sections until ticket flow stabilizes."
+• IF NO: "Close sections. Combine tables. Communicate the adjustment now."
+
+═══════════════════════════════════════════
+4. GUEST COMMUNICATION SCRIPT
+═══════════════════════════════════════════
+
+Provide EXACT language to use with guests (not guidance):
+
+Primary script: "We hit an unexpected rush and are slightly behind. I'm personally tracking your order and will update you before you have to ask."
+
+If anger escalates: "Thank you for your patience. We value your time, and I'm making this right."
+
+═══════════════════════════════════════════
+5. STAFF STABILIZATION
+═══════════════════════════════════════════
+
+Provide leadership behavior prompts:
+• "Speak calmly. Short instructions only. No side conversations."
+${selectedCrises.includes('walkout') ? `
+WALKOUT PROTOCOL:
+• "Do not chase. Reassign sections. Thank remaining staff out loud."
+• This is disruptive — not catastrophic. Adjust coverage now.` : ''}
+${selectedCrises.includes('owner_overwhelmed') ? `
+OWNER OVERWHELM PROTOCOL:
+• "You are not the emergency. The system is."
+• Delegate one decision immediately
+• Focus on guest-facing stability only` : ''}
+
+═══════════════════════════════════════════
+6. RECOVERY ACTIONS
+═══════════════════════════════════════════
+
+"Has ticket flow returned to manageable pace?"
+
+IF YES:
+• Touch all affected tables
+• Comp strategically, not emotionally
+• Thank guests for patience
+
+IF NO:
+• Maintain containment
+• Do not reopen sections
+• Maintain communication cadence every 10 minutes
+
+═══════════════════════════════════════════
+7. POST-SHIFT DEBRIEF
+═══════════════════════════════════════════
+
+End with: "After service, document this incident. Answer these exactly:"
+
+• What broke first?
+• Why did it break?
+• What system failed?
+• What change prevents recurrence?
+
+"If it's not written down, it will happen again."
+
+═══════════════════════════════════════════
+FINAL MESSAGE
+═══════════════════════════════════════════
+
+"Crisis handled. Stability restored or contained.
+Debrief after service. Systems improve tomorrow."
+
+SAFETY RULES - NEVER:
+• Assign blame
+• Suggest yelling, threats, or discipline during service
+• Recommend chasing staff
+• Encourage public arguments
+• Escalate emotionally
+
+ALWAYS:
+• Default to containment
+• Protect guest perception
+• Preserve staff dignity
+• Reinforce leadership authority`;
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: prompt }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to get crisis response");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setResponse(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to get crisis response", variant: "destructive" });
+      setStep("intake");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(response);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  const resetIntake = () => {
+    setStep("intake");
+    setResponse("");
+    setSelectedCrises([]);
+    setOtherDescription("");
+    setAdditionalContext("");
+  };
+
+  return (
+    <Card className="mb-8 border-destructive/30">
+      <CardHeader className="bg-destructive/5">
+        <CardTitle className="flex items-center gap-2 text-destructive">
+          <Shield className="h-5 w-5" />
+          Crisis Response Command Center
+        </CardTitle>
+        <CardDescription>
+          Control the moment. Protect the system. Get immediate crisis playbook guidance.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-6 space-y-4">
+        {step === "intake" ? (
+          <>
+            <div>
+              <Label className="text-base font-semibold">What's happening right now?</Label>
+              <p className="text-sm text-muted-foreground mb-3">Select all that apply</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {CRISIS_TYPES.map((crisis) => {
+                  const isSelected = selectedCrises.includes(crisis.id);
+                  return (
+                    <Button
+                      key={crisis.id}
+                      type="button"
+                      variant={isSelected ? "destructive" : "outline"}
+                      onClick={() => toggleCrisis(crisis.id)}
+                      className="flex items-center justify-start gap-3 h-auto py-3 text-left"
+                      data-testid={`crisis-option-${crisis.id}`}
+                    >
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? 'border-destructive-foreground bg-destructive-foreground/20' : 'border-muted-foreground'
+                      }`}>
+                        {isSelected && <CheckSquare className="h-3 w-3" />}
+                      </div>
+                      <crisis.icon className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm">{crisis.label}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="otherDescription">Other (describe in one sentence)</Label>
+              <Input
+                id="otherDescription"
+                placeholder="e.g., Health inspector arrived unexpectedly..."
+                className="mt-1"
+                value={otherDescription}
+                onChange={(e) => setOtherDescription(e.target.value)}
+                data-testid="input-other-crisis"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="additionalContext">Additional context (optional)</Label>
+              <Textarea
+                id="additionalContext"
+                placeholder="Any other details that would help... How long has this been going on? What have you tried?"
+                className="mt-1 min-h-[80px]"
+                value={additionalContext}
+                onChange={(e) => setAdditionalContext(e.target.value)}
+                data-testid="textarea-crisis-context"
+              />
+            </div>
+
+            <Button 
+              onClick={getCrisisResponse} 
+              disabled={isGenerating || (selectedCrises.length === 0 && !otherDescription.trim())}
+              variant="destructive"
+              className="w-full"
+              data-testid="btn-get-crisis-response"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating Crisis Protocol...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Get Crisis Response Protocol
+                </>
+              )}
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={resetIntake} data-testid="btn-new-crisis">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  New Crisis
+                </Button>
+              </div>
+              {response && (
+                <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-crisis-response">
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy
+                </Button>
+              )}
+            </div>
+
+            {isGenerating && !response && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-destructive" />
+              </div>
+            )}
+
+            {response && (
+              <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm font-mono border border-destructive/20">
+                {response}
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SOPCaptureEngine() {
   const { toast } = useToast();
   const [mode, setMode] = useState<"capture" | "checklist" | "audit">("capture");
@@ -3179,6 +3510,9 @@ export default function DomainPage() {
 
         {/* SOP Capture Engine - only show for sops domain */}
         {slug === "sops" && <SOPCaptureEngine />}
+
+        {/* Crisis Response Engine - only show for crisis domain */}
+        {slug === "crisis" && <CrisisResponseEngine />}
 
         {/* Content Accordion */}
         <Accordion type="multiple" className="space-y-4">
