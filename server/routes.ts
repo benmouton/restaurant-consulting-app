@@ -983,6 +983,13 @@ async function seedDatabase() {
       icon: "AlertTriangle",
       sequenceOrder: 10,
     },
+    {
+      name: "Facilities & Asset Protection",
+      slug: "facilities",
+      description: "Downtime is a hidden crisis. Preventative maintenance, equipment classification, and repair discipline that protects the operation.",
+      icon: "Wrench",
+      sequenceOrder: 11,
+    },
   ];
 
   for (const domain of domainsData) {
@@ -1267,6 +1274,58 @@ function getContentForDomain(slug: string): { title: string; type: string; conte
         title: "Owner Burnout Recovery",
         type: "checklist",
         content: "WARNING SIGNS:\n□ Dreading going to the restaurant\n□ Snapping at staff over minor issues\n□ Neglecting personal relationships\n□ Physical exhaustion despite adequate sleep\n□ Unable to delegate anything\n□ Feeling like \"nobody can do it right\"\n\nRECOVERY STEPS:\n□ Take 2 consecutive days off (actually off—no phone)\n□ Identify 3 things only YOU must do\n□ List 10 things you're doing that someone else could\n□ Pick 2 to delegate this week\n□ Schedule weekly off-site time (even 2 hours)\n□ Find one owner peer to talk to monthly\n\nTHE HARD TRUTH:\nIf the restaurant can't survive 48 hours without you, you don't own a business—you own a job."
+      }
+    ],
+    facilities: [
+      {
+        title: "Core Principle",
+        type: "principle",
+        content: "Maintenance Is Risk Management\n\nRestaurants don't fail because equipment breaks. They fail because breakdowns turn into service chaos, emergency spending, and reputation damage.\n\nEvery piece of equipment is either:\n• Producing revenue\n• Or threatening it\n\nIf you don't control your assets, they control your nights.\n\nElite operators don't \"fix things fast.\" They prevent failures quietly and respond decisively when prevention fails."
+      },
+      {
+        title: "Equipment Risk Classification",
+        type: "framework",
+        content: "NOT ALL EQUIPMENT IS EQUAL\n\nClassify every piece of equipment into three tiers:\n\nTIER 1 — SERVICE-CRITICAL (Failure = Immediate Crisis)\nFailure stops service or creates safety risk.\n• Refrigeration\n• Cooking line (grills, fryers, ranges)\n• POS / network hardware\n• Dish machine (in full-service)\n• HVAC in extreme weather\nRule: Gets scheduled preventative maintenance. No exceptions.\n\nTIER 2 — SERVICE-IMPACTING (Failure = Degraded Experience)\nFailure slows service or increases labor.\n• Prep equipment\n• Ice machines\n• Coffee systems\n• Smallwares critical to volume\nRule: Gets routine inspection and cleaning schedules.\n\nTIER 3 — NON-CRITICAL (Failure = Inconvenience)\nFailure does not immediately impact guests.\n• Office equipment\n• Decorative lighting\n• Non-essential fixtures\nRule: Fix when practical. Do not prioritize during service."
+      },
+      {
+        title: "Preventative Maintenance Cadence",
+        type: "checklist",
+        content: "REQUIRED MAINTENANCE SCHEDULE\n\nDAILY:\n□ Visual inspections\n□ Temperature checks\n□ Unusual noises, leaks, smells logged\n□ Clean-as-you-go enforcement\n\nWEEKLY:\n□ Deep cleaning of Tier 1 & Tier 2 equipment\n□ Gasket checks\n□ Drain lines flushed\n□ Filters inspected\n\nMONTHLY:\n□ Preventative service on Tier 1 equipment\n□ Calibration checks\n□ HVAC filter changes\n□ Ice machine sanitation\n\nQUARTERLY:\n□ Professional servicing as required\n□ Fire suppression checks\n□ Hood system inspection\n□ Electrical and plumbing review\n\nIf it's not scheduled, it won't happen."
+      },
+      {
+        title: "Fail Loud vs Fail Silent Rule",
+        type: "framework",
+        content: "THE SILENT KILLER\n\nFAIL LOUD EQUIPMENT:\n• Breaks obviously\n• Forces immediate action\n• Easier to control\n\nFAIL SILENT EQUIPMENT:\n• Degrades slowly\n• Creates hidden losses\n• Destroys margins quietly\n\nEXAMPLES OF SILENT FAILURES:\n• Refrigeration running warm (food cost creep)\n• Ice machines growing biofilm (health risk)\n• Dish machines under-sanitizing (contamination risk)\n• HVAC inefficiency driving energy cost\n\nRULE:\nFail silent equipment must be monitored, logged, and verified—not trusted.\n\nTrust the log, not the assumption."
+      },
+      {
+        title: "Repair Triage Protocol",
+        type: "script",
+        content: "WHEN EQUIPMENT FAILS\n\nDo not panic. Execute the triage.\n\nSTEP 1: CLASSIFY THE FAILURE\n• Is this Tier 1, 2, or 3?\n• Does service stop?\n• Is there a safety risk?\n\nSTEP 2: STABILIZE SERVICE\n• Adjust menu if needed\n• Reassign stations\n• Communicate clearly to staff\nNever troubleshoot emotionally during service.\n\nSTEP 3: DECIDE REPAIR PATH\nAsk:\n• Can we operate safely tonight?\n• Is temporary mitigation acceptable?\n• Does this require emergency service?\nRule: Emergency repairs are for service continuity, not convenience.\n\nSTEP 4: DOCUMENT IMMEDIATELY\n• What failed?\n• When was last maintenance?\n• Was this preventable?\n• What changes reduce recurrence?\n\nUndocumented failures repeat."
+      },
+      {
+        title: "Vendor Control & Repair Discipline",
+        type: "framework",
+        content: "VENDORS WORK FOR YOU\n\nAPPROVED VENDOR LIST:\nEvery restaurant must maintain:\n• Primary vendor per equipment category\n• Secondary backup\n• Emergency contact\nNo random calls during service.\n\nREPAIR AUTHORIZATION RULES:\n• Who can approve repairs?\n• Dollar limits per role?\n• When does owner approval trigger?\nUndefined authority = overspending.\n\nPOST-REPAIR REVIEW:\nAfter every repair:\n• Was this preventative failure?\n• Was vendor response acceptable?\n• Do we adjust maintenance cadence?\n\nRepairs should improve the system, not just fix the problem."
+      },
+      {
+        title: "Maintenance Documentation Requirements",
+        type: "checklist",
+        content: "DOCUMENT EVERYTHING\n\nEvery location must maintain:\n□ Equipment inventory with make/model\n□ Serial numbers\n□ Service logs with dates\n□ Warranty details and expiration\n□ Repair history with costs\n□ Vendor contact information\n\nThis protects against:\n• Vendor disputes\n• Insurance claims\n• Health department issues\n• Buyer due diligence (if selling)\n\nIf it's not documented, it didn't happen."
+      },
+      {
+        title: "Manager Asset Guardian Role",
+        type: "output",
+        content: "MANAGERS ARE NOT MECHANICS\nThey are asset guardians.\n\nMANAGER RESPONSIBILITIES:\n• Daily inspections\n• Logging anomalies immediately\n• Scheduling maintenance proactively\n• Escalating risks early\n• Enforcing clean-as-you-go standards\n• Maintaining vendor relationships\n\nIgnoring equipment issues is a management failure, not bad luck.\n\nThe manager who notices the walk-in running warm at 6pm saves money.\nThe manager who discovers it at midnight costs money."
+      },
+      {
+        title: "Owner Asset Protection Checklist",
+        type: "checklist",
+        content: "OWNER SELF-AUDIT\n\n□ Preventative maintenance schedule exists and is followed\n□ Equipment classified by risk tier\n□ Repair authorization rules defined and understood\n□ Approved vendor list maintained with backups\n□ Maintenance logs current (check monthly)\n□ Silent failures monitored with verification schedule\n□ Emergency protocols documented\n□ Staff trained on equipment care standards\n□ Budget allocated for preventative vs reactive repair\n\nIf any are missing, downtime is coming."
+      },
+      {
+        title: "The Standard",
+        type: "principle",
+        content: "Emergency repairs are expensive.\nPreventative maintenance is boring.\n\nBoring is profitable.\n\nRestaurants that control their facilities:\n• Spend less on repairs\n• Panic less during service\n• Recover faster from failures\n• Protect brand trust\n\nBOTTOM LINE:\nYou don't own a restaurant—you own a collection of assets that must perform under stress.\n\nControl the assets. Control the nights."
       }
     ]
   };

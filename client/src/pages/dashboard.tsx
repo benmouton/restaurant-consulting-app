@@ -27,7 +27,8 @@ import {
   Clock,
   Calendar,
   Bell,
-  Briefcase
+  Briefcase,
+  Wrench
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 
@@ -51,6 +52,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Star,
   ClipboardList,
   AlertTriangle,
+  Wrench,
 };
 
 export default function Dashboard() {
