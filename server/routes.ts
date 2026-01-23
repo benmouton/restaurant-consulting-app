@@ -274,7 +274,7 @@ export async function registerRoutes(
   app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { firstName, lastName, phone, address, restaurantName } = req.body;
+      const { firstName, lastName, phone, address, restaurantName, role } = req.body;
       
       const updateSchema = z.object({
         firstName: z.string().min(1).optional(),
@@ -282,9 +282,10 @@ export async function registerRoutes(
         phone: z.string().optional(),
         address: z.string().optional(),
         restaurantName: z.string().optional(),
+        role: z.enum(["owner", "gm", "manager"]).optional(),
       });
 
-      const validated = updateSchema.parse({ firstName, lastName, phone, address, restaurantName });
+      const validated = updateSchema.parse({ firstName, lastName, phone, address, restaurantName, role });
       const user = await storage.updateUserProfile(userId, validated);
       
       if (!user) {

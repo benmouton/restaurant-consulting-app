@@ -46,6 +46,7 @@ export interface IStorage {
     phone?: string;
     address?: string;
     restaurantName?: string;
+    role?: string;
   }): Promise<User | undefined>;
   updateUserStripeInfo(userId: string, stripeInfo: {
     stripeCustomerId?: string;
@@ -210,6 +211,7 @@ export class DatabaseStorage implements IStorage {
     phone?: string;
     address?: string;
     restaurantName?: string;
+    role?: string;
   }): Promise<User | undefined> {
     const [user] = await db.update(users).set({
       ...profile,

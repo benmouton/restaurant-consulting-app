@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Form,
@@ -53,9 +54,21 @@ const profileFormSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   restaurantName: z.string().optional(),
+  role: z.enum(["owner", "gm", "manager"]).optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
+
+const roleOptions = [
+  { value: "owner", label: "Owner", description: "Full access to all features including financials" },
+  { value: "gm", label: "General Manager", description: "Operations, training, AI, and staff management" },
+  { value: "manager", label: "Manager", description: "Shift operations, checklists, and training" },
+];
+
+const getRoleLabelFromValue = (role: string | null | undefined): string => {
+  const option = roleOptions.find(opt => opt.value === role);
+  return option?.label || "Not set";
+};
 
 interface ProfileData {
   id: string;
@@ -98,6 +111,7 @@ export default function ProfilePage() {
       phone: "",
       address: "",
       restaurantName: "",
+      role: undefined,
     },
   });
 
@@ -109,6 +123,7 @@ export default function ProfilePage() {
         phone: profile.phone || "",
         address: profile.address || "",
         restaurantName: profile.restaurantName || "",
+        role: (profile.role as "owner" | "gm" | "manager") || undefined,
       });
     }
   }, [profile, isEditing, form]);
@@ -121,6 +136,7 @@ export default function ProfilePage() {
         phone: data.phone || undefined,
         address: data.address || undefined,
         restaurantName: data.restaurantName || undefined,
+        role: data.role || undefined,
       });
       return response.json();
     },
@@ -167,6 +183,7 @@ export default function ProfilePage() {
       phone: profile?.phone || "",
       address: profile?.address || "",
       restaurantName: profile?.restaurantName || "",
+      role: (profile?.role as "owner" | "gm" | "manager") || undefined,
     });
     setIsEditing(true);
   };
@@ -348,6 +365,33 @@ export default function ProfilePage() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem className="sm:col-span-2">
+                          <FormLabel>Role</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-role">
+                                <SelectValue placeholder="Select your role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {roleOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  <div className="flex flex-col">
+                                    <span>{option.label}</span>
+                                    <span className="text-xs text-muted-foreground">{option.description}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </form>
                 </Form>
               ) : (
@@ -379,10 +423,15 @@ export default function ProfilePage() {
                       <span className="text-muted-foreground">Restaurant:</span>
                       <span data-testid="text-restaurant">{profile?.restaurantName || "Not set"}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm sm:col-span-2">
+                    <div className="flex items-center gap-2 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Address:</span>
                       <span data-testid="text-address">{profile?.address || "Not set"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Role:</span>
+                      <span data-testid="text-role">{getRoleLabelFromValue(profile?.role)}</span>
                     </div>
                   </div>
                 </div>
@@ -401,7 +450,7 @@ export default function ProfilePage() {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <span className="text-muted-foreground">Restaurant Role:</span>
-                <Badge variant="secondary" data-testid="badge-role">{roleLabel}</Badge>
+                <Badge variant="secondary" data-testid="badge-role">{getRoleLabelFromValue(profile?.role)}</Badge>
               </div>
               {profile?.isAdmin && (
                 <div className="flex items-center gap-3">
@@ -410,7 +459,7 @@ export default function ProfilePage() {
                 </div>
               )}
               <p className="text-sm text-muted-foreground">
-                Your role determines which features you can access. Role is set during onboarding and cannot be changed.
+                Your role determines which features you can access. You can change your role in the Personal Information section above.
               </p>
             </CardContent>
           </Card>

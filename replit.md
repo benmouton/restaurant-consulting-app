@@ -90,7 +90,7 @@ The application implements a three-tier role hierarchy:
 - **Manager**: Access to shift operations, checklists, training, and AI consulting. Cannot access financials or send to staff features
 
 **Key Implementation Details**:
-- Role is selected during onboarding and cannot be changed afterward (security measure)
+- Role is selected during onboarding and can be changed in Account Settings
 - `useRole` hook provides permissions and role checking throughout the app
 - `RoleGate` component protects routes/features requiring specific roles
 - Default role is "manager" (lowest privilege) for security when role is undefined
