@@ -255,6 +255,40 @@ export class DatabaseStorage implements IStorage {
     await db.delete(staffMembers).where(eq(staffMembers.id, id));
   }
 
+  async getStaffMemberByInviteToken(token: string): Promise<StaffMember | undefined> {
+    const [member] = await db.select().from(staffMembers).where(eq(staffMembers.inviteToken, token));
+    return member;
+  }
+
+  async getStaffMemberByEmail(email: string): Promise<StaffMember | undefined> {
+    const [member] = await db.select().from(staffMembers).where(eq(staffMembers.email, email));
+    return member;
+  }
+
+  async updateStaffMemberInvite(id: number, data: { inviteToken?: string | null; inviteStatus?: string; inviteSentAt?: Date | null; inviteAcceptedAt?: Date | null; passwordHash?: string | null }): Promise<StaffMember | undefined> {
+    const [member] = await db.update(staffMembers).set(data).where(eq(staffMembers.id, id)).returning();
+    return member;
+  }
+
+  async getActiveEmployeeCount(): Promise<number> {
+    const result = await db.select().from(staffMembers)
+      .where(and(
+        eq(staffMembers.status, "active"),
+        eq(staffMembers.inviteStatus, "accepted")
+      ));
+    return result.length;
+  }
+
+  async countAcceptedEmployees(ownerId: string): Promise<number> {
+    const result = await db.select().from(staffMembers)
+      .where(and(
+        eq(staffMembers.ownerId, ownerId),
+        eq(staffMembers.status, "active"),
+        eq(staffMembers.inviteStatus, "accepted")
+      ));
+    return result.length;
+  }
+
   // Shifts
   async getShifts(startDate: string, endDate: string): Promise<Shift[]> {
     return await db.select().from(shifts)

@@ -25,7 +25,11 @@ import {
   Briefcase,
   Trash2,
   Edit,
-  AlertTriangle
+  AlertTriangle,
+  Mail,
+  Copy,
+  Check,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -86,6 +90,10 @@ export default function SchedulingPage() {
   const [newStaff, setNewStaff] = useState({ firstName: "", lastName: "", email: "", phone: "", positionId: "" });
   const [newPosition, setNewPosition] = useState({ name: "", color: "#3B82F6", department: "FOH" });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: "", content: "", priority: "normal" });
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [invitingMemberId, setInvitingMemberId] = useState<number | null>(null);
 
   const weekDates = getWeekDates(currentWeekStart);
   const startDate = formatDate(weekDates[0]);
@@ -177,6 +185,48 @@ export default function SchedulingPage() {
       toast({ title: "Staff member removed" });
     },
   });
+
+  const inviteStaffMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/employee/invite/${id}`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduling/staff"] });
+      setInviteUrl(data.inviteUrl);
+      setShowInviteDialog(true);
+      setInvitingMemberId(null);
+      toast({ title: "Invite link generated!" });
+    },
+    onError: (error: any) => {
+      setInvitingMemberId(null);
+      toast({ 
+        title: "Failed to generate invite", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleSendInvite = (member: StaffMember) => {
+    if (!member.email) {
+      toast({ 
+        title: "Email required", 
+        description: "Add an email address before sending an invite",
+        variant: "destructive" 
+      });
+      return;
+    }
+    setInvitingMemberId(member.id);
+    inviteStaffMutation.mutate(member.id);
+  };
+
+  const copyInviteLink = () => {
+    navigator.clipboard.writeText(inviteUrl);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
+    toast({ title: "Invite link copied!" });
+  };
 
   const createPositionMutation = useMutation({
     mutationFn: async (data: typeof newPosition) => {
@@ -563,23 +613,55 @@ export default function SchedulingPage() {
                 <Card key={member.id} className="relative group" data-testid={`staff-card-${member.id}`}>
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold">{member.firstName} {member.lastName}</h3>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold">{member.firstName} {member.lastName}</h3>
+                          {(member as any).inviteStatus === "accepted" && (
+                            <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                              <Check className="h-3 w-3 mr-1" />
+                              Active
+                            </Badge>
+                          )}
+                          {(member as any).inviteStatus === "pending" && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-600 text-xs">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
                         {member.positionId && (
                           <Badge variant="secondary" className="mt-1">{getPositionName(member.positionId)}</Badge>
                         )}
                         {member.email && <p className="text-sm text-muted-foreground mt-2">{member.email}</p>}
                         {member.phone && <p className="text-sm text-muted-foreground">{member.phone}</p>}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100"
-                        onClick={() => deleteStaffMutation.mutate(member.id)}
-                        data-testid={`btn-delete-staff-${member.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {(member as any).inviteStatus !== "accepted" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="opacity-0 group-hover:opacity-100"
+                            onClick={() => handleSendInvite(member)}
+                            disabled={invitingMemberId === member.id}
+                            title={member.email ? "Send portal invite" : "Add email first"}
+                            data-testid={`btn-invite-staff-${member.id}`}
+                          >
+                            {invitingMemberId === member.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100"
+                          onClick={() => deleteStaffMutation.mutate(member.id)}
+                          data-testid={`btn-delete-staff-${member.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -590,6 +672,44 @@ export default function SchedulingPage() {
                 </div>
               )}
             </div>
+
+            {/* Invite Link Dialog */}
+            <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Employee Invite Link</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Share this link with the employee. They'll use it to create their account and access the staff scheduling portal.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      value={inviteUrl} 
+                      readOnly 
+                      className="font-mono text-xs"
+                      data-testid="input-invite-url"
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={copyInviteLink}
+                      data-testid="btn-copy-invite"
+                    >
+                      {inviteCopied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <div className="p-3 bg-amber-500/10 rounded-lg">
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      <strong>Note:</strong> Each active employee adds $5/month to your subscription.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={() => setShowInviteDialog(false)}>Done</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="positions" className="space-y-4">

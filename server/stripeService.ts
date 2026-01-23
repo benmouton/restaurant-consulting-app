@@ -65,6 +65,75 @@ export class StripeService {
     );
     return result.rows[0] || null;
   }
+
+  async getEmployeeSeatPriceId(): Promise<string | null> {
+    // Find the price for the Employee Scheduling Seat product
+    const result = await db.execute(
+      sql`SELECT p.id FROM stripe.prices p
+          INNER JOIN stripe.products prod ON p.product = prod.id
+          WHERE p.active = true 
+          AND prod.name = 'Employee Scheduling Seat'
+          AND prod.active = true
+          ORDER BY p.created DESC 
+          LIMIT 1`
+    );
+    return result.rows[0]?.id as string || null;
+  }
+
+  async updateEmployeeSeatQuantity(customerId: string, seatCount: number): Promise<boolean> {
+    try {
+      const stripe = await getUncachableStripeClient();
+      
+      // Get the active subscription for this customer
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'active',
+        limit: 1,
+      });
+
+      if (!subscriptions.data.length) {
+        console.log('No active subscription found for customer:', customerId);
+        return false;
+      }
+
+      const subscription = subscriptions.data[0];
+      const employeeSeatPriceId = await this.getEmployeeSeatPriceId();
+      
+      if (!employeeSeatPriceId) {
+        console.log('Employee seat price not found');
+        return false;
+      }
+
+      // Find existing employee seat item in subscription
+      const existingSeatItem = subscription.items.data.find(
+        item => item.price.id === employeeSeatPriceId
+      );
+
+      if (existingSeatItem) {
+        if (seatCount > 0) {
+          // Update quantity
+          await stripe.subscriptionItems.update(existingSeatItem.id, {
+            quantity: seatCount,
+          });
+        } else {
+          // Remove the item if no seats
+          await stripe.subscriptionItems.del(existingSeatItem.id);
+        }
+      } else if (seatCount > 0) {
+        // Add new line item
+        await stripe.subscriptionItems.create({
+          subscription: subscription.id,
+          price: employeeSeatPriceId,
+          quantity: seatCount,
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to update employee seat quantity:', error);
+      return false;
+    }
+  }
 }
 
 export const stripeService = new StripeService();

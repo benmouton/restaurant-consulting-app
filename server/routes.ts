@@ -424,7 +424,9 @@ export async function registerRoutes(
 
   app.post("/api/scheduling/staff", isAuthenticated, async (req: any, res) => {
     try {
-      const member = await storage.createStaffMember(req.body);
+      const userId = req.user.claims.sub;
+      // Set the owner ID to track who created this staff member for billing
+      const member = await storage.createStaffMember({ ...req.body, ownerId: userId });
       res.status(201).json(member);
     } catch (err) {
       res.status(500).json({ message: "Failed to create staff member" });
@@ -433,7 +435,24 @@ export async function registerRoutes(
 
   app.put("/api/scheduling/staff/:id", isAuthenticated, async (req: any, res) => {
     try {
+      // Get the existing member to check for status changes
+      const existingMember = await storage.getStaffMember(Number(req.params.id));
       const member = await storage.updateStaffMember(Number(req.params.id), req.body);
+      
+      // Update billing if status changed and member was accepted
+      if (existingMember?.ownerId && existingMember.inviteStatus === "accepted" && 
+          req.body.status && req.body.status !== existingMember.status) {
+        try {
+          const owner = await storage.getUserById(existingMember.ownerId);
+          if (owner?.stripeCustomerId) {
+            const employeeCount = await storage.countAcceptedEmployees(existingMember.ownerId);
+            await stripeService.updateEmployeeSeatQuantity(owner.stripeCustomerId, employeeCount);
+          }
+        } catch (billingErr) {
+          console.error("Failed to update billing on staff status change:", billingErr);
+        }
+      }
+      
       res.json(member);
     } catch (err) {
       res.status(500).json({ message: "Failed to update staff member" });
@@ -442,10 +461,267 @@ export async function registerRoutes(
 
   app.delete("/api/scheduling/staff/:id", isAuthenticated, async (req: any, res) => {
     try {
+      // Get member before deletion to update billing
+      const member = await storage.getStaffMember(Number(req.params.id));
       await storage.deleteStaffMember(Number(req.params.id));
+      
+      // Update billing if member was accepted
+      if (member?.ownerId && member.inviteStatus === "accepted") {
+        try {
+          const owner = await storage.getUserById(member.ownerId);
+          if (owner?.stripeCustomerId) {
+            const employeeCount = await storage.countAcceptedEmployees(member.ownerId);
+            await stripeService.updateEmployeeSeatQuantity(owner.stripeCustomerId, employeeCount);
+          }
+        } catch (billingErr) {
+          console.error("Failed to update billing on staff deletion:", billingErr);
+        }
+      }
+      
       res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to delete staff member" });
+    }
+  });
+
+  // Employee Invite System
+  app.post("/api/employee/invite/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const staffId = Number(req.params.id);
+      const member = await storage.getStaffMember(staffId);
+      
+      if (!member) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+      
+      if (!member.email) {
+        return res.status(400).json({ message: "Staff member must have an email to receive an invite" });
+      }
+      
+      // Generate unique invite token
+      const crypto = await import("crypto");
+      const inviteToken = crypto.randomBytes(32).toString("hex");
+      
+      await storage.updateStaffMemberInvite(staffId, {
+        inviteToken,
+        inviteStatus: "pending",
+        inviteSentAt: new Date(),
+      });
+      
+      // Generate invite URL
+      const baseUrl = process.env.REPLIT_DOMAINS?.split(",")[0] || "localhost:5000";
+      const protocol = baseUrl.includes("localhost") ? "http" : "https";
+      const inviteUrl = `${protocol}://${baseUrl}/employee/accept-invite?token=${inviteToken}`;
+      
+      res.json({ 
+        success: true, 
+        inviteUrl,
+        message: "Invite link generated. Share this link with the employee." 
+      });
+    } catch (err) {
+      console.error("Failed to generate invite:", err);
+      res.status(500).json({ message: "Failed to generate invite" });
+    }
+  });
+
+  app.get("/api/employee/invite/:token", async (req, res) => {
+    try {
+      const member = await storage.getStaffMemberByInviteToken(req.params.token);
+      
+      if (!member) {
+        return res.status(404).json({ message: "Invalid or expired invite link" });
+      }
+      
+      if (member.inviteStatus === "accepted") {
+        return res.status(400).json({ message: "This invite has already been accepted" });
+      }
+      
+      res.json({
+        firstName: member.firstName,
+        lastName: member.lastName,
+        email: member.email,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to verify invite" });
+    }
+  });
+
+  app.post("/api/employee/accept-invite", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token and password are required" });
+      }
+      
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+      
+      const member = await storage.getStaffMemberByInviteToken(token);
+      
+      if (!member) {
+        return res.status(404).json({ message: "Invalid or expired invite link" });
+      }
+      
+      if (member.inviteStatus === "accepted") {
+        return res.status(400).json({ message: "This invite has already been accepted" });
+      }
+      
+      // Hash password
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.hash(password, 10);
+      
+      await storage.updateStaffMemberInvite(member.id, {
+        inviteToken: null,
+        inviteStatus: "accepted",
+        inviteAcceptedAt: new Date(),
+        passwordHash,
+      });
+      
+      // Update subscription billing for employee seats
+      if (member.ownerId) {
+        try {
+          const owner = await storage.getUserById(member.ownerId);
+          if (owner?.stripeCustomerId) {
+            // Count all accepted employees for this owner
+            const employeeCount = await storage.countAcceptedEmployees(member.ownerId);
+            await stripeService.updateEmployeeSeatQuantity(owner.stripeCustomerId, employeeCount);
+          }
+        } catch (billingErr) {
+          console.error("Failed to update billing:", billingErr);
+          // Don't fail the invite acceptance if billing update fails
+        }
+      }
+      
+      // Create employee session
+      (req.session as any).employeeId = member.id;
+      
+      res.json({ 
+        success: true, 
+        message: "Account created successfully",
+        employee: {
+          id: member.id,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          email: member.email,
+        }
+      });
+    } catch (err) {
+      console.error("Failed to accept invite:", err);
+      res.status(500).json({ message: "Failed to accept invite" });
+    }
+  });
+
+  app.post("/api/employee/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+      
+      const member = await storage.getStaffMemberByEmail(email);
+      
+      if (!member || !member.passwordHash) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      if (member.inviteStatus !== "accepted") {
+        return res.status(401).json({ message: "Account not activated. Please use your invite link." });
+      }
+      
+      const bcrypt = await import("bcrypt");
+      const validPassword = await bcrypt.compare(password, member.passwordHash);
+      
+      if (!validPassword) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      // Create employee session
+      (req.session as any).employeeId = member.id;
+      
+      res.json({ 
+        success: true,
+        employee: {
+          id: member.id,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          email: member.email,
+        }
+      });
+    } catch (err) {
+      console.error("Failed to login:", err);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.get("/api/employee/me", async (req, res) => {
+    try {
+      const employeeId = (req.session as any)?.employeeId;
+      
+      if (!employeeId) {
+        return res.status(401).json({ message: "Not logged in" });
+      }
+      
+      const member = await storage.getStaffMember(employeeId);
+      
+      if (!member) {
+        (req.session as any).employeeId = null;
+        return res.status(401).json({ message: "Employee not found" });
+      }
+      
+      res.json({
+        id: member.id,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        email: member.email,
+        positionId: member.positionId,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get employee info" });
+    }
+  });
+
+  app.post("/api/employee/logout", (req, res) => {
+    (req.session as any).employeeId = null;
+    res.json({ success: true });
+  });
+
+  // Employee Portal Data (requires employee session)
+  const isEmployee = async (req: any, res: any, next: any) => {
+    const employeeId = req.session?.employeeId;
+    if (!employeeId) {
+      return res.status(401).json({ message: "Employee login required" });
+    }
+    req.employeeId = employeeId;
+    next();
+  };
+
+  app.get("/api/employee/schedule", isEmployee, async (req: any, res) => {
+    try {
+      const shifts = await storage.getShiftsByStaffMember(req.employeeId);
+      res.json(shifts);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get schedule" });
+    }
+  });
+
+  app.get("/api/employee/announcements", isEmployee, async (req: any, res) => {
+    try {
+      const announcements = await storage.getStaffAnnouncements();
+      res.json(announcements);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get announcements" });
+    }
+  });
+
+  app.get("/api/employee/open-shifts", isEmployee, async (req: any, res) => {
+    try {
+      const shifts = await storage.getOpenShifts();
+      res.json(shifts);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get open shifts" });
     }
   });
 

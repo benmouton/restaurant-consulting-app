@@ -94,6 +94,7 @@ export const staffPositions = pgTable("staff_positions", {
 export const staffMembers = pgTable("staff_members", {
   id: serial("id").primaryKey(),
   userId: text("user_id"), // links to auth user if they have an account
+  ownerId: text("owner_id"), // the subscription owner who created this staff member
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email"),
@@ -101,6 +102,12 @@ export const staffMembers = pgTable("staff_members", {
   positionId: integer("position_id").references(() => staffPositions.id),
   status: text("status").notNull().default("active"), // active, inactive, terminated
   hireDate: text("hire_date"), // YYYY-MM-DD
+  // Employee portal auth fields
+  inviteToken: text("invite_token").unique(), // unique token for invite link
+  inviteStatus: text("invite_status").default("none"), // none, pending, accepted
+  inviteSentAt: timestamp("invite_sent_at"),
+  inviteAcceptedAt: timestamp("invite_accepted_at"),
+  passwordHash: text("password_hash"), // bcrypt hash for employee login
   createdAt: timestamp("created_at").defaultNow(),
 });
 
