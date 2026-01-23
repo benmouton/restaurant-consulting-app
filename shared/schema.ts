@@ -100,6 +100,7 @@ export const staffMembers = pgTable("staff_members", {
   email: text("email"),
   phone: text("phone"),
   positionId: integer("position_id").references(() => staffPositions.id),
+  hourlyRate: text("hourly_rate"), // stored as string to avoid float precision issues (e.g. "15.50")
   status: text("status").notNull().default("active"), // active, inactive, terminated
   hireDate: text("hire_date"), // YYYY-MM-DD
   // Employee portal auth fields

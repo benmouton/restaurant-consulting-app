@@ -29,7 +29,8 @@ import {
   Mail,
   Copy,
   Check,
-  Loader2
+  Loader2,
+  DollarSign
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -57,6 +58,19 @@ function formatTime(time: string): string {
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${minutes} ${ampm}`;
+}
+
+function calculateShiftHours(startTime: string, endTime: string): number {
+  const [startHours, startMinutes] = startTime.split(':').map(Number);
+  const [endHours, endMinutes] = endTime.split(':').map(Number);
+  
+  let totalMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+  
+  if (totalMinutes < 0) {
+    totalMinutes += 24 * 60;
+  }
+  
+  return totalMinutes / 60;
 }
 
 export default function SchedulingPage() {
@@ -87,7 +101,7 @@ export default function SchedulingPage() {
   const [showAddAnnouncement, setShowAddAnnouncement] = useState(false);
   
   const [newShift, setNewShift] = useState({ date: "", startTime: "09:00", endTime: "17:00", staffMemberId: "", positionId: "", notes: "" });
-  const [newStaff, setNewStaff] = useState({ firstName: "", lastName: "", email: "", phone: "", positionId: "" });
+  const [newStaff, setNewStaff] = useState({ firstName: "", lastName: "", email: "", phone: "", positionId: "", hourlyRate: "" });
   const [newPosition, setNewPosition] = useState({ name: "", color: "#3B82F6", department: "FOH" });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: "", content: "", priority: "normal" });
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -165,13 +179,14 @@ export default function SchedulingPage() {
         email: data.email || null,
         phone: data.phone || null,
         positionId: data.positionId ? parseInt(data.positionId) : null,
+        hourlyRate: data.hourlyRate || null,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/staff"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
       setShowAddStaff(false);
-      setNewStaff({ firstName: "", lastName: "", email: "", phone: "", positionId: "" });
+      setNewStaff({ firstName: "", lastName: "", email: "", phone: "", positionId: "", hourlyRate: "" });
       toast({ title: "Staff member added" });
     },
     onError: () => toast({ title: "Failed to add staff member", variant: "destructive" }),
@@ -300,6 +315,25 @@ export default function SchedulingPage() {
 
   const getShiftsForDate = (date: string) => {
     return shifts.filter(s => s.date === date);
+  };
+
+  const calculateDayLaborCost = (dayShifts: Shift[]) => {
+    let totalCost = 0;
+    let hasRates = false;
+    
+    for (const shift of dayShifts) {
+      if (shift.staffMemberId) {
+        const member = staff.find(s => s.id === shift.staffMemberId);
+        if (member && (member as any).hourlyRate) {
+          hasRates = true;
+          const hours = calculateShiftHours(shift.startTime, shift.endTime);
+          const rate = parseFloat((member as any).hourlyRate);
+          totalCost += hours * rate;
+        }
+      }
+    }
+    
+    return { totalCost, hasRates };
   };
 
   return (
@@ -458,9 +492,10 @@ export default function SchedulingPage() {
                 const dateStr = formatDate(date);
                 const dayShifts = getShiftsForDate(dateStr);
                 const isToday = dateStr === formatDate(new Date());
+                const { totalCost, hasRates } = calculateDayLaborCost(dayShifts);
                 
                 return (
-                  <div key={i} className={`min-h-[200px] border rounded-lg p-2 ${isToday ? 'border-primary bg-primary/5' : ''}`}>
+                  <div key={i} className={`min-h-[200px] border rounded-lg p-2 flex flex-col ${isToday ? 'border-primary bg-primary/5' : ''}`}>
                     <div className="text-center mb-2">
                       <div className="text-xs text-muted-foreground">
                         {date.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -469,7 +504,7 @@ export default function SchedulingPage() {
                         {date.getDate()}
                       </div>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1">
                       {dayShifts.map(shift => (
                         <div 
                           key={shift.id}
@@ -494,6 +529,12 @@ export default function SchedulingPage() {
                         </div>
                       ))}
                     </div>
+                    {dayShifts.length > 0 && hasRates && (
+                      <div className="mt-2 pt-2 border-t border-dashed text-center" data-testid={`labor-cost-${dateStr}`}>
+                        <div className="text-xs text-muted-foreground">Labor Cost</div>
+                        <div className="text-sm font-semibold text-primary">${totalCost.toFixed(2)}</div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -580,18 +621,33 @@ export default function SchedulingPage() {
                         data-testid="input-staff-phone"
                       />
                     </div>
-                    <div>
-                      <Label>Position</Label>
-                      <Select value={newStaff.positionId} onValueChange={(v) => setNewStaff(s => ({ ...s, positionId: v }))}>
-                        <SelectTrigger className="mt-1" data-testid="select-staff-position">
-                          <SelectValue placeholder="Select position" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {positions.map(p => (
-                            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Position</Label>
+                        <Select value={newStaff.positionId} onValueChange={(v) => setNewStaff(s => ({ ...s, positionId: v }))}>
+                          <SelectTrigger className="mt-1" data-testid="select-staff-position">
+                            <SelectValue placeholder="Select position" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {positions.map(p => (
+                              <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Pay Rate ($/hr)</Label>
+                        <Input 
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="15.00"
+                          value={newStaff.hourlyRate}
+                          onChange={(e) => setNewStaff(s => ({ ...s, hourlyRate: e.target.value }))}
+                          className="mt-1"
+                          data-testid="input-staff-hourly-rate"
+                        />
+                      </div>
                     </div>
                   </div>
                   <DialogFooter>
@@ -628,9 +684,17 @@ export default function SchedulingPage() {
                             </Badge>
                           )}
                         </div>
-                        {member.positionId && (
-                          <Badge variant="secondary" className="mt-1">{getPositionName(member.positionId)}</Badge>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          {member.positionId && (
+                            <Badge variant="secondary">{getPositionName(member.positionId)}</Badge>
+                          )}
+                          {(member as any).hourlyRate && (
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              <DollarSign className="h-3 w-3 mr-0.5" />
+                              {parseFloat((member as any).hourlyRate).toFixed(2)}/hr
+                            </Badge>
+                          )}
+                        </div>
                         {member.email && <p className="text-sm text-muted-foreground mt-2">{member.email}</p>}
                         {member.phone && <p className="text-sm text-muted-foreground">{member.phone}</p>}
                       </div>
