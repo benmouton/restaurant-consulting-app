@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or } from "drizzle-orm";
 
 export interface IStorage {
@@ -60,6 +60,26 @@ export interface IStorage {
   getUpcomingHolidays(): Promise<RestaurantHoliday[]>;
   getBrandVoiceSettings(userId: string): Promise<BrandVoiceSettings | undefined>;
   saveBrandVoiceSettings(userId: string, data: Partial<BrandVoiceSettings>): Promise<BrandVoiceSettings>;
+  
+  // Connected Accounts
+  getConnectedAccounts(userId: string): Promise<ConnectedAccount[]>;
+  getConnectedAccountById(id: number): Promise<ConnectedAccount | undefined>;
+  createConnectedAccount(data: InsertConnectedAccount): Promise<ConnectedAccount>;
+  updateConnectedAccount(id: number, data: Partial<ConnectedAccount>): Promise<ConnectedAccount | undefined>;
+  deleteConnectedAccount(id: number): Promise<void>;
+  
+  // Scheduled Posts
+  getScheduledPosts(userId: string): Promise<ScheduledPost[]>;
+  getScheduledPostById(id: number): Promise<ScheduledPost | undefined>;
+  createScheduledPost(data: InsertScheduledPost): Promise<ScheduledPost>;
+  updateScheduledPost(id: number, data: Partial<ScheduledPost>): Promise<ScheduledPost | undefined>;
+  deleteScheduledPost(id: number): Promise<void>;
+  getDuePosts(): Promise<ScheduledPost[]>;
+  
+  // Post Results
+  getPostResults(scheduledPostId: number): Promise<PostResult[]>;
+  createPostResult(data: InsertPostResult): Promise<PostResult>;
+  updatePostResult(id: number, data: Partial<PostResult>): Promise<PostResult | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -470,6 +490,102 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Connected Accounts
+  async getConnectedAccounts(userId: string): Promise<ConnectedAccount[]> {
+    return await db.select().from(connectedAccounts)
+      .where(eq(connectedAccounts.userId, userId))
+      .orderBy(desc(connectedAccounts.createdAt));
+  }
+
+  async getConnectedAccountById(id: number): Promise<ConnectedAccount | undefined> {
+    const [account] = await db.select().from(connectedAccounts)
+      .where(eq(connectedAccounts.id, id));
+    return account;
+  }
+
+  async createConnectedAccount(data: InsertConnectedAccount): Promise<ConnectedAccount> {
+    const [account] = await db.insert(connectedAccounts)
+      .values(data)
+      .returning();
+    return account;
+  }
+
+  async updateConnectedAccount(id: number, data: Partial<ConnectedAccount>): Promise<ConnectedAccount | undefined> {
+    const [updated] = await db.update(connectedAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(connectedAccounts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteConnectedAccount(id: number): Promise<void> {
+    await db.delete(connectedAccounts).where(eq(connectedAccounts.id, id));
+  }
+
+  // Scheduled Posts
+  async getScheduledPosts(userId: string): Promise<ScheduledPost[]> {
+    return await db.select().from(scheduledPosts)
+      .where(eq(scheduledPosts.userId, userId))
+      .orderBy(desc(scheduledPosts.createdAt));
+  }
+
+  async getScheduledPostById(id: number): Promise<ScheduledPost | undefined> {
+    const [post] = await db.select().from(scheduledPosts)
+      .where(eq(scheduledPosts.id, id));
+    return post;
+  }
+
+  async createScheduledPost(data: InsertScheduledPost): Promise<ScheduledPost> {
+    const [post] = await db.insert(scheduledPosts)
+      .values(data)
+      .returning();
+    return post;
+  }
+
+  async updateScheduledPost(id: number, data: Partial<ScheduledPost>): Promise<ScheduledPost | undefined> {
+    const [updated] = await db.update(scheduledPosts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(scheduledPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteScheduledPost(id: number): Promise<void> {
+    await db.delete(scheduledPosts).where(eq(scheduledPosts.id, id));
+  }
+
+  async getDuePosts(): Promise<ScheduledPost[]> {
+    const now = new Date();
+    return await db.select().from(scheduledPosts)
+      .where(and(
+        eq(scheduledPosts.status, 'scheduled'),
+        lte(scheduledPosts.scheduledFor, now)
+      ))
+      .orderBy(scheduledPosts.scheduledFor);
+  }
+
+  // Post Results
+  async getPostResults(scheduledPostId: number): Promise<PostResult[]> {
+    return await db.select().from(postResults)
+      .where(eq(postResults.scheduledPostId, scheduledPostId))
+      .orderBy(desc(postResults.createdAt));
+  }
+
+  async createPostResult(data: InsertPostResult): Promise<PostResult> {
+    const [result] = await db.insert(postResults)
+      .values(data)
+      .returning();
+    return result;
+  }
+
+  async updatePostResult(id: number, data: Partial<PostResult>): Promise<PostResult | undefined> {
+    const [updated] = await db.update(postResults)
+      .set(data)
+      .where(eq(postResults.id, id))
+      .returning();
+    return updated;
   }
 }
 

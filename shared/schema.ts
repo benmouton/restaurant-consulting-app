@@ -247,11 +247,62 @@ export const insertShiftSchema = createInsertSchema(shifts).omit({ id: true, cre
 export const insertShiftApplicationSchema = createInsertSchema(shiftApplications).omit({ id: true, appliedAt: true });
 export const insertStaffAnnouncementSchema = createInsertSchema(staffAnnouncements).omit({ id: true, createdAt: true });
 export const insertAnnouncementReadSchema = createInsertSchema(announcementReads).omit({ id: true, readAt: true });
+// Connected Social Media Accounts (OAuth tokens for posting)
+export const connectedAccounts = pgTable("connected_accounts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  provider: text("provider").notNull(), // 'facebook' | 'instagram' | 'google_business'
+  providerAccountId: text("provider_account_id").notNull(), // page_id, ig_user_id, location_name
+  displayName: text("display_name").notNull(),
+  profilePictureUrl: text("profile_picture_url"),
+  scopes: text("scopes").array(),
+  accessTokenEncrypted: text("access_token_encrypted").notNull(),
+  refreshTokenEncrypted: text("refresh_token_encrypted"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  meta: jsonb("meta"), // Additional provider-specific data (page_id, ig_user_id, etc.)
+  status: text("status").notNull().default("active"), // 'active' | 'needs_reauth' | 'revoked'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Scheduled Social Media Posts
+export const scheduledPosts = pgTable("scheduled_posts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  caption: text("caption").notNull(),
+  platformTargets: integer("platform_targets").array(), // connected_accounts ids
+  mediaUrls: text("media_urls").array(),
+  scheduledFor: timestamp("scheduled_for"),
+  status: text("status").notNull().default("draft"), // 'draft' | 'scheduled' | 'posting' | 'posted' | 'failed' | 'partial'
+  postType: text("post_type"), // 'event' | 'promotion' | 'menu_feature' | etc.
+  generatedContent: jsonb("generated_content"), // AI-generated content (hashtags, story overlays, etc.)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Post Results (per-platform posting results)
+export const postResults = pgTable("post_results", {
+  id: serial("id").primaryKey(),
+  scheduledPostId: integer("scheduled_post_id").notNull().references(() => scheduledPosts.id),
+  connectedAccountId: integer("connected_account_id").notNull().references(() => connectedAccounts.id),
+  provider: text("provider").notNull(),
+  providerPostId: text("provider_post_id"), // The ID returned by the platform
+  status: text("status").notNull().default("pending"), // 'pending' | 'success' | 'failed'
+  errorMessage: text("error_message"),
+  rawResponse: jsonb("raw_response"),
+  postedAt: timestamp("posted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertSocialMediaFolderSchema = createInsertSchema(socialMediaFolders).omit({ id: true, createdAt: true });
 export const insertSocialMediaAssetSchema = createInsertSchema(socialMediaAssets).omit({ id: true, createdAt: true });
 export const insertBrandVoiceSettingsSchema = createInsertSchema(brandVoiceSettings).omit({ id: true, updatedAt: true });
 export const insertSocialMediaPostSchema = createInsertSchema(socialMediaPosts).omit({ id: true, createdAt: true });
 export const insertRestaurantHolidaySchema = createInsertSchema(restaurantHolidays).omit({ id: true });
+
+export const insertConnectedAccountSchema = createInsertSchema(connectedAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertScheduledPostSchema = createInsertSchema(scheduledPosts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPostResultSchema = createInsertSchema(postResults).omit({ id: true, createdAt: true });
 
 export type Domain = typeof domains.$inferSelect;
 export type FrameworkContent = typeof frameworkContent.$inferSelect;
@@ -282,3 +333,10 @@ export type InsertSocialMediaAsset = z.infer<typeof insertSocialMediaAssetSchema
 export type InsertBrandVoiceSettings = z.infer<typeof insertBrandVoiceSettingsSchema>;
 export type InsertSocialMediaPost = z.infer<typeof insertSocialMediaPostSchema>;
 export type InsertRestaurantHoliday = z.infer<typeof insertRestaurantHolidaySchema>;
+
+export type ConnectedAccount = typeof connectedAccounts.$inferSelect;
+export type ScheduledPost = typeof scheduledPosts.$inferSelect;
+export type PostResult = typeof postResults.$inferSelect;
+export type InsertConnectedAccount = z.infer<typeof insertConnectedAccountSchema>;
+export type InsertScheduledPost = z.infer<typeof insertScheduledPostSchema>;
+export type InsertPostResult = z.infer<typeof insertPostResultSchema>;
