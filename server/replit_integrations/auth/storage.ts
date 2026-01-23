@@ -2,6 +2,11 @@ import { users, type User, type UpsertUser, type UserRole } from "@shared/models
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 
+// Admin emails that automatically get admin access
+const ADMIN_EMAILS = [
+  "benmouton@gmail.com",
+];
+
 // Interface for auth storage operations
 // (IMPORTANT) These user operations are mandatory for Replit Auth.
 export interface IAuthStorage {
@@ -17,13 +22,20 @@ class AuthStorage implements IAuthStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Automatically set admin status for designated admin emails
+    const isAdminEmail = userData.email && ADMIN_EMAILS.includes(userData.email.toLowerCase());
+    const dataToInsert = {
+      ...userData,
+      isAdmin: isAdminEmail ? "true" : userData.isAdmin,
+    };
+    
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values(dataToInsert)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          ...dataToInsert,
           updatedAt: new Date(),
         },
       })
