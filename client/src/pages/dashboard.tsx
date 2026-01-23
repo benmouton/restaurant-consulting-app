@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
 import { useRole } from "@/hooks/use-role";
@@ -8,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Crown, 
   Users, 
@@ -25,7 +33,9 @@ import {
   BarChart3,
   Shield,
   Calendar,
-  Wrench
+  Wrench,
+  UserCog,
+  ChevronDown
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 
@@ -44,6 +54,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export default function Dashboard() {
+  const [, navigate] = useLocation();
   const { user, logout, isLoading: authLoading } = useAuth();
   const { isAdmin } = useAdmin();
   const { roleLabel, permissions } = useRole();
@@ -98,30 +109,50 @@ export default function Dashboard() {
                 </Button>
               </Link>
             )}
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.profileImageUrl || undefined} />
-                <AvatarFallback>
-                  {user?.firstName?.[0] || user?.email?.[0] || "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="hidden md:flex flex-col items-start">
-                <span className="text-sm">
-                  {user?.firstName || user?.email || "User"}
-                </span>
-                <Badge variant="secondary" className="text-xs" data-testid="badge-user-role">
-                  {roleLabel}
-                </Badge>
-              </div>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => logout()}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-muted cursor-pointer" data-testid="button-user-menu">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.profileImageUrl || undefined} />
+                  <AvatarFallback>
+                    {user?.firstName?.[0] || user?.email?.[0] || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden md:flex flex-col items-start">
+                  <span className="text-sm">
+                    {user?.firstName || user?.email || "User"}
+                  </span>
+                  <Badge variant="secondary" className="text-xs" data-testid="badge-user-role">
+                    {roleLabel}
+                  </Badge>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
+                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => navigate("/profile")}
+                  className="cursor-pointer"
+                  data-testid="button-profile"
+                >
+                  <UserCog className="mr-2 h-4 w-4" />
+                  Account Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => logout()}
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
