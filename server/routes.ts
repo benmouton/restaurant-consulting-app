@@ -973,22 +973,53 @@ export async function registerRoutes(
     }
   });
 
+  const brandVoiceSettingsSchema = z.object({
+    restaurantName: z.string().optional(),
+    location: z.string().optional(),
+    voiceAdjectives: z.array(z.string()).optional(),
+    neverSayList: z.array(z.string()).optional(),
+    emojiLevel: z.enum(["none", "light", "moderate"]).optional(),
+    hashtagStyle: z.enum(["minimal", "moderate", "heavy"]).optional(),
+    defaultCta: z.string().optional(),
+  });
+
   app.post("/api/social-media/brand-settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const settings = await storage.saveBrandVoiceSettings(userId, req.body);
+      const validatedData = brandVoiceSettingsSchema.parse(req.body);
+      const settings = await storage.saveBrandVoiceSettings(userId, validatedData);
       res.json(settings);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid request data", errors: error.errors });
+        return;
+      }
       console.error("Error saving brand settings:", error);
       res.status(500).json({ message: "Failed to save brand settings" });
     }
   });
 
+  const generatePostSchema = z.object({
+    postType: z.string(),
+    platforms: z.array(z.string()),
+    outputStyle: z.string().optional(),
+    eventName: z.string().optional(),
+    eventDate: z.string().optional(),
+    startTime: z.string().optional(),
+    endTime: z.string().optional(),
+    promotionDetails: z.string().optional(),
+    targetAudience: z.string().optional(),
+    tone: z.string().optional(),
+    cta: z.string().optional(),
+    selectedHoliday: z.string().optional(),
+  });
+
   app.post("/api/social-media/generate-post", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const validatedData = generatePostSchema.parse(req.body);
       const { postType, platforms, outputStyle, eventName, eventDate, startTime, endTime, 
-              promotionDetails, targetAudience, tone, cta, selectedHoliday } = req.body;
+              promotionDetails, targetAudience, tone, cta, selectedHoliday } = validatedData;
       
       const brandSettings = await storage.getBrandVoiceSettings(userId);
       
@@ -1047,6 +1078,10 @@ Generate JSON with:
       const generatedPost = JSON.parse(content);
       res.json(generatedPost);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ message: "Invalid request data", errors: error.errors });
+        return;
+      }
       console.error("Error generating post:", error);
       res.status(500).json({ message: "Failed to generate post" });
     }

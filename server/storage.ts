@@ -55,6 +55,11 @@ export interface IStorage {
   }): Promise<User | undefined>;
   getAllUsersWithSubscriptions(): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
+  
+  // Social Media
+  getUpcomingHolidays(): Promise<RestaurantHoliday[]>;
+  getBrandVoiceSettings(userId: string): Promise<BrandVoiceSettings | undefined>;
+  saveBrandVoiceSettings(userId: string, data: Partial<BrandVoiceSettings>): Promise<BrandVoiceSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
