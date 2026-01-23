@@ -221,6 +221,113 @@ export async function registerRoutes(
     }
   });
 
+  // Profile Routes
+  app.get("/api/user/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get subscription details including next billing date
+      let subscriptionDetails = null;
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripeService.getSubscription(user.stripeSubscriptionId);
+        if (subscription) {
+          subscriptionDetails = {
+            id: subscription.id,
+            status: subscription.status,
+            currentPeriodEnd: subscription.current_period_end,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          };
+        }
+      }
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        address: user.address,
+        restaurantName: user.restaurantName,
+        role: user.role,
+        profileImageUrl: user.profileImageUrl,
+        isAdmin: user.isAdmin === "true",
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionDetails,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      console.error('Profile fetch error:', error);
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName, phone, address, restaurantName } = req.body;
+      
+      const updateSchema = z.object({
+        firstName: z.string().min(1).optional(),
+        lastName: z.string().min(1).optional(),
+        phone: z.string().optional(),
+        address: z.string().optional(),
+        restaurantName: z.string().optional(),
+      });
+
+      const validated = updateSchema.parse({ firstName, lastName, phone, address, restaurantName });
+      const user = await storage.updateUserProfile(userId, validated);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        address: user.address,
+        restaurantName: user.restaurantName,
+        role: user.role,
+      });
+    } catch (error) {
+      console.error('Profile update error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid profile data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.post("/api/subscription/cancel", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      
+      if (!user?.stripeCustomerId) {
+        return res.status(400).json({ error: "No subscription found" });
+      }
+
+      // Redirect to Stripe portal for cancellation (safer approach)
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const session = await stripeService.createCustomerPortalSession(
+        user.stripeCustomerId,
+        `${baseUrl}/profile`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error('Subscription cancel error:', error);
+      res.status(500).json({ error: "Failed to process cancellation" });
+    }
+  });
+
   // Admin middleware
   const isAdmin = async (req: any, res: any, next: any) => {
     if (!req.user?.claims?.sub) {

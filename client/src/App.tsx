@@ -22,6 +22,7 @@ import AdminDashboard from "@/pages/admin";
 import EmployeeLoginPage from "@/pages/employee-login";
 import EmployeeAcceptInvitePage from "@/pages/employee-accept-invite";
 import EmployeePortalPage from "@/pages/employee-portal";
+import ProfilePage from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
@@ -73,6 +74,9 @@ function Router() {
           ) : <Landing />}
         </Route>
         <Route path="/admin" component={AdminDashboard} />
+        <Route path="/profile">
+          {user ? <ProfilePage /> : <Landing />}
+        </Route>
         {/* Employee Portal Routes - separate from main app auth */}
         <Route path="/employee/login" component={EmployeeLoginPage} />
         <Route path="/employee/accept-invite" component={EmployeeAcceptInvitePage} />

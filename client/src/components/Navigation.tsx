@@ -4,7 +4,7 @@ import { useRole } from "@/hooks/use-role";
 import { useAdmin } from "@/hooks/use-admin";
 import { useSubscription } from "@/hooks/use-subscription";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, LogOut, UtensilsCrossed, User, Building2, Mail, Shield, CreditCard, Settings, ChevronDown } from "lucide-react";
+import { LayoutDashboard, BookOpen, LogOut, UtensilsCrossed, Building2, Shield, CreditCard, Settings, ChevronDown, UserCog } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -127,6 +127,15 @@ export function Navigation() {
             </div>
             
             <DropdownMenuSeparator />
+            <Link href="/profile">
+              <DropdownMenuItem 
+                className="cursor-pointer"
+                data-testid="button-profile"
+              >
+                <UserCog className="mr-2 h-4 w-4" />
+                Account Settings
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuItem 
               onClick={() => logout()}
               className="text-destructive focus:text-destructive cursor-pointer"

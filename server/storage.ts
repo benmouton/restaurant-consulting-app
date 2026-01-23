@@ -187,6 +187,20 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserProfile(userId: string, profile: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    address?: string;
+    restaurantName?: string;
+  }): Promise<User | undefined> {
+    const [user] = await db.update(users).set({
+      ...profile,
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId)).returning();
+    return user;
+  }
+
   async getAllUsersWithSubscriptions(): Promise<User[]> {
     return await db.select().from(users)
       .where(isNotNull(users.stripeCustomerId))
