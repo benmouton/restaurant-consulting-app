@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
@@ -18,11 +19,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   ArrowLeft,
   ChefHat,
   Lightbulb,
   FileOutput,
+  FileText,
   CheckSquare,
   MessageSquare as ScriptIcon,
   LogOut,
@@ -46,7 +49,9 @@ import {
   Wrench,
   Printer,
   Send,
-  ChevronLeft
+  ChevronLeft,
+  Eye,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -1253,6 +1258,167 @@ Ensure all language is:
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function HRRecordsViewer() {
+  const { toast } = useToast();
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  
+  const { data: documents, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/hr-documents"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/hr-documents/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Document deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/hr-documents"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete document", variant: "destructive" });
+    },
+  });
+
+  const disciplineLevelLabels: Record<string, string> = {
+    first: "Verbal/Written Warning",
+    second: "3 Shift Suspension",
+    third: "5 Shift Suspension/Termination",
+  };
+
+  const issueTypeLabels: Record<string, string> = {
+    attendance: "Attendance",
+    ncns: "No-Call/No-Show",
+    performance: "Performance",
+    conduct: "Conduct",
+    "guest-incident": "Guest Incident",
+    safety: "Safety",
+    insubordination: "Insubordination",
+    "cash-handling": "Cash Handling",
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            HR Document Records
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            HR Document Records
+          </CardTitle>
+          <CardDescription>
+            View and manage stored discipline documentation
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!documents || documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No HR documents saved yet. Generate and save documentation above to start building records.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {documents.map((doc: any) => (
+                <div key={doc.id} className="p-4 border rounded-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="font-medium">{doc.employeeName}</span>
+                      {doc.employeePosition && (
+                        <Badge variant="secondary" className="text-xs">{doc.employeePosition}</Badge>
+                      )}
+                      <Badge variant={doc.disciplineLevel === "third" ? "destructive" : doc.disciplineLevel === "second" ? "default" : "outline"} className="text-xs">
+                        {disciplineLevelLabels[doc.disciplineLevel] || doc.disciplineLevel}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {issueTypeLabels[doc.issueType] || doc.issueType}
+                      {doc.incidentDate && ` - ${new Date(doc.incidentDate).toLocaleDateString()}`}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Created: {new Date(doc.createdAt).toLocaleDateString()}
+                      {doc.signedAt && (
+                        <span className="ml-2 text-green-600 dark:text-green-400">
+                          <CheckSquare className="h-3 w-3 inline mr-1" />
+                          Signed copy uploaded
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setSelectedDoc(doc); setShowPreview(true); }}
+                      data-testid={`btn-view-hr-doc-${doc.id}`}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {doc.scanFilename && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/api/hr-documents/${doc.id}/scan`, "_blank")}
+                        data-testid={`btn-view-scan-${doc.id}`}
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to delete this HR document?")) {
+                          deleteMutation.mutate(doc.id);
+                        }
+                      }}
+                      data-testid={`btn-delete-hr-doc-${doc.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>HR Document - {selectedDoc?.employeeName}</DialogTitle>
+            <DialogDescription>
+              {disciplineLevelLabels[selectedDoc?.disciplineLevel] || selectedDoc?.disciplineLevel}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 bg-accent/30 rounded-lg border font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[50vh]">
+            {selectedDoc?.documentContent || "No content available"}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPreview(false)} data-testid="btn-close-hr-doc-preview">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -4296,6 +4462,7 @@ export default function DomainPage() {
 
         {/* HR Compliance Engine - only show for hr domain */}
         {slug === "hr" && <HRComplianceEngine />}
+        {slug === "hr" && <HRRecordsViewer />}
 
         {/* Kitchen Compliance Engine - only show for kitchen domain */}
         {slug === "kitchen" && <KitchenComplianceEngine />}
