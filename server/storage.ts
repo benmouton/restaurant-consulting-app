@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or } from "drizzle-orm";
 
 export interface IStorage {
@@ -80,6 +80,13 @@ export interface IStorage {
   getPostResults(scheduledPostId: number): Promise<PostResult[]>;
   createPostResult(data: InsertPostResult): Promise<PostResult>;
   updatePostResult(id: number, data: Partial<PostResult>): Promise<PostResult | undefined>;
+  
+  // HR Documents
+  getHRDocuments(userId: string): Promise<HRDocument[]>;
+  getHRDocument(id: number, userId: string): Promise<HRDocument | undefined>;
+  createHRDocument(data: InsertHRDocument): Promise<HRDocument>;
+  updateHRDocumentScan(id: number, userId: string, scanData: { scanFilename: string; scanOriginalName: string; scanMimeType: string; scanFileSize: number; signedAt: Date }): Promise<HRDocument | undefined>;
+  deleteHRDocument(id: number, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -586,6 +593,39 @@ export class DatabaseStorage implements IStorage {
       .where(eq(postResults.id, id))
       .returning();
     return updated;
+  }
+
+  // HR Documents
+  async getHRDocuments(userId: string): Promise<HRDocument[]> {
+    return await db.select().from(hrDocuments)
+      .where(eq(hrDocuments.userId, userId))
+      .orderBy(desc(hrDocuments.createdAt));
+  }
+
+  async getHRDocument(id: number, userId: string): Promise<HRDocument | undefined> {
+    const [doc] = await db.select().from(hrDocuments)
+      .where(and(eq(hrDocuments.id, id), eq(hrDocuments.userId, userId)));
+    return doc;
+  }
+
+  async createHRDocument(data: InsertHRDocument): Promise<HRDocument> {
+    const [doc] = await db.insert(hrDocuments)
+      .values(data)
+      .returning();
+    return doc;
+  }
+
+  async updateHRDocumentScan(id: number, userId: string, scanData: { scanFilename: string; scanOriginalName: string; scanMimeType: string; scanFileSize: number; signedAt: Date }): Promise<HRDocument | undefined> {
+    const [updated] = await db.update(hrDocuments)
+      .set(scanData)
+      .where(and(eq(hrDocuments.id, id), eq(hrDocuments.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteHRDocument(id: number, userId: string): Promise<void> {
+    await db.delete(hrDocuments)
+      .where(and(eq(hrDocuments.id, id), eq(hrDocuments.userId, userId)));
   }
 }
 

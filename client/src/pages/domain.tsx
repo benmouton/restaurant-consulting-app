@@ -790,10 +790,14 @@ function HRComplianceEngine() {
   const [employeeName, setEmployeeName] = useState<string>("");
   const [employeeRole, setEmployeeRole] = useState<string>("");
   const [incidentDate, setIncidentDate] = useState<string>("");
-  const [priorIncidents, setPriorIncidents] = useState<string>("none");
+  const [priorIncidents, setPriorIncidents] = useState<string>("first");
   const [policyAware, setPolicyAware] = useState<string>("yes");
   const [documentation, setDocumentation] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [savedDocId, setSavedDocId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const issueTypes = [
     { value: "attendance", label: "Attendance / Tardiness" },
@@ -807,11 +811,9 @@ function HRComplianceEngine() {
   ];
 
   const priorIncidentOptions = [
-    { value: "none", label: "First occurrence" },
-    { value: "verbal", label: "Prior verbal coaching" },
-    { value: "written", label: "Prior written warning" },
-    { value: "final", label: "On final written warning" },
-    { value: "multiple", label: "Multiple prior incidents" },
+    { value: "first", label: "1st Instance - Verbal/Written Warning" },
+    { value: "second", label: "2nd Instance - 3 Shift Suspension" },
+    { value: "third", label: "3rd Instance - 5 Shift Suspension/Termination" },
   ];
 
   const generateDocumentation = async () => {
@@ -827,12 +829,19 @@ function HRComplianceEngine() {
       const issueLabel = issueTypes.find(i => i.value === issueType)?.label || issueType;
       const priorLabel = priorIncidentOptions.find(p => p.value === priorIncidents)?.label || priorIncidents;
 
+      const disciplineInfo = priorIncidents === "first" 
+        ? { level: "VERBAL/WRITTEN WARNING", consequence: "a 3 shift suspension" }
+        : priorIncidents === "second" 
+        ? { level: "3 SHIFT SUSPENSION", consequence: "a 5 shift suspension or termination" }
+        : { level: "5 SHIFT SUSPENSION / TERMINATION", consequence: "immediate termination" };
+
       const res = await fetch("/api/consultant/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: `Generate State Workforce Commission-compliant HR documentation for a restaurant employee issue.
+          question: `Generate a printable, Workforce Commission-compliant progressive discipline document for a restaurant employee.
 
+DISCIPLINE LEVEL: ${disciplineInfo.level}
 ISSUE TYPE: ${issueLabel}
 EMPLOYEE NAME: ${employeeName || "[Employee Name]"}
 EMPLOYEE ROLE: ${employeeRole || "[Position]"}
@@ -841,61 +850,99 @@ INCIDENT DATE: ${incidentDate || "[Date]"}
 WHAT HAPPENED:
 ${description}
 
-PRIOR DISCIPLINE HISTORY: ${priorLabel}
 EMPLOYEE WAS AWARE OF POLICY: ${policyAware === "yes" ? "Yes" : "No/Unclear"}
 
-Based on progressive discipline principles and Workforce Commission standards, generate a compliant HR document.
+This is the progressive discipline framework:
+- 1st Instance: Verbal/Written Warning
+- 2nd Instance: 3 Shift Suspension  
+- 3rd Instance: 5 Shift Suspension or Termination
 
-First, determine the appropriate documentation level:
-- Documented Coaching (first occurrence, minor issue)
-- Written Warning (repeated issue or moderate severity)
-- Final Written Warning (pattern of behavior or serious issue)
-- Performance Improvement Plan (ongoing performance failure)
-- Termination Documentation (policy warrants immediate termination or final warning violated)
+Generate a PRINTABLE document with clear sections. Format it to look professional when printed:
 
-Then produce a complete document with these sections:
+================================================================================
+                        EMPLOYEE DISCIPLINE NOTICE
+================================================================================
 
----
-[DOCUMENT TYPE: Coaching Memo / Written Warning / Final Written Warning / etc.]
+DOCUMENT TYPE: ${disciplineInfo.level}
 
-DATE: ${incidentDate || "[Date]"}
-EMPLOYEE: ${employeeName || "[Employee Name]"}
-POSITION: ${employeeRole || "[Position]"}
+DATE OF NOTICE: ${incidentDate || "_____________"}
+EMPLOYEE NAME: ${employeeName || "_________________________________"}
+POSITION: ${employeeRole || "_________________________________"}
 
-STATEMENT OF FACTS:
+--------------------------------------------------------------------------------
+STATEMENT OF FACTS
+--------------------------------------------------------------------------------
 [Objective description - who, what, when, where. No opinions or emotional language.]
 
-POLICY/STANDARD VIOLATED:
+--------------------------------------------------------------------------------
+POLICY/STANDARD VIOLATED
+--------------------------------------------------------------------------------
 [Specific policy or expectation that was not met]
 
-PRIOR COMMUNICATION OF EXPECTATIONS:
+--------------------------------------------------------------------------------
+PRIOR COMMUNICATION OF EXPECTATIONS
+--------------------------------------------------------------------------------
 [How/when employee was made aware of this standard]
 
-PRIOR DISCIPLINE (if applicable):
-[Reference any prior coaching or warnings]
-
-IMPACT:
+--------------------------------------------------------------------------------
+IMPACT ON OPERATIONS
+--------------------------------------------------------------------------------
 [How this affected operations, guests, team, or safety]
 
-REQUIRED CORRECTIVE ACTION:
+--------------------------------------------------------------------------------
+DISCIPLINARY ACTION
+--------------------------------------------------------------------------------
+Based on our progressive discipline policy, this ${disciplineInfo.level} is being issued.
+
+${priorIncidents === "second" ? "The employee is hereby suspended for THREE (3) scheduled shifts without pay, effective immediately." : priorIncidents === "third" ? "The employee is hereby suspended for FIVE (5) scheduled shifts without pay OR terminated, effective immediately." : "This serves as a formal warning. No suspension at this time."}
+
+--------------------------------------------------------------------------------
+REQUIRED CORRECTIVE ACTION
+--------------------------------------------------------------------------------
 [Specific, measurable actions the employee must take]
 
-CONSEQUENCES FOR FAILURE TO IMPROVE:
-[Clear statement of what happens if behavior continues]
+--------------------------------------------------------------------------------
+CONSEQUENCES FOR FUTURE VIOLATIONS
+--------------------------------------------------------------------------------
+Any future violation of company policy will result in ${disciplineInfo.consequence}.
 
-EMPLOYEE ACKNOWLEDGMENT:
-[ ] I have read and understand this document
-[ ] I understand that failure to improve may result in further discipline up to and including termination
+================================================================================
+                           ACKNOWLEDGMENT
+================================================================================
 
-Employee Signature: _________________ Date: _______
-Manager Signature: _________________ Date: _______
----
+[ ] I have read and understand this document.
+[ ] I understand the corrective action required of me.
+[ ] I understand that further violations will result in additional discipline
+    up to and including termination.
 
-AT-WILL STATEMENT:
-[Standard at-will employment language]
+Note: Signing this document does not indicate agreement with the contents,
+only acknowledgment of receipt.
 
-NOTES FOR MANAGER:
-[Any additional guidance on follow-up, documentation retention, or next steps]
+EMPLOYEE SIGNATURE: _________________________________  DATE: _______________
+
+PRINT NAME: _________________________________
+
+
+MANAGER SIGNATURE: _________________________________  DATE: _______________
+
+PRINT NAME: _________________________________
+
+WITNESS (if applicable): ___________________________  DATE: _______________
+
+
+================================================================================
+                        AT-WILL EMPLOYMENT STATEMENT
+================================================================================
+Employment with this company is "at-will" and may be terminated by either 
+party at any time, with or without cause or notice. This discipline does 
+not alter the at-will nature of employment.
+
+================================================================================
+                          DOCUMENT COPY DISTRIBUTION
+================================================================================
+[ ] Original - Employee Personnel File
+[ ] Copy - Employee
+[ ] Copy - Manager's Records
 
 Ensure all language is:
 - Objective and factual (no emotional language)
@@ -941,6 +988,87 @@ Ensure all language is:
   const copyToClipboard = () => {
     navigator.clipboard.writeText(documentation);
     toast({ title: "Copied to clipboard!" });
+  };
+
+  const printDocument = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>HR Document - ${employeeName || 'Employee'}</title>
+          <style>
+            body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 20px; max-width: 8.5in; margin: 0 auto; }
+            pre { white-space: pre-wrap; word-wrap: break-word; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <pre>${documentation}</pre>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
+  const saveDocument = async () => {
+    if (!documentation || !employeeName || !issueType) {
+      toast({ title: "Please complete the form and generate documentation first", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/hr-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          employeeName,
+          employeePosition: employeeRole,
+          issueType,
+          disciplineLevel: priorIncidents,
+          incidentDate,
+          documentContent: documentation,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save document");
+      const data = await res.json();
+      setSavedDocId(data.id);
+      toast({ title: "Document saved! You can now upload the signed scan." });
+    } catch (err) {
+      toast({ title: "Failed to save document", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleScanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!savedDocId) {
+      toast({ title: "Please save the document first", variant: "destructive" });
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("scan", file);
+      const res = await fetch(`/api/hr-documents/${savedDocId}/scan`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to upload scan");
+      toast({ title: "Signed document uploaded successfully!" });
+    } catch (err) {
+      toast({ title: "Failed to upload scan", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -1074,10 +1202,53 @@ Ensure all language is:
                 {documentation}
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-hr-doc">
-              <Copy className="h-4 w-4 mr-2" />
-              Copy Documentation
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-hr-doc">
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+              <Button variant="outline" size="sm" onClick={printDocument} data-testid="btn-print-hr-doc">
+                <Printer className="h-4 w-4 mr-2" />
+                Print Document
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={saveDocument} 
+                disabled={isSaving || savedDocId !== null}
+                data-testid="btn-save-hr-doc"
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />}
+                {savedDocId ? "Saved" : "Save to HR Records"}
+              </Button>
+            </div>
+            
+            {savedDocId && (
+              <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
+                <p className="text-sm font-medium">Upload Signed Document</p>
+                <p className="text-xs text-muted-foreground">
+                  After printing and getting signatures, scan or photograph the signed document and upload it here.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleScanUpload}
+                  className="hidden"
+                  id="scan-upload"
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  data-testid="btn-upload-scan"
+                >
+                  {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                  Upload Signed Scan
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

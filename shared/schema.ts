@@ -280,6 +280,25 @@ export const scheduledPosts = pgTable("scheduled_posts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// HR Documents (stored signed discipline documents)
+export const hrDocuments = pgTable("hr_documents", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  employeeName: text("employee_name").notNull(),
+  employeePosition: text("employee_position"),
+  issueType: text("issue_type").notNull(),
+  disciplineLevel: text("discipline_level").notNull(), // first_warning, second_suspension, third_termination
+  incidentDate: text("incident_date"),
+  documentContent: text("document_content"), // generated HR document text
+  scanFilename: text("scan_filename"), // uploaded scan filename
+  scanOriginalName: text("scan_original_name"),
+  scanMimeType: text("scan_mime_type"),
+  scanFileSize: integer("scan_file_size"),
+  signedAt: timestamp("signed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Post Results (per-platform posting results)
 export const postResults = pgTable("post_results", {
   id: serial("id").primaryKey(),
@@ -303,6 +322,7 @@ export const insertRestaurantHolidaySchema = createInsertSchema(restaurantHolida
 export const insertConnectedAccountSchema = createInsertSchema(connectedAccounts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertScheduledPostSchema = createInsertSchema(scheduledPosts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPostResultSchema = createInsertSchema(postResults).omit({ id: true, createdAt: true });
+export const insertHRDocumentSchema = createInsertSchema(hrDocuments).omit({ id: true, createdAt: true });
 
 export type Domain = typeof domains.$inferSelect;
 export type FrameworkContent = typeof frameworkContent.$inferSelect;
@@ -337,6 +357,8 @@ export type InsertRestaurantHoliday = z.infer<typeof insertRestaurantHolidaySche
 export type ConnectedAccount = typeof connectedAccounts.$inferSelect;
 export type ScheduledPost = typeof scheduledPosts.$inferSelect;
 export type PostResult = typeof postResults.$inferSelect;
+export type HRDocument = typeof hrDocuments.$inferSelect;
 export type InsertConnectedAccount = z.infer<typeof insertConnectedAccountSchema>;
 export type InsertScheduledPost = z.infer<typeof insertScheduledPostSchema>;
 export type InsertPostResult = z.infer<typeof insertPostResultSchema>;
+export type InsertHRDocument = z.infer<typeof insertHRDocumentSchema>;

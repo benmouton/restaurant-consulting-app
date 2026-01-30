@@ -1487,6 +1487,154 @@ Generate JSON with:
     res.status(204).send();
   });
 
+  // =============================================
+  // HR DOCUMENTS ROUTES
+  // =============================================
+  
+  // Create HR scan uploads directory
+  const hrUploadsDir = path.join(process.cwd(), "uploads", "hr-scans");
+  if (!fs.existsSync(hrUploadsDir)) {
+    fs.mkdirSync(hrUploadsDir, { recursive: true });
+  }
+
+  const hrScanUpload = multer({
+    storage: multer.diskStorage({
+      destination: hrUploadsDir,
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+      },
+    }),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/heic",
+        "image/heif",
+        "image/webp",
+        "application/pdf",
+      ];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only images and PDF files are allowed"));
+      }
+    },
+  });
+
+  // List user's HR documents
+  app.get("/api/hr-documents", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const documents = await storage.getHRDocuments(userId);
+    res.json(documents);
+  });
+
+  // Get single HR document
+  app.get("/api/hr-documents/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const document = await storage.getHRDocument(Number(req.params.id), userId);
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    res.json(document);
+  });
+
+  // Create HR document
+  app.post("/api/hr-documents", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { employeeName, employeePosition, issueType, disciplineLevel, incidentDate, documentContent } = req.body;
+
+      if (!employeeName || !issueType || !disciplineLevel) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const document = await storage.createHRDocument({
+        userId,
+        employeeName,
+        employeePosition: employeePosition || null,
+        issueType,
+        disciplineLevel,
+        incidentDate: incidentDate || null,
+        documentContent: documentContent || null,
+      });
+
+      res.status(201).json(document);
+    } catch (err) {
+      console.error("HR document creation error:", err);
+      res.status(500).json({ message: "Failed to create HR document" });
+    }
+  });
+
+  // Upload signed scan for HR document
+  app.post("/api/hr-documents/:id/scan", isAuthenticated, hrScanUpload.single("scan"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const userId = req.user.claims.sub;
+      const documentId = Number(req.params.id);
+
+      const document = await storage.getHRDocument(documentId, userId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      const updated = await storage.updateHRDocumentScan(documentId, userId, {
+        scanFilename: req.file.filename,
+        scanOriginalName: req.file.originalname,
+        scanMimeType: req.file.mimetype,
+        scanFileSize: req.file.size,
+        signedAt: new Date(),
+      });
+
+      res.json(updated);
+    } catch (err) {
+      console.error("HR scan upload error:", err);
+      res.status(500).json({ message: "Failed to upload scan" });
+    }
+  });
+
+  // Get HR document scan file
+  app.get("/api/hr-documents/:id/scan", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const document = await storage.getHRDocument(Number(req.params.id), userId);
+    if (!document || !document.scanFilename) {
+      return res.status(404).json({ message: "Scan not found" });
+    }
+
+    const filePath = path.join(hrUploadsDir, document.scanFilename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    res.setHeader("Content-Type", document.scanMimeType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="${document.scanOriginalName}"`);
+    res.sendFile(filePath);
+  });
+
+  // Delete HR document
+  app.delete("/api/hr-documents/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const document = await storage.getHRDocument(Number(req.params.id), userId);
+    if (!document) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    // Delete scan file if exists
+    if (document.scanFilename) {
+      const filePath = path.join(hrUploadsDir, document.scanFilename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await storage.deleteHRDocument(document.id, userId);
+    res.status(204).send();
+  });
+
   // Get financial messages
   app.get(api.financial.messages.list.path, isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
