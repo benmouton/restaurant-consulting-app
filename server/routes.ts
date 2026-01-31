@@ -1635,6 +1635,182 @@ Generate JSON with:
     res.status(204).send();
   });
 
+  // ===== FOOD COSTING ROUTES =====
+
+  // Get saved ingredients
+  app.get("/api/ingredients", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const ingredients = await storage.getSavedIngredients(userId);
+    res.json(ingredients);
+  });
+
+  // Create saved ingredient
+  app.post("/api/ingredients", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, costPerUnit, unit, category, wasteBuffer, notes } = req.body;
+
+      if (!name || !costPerUnit || !unit) {
+        return res.status(400).json({ message: "Name, cost, and unit are required" });
+      }
+
+      const ingredient = await storage.createSavedIngredient({
+        userId,
+        name,
+        costPerUnit: String(costPerUnit),
+        unit,
+        category: category || "other",
+        wasteBuffer: String(wasteBuffer || 0),
+        notes: notes || null,
+      });
+
+      res.status(201).json(ingredient);
+    } catch (err) {
+      console.error("Create ingredient error:", err);
+      res.status(500).json({ message: "Failed to create ingredient" });
+    }
+  });
+
+  // Update saved ingredient
+  app.patch("/api/ingredients/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = Number(req.params.id);
+      const { name, costPerUnit, unit, category, wasteBuffer, notes } = req.body;
+
+      const existing = await storage.getSavedIngredient(id, userId);
+      if (!existing) {
+        return res.status(404).json({ message: "Ingredient not found" });
+      }
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (costPerUnit !== undefined) updateData.costPerUnit = String(costPerUnit);
+      if (unit !== undefined) updateData.unit = unit;
+      if (category !== undefined) updateData.category = category;
+      if (wasteBuffer !== undefined) updateData.wasteBuffer = String(wasteBuffer);
+      if (notes !== undefined) updateData.notes = notes;
+
+      const updated = await storage.updateSavedIngredient(id, userId, updateData);
+      res.json(updated);
+    } catch (err) {
+      console.error("Update ingredient error:", err);
+      res.status(500).json({ message: "Failed to update ingredient" });
+    }
+  });
+
+  // Delete saved ingredient
+  app.delete("/api/ingredients/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    
+    const existing = await storage.getSavedIngredient(id, userId);
+    if (!existing) {
+      return res.status(404).json({ message: "Ingredient not found" });
+    }
+
+    await storage.deleteSavedIngredient(id, userId);
+    res.status(204).send();
+  });
+
+  // Get saved plates
+  app.get("/api/plates", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const plates = await storage.getSavedPlates(userId);
+    res.json(plates);
+  });
+
+  // Create saved plate
+  app.post("/api/plates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, ingredients, totalCost, menuPrice, foodCostPercent, targetFoodCost, category, notes } = req.body;
+
+      if (!name || !ingredients || !totalCost) {
+        return res.status(400).json({ message: "Name, ingredients, and total cost are required" });
+      }
+
+      const plate = await storage.createSavedPlate({
+        userId,
+        name,
+        ingredients,
+        totalCost: String(totalCost),
+        menuPrice: menuPrice ? String(menuPrice) : null,
+        foodCostPercent: foodCostPercent ? String(foodCostPercent) : null,
+        targetFoodCost: targetFoodCost ? String(targetFoodCost) : "28",
+        category: category || null,
+        notes: notes || null,
+      });
+
+      res.status(201).json(plate);
+    } catch (err) {
+      console.error("Create plate error:", err);
+      res.status(500).json({ message: "Failed to create plate" });
+    }
+  });
+
+  // Delete saved plate
+  app.delete("/api/plates/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    
+    const existing = await storage.getSavedPlate(id, userId);
+    if (!existing) {
+      return res.status(404).json({ message: "Plate not found" });
+    }
+
+    await storage.deleteSavedPlate(id, userId);
+    res.status(204).send();
+  });
+
+  // Get food cost periods
+  app.get("/api/food-cost-periods", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const periods = await storage.getFoodCostPeriods(userId);
+    res.json(periods);
+  });
+
+  // Create food cost period
+  app.post("/api/food-cost-periods", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { periodType, periodStart, periodEnd, totalPurchases, totalSales, targetFoodCostPercent, notes } = req.body;
+
+      if (!periodStart || !periodEnd || !totalPurchases || !totalSales) {
+        return res.status(400).json({ message: "Period dates, purchases, and sales are required" });
+      }
+
+      const purchases = parseFloat(totalPurchases);
+      const sales = parseFloat(totalSales);
+      const actualFoodCostPercent = sales > 0 ? ((purchases / sales) * 100).toFixed(1) : "0";
+
+      const period = await storage.createFoodCostPeriod({
+        userId,
+        periodType: periodType || "week",
+        periodStart,
+        periodEnd,
+        totalPurchases: String(purchases),
+        totalSales: String(sales),
+        actualFoodCostPercent,
+        targetFoodCostPercent: targetFoodCostPercent ? String(targetFoodCostPercent) : "28",
+        notes: notes || null,
+      });
+
+      res.status(201).json(period);
+    } catch (err) {
+      console.error("Create food cost period error:", err);
+      res.status(500).json({ message: "Failed to create food cost period" });
+    }
+  });
+
+  // Delete food cost period
+  app.delete("/api/food-cost-periods/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    await storage.deleteFoodCostPeriod(id, userId);
+    res.status(204).send();
+  });
+
   // Get financial messages
   app.get(api.financial.messages.list.path, isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or } from "drizzle-orm";
 
 export interface IStorage {
@@ -87,6 +87,25 @@ export interface IStorage {
   createHRDocument(data: InsertHRDocument): Promise<HRDocument>;
   updateHRDocumentScan(id: number, userId: string, scanData: { scanFilename: string; scanOriginalName: string; scanMimeType: string; scanFileSize: number; signedAt: Date }): Promise<HRDocument | undefined>;
   deleteHRDocument(id: number, userId: string): Promise<void>;
+  
+  // Saved Ingredients
+  getSavedIngredients(userId: string): Promise<SavedIngredient[]>;
+  getSavedIngredient(id: number, userId: string): Promise<SavedIngredient | undefined>;
+  createSavedIngredient(data: InsertSavedIngredient): Promise<SavedIngredient>;
+  updateSavedIngredient(id: number, userId: string, data: Partial<InsertSavedIngredient>): Promise<SavedIngredient | undefined>;
+  deleteSavedIngredient(id: number, userId: string): Promise<void>;
+  
+  // Saved Plates
+  getSavedPlates(userId: string): Promise<SavedPlate[]>;
+  getSavedPlate(id: number, userId: string): Promise<SavedPlate | undefined>;
+  createSavedPlate(data: InsertSavedPlate): Promise<SavedPlate>;
+  updateSavedPlate(id: number, userId: string, data: Partial<InsertSavedPlate>): Promise<SavedPlate | undefined>;
+  deleteSavedPlate(id: number, userId: string): Promise<void>;
+  
+  // Food Cost Periods
+  getFoodCostPeriods(userId: string): Promise<FoodCostPeriod[]>;
+  createFoodCostPeriod(data: InsertFoodCostPeriod): Promise<FoodCostPeriod>;
+  deleteFoodCostPeriod(id: number, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -626,6 +645,91 @@ export class DatabaseStorage implements IStorage {
   async deleteHRDocument(id: number, userId: string): Promise<void> {
     await db.delete(hrDocuments)
       .where(and(eq(hrDocuments.id, id), eq(hrDocuments.userId, userId)));
+  }
+
+  // Saved Ingredients
+  async getSavedIngredients(userId: string): Promise<SavedIngredient[]> {
+    return await db.select().from(savedIngredients)
+      .where(eq(savedIngredients.userId, userId))
+      .orderBy(savedIngredients.name);
+  }
+
+  async getSavedIngredient(id: number, userId: string): Promise<SavedIngredient | undefined> {
+    const [ingredient] = await db.select().from(savedIngredients)
+      .where(and(eq(savedIngredients.id, id), eq(savedIngredients.userId, userId)));
+    return ingredient;
+  }
+
+  async createSavedIngredient(data: InsertSavedIngredient): Promise<SavedIngredient> {
+    const [ingredient] = await db.insert(savedIngredients)
+      .values(data)
+      .returning();
+    return ingredient;
+  }
+
+  async updateSavedIngredient(id: number, userId: string, data: Partial<InsertSavedIngredient>): Promise<SavedIngredient | undefined> {
+    const [updated] = await db.update(savedIngredients)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(savedIngredients.id, id), eq(savedIngredients.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteSavedIngredient(id: number, userId: string): Promise<void> {
+    await db.delete(savedIngredients)
+      .where(and(eq(savedIngredients.id, id), eq(savedIngredients.userId, userId)));
+  }
+
+  // Saved Plates
+  async getSavedPlates(userId: string): Promise<SavedPlate[]> {
+    return await db.select().from(savedPlates)
+      .where(eq(savedPlates.userId, userId))
+      .orderBy(desc(savedPlates.updatedAt));
+  }
+
+  async getSavedPlate(id: number, userId: string): Promise<SavedPlate | undefined> {
+    const [plate] = await db.select().from(savedPlates)
+      .where(and(eq(savedPlates.id, id), eq(savedPlates.userId, userId)));
+    return plate;
+  }
+
+  async createSavedPlate(data: InsertSavedPlate): Promise<SavedPlate> {
+    const [plate] = await db.insert(savedPlates)
+      .values(data)
+      .returning();
+    return plate;
+  }
+
+  async updateSavedPlate(id: number, userId: string, data: Partial<InsertSavedPlate>): Promise<SavedPlate | undefined> {
+    const [updated] = await db.update(savedPlates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(savedPlates.id, id), eq(savedPlates.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteSavedPlate(id: number, userId: string): Promise<void> {
+    await db.delete(savedPlates)
+      .where(and(eq(savedPlates.id, id), eq(savedPlates.userId, userId)));
+  }
+
+  // Food Cost Periods
+  async getFoodCostPeriods(userId: string): Promise<FoodCostPeriod[]> {
+    return await db.select().from(foodCostPeriods)
+      .where(eq(foodCostPeriods.userId, userId))
+      .orderBy(desc(foodCostPeriods.periodStart));
+  }
+
+  async createFoodCostPeriod(data: InsertFoodCostPeriod): Promise<FoodCostPeriod> {
+    const [period] = await db.insert(foodCostPeriods)
+      .values(data)
+      .returning();
+    return period;
+  }
+
+  async deleteFoodCostPeriod(id: number, userId: string): Promise<void> {
+    await db.delete(foodCostPeriods)
+      .where(and(eq(foodCostPeriods.id, id), eq(foodCostPeriods.userId, userId)));
   }
 }
 

@@ -1,0 +1,200 @@
+1. Core Principle (Don’t Skip This)
+
+If it takes more than 2 minutes to use, owners won’t use it.
+Your tool should feel like writing a recipe card, not accounting.
+
+Every improvement below follows one rule:
+
+Owners think in portions, not invoices.
+
+⸻
+
+2. Tool #1: New Plate Food Cost Calculator (Must-Have)
+
+What It Should Do (Minimum Viable)
+
+Inputs (fast, human-friendly):
+	•	Menu item name
+	•	Portion size (e.g., “6 oz chicken”)
+	•	Ingredients list:
+	•	Ingredient name
+	•	Portion used (oz, each, tbsp, etc.)
+	•	Cost per unit (auto-filled if known)
+
+Outputs (instant):
+	•	Total plate cost
+	•	Food cost %
+	•	Suggested menu price (optional margin presets)
+
+Critical Improvements
+
+✅ Ingredient Memory (Huge Win)
+	•	Once “Chicken Breast – $2.85/lb” is entered, it’s reusable
+	•	Auto-convert:
+	•	lb → oz
+	•	case → unit
+	•	Let the owner update cost once, and all plates update
+
+This is where most tools fail—and where yours wins.
+
+⸻
+
+✅ Smart Defaults (No Thinking Required)
+	•	Default food cost targets:
+	•	28% casual dining
+	•	30% brunch
+	•	32% seafood
+	•	Default waste buffer:
+	•	Proteins: +5%
+	•	Produce: +10%
+
+Make these editable but never blank.
+
+⸻
+
+✅ One-Click Reality Check
+Add a button:
+
+“Does this plate make sense?”
+
+Output:
+	•	Margin warning (green / yellow / red)
+	•	“This item needs to sell for $X to hit 30% FC”
+
+Owners love being told the truth fast.
+
+⸻
+
+3. Tool #2: Weekly / Monthly Food Cost Calculator
+
+This is where most people overcomplicate it. Don’t.
+
+What Owners Actually Want
+
+Not:
+	•	Inventory math
+	•	COGS accounting
+	•	Variance reports
+
+They want:
+
+“Did we make money on food this week?”
+
+⸻
+
+Simple Inputs (Non-Negotiable)
+
+Option A (Fastest):
+	•	Total food purchases (week or month)
+	•	Total food sales
+
+Output:
+	•	Actual food cost %
+	•	Target vs actual
+	•	Dollar variance
+
+That alone solves 80% of pain.
+
+⸻
+
+Power Upgrade (Still Simple)
+
+Optional Inputs:
+	•	Top 10 selling menu items (auto-pulled from POS later)
+	•	Expected plate cost (from Tool #1)
+
+Outputs:
+	•	“Your food cost should have been X”
+	•	“You’re off by $Y”
+	•	Likely causes:
+	•	Portion creep
+	•	Waste
+	•	Price increases
+	•	Menu mix shift
+
+No spreadsheets. No blame. Just signal.
+
+⸻
+
+4. UX Improvements That Matter More Than Features
+
+🔹 Language Matters
+
+Avoid:
+	•	“COGS”
+	•	“Variance”
+	•	“Inventory depletion”
+
+Use:
+	•	“What you paid for food”
+	•	“What food should have cost”
+	•	“Where money leaked”
+
+⸻
+
+🔹 Mobile-First Inputs
+
+Restaurant owners:
+	•	Enter this on their phone
+	•	Between tasks
+	•	With greasy fingers
+
+Large inputs. Big buttons. No tiny tables.
+
+⸻
+
+🔹 Save Everything Automatically
+
+Never make them click “Save.”
+
+If they leave:
+	•	It’s saved
+	•	They trust you more
+
+⸻
+
+5. Advanced (But Optional) Power Features
+
+Only add these after the basics are loved:
+
+🔸 POS Import (Later)
+	•	Toast / Square / Clover
+	•	Pull:
+	•	Item sales counts
+	•	Revenue totals
+
+Match to plate costs automatically.
+
+⸻
+
+🔸 “What If” Pricing Mode
+
+Slider:
+	•	Raise menu price $1
+	•	See margin impact instantly
+
+This is addicting (in a good way).
+
+⸻
+
+🔸 Owner Coaching Output
+
+At the bottom:
+
+Owner Insight
+
+	•	“Two items are dragging your food cost up.”
+	•	“One protein increase erased $1,200 this month.”
+
+This aligns perfectly with your Restaurant AI Consultant positioning.
+
+⸻
+
+6. What NOT to Build (Hard Truth)
+
+❌ Full inventory systems
+❌ Accounting exports first
+❌ Recipe-level prep yield math early
+❌ Anything that feels like QuickBooks
+
+Those come later, if ever

@@ -280,6 +280,51 @@ export const scheduledPosts = pgTable("scheduled_posts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Saved Ingredients (ingredient memory for food costing)
+export const savedIngredients = pgTable("saved_ingredients", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  costPerUnit: text("cost_per_unit").notNull(), // stored as string to avoid precision issues
+  unit: text("unit").notNull(), // 'lb', 'oz', 'each', 'case', 'gal', 'tbsp', 'cup'
+  category: text("category").notNull().default("other"), // 'protein', 'produce', 'dairy', 'dry_goods', 'other'
+  wasteBuffer: text("waste_buffer").default("0"), // percentage waste buffer (e.g., "5" for 5%)
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Saved Plates (menu items with calculated costs)
+export const savedPlates = pgTable("saved_plates", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  ingredients: jsonb("ingredients").notNull(), // Array of { ingredientId, ingredientName, quantity, unit, cost }
+  totalCost: text("total_cost").notNull(),
+  menuPrice: text("menu_price"),
+  foodCostPercent: text("food_cost_percent"),
+  targetFoodCost: text("target_food_cost").default("28"),
+  category: text("category"), // 'appetizer', 'entree', 'dessert', 'beverage', 'side'
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Weekly Food Cost Tracking
+export const foodCostPeriods = pgTable("food_cost_periods", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  periodType: text("period_type").notNull().default("week"), // 'week' or 'month'
+  periodStart: text("period_start").notNull(), // YYYY-MM-DD
+  periodEnd: text("period_end").notNull(),
+  totalPurchases: text("total_purchases").notNull(), // what you paid for food
+  totalSales: text("total_sales").notNull(), // food revenue
+  actualFoodCostPercent: text("actual_food_cost_percent"),
+  targetFoodCostPercent: text("target_food_cost_percent").default("28"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // HR Documents (stored signed discipline documents)
 export const hrDocuments = pgTable("hr_documents", {
   id: serial("id").primaryKey(),
@@ -323,6 +368,9 @@ export const insertConnectedAccountSchema = createInsertSchema(connectedAccounts
 export const insertScheduledPostSchema = createInsertSchema(scheduledPosts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPostResultSchema = createInsertSchema(postResults).omit({ id: true, createdAt: true });
 export const insertHRDocumentSchema = createInsertSchema(hrDocuments).omit({ id: true, createdAt: true });
+export const insertSavedIngredientSchema = createInsertSchema(savedIngredients).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSavedPlateSchema = createInsertSchema(savedPlates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFoodCostPeriodSchema = createInsertSchema(foodCostPeriods).omit({ id: true, createdAt: true });
 
 export type Domain = typeof domains.$inferSelect;
 export type FrameworkContent = typeof frameworkContent.$inferSelect;
@@ -358,7 +406,13 @@ export type ConnectedAccount = typeof connectedAccounts.$inferSelect;
 export type ScheduledPost = typeof scheduledPosts.$inferSelect;
 export type PostResult = typeof postResults.$inferSelect;
 export type HRDocument = typeof hrDocuments.$inferSelect;
+export type SavedIngredient = typeof savedIngredients.$inferSelect;
+export type SavedPlate = typeof savedPlates.$inferSelect;
+export type FoodCostPeriod = typeof foodCostPeriods.$inferSelect;
 export type InsertConnectedAccount = z.infer<typeof insertConnectedAccountSchema>;
 export type InsertScheduledPost = z.infer<typeof insertScheduledPostSchema>;
 export type InsertPostResult = z.infer<typeof insertPostResultSchema>;
 export type InsertHRDocument = z.infer<typeof insertHRDocumentSchema>;
+export type InsertSavedIngredient = z.infer<typeof insertSavedIngredientSchema>;
+export type InsertSavedPlate = z.infer<typeof insertSavedPlateSchema>;
+export type InsertFoodCostPeriod = z.infer<typeof insertFoodCostPeriodSchema>;
