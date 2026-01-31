@@ -58,220 +58,572 @@ import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
 import type { Domain, FrameworkContent } from "@shared/schema";
 
+interface PlateIngredient {
+  id: string;
+  name: string;
+  quantity: string;
+  unit: string;
+  costPerUnit: string;
+  category: string;
+  wasteBuffer: string;
+  calculatedCost: number;
+}
+
+const UNIT_CONVERSIONS: Record<string, number> = {
+  lb: 16,
+  oz: 1,
+  each: 1,
+  case: 1,
+  gal: 128,
+  cup: 8,
+  tbsp: 0.5,
+  tsp: 0.167,
+};
+
+const CATEGORY_WASTE_DEFAULTS: Record<string, string> = {
+  protein: "5",
+  produce: "10",
+  dairy: "3",
+  dry_goods: "2",
+  other: "0",
+};
+
+const FOOD_COST_PRESETS = [
+  { label: "Casual Dining", value: "28" },
+  { label: "Brunch/Breakfast", value: "30" },
+  { label: "Seafood/Fine Dining", value: "32" },
+  { label: "Quick Service", value: "25" },
+];
+
 function FoodCostCalculator() {
-  const [ingredientCost, setIngredientCost] = useState<string>("");
-  const [yieldPercent, setYieldPercent] = useState<string>("80");
-  const [portionOz, setPortionOz] = useState<string>("");
-  const [targetFoodCost, setTargetFoodCost] = useState<string>("28");
-  const [coversPerShift, setCoversPerShift] = useState<string>("100");
-  const [overPortionOz, setOverPortionOz] = useState<string>("2");
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("plate-builder");
+  
+  const [plateName, setPlateName] = useState("");
+  const [plateIngredients, setPlateIngredients] = useState<PlateIngredient[]>([]);
+  const [targetFoodCost, setTargetFoodCost] = useState("28");
+  const [menuPrice, setMenuPrice] = useState("");
+  
+  const [newIngredient, setNewIngredient] = useState({
+    name: "",
+    quantity: "",
+    unit: "oz",
+    costPerUnit: "",
+    category: "other",
+  });
+  
+  const [weeklyPurchases, setWeeklyPurchases] = useState("");
+  const [weeklySales, setWeeklySales] = useState("");
+  const [targetWeeklyFC, setTargetWeeklyFC] = useState("28");
+  
+  const { data: savedIngredients } = useQuery<any[]>({
+    queryKey: ["/api/ingredients"],
+  });
 
-  const ingredientCostNum = parseFloat(ingredientCost) || 0;
-  const yieldPercentNum = parseFloat(yieldPercent) || 100;
-  const portionOzNum = parseFloat(portionOz) || 0;
-  const targetFoodCostNum = parseFloat(targetFoodCost) || 30;
-  const coversNum = parseFloat(coversPerShift) || 0;
-  const overPortionOzNum = parseFloat(overPortionOz) || 0;
+  const { data: savedPlates } = useQuery<any[]>({
+    queryKey: ["/api/plates"],
+  });
 
-  const usableCost = ingredientCostNum / (yieldPercentNum / 100);
-  const costPerOz = usableCost / 16;
-  const plateCost = costPerOz * portionOzNum;
-  const recommendedPrice = plateCost / (targetFoodCostNum / 100);
-  const marginLossPerShift = costPerOz * overPortionOzNum * coversNum;
+  const { data: foodCostPeriods } = useQuery<any[]>({
+    queryKey: ["/api/food-cost-periods"],
+  });
+
+  const calculateIngredientCost = (ing: typeof newIngredient): number => {
+    const qty = parseFloat(ing.quantity) || 0;
+    const cost = parseFloat(ing.costPerUnit) || 0;
+    const waste = parseFloat(CATEGORY_WASTE_DEFAULTS[ing.category] || "0");
+    const wasteMultiplier = 1 + (waste / 100);
+    return qty * cost * wasteMultiplier;
+  };
+
+  const addIngredient = () => {
+    if (!newIngredient.name || !newIngredient.quantity || !newIngredient.costPerUnit) {
+      toast({ title: "Fill in ingredient name, amount, and cost", variant: "destructive" });
+      return;
+    }
+
+    const calculatedCost = calculateIngredientCost(newIngredient);
+    const ingredient: PlateIngredient = {
+      id: Date.now().toString(),
+      ...newIngredient,
+      wasteBuffer: CATEGORY_WASTE_DEFAULTS[newIngredient.category] || "0",
+      calculatedCost,
+    };
+
+    setPlateIngredients([...plateIngredients, ingredient]);
+    setNewIngredient({ name: "", quantity: "", unit: "oz", costPerUnit: "", category: "other" });
+  };
+
+  const removeIngredient = (id: string) => {
+    setPlateIngredients(plateIngredients.filter(i => i.id !== id));
+  };
+
+  const selectSavedIngredient = (saved: any) => {
+    setNewIngredient({
+      name: saved.name,
+      quantity: "",
+      unit: saved.unit,
+      costPerUnit: saved.costPerUnit,
+      category: saved.category,
+    });
+  };
+
+  const totalPlateCost = plateIngredients.reduce((sum, ing) => sum + ing.calculatedCost, 0);
+  const targetFoodCostNum = parseFloat(targetFoodCost) || 28;
+  const suggestedPrice = totalPlateCost > 0 ? totalPlateCost / (targetFoodCostNum / 100) : 0;
+  const menuPriceNum = parseFloat(menuPrice) || 0;
+  const actualFoodCostPercent = menuPriceNum > 0 ? (totalPlateCost / menuPriceNum) * 100 : 0;
+
+  const getMarginStatus = () => {
+    if (totalPlateCost === 0) return null;
+    if (actualFoodCostPercent === 0 && menuPriceNum === 0) {
+      if (suggestedPrice > 0) {
+        return { color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950", message: `Price this at $${suggestedPrice.toFixed(2)} to hit ${targetFoodCost}% food cost` };
+      }
+      return null;
+    }
+    if (actualFoodCostPercent <= targetFoodCostNum - 3) {
+      return { color: "text-green-600", bg: "bg-green-50 dark:bg-green-950", message: "Great margins! This plate is profitable." };
+    }
+    if (actualFoodCostPercent <= targetFoodCostNum + 2) {
+      return { color: "text-yellow-600", bg: "bg-yellow-50 dark:bg-yellow-950", message: "Acceptable margins. Watch portion sizes." };
+    }
+    return { color: "text-red-600", bg: "bg-red-50 dark:bg-red-950", message: `High food cost! Raise price to $${suggestedPrice.toFixed(2)} or reduce portions.` };
+  };
+
+  const marginStatus = getMarginStatus();
+
+  const weeklyPurchasesNum = parseFloat(weeklyPurchases) || 0;
+  const weeklySalesNum = parseFloat(weeklySales) || 0;
+  const actualWeeklyFC = weeklySalesNum > 0 ? (weeklyPurchasesNum / weeklySalesNum) * 100 : 0;
+  const targetWeeklyFCNum = parseFloat(targetWeeklyFC) || 28;
+  const weeklyVariance = actualWeeklyFC - targetWeeklyFCNum;
+  const dollarVariance = weeklySalesNum > 0 ? (weeklyVariance / 100) * weeklySalesNum : 0;
+
+  const saveIngredientToLibrary = async (ing: PlateIngredient) => {
+    try {
+      await apiRequest("POST", "/api/ingredients", {
+        name: ing.name,
+        costPerUnit: ing.costPerUnit,
+        unit: ing.unit,
+        category: ing.category,
+        wasteBuffer: ing.wasteBuffer,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
+      toast({ title: `${ing.name} saved to your ingredient library!` });
+    } catch (err) {
+      toast({ title: "Failed to save ingredient", variant: "destructive" });
+    }
+  };
+
+  const savePlate = async () => {
+    if (!plateName || plateIngredients.length === 0) {
+      toast({ title: "Add a name and at least one ingredient", variant: "destructive" });
+      return;
+    }
+    try {
+      await apiRequest("POST", "/api/plates", {
+        name: plateName,
+        ingredients: plateIngredients,
+        totalCost: totalPlateCost.toFixed(2),
+        menuPrice: menuPrice || null,
+        foodCostPercent: actualFoodCostPercent > 0 ? actualFoodCostPercent.toFixed(1) : null,
+        targetFoodCost,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/plates"] });
+      toast({ title: "Plate saved!" });
+      setPlateName("");
+      setPlateIngredients([]);
+      setMenuPrice("");
+    } catch (err) {
+      toast({ title: "Failed to save plate", variant: "destructive" });
+    }
+  };
+
+  const saveWeeklyData = async () => {
+    if (!weeklyPurchases || !weeklySales) {
+      toast({ title: "Enter both purchases and sales", variant: "destructive" });
+      return;
+    }
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    try {
+      await apiRequest("POST", "/api/food-cost-periods", {
+        periodType: "week",
+        periodStart: weekAgo.toISOString().split("T")[0],
+        periodEnd: today.toISOString().split("T")[0],
+        totalPurchases: weeklyPurchases,
+        totalSales: weeklySales,
+        targetFoodCostPercent: targetWeeklyFC,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/food-cost-periods"] });
+      toast({ title: "Week saved!" });
+      setWeeklyPurchases("");
+      setWeeklySales("");
+    } catch (err) {
+      toast({ title: "Failed to save", variant: "destructive" });
+    }
+  };
 
   return (
     <Card className="mb-8">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calculator className="h-5 w-5 text-primary" />
-          Food Cost Calculator
+          Food Cost Tools
         </CardTitle>
         <CardDescription>
-          Calculate your plate cost, menu price, and margin loss from over-portioning
+          Build plates, track costs, know if you're making money
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="plate-cost" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="plate-cost" data-testid="tab-plate-cost">Plate Cost</TabsTrigger>
-            <TabsTrigger value="menu-price" data-testid="tab-menu-price">Menu Price</TabsTrigger>
-            <TabsTrigger value="margin-loss" data-testid="tab-margin-loss">Margin Loss</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsTrigger value="plate-builder" className="text-xs sm:text-sm py-2" data-testid="tab-plate-builder">New Plate</TabsTrigger>
+            <TabsTrigger value="weekly-check" className="text-xs sm:text-sm py-2" data-testid="tab-weekly-check">Weekly Check</TabsTrigger>
+            <TabsTrigger value="saved" className="text-xs sm:text-sm py-2" data-testid="tab-saved">Saved</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="plate-cost" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="ingredientCost">Ingredient Cost ($/lb)</Label>
-                <div className="relative mt-1">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="ingredientCost"
-                    type="number"
-                    step="0.01"
-                    placeholder="12.00"
-                    className="pl-9"
-                    value={ingredientCost}
-                    onChange={(e) => setIngredientCost(e.target.value)}
-                    data-testid="input-ingredient-cost"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="yieldPercent">Yield After Trim (%)</Label>
-                <div className="relative mt-1">
-                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="yieldPercent"
-                    type="number"
-                    step="1"
-                    placeholder="80"
-                    className="pl-9"
-                    value={yieldPercent}
-                    onChange={(e) => setYieldPercent(e.target.value)}
-                    data-testid="input-yield-percent"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="portionOz">Portion Size (oz)</Label>
-                <Input
-                  id="portionOz"
-                  type="number"
-                  step="0.5"
-                  placeholder="10"
-                  className="mt-1"
-                  value={portionOz}
-                  onChange={(e) => setPortionOz(e.target.value)}
-                  data-testid="input-portion-oz"
-                />
-              </div>
+          <TabsContent value="plate-builder" className="space-y-6">
+            <div>
+              <Label htmlFor="plateName" className="text-base">What are you costing?</Label>
+              <Input
+                id="plateName"
+                placeholder="e.g., 8oz Ribeye with sides"
+                className="mt-2 text-lg h-12"
+                value={plateName}
+                onChange={(e) => setPlateName(e.target.value)}
+                data-testid="input-plate-name"
+              />
             </div>
 
-            {ingredientCostNum > 0 && portionOzNum > 0 && (
-              <div className="mt-4 p-4 bg-accent/50 rounded-lg space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Usable Cost ($/lb)</span>
-                  <span className="font-medium">${usableCost.toFixed(2)}</span>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base">Ingredients</Label>
+                {savedIngredients && savedIngredients.length > 0 && (
+                  <Select onValueChange={(id) => {
+                    const saved = savedIngredients.find((s: any) => s.id.toString() === id);
+                    if (saved) selectSavedIngredient(saved);
+                  }}>
+                    <SelectTrigger className="w-48" data-testid="select-saved-ingredient">
+                      <SelectValue placeholder="Use saved..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedIngredients.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id.toString()}>{s.name} (${s.costPerUnit}/{s.unit})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <Input
+                  placeholder="Ingredient name"
+                  className="col-span-2 sm:col-span-1 h-12"
+                  value={newIngredient.name}
+                  onChange={(e) => setNewIngredient({ ...newIngredient, name: e.target.value })}
+                  data-testid="input-new-ingredient-name"
+                />
+                <Input
+                  type="number"
+                  placeholder="Amount"
+                  className="h-12"
+                  value={newIngredient.quantity}
+                  onChange={(e) => setNewIngredient({ ...newIngredient, quantity: e.target.value })}
+                  data-testid="input-new-ingredient-qty"
+                />
+                <Select value={newIngredient.unit} onValueChange={(v) => setNewIngredient({ ...newIngredient, unit: v })}>
+                  <SelectTrigger className="h-12" data-testid="select-new-ingredient-unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="oz">oz</SelectItem>
+                    <SelectItem value="lb">lb</SelectItem>
+                    <SelectItem value="each">each</SelectItem>
+                    <SelectItem value="cup">cup</SelectItem>
+                    <SelectItem value="tbsp">tbsp</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Cost/unit"
+                    className="pl-8 h-12"
+                    value={newIngredient.costPerUnit}
+                    onChange={(e) => setNewIngredient({ ...newIngredient, costPerUnit: e.target.value })}
+                    data-testid="input-new-ingredient-cost"
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cost per Ounce</span>
-                  <span className="font-medium">${costPerOz.toFixed(2)}</span>
+                <Select value={newIngredient.category} onValueChange={(v) => setNewIngredient({ ...newIngredient, category: v })}>
+                  <SelectTrigger className="h-12" data-testid="select-new-ingredient-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="protein">Protein (+5%)</SelectItem>
+                    <SelectItem value="produce">Produce (+10%)</SelectItem>
+                    <SelectItem value="dairy">Dairy (+3%)</SelectItem>
+                    <SelectItem value="dry_goods">Dry Goods (+2%)</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={addIngredient} className="w-full h-12 text-base" data-testid="btn-add-ingredient">
+                Add Ingredient
+              </Button>
+            </div>
+
+            {plateIngredients.length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 px-4 py-2 font-medium text-sm flex justify-between">
+                  <span>Ingredients on this plate</span>
+                  <span>Cost</span>
                 </div>
-                <div className="flex justify-between text-lg border-t pt-2 mt-2">
-                  <span className="font-semibold">Plate Cost</span>
-                  <span className="font-bold text-primary">${plateCost.toFixed(2)}</span>
+                {plateIngredients.map((ing) => (
+                  <div key={ing.id} className="px-4 py-3 border-t flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{ing.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {ing.quantity} {ing.unit} @ ${ing.costPerUnit}/{ing.unit}
+                        {parseFloat(ing.wasteBuffer) > 0 && <span className="ml-1">(+{ing.wasteBuffer}% waste)</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">${ing.calculatedCost.toFixed(2)}</span>
+                      <Button variant="ghost" size="icon" onClick={() => saveIngredientToLibrary(ing)} title="Save to library" data-testid={`btn-save-ingredient-${ing.id}`}>
+                        <Star className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => removeIngredient(ing.id)} data-testid={`btn-remove-ingredient-${ing.id}`}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <div className="px-4 py-3 border-t bg-accent/30 flex justify-between items-center">
+                  <span className="font-semibold text-lg">Total Plate Cost</span>
+                  <span className="font-bold text-xl text-primary">${totalPlateCost.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            {totalPlateCost > 0 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-base">Target Food Cost</Label>
+                    <Select value={targetFoodCost} onValueChange={setTargetFoodCost}>
+                      <SelectTrigger className="mt-2 h-12" data-testid="select-target-fc">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FOOD_COST_PRESETS.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>{p.label} ({p.value}%)</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-base">Your Menu Price (optional)</Label>
+                    <div className="relative mt-2">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        step="0.50"
+                        placeholder="Leave blank for suggestion"
+                        className="pl-8 h-12"
+                        value={menuPrice}
+                        onChange={(e) => setMenuPrice(e.target.value)}
+                        data-testid="input-menu-price"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {marginStatus && (
+                  <div className={`p-4 rounded-lg ${marginStatus.bg}`}>
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className={`h-5 w-5 mt-0.5 ${marginStatus.color}`} />
+                      <div>
+                        <p className={`font-semibold ${marginStatus.color}`}>
+                          {menuPriceNum > 0 ? `${actualFoodCostPercent.toFixed(1)}% food cost` : "Reality Check"}
+                        </p>
+                        <p className="text-sm mt-1">{marginStatus.message}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={savePlate} disabled={!plateName} className="flex-1 h-12" data-testid="btn-save-plate">
+                    Save This Plate
+                  </Button>
                 </div>
               </div>
             )}
           </TabsContent>
 
-          <TabsContent value="menu-price" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TabsContent value="weekly-check" className="space-y-6">
+            <div className="text-center py-4">
+              <h3 className="text-lg font-semibold">Did you make money on food this week?</h3>
+              <p className="text-muted-foreground mt-1">Just two numbers. That's it.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="plateCostDisplay">Plate Cost ($)</Label>
-                <div className="relative mt-1">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Label className="text-base">What you paid for food</Label>
+                <div className="relative mt-2">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    id="plateCostDisplay"
                     type="number"
-                    step="0.01"
-                    className="pl-9"
-                    value={plateCost > 0 ? plateCost.toFixed(2) : ""}
-                    readOnly
-                    placeholder="Calculate in Plate Cost tab"
-                    data-testid="input-plate-cost-display"
+                    placeholder="Total food purchases"
+                    className="pl-10 h-14 text-lg"
+                    value={weeklyPurchases}
+                    onChange={(e) => setWeeklyPurchases(e.target.value)}
+                    data-testid="input-weekly-purchases"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Calculated from Plate Cost tab</p>
               </div>
               <div>
-                <Label htmlFor="targetFoodCost">Target Food Cost (%)</Label>
-                <div className="relative mt-1">
-                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Label className="text-base">What you sold in food</Label>
+                <div className="relative mt-2">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    id="targetFoodCost"
                     type="number"
-                    step="1"
-                    placeholder="28"
-                    className="pl-9"
-                    value={targetFoodCost}
-                    onChange={(e) => setTargetFoodCost(e.target.value)}
-                    data-testid="input-target-food-cost"
+                    placeholder="Total food sales"
+                    className="pl-10 h-14 text-lg"
+                    value={weeklySales}
+                    onChange={(e) => setWeeklySales(e.target.value)}
+                    data-testid="input-weekly-sales"
                   />
                 </div>
               </div>
             </div>
 
-            {plateCost > 0 && (
-              <div className="mt-4 p-4 bg-accent/50 rounded-lg">
-                <div className="flex justify-between text-lg">
-                  <span className="font-semibold">Recommended Menu Price</span>
-                  <span className="font-bold text-primary">${recommendedPrice.toFixed(2)}</span>
+            <div>
+              <Label className="text-base">Your target</Label>
+              <Select value={targetWeeklyFC} onValueChange={setTargetWeeklyFC}>
+                <SelectTrigger className="mt-2 h-12" data-testid="select-weekly-target">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FOOD_COST_PRESETS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>{p.label} ({p.value}%)</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {weeklySalesNum > 0 && weeklyPurchasesNum > 0 && (
+              <div className={`p-6 rounded-lg ${weeklyVariance <= 0 ? "bg-green-50 dark:bg-green-950" : weeklyVariance <= 3 ? "bg-yellow-50 dark:bg-yellow-950" : "bg-red-50 dark:bg-red-950"}`}>
+                <div className="text-center">
+                  <div className={`text-4xl font-bold ${weeklyVariance <= 0 ? "text-green-600" : weeklyVariance <= 3 ? "text-yellow-600" : "text-red-600"}`}>
+                    {actualWeeklyFC.toFixed(1)}%
+                  </div>
+                  <p className="text-lg mt-1">Your actual food cost</p>
+                  
+                  <div className="mt-4 pt-4 border-t border-current/20">
+                    {weeklyVariance <= 0 ? (
+                      <p className="text-green-700 dark:text-green-400">
+                        You're {Math.abs(weeklyVariance).toFixed(1)}% under target. That's ${Math.abs(dollarVariance).toFixed(0)} extra profit this week!
+                      </p>
+                    ) : (
+                      <p className={weeklyVariance <= 3 ? "text-yellow-700 dark:text-yellow-400" : "text-red-700 dark:text-red-400"}>
+                        You're {weeklyVariance.toFixed(1)}% over target. That's ${dollarVariance.toFixed(0)} that leaked somewhere.
+                      </p>
+                    )}
+                  </div>
+
+                  {weeklyVariance > 2 && (
+                    <div className="mt-4 text-left bg-background/50 p-3 rounded text-sm">
+                      <p className="font-medium mb-1">Where money leaks:</p>
+                      <ul className="text-muted-foreground space-y-1">
+                        <li>- Portions bigger than spec</li>
+                        <li>- Waste not tracked</li>
+                        <li>- Supplier prices increased</li>
+                        <li>- Menu mix shifted to higher-cost items</li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Round UP to ${Math.ceil(recommendedPrice)}.00 or ${(Math.ceil(recommendedPrice * 2) / 2).toFixed(2)}
-                </p>
+              </div>
+            )}
+
+            <Button onClick={saveWeeklyData} disabled={!weeklyPurchases || !weeklySales} className="w-full h-12" data-testid="btn-save-weekly">
+              Save This Week
+            </Button>
+
+            {foodCostPeriods && foodCostPeriods.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-medium mb-3">Recent Weeks</h4>
+                <div className="space-y-2">
+                  {foodCostPeriods.slice(0, 5).map((p: any) => (
+                    <div key={p.id} className="flex justify-between items-center p-3 bg-muted/30 rounded">
+                      <span className="text-sm">{new Date(p.periodEnd).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-muted-foreground">${parseFloat(p.totalPurchases).toLocaleString()} / ${parseFloat(p.totalSales).toLocaleString()}</span>
+                        <Badge variant={parseFloat(p.actualFoodCostPercent) <= parseFloat(p.targetFoodCostPercent) ? "default" : "destructive"}>
+                          {p.actualFoodCostPercent}%
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </TabsContent>
 
-          <TabsContent value="margin-loss" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TabsContent value="saved" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <Label htmlFor="costPerOzDisplay">Cost per Ounce ($)</Label>
-                <div className="relative mt-1">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="costPerOzDisplay"
-                    type="number"
-                    step="0.01"
-                    className="pl-9"
-                    value={costPerOz > 0 ? costPerOz.toFixed(2) : ""}
-                    readOnly
-                    placeholder="Calculate in Plate Cost tab"
-                    data-testid="input-cost-per-oz-display"
-                  />
-                </div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Star className="h-4 w-4" /> Saved Ingredients
+                </h4>
+                {!savedIngredients || savedIngredients.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No saved ingredients yet. Add ingredients to plates and save them!</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {savedIngredients.map((ing: any) => (
+                      <div key={ing.id} className="flex justify-between items-center p-3 border rounded">
+                        <div>
+                          <div className="font-medium">{ing.name}</div>
+                          <div className="text-sm text-muted-foreground">${ing.costPerUnit}/{ing.unit}</div>
+                        </div>
+                        <Badge variant="secondary">{ing.category}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
               <div>
-                <Label htmlFor="overPortionOz">Over-Portion (oz)</Label>
-                <Input
-                  id="overPortionOz"
-                  type="number"
-                  step="0.5"
-                  placeholder="2"
-                  className="mt-1"
-                  value={overPortionOz}
-                  onChange={(e) => setOverPortionOz(e.target.value)}
-                  data-testid="input-over-portion-oz"
-                />
-              </div>
-              <div>
-                <Label htmlFor="coversPerShift">Covers per Shift</Label>
-                <Input
-                  id="coversPerShift"
-                  type="number"
-                  step="1"
-                  placeholder="100"
-                  className="mt-1"
-                  value={coversPerShift}
-                  onChange={(e) => setCoversPerShift(e.target.value)}
-                  data-testid="input-covers-per-shift"
-                />
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <ChefHat className="h-4 w-4" /> Saved Plates
+                </h4>
+                {!savedPlates || savedPlates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No saved plates yet. Build and save your first plate!</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-auto">
+                    {savedPlates.map((plate: any) => (
+                      <div key={plate.id} className="p-3 border rounded">
+                        <div className="flex justify-between items-start">
+                          <div className="font-medium">{plate.name}</div>
+                          <span className="font-semibold text-primary">${plate.totalCost}</span>
+                        </div>
+                        {plate.menuPrice && (
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Menu: ${plate.menuPrice} ({plate.foodCostPercent}% FC)
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-
-            {costPerOz > 0 && (
-              <div className="mt-4 p-4 bg-destructive/10 rounded-lg">
-                <div className="flex justify-between text-lg">
-                  <span className="font-semibold">Margin Loss per Shift</span>
-                  <span className="font-bold text-destructive">${marginLossPerShift.toFixed(2)}</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  That's ${(marginLossPerShift * 30).toFixed(0)}/month or ${(marginLossPerShift * 365).toFixed(0)}/year in lost margin
-                </p>
-              </div>
-            )}
           </TabsContent>
         </Tabs>
       </CardContent>
