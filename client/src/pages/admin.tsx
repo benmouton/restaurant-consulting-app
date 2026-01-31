@@ -81,24 +81,25 @@ export default function AdminDashboard() {
     enabled: isAdmin,
   });
 
-  const removeMemberMutation = useMutation({
+  const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await apiRequest("DELETE", `/api/organization/members/${userId}`);
+      await apiRequest("DELETE", `/api/admin/users/${userId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/organization/members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       setUserToRemove(null);
       setSelectedUser(null);
       toast({
-        title: "Member removed",
-        description: "The user has been removed from your organization.",
+        title: "User deleted",
+        description: "The user has been permanently removed from the platform.",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to remove member.",
+        description: error.message || "Failed to delete user.",
         variant: "destructive",
       });
     },
@@ -415,16 +416,16 @@ export default function AdminDashboard() {
                 </div>
               </div>
               
-              {isOrgMember(selectedUser.id) && getOrgMember(selectedUser.id)?.role !== 'owner' && (
+              {selectedUser.id !== user?.id && (
                 <div className="pt-4 border-t">
                   <Button 
                     variant="destructive" 
                     className="w-full"
                     onClick={() => setUserToRemove(selectedUser)}
-                    data-testid="btn-remove-from-org"
+                    data-testid="btn-delete-user"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Remove from Organization
+                    Delete User
                   </Button>
                 </div>
               )}
@@ -433,30 +434,30 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Remove User Confirmation Dialog */}
+      {/* Delete User Confirmation Dialog */}
       <AlertDialog open={!!userToRemove} onOpenChange={(open) => !open && setUserToRemove(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove from Organization</AlertDialogTitle>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove {userToRemove?.firstName} {userToRemove?.lastName} from your organization? 
-              They will lose access to the platform unless they have their own subscription.
+              Are you sure you want to permanently delete {userToRemove?.firstName || userToRemove?.lastName ? `${userToRemove?.firstName ?? ''} ${userToRemove?.lastName ?? ''}`.trim() : 'this user'}? 
+              This action cannot be undone and will remove all their data from the platform.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => userToRemove && removeMemberMutation.mutate(userToRemove.id)}
+              onClick={() => userToRemove && deleteUserMutation.mutate(userToRemove.id)}
               className="bg-destructive text-destructive-foreground"
-              disabled={removeMemberMutation.isPending}
-              data-testid="btn-confirm-remove"
+              disabled={deleteUserMutation.isPending}
+              data-testid="btn-confirm-delete"
             >
-              {removeMemberMutation.isPending ? (
+              {deleteUserMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 <Trash2 className="h-4 w-4 mr-2" />
               )}
-              Remove
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

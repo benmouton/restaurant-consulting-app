@@ -423,6 +423,23 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/admin/users/:userId", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const currentUserId = req.user.claims.sub;
+      
+      if (userId === currentUserId) {
+        return res.status(400).json({ error: "Cannot delete yourself" });
+      }
+      
+      await storage.deleteUser(userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Admin delete user error:', error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Domain Routes
   app.get(api.domains.list.path, async (req, res) => {
     const domainsList = await storage.getDomains();

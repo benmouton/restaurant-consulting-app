@@ -40,6 +40,7 @@ export interface IStorage {
   
   // User Profile
   getUserById(userId: string): Promise<User | undefined>;
+  deleteUser(userId: string): Promise<void>;
   updateUserProfile(userId: string, profile: {
     firstName?: string;
     lastName?: string;
@@ -267,6 +268,10 @@ export class DatabaseStorage implements IStorage {
   async getUserById(userId: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     return user;
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   async updateUserStripeInfo(userId: string, stripeInfo: {
