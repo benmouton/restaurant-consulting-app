@@ -4,7 +4,7 @@ import { useRole } from "@/hooks/use-role";
 import { useAdmin } from "@/hooks/use-admin";
 import { useSubscription } from "@/hooks/use-subscription";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, LogOut, Building2, Shield, CreditCard, Settings, ChevronDown, UserCog } from "lucide-react";
+import { LayoutDashboard, BookOpen, LogOut, Building2, Shield, CreditCard, Settings, ChevronDown, UserCog, MessageSquare } from "lucide-react";
 import logoImage from "@/assets/logo.png";
 import {
   DropdownMenu,
@@ -119,6 +119,15 @@ export function Navigation() {
             </div>
             
             <DropdownMenuSeparator />
+            <Link href="/messages">
+              <DropdownMenuItem 
+                className="cursor-pointer"
+                data-testid="button-messages"
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Team Messages
+              </DropdownMenuItem>
+            </Link>
             <Link href="/profile">
               <DropdownMenuItem 
                 className="cursor-pointer"

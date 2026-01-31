@@ -23,6 +23,7 @@ import EmployeeLoginPage from "@/pages/employee-login";
 import EmployeeAcceptInvitePage from "@/pages/employee-accept-invite";
 import EmployeePortalPage from "@/pages/employee-portal";
 import AcceptInvitePage from "@/pages/accept-invite";
+import MessagesPage from "@/pages/messages";
 import ProfilePage from "@/pages/profile";
 import PrivacyPolicy from "@/pages/privacy";
 import DataDeletion from "@/pages/data-deletion";
@@ -80,6 +81,9 @@ function Router() {
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/profile">
           {user ? <ProfilePage /> : <Landing />}
+        </Route>
+        <Route path="/messages">
+          {user ? <ProtectedPage component={MessagesPage} /> : <Landing />}
         </Route>
         {/* Public Pages */}
         <Route path="/privacy" component={PrivacyPolicy} />
