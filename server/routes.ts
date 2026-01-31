@@ -136,6 +136,7 @@ export async function registerRoutes(
         });
       }
 
+      // Check if user has their own active subscription
       if (user.stripeCustomerId) {
         const subscription = await stripeService.getActiveSubscriptionForCustomer(user.stripeCustomerId);
         if (subscription) {
@@ -148,6 +149,42 @@ export async function registerRoutes(
             subscriptionStatus: subscription.status,
             subscriptionId: subscription.id
           });
+        }
+      }
+
+      // Check if user is a member of an organization (org members get access through owner's subscription)
+      const userOrg = await storage.getUserOrganization(userId);
+      if (userOrg) {
+        // Check if org owner has an active subscription
+        const owner = await storage.getUserById(userOrg.ownerId);
+        if (owner) {
+          // If owner is admin, org members get access
+          if (owner.isAdmin === "true") {
+            return res.json({
+              hasSubscription: true,
+              subscriptionStatus: "organization_member",
+              organizationName: userOrg.name
+            });
+          }
+          // Check owner's subscription
+          if (owner.stripeCustomerId) {
+            const ownerSubscription = await stripeService.getActiveSubscriptionForCustomer(owner.stripeCustomerId);
+            if (ownerSubscription && ownerSubscription.status === 'active') {
+              return res.json({
+                hasSubscription: true,
+                subscriptionStatus: "organization_member",
+                organizationName: userOrg.name
+              });
+            }
+          }
+          // Check cached subscription status for owner
+          if (owner.subscriptionStatus === 'active') {
+            return res.json({
+              hasSubscription: true,
+              subscriptionStatus: "organization_member",
+              organizationName: userOrg.name
+            });
+          }
         }
       }
 
