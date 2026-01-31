@@ -2072,6 +2072,112 @@ Generate JSON with:
     res.status(204).send();
   });
 
+  // ===== INTERNAL MESSAGING ROUTES =====
+
+  // Get internal messages for current user
+  app.get("/api/messages", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const org = await storage.getUserOrganization(userId);
+    if (!org) {
+      return res.status(404).json({ message: "You are not part of an organization" });
+    }
+
+    const messages = await storage.getInternalMessages(userId, org.id);
+    const allUsers = await storage.getAllUsers();
+    
+    const enrichedMessages = messages.map(msg => {
+      const sender = allUsers.find(u => u.id === msg.senderId);
+      const recipient = msg.recipientId ? allUsers.find(u => u.id === msg.recipientId) : null;
+      return {
+        ...msg,
+        senderName: sender ? `${sender.firstName} ${sender.lastName}` : "Unknown",
+        senderEmail: sender?.email || "",
+        recipientName: recipient ? `${recipient.firstName} ${recipient.lastName}` : "Everyone",
+        recipientEmail: recipient?.email || "",
+        isBroadcast: !msg.recipientId,
+      };
+    });
+
+    res.json(enrichedMessages);
+  });
+
+  // Get unread message count
+  app.get("/api/messages/unread-count", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const org = await storage.getUserOrganization(userId);
+    if (!org) {
+      return res.json({ count: 0 });
+    }
+
+    const count = await storage.getUnreadMessageCount(userId, org.id);
+    res.json({ count });
+  });
+
+  // Send a message
+  app.post("/api/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { recipientId, subject, content } = req.body;
+
+      if (!content) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      const org = await storage.getUserOrganization(userId);
+      if (!org) {
+        return res.status(404).json({ message: "You are not part of an organization" });
+      }
+
+      if (recipientId) {
+        const isMember = await storage.isOrganizationMember(org.id, recipientId);
+        if (!isMember) {
+          return res.status(400).json({ message: "Recipient is not a member of your organization" });
+        }
+      }
+
+      const message = await storage.createInternalMessage({
+        organizationId: org.id,
+        senderId: userId,
+        recipientId: recipientId || null,
+        subject: subject || null,
+        content,
+        isRead: false,
+      });
+
+      res.status(201).json(message);
+    } catch (err) {
+      console.error("Send message error:", err);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // Mark message as read
+  app.post("/api/messages/:id/read", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const messageId = Number(req.params.id);
+
+    await storage.markMessageAsRead(messageId, userId);
+    res.json({ success: true });
+  });
+
+  // Delete a message (sender only)
+  app.delete("/api/messages/:id", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const messageId = Number(req.params.id);
+
+    const message = await storage.getInternalMessage(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    if (message.senderId !== userId) {
+      return res.status(403).json({ message: "You can only delete your own messages" });
+    }
+
+    await storage.deleteInternalMessage(messageId, userId);
+    res.status(204).send();
+  });
+
   // Get financial messages
   app.get(api.financial.messages.list.path, isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
