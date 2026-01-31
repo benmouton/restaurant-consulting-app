@@ -36,6 +36,7 @@ import {
   Save,
   ExternalLink
 } from "lucide-react";
+import OrganizationManagement from "@/components/OrganizationManagement";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -571,6 +572,8 @@ export default function ProfilePage() {
               )}
             </CardContent>
           </Card>
+
+          <OrganizationManagement />
 
           <Card>
             <CardHeader>

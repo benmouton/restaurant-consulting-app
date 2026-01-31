@@ -22,6 +22,7 @@ import AdminDashboard from "@/pages/admin";
 import EmployeeLoginPage from "@/pages/employee-login";
 import EmployeeAcceptInvitePage from "@/pages/employee-accept-invite";
 import EmployeePortalPage from "@/pages/employee-portal";
+import AcceptInvitePage from "@/pages/accept-invite";
 import ProfilePage from "@/pages/profile";
 import PrivacyPolicy from "@/pages/privacy";
 import DataDeletion from "@/pages/data-deletion";
@@ -84,6 +85,8 @@ function Router() {
         <Route path="/privacy" component={PrivacyPolicy} />
         <Route path="/data-deletion" component={DataDeletion} />
         <Route path="/terms" component={TermsOfService} />
+        {/* Organization invite acceptance */}
+        <Route path="/accept-invite/:token" component={AcceptInvitePage} />
         {/* Employee Portal Routes - separate from main app auth */}
         <Route path="/employee/login" component={EmployeeLoginPage} />
         <Route path="/employee/accept-invite" component={EmployeeAcceptInvitePage} />
