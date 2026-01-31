@@ -3,6 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import crypto from "crypto";
 import OpenAI from "openai";
 import multer from "multer";
 import path from "path";
@@ -15,6 +16,7 @@ import { getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { restaurantHolidays } from "@shared/schema";
+import { sendOrganizationInviteEmail } from "./emailService";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -1523,11 +1525,25 @@ Generate JSON with:
     },
   });
 
-  // List user's HR documents
+  // List HR documents (user's own + organization's)
   app.get("/api/hr-documents", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const documents = await storage.getHRDocuments(userId);
-    res.json(documents);
+    const userDocs = await storage.getHRDocuments(userId);
+    
+    const org = await storage.getUserOrganization(userId);
+    if (org) {
+      const orgDocs = await storage.getHRDocumentsForOrganization(org.id);
+      const allDocs = [...userDocs];
+      for (const doc of orgDocs) {
+        if (!allDocs.find(d => d.id === doc.id)) {
+          allDocs.push(doc);
+        }
+      }
+      allDocs.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+      return res.json(allDocs);
+    }
+    
+    res.json(userDocs);
   });
 
   // Get single HR document
@@ -1550,8 +1566,11 @@ Generate JSON with:
         return res.status(400).json({ message: "Missing required fields" });
       }
 
+      const org = await storage.getUserOrganization(userId);
+      
       const document = await storage.createHRDocument({
         userId,
+        organizationId: org?.id || null,
         employeeName,
         employeePosition: employeePosition || null,
         issueType,
@@ -1615,15 +1634,45 @@ Generate JSON with:
     res.sendFile(filePath);
   });
 
-  // Delete HR document
+  // Delete HR document (only organization owner can delete)
   app.delete("/api/hr-documents/:id", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const document = await storage.getHRDocument(Number(req.params.id), userId);
+    const documentId = Number(req.params.id);
+    
+    const document = await storage.getHRDocument(documentId, userId);
+    
     if (!document) {
+      const org = await storage.getUserOrganization(userId);
+      if (org) {
+        const orgDocs = await storage.getHRDocumentsForOrganization(org.id);
+        const orgDoc = orgDocs.find(d => d.id === documentId);
+        if (orgDoc) {
+          const isOwner = await storage.isOrganizationOwner(org.id, userId);
+          if (!isOwner) {
+            return res.status(403).json({ message: "Only the organization owner can delete documents" });
+          }
+          
+          if (orgDoc.scanFilename) {
+            const filePath = path.join(hrUploadsDir, orgDoc.scanFilename);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+          
+          await storage.deleteHRDocument(orgDoc.id, orgDoc.userId);
+          return res.status(204).send();
+        }
+      }
       return res.status(404).json({ message: "Document not found" });
     }
 
-    // Delete scan file if exists
+    if (document.organizationId) {
+      const isOwner = await storage.isOrganizationOwner(document.organizationId, userId);
+      if (!isOwner && document.userId !== userId) {
+        return res.status(403).json({ message: "Only the organization owner can delete documents" });
+      }
+    }
+
     if (document.scanFilename) {
       const filePath = path.join(hrUploadsDir, document.scanFilename);
       if (fs.existsSync(filePath)) {
@@ -1631,7 +1680,7 @@ Generate JSON with:
       }
     }
 
-    await storage.deleteHRDocument(document.id, userId);
+    await storage.deleteHRDocument(document.id, document.userId);
     res.status(204).send();
   });
 
@@ -1808,6 +1857,218 @@ Generate JSON with:
     const userId = req.user.claims.sub;
     const id = Number(req.params.id);
     await storage.deleteFoodCostPeriod(id, userId);
+    res.status(204).send();
+  });
+
+  // ===== ORGANIZATION ROUTES =====
+
+  // Get current user's organization
+  app.get("/api/organization", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const org = await storage.getUserOrganization(userId);
+    if (!org) {
+      return res.json(null);
+    }
+    const isOwner = org.ownerId === userId;
+    res.json({ ...org, isOwner });
+  });
+
+  // Create organization (for owners)
+  app.post("/api/organization", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name } = req.body;
+
+      if (!name) {
+        return res.status(400).json({ message: "Organization name is required" });
+      }
+
+      const existing = await storage.getOrganizationByOwner(userId);
+      if (existing) {
+        return res.status(400).json({ message: "You already have an organization" });
+      }
+
+      const org = await storage.createOrganization({ name, ownerId: userId });
+      
+      await storage.addOrganizationMember({
+        organizationId: org.id,
+        userId,
+        role: "owner",
+      });
+
+      res.status(201).json({ ...org, isOwner: true });
+    } catch (err) {
+      console.error("Create organization error:", err);
+      res.status(500).json({ message: "Failed to create organization" });
+    }
+  });
+
+  // Get organization members
+  app.get("/api/organization/members", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const org = await storage.getUserOrganization(userId);
+    if (!org) {
+      return res.status(404).json({ message: "No organization found" });
+    }
+
+    const members = await storage.getOrganizationMembers(org.id);
+    const users = await storage.getAllUsers();
+    
+    const memberDetails = members.map(m => {
+      const user = users.find(u => u.id === m.userId);
+      return {
+        ...m,
+        firstName: user?.firstName || "Unknown",
+        lastName: user?.lastName || "User",
+        email: user?.email || "",
+      };
+    });
+
+    res.json(memberDetails);
+  });
+
+  // Get organization invites (owners only)
+  app.get("/api/organization/invites", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const org = await storage.getOrganizationByOwner(userId);
+    if (!org) {
+      return res.status(403).json({ message: "Only organization owners can view invites" });
+    }
+
+    const invites = await storage.getOrganizationInvites(org.id);
+    res.json(invites);
+  });
+
+  // Send organization invite (owners only)
+  app.post("/api/organization/invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const org = await storage.getOrganizationByOwner(userId);
+      if (!org) {
+        return res.status(403).json({ message: "Only organization owners can send invites" });
+      }
+
+      const user = await storage.getUserById(userId);
+      const inviterName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "A team member";
+
+      const inviteToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const invite = await storage.createOrganizationInvite({
+        organizationId: org.id,
+        email,
+        inviteToken,
+        invitedBy: userId,
+        status: "pending",
+        expiresAt,
+      });
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DEPLOYMENT_URL || "http://localhost:5000";
+      const inviteLink = `${baseUrl}/accept-invite/${inviteToken}`;
+
+      const emailSent = await sendOrganizationInviteEmail(email, inviterName, org.name, inviteLink);
+      
+      if (!emailSent) {
+        console.warn("Failed to send invite email, but invite was created");
+      }
+
+      res.status(201).json(invite);
+    } catch (err) {
+      console.error("Send invite error:", err);
+      res.status(500).json({ message: "Failed to send invite" });
+    }
+  });
+
+  // Accept organization invite
+  app.post("/api/organization/accept-invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { token } = req.body;
+
+      if (!token) {
+        return res.status(400).json({ message: "Invite token is required" });
+      }
+
+      const invite = await storage.getInviteByToken(token);
+      if (!invite) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+
+      if (invite.status !== "pending") {
+        return res.status(400).json({ message: "This invite has already been used or expired" });
+      }
+
+      if (new Date() > new Date(invite.expiresAt)) {
+        await storage.updateInviteStatus(invite.id, "expired");
+        return res.status(400).json({ message: "This invite has expired" });
+      }
+
+      const existingOrg = await storage.getUserOrganization(userId);
+      if (existingOrg) {
+        return res.status(400).json({ message: "You are already a member of an organization" });
+      }
+
+      await storage.addOrganizationMember({
+        organizationId: invite.organizationId,
+        userId,
+        role: "member",
+      });
+
+      await storage.updateInviteStatus(invite.id, "accepted");
+
+      const org = await storage.getOrganization(invite.organizationId);
+      res.json({ success: true, organization: org });
+    } catch (err) {
+      console.error("Accept invite error:", err);
+      res.status(500).json({ message: "Failed to accept invite" });
+    }
+  });
+
+  // Get invite details (public, for accept page)
+  app.get("/api/organization/invite/:token", async (req, res) => {
+    const { token } = req.params;
+    const invite = await storage.getInviteByToken(token);
+    
+    if (!invite) {
+      return res.status(404).json({ message: "Invite not found" });
+    }
+
+    if (invite.status !== "pending") {
+      return res.status(400).json({ message: "This invite has already been used", status: invite.status });
+    }
+
+    if (new Date() > new Date(invite.expiresAt)) {
+      return res.status(400).json({ message: "This invite has expired", status: "expired" });
+    }
+
+    const org = await storage.getOrganization(invite.organizationId);
+    res.json({ organizationName: org?.name, email: invite.email });
+  });
+
+  // Remove organization member (owners only)
+  app.delete("/api/organization/members/:userId", isAuthenticated, async (req: any, res) => {
+    const ownerId = req.user.claims.sub;
+    const memberUserId = req.params.userId;
+
+    const org = await storage.getOrganizationByOwner(ownerId);
+    if (!org) {
+      return res.status(403).json({ message: "Only organization owners can remove members" });
+    }
+
+    if (memberUserId === ownerId) {
+      return res.status(400).json({ message: "Cannot remove yourself from the organization" });
+    }
+
+    await storage.removeOrganizationMember(org.id, memberUserId);
     res.status(204).send();
   });
 

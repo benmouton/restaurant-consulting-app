@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod } from "@shared/schema";
-import { eq, and, desc, sql, isNotNull, gte, lte, or } from "drizzle-orm";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite } from "@shared/schema";
+import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Domains
@@ -106,6 +106,28 @@ export interface IStorage {
   getFoodCostPeriods(userId: string): Promise<FoodCostPeriod[]>;
   createFoodCostPeriod(data: InsertFoodCostPeriod): Promise<FoodCostPeriod>;
   deleteFoodCostPeriod(id: number, userId: string): Promise<void>;
+  
+  // Organizations
+  createOrganization(data: InsertOrganization): Promise<Organization>;
+  getOrganization(id: number): Promise<Organization | undefined>;
+  getOrganizationByOwner(ownerId: string): Promise<Organization | undefined>;
+  getUserOrganization(userId: string): Promise<Organization | undefined>;
+  
+  // Organization Members
+  getOrganizationMembers(organizationId: number): Promise<OrganizationMember[]>;
+  addOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember>;
+  removeOrganizationMember(organizationId: number, userId: string): Promise<void>;
+  isOrganizationOwner(organizationId: number, userId: string): Promise<boolean>;
+  isOrganizationMember(organizationId: number, userId: string): Promise<boolean>;
+  
+  // Organization Invites
+  createOrganizationInvite(data: InsertOrganizationInvite): Promise<OrganizationInvite>;
+  getOrganizationInvites(organizationId: number): Promise<OrganizationInvite[]>;
+  getInviteByToken(token: string): Promise<OrganizationInvite | undefined>;
+  updateInviteStatus(id: number, status: string): Promise<void>;
+  
+  // HR Documents (organization-aware)
+  getHRDocumentsForOrganization(organizationId: number): Promise<HRDocument[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -730,6 +752,102 @@ export class DatabaseStorage implements IStorage {
   async deleteFoodCostPeriod(id: number, userId: string): Promise<void> {
     await db.delete(foodCostPeriods)
       .where(and(eq(foodCostPeriods.id, id), eq(foodCostPeriods.userId, userId)));
+  }
+
+  // Organizations
+  async createOrganization(data: InsertOrganization): Promise<Organization> {
+    const [org] = await db.insert(organizations).values(data).returning();
+    return org;
+  }
+
+  async getOrganization(id: number): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
+  }
+
+  async getOrganizationByOwner(ownerId: string): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.ownerId, ownerId));
+    return org;
+  }
+
+  async getUserOrganization(userId: string): Promise<Organization | undefined> {
+    const ownerOrg = await this.getOrganizationByOwner(userId);
+    if (ownerOrg) return ownerOrg;
+    
+    const [membership] = await db.select().from(organizationMembers)
+      .where(eq(organizationMembers.userId, userId));
+    if (membership) {
+      return this.getOrganization(membership.organizationId);
+    }
+    return undefined;
+  }
+
+  // Organization Members
+  async getOrganizationMembers(organizationId: number): Promise<OrganizationMember[]> {
+    return await db.select().from(organizationMembers)
+      .where(eq(organizationMembers.organizationId, organizationId));
+  }
+
+  async addOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember> {
+    const [member] = await db.insert(organizationMembers).values(data).returning();
+    return member;
+  }
+
+  async removeOrganizationMember(organizationId: number, userId: string): Promise<void> {
+    await db.delete(organizationMembers)
+      .where(and(
+        eq(organizationMembers.organizationId, organizationId),
+        eq(organizationMembers.userId, userId)
+      ));
+  }
+
+  async isOrganizationOwner(organizationId: number, userId: string): Promise<boolean> {
+    const [org] = await db.select().from(organizations)
+      .where(and(eq(organizations.id, organizationId), eq(organizations.ownerId, userId)));
+    return !!org;
+  }
+
+  async isOrganizationMember(organizationId: number, userId: string): Promise<boolean> {
+    const org = await this.getOrganization(organizationId);
+    if (org?.ownerId === userId) return true;
+    
+    const [member] = await db.select().from(organizationMembers)
+      .where(and(
+        eq(organizationMembers.organizationId, organizationId),
+        eq(organizationMembers.userId, userId)
+      ));
+    return !!member;
+  }
+
+  // Organization Invites
+  async createOrganizationInvite(data: InsertOrganizationInvite): Promise<OrganizationInvite> {
+    const [invite] = await db.insert(organizationInvites).values(data).returning();
+    return invite;
+  }
+
+  async getOrganizationInvites(organizationId: number): Promise<OrganizationInvite[]> {
+    return await db.select().from(organizationInvites)
+      .where(eq(organizationInvites.organizationId, organizationId))
+      .orderBy(desc(organizationInvites.createdAt));
+  }
+
+  async getInviteByToken(token: string): Promise<OrganizationInvite | undefined> {
+    const [invite] = await db.select().from(organizationInvites)
+      .where(eq(organizationInvites.inviteToken, token));
+    return invite;
+  }
+
+  async updateInviteStatus(id: number, status: string): Promise<void> {
+    await db.update(organizationInvites)
+      .set({ status })
+      .where(eq(organizationInvites.id, id));
+  }
+
+  // HR Documents (organization-aware)
+  async getHRDocumentsForOrganization(organizationId: number): Promise<HRDocument[]> {
+    return await db.select().from(hrDocuments)
+      .where(eq(hrDocuments.organizationId, organizationId))
+      .orderBy(desc(hrDocuments.createdAt));
   }
 }
 

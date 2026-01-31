@@ -325,10 +325,40 @@ export const foodCostPeriods = pgTable("food_cost_periods", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Organizations (groups of users who can share documents)
+export const organizations = pgTable("organizations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  ownerId: text("owner_id").notNull(), // the user who created this org
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Organization Members (users who belong to an organization)
+export const organizationMembers = pgTable("organization_members", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  userId: text("user_id").notNull(),
+  role: text("role").notNull().default("member"), // 'owner' or 'member'
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+// Organization Invites (pending invitations)
+export const organizationInvites = pgTable("organization_invites", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  email: text("email").notNull(),
+  inviteToken: text("invite_token").notNull().unique(),
+  invitedBy: text("invited_by").notNull(), // userId of inviter
+  status: text("status").notNull().default("pending"), // 'pending', 'accepted', 'expired'
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // HR Documents (stored signed discipline documents)
 export const hrDocuments = pgTable("hr_documents", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(),
+  userId: text("user_id").notNull(), // who created the document
+  organizationId: integer("organization_id").references(() => organizations.id), // for shared access
   employeeName: text("employee_name").notNull(),
   employeePosition: text("employee_position"),
   issueType: text("issue_type").notNull(),
@@ -371,6 +401,9 @@ export const insertHRDocumentSchema = createInsertSchema(hrDocuments).omit({ id:
 export const insertSavedIngredientSchema = createInsertSchema(savedIngredients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSavedPlateSchema = createInsertSchema(savedPlates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFoodCostPeriodSchema = createInsertSchema(foodCostPeriods).omit({ id: true, createdAt: true });
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({ id: true, createdAt: true });
+export const insertOrganizationMemberSchema = createInsertSchema(organizationMembers).omit({ id: true, joinedAt: true });
+export const insertOrganizationInviteSchema = createInsertSchema(organizationInvites).omit({ id: true, createdAt: true });
 
 export type Domain = typeof domains.$inferSelect;
 export type FrameworkContent = typeof frameworkContent.$inferSelect;
@@ -416,3 +449,9 @@ export type InsertHRDocument = z.infer<typeof insertHRDocumentSchema>;
 export type InsertSavedIngredient = z.infer<typeof insertSavedIngredientSchema>;
 export type InsertSavedPlate = z.infer<typeof insertSavedPlateSchema>;
 export type InsertFoodCostPeriod = z.infer<typeof insertFoodCostPeriodSchema>;
+export type Organization = typeof organizations.$inferSelect;
+export type OrganizationMember = typeof organizationMembers.$inferSelect;
+export type OrganizationInvite = typeof organizationInvites.$inferSelect;
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
+export type InsertOrganizationInvite = z.infer<typeof insertOrganizationInviteSchema>;
