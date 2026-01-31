@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -848,6 +848,66 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(hrDocuments)
       .where(eq(hrDocuments.organizationId, organizationId))
       .orderBy(desc(hrDocuments.createdAt));
+  }
+
+  // Internal Messages
+  async createInternalMessage(data: InsertInternalMessage): Promise<InternalMessage> {
+    const [message] = await db.insert(internalMessages).values(data).returning();
+    return message;
+  }
+
+  async getInternalMessages(userId: string, organizationId: number): Promise<InternalMessage[]> {
+    return await db.select().from(internalMessages)
+      .where(and(
+        eq(internalMessages.organizationId, organizationId),
+        or(
+          eq(internalMessages.recipientId, userId),
+          eq(internalMessages.senderId, userId),
+          sql`${internalMessages.recipientId} IS NULL`
+        )
+      ))
+      .orderBy(desc(internalMessages.createdAt));
+  }
+
+  async getInternalMessage(id: number): Promise<InternalMessage | undefined> {
+    const [message] = await db.select().from(internalMessages)
+      .where(eq(internalMessages.id, id));
+    return message;
+  }
+
+  async markMessageAsRead(id: number, userId: string): Promise<void> {
+    await db.update(internalMessages)
+      .set({ isRead: true })
+      .where(and(
+        eq(internalMessages.id, id),
+        or(
+          eq(internalMessages.recipientId, userId),
+          sql`${internalMessages.recipientId} IS NULL`
+        )
+      ));
+  }
+
+  async getUnreadMessageCount(userId: string, organizationId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(internalMessages)
+      .where(and(
+        eq(internalMessages.organizationId, organizationId),
+        eq(internalMessages.isRead, false),
+        or(
+          eq(internalMessages.recipientId, userId),
+          sql`${internalMessages.recipientId} IS NULL`
+        ),
+        sql`${internalMessages.senderId} != ${userId}`
+      ));
+    return result[0]?.count || 0;
+  }
+
+  async deleteInternalMessage(id: number, userId: string): Promise<void> {
+    await db.delete(internalMessages)
+      .where(and(
+        eq(internalMessages.id, id),
+        eq(internalMessages.senderId, userId)
+      ));
   }
 }
 

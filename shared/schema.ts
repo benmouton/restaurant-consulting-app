@@ -354,6 +354,25 @@ export const organizationInvites = pgTable("organization_invites", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Internal Messages (org member-to-member messaging)
+export const internalMessages = pgTable("internal_messages", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id),
+  senderId: text("sender_id").notNull(),
+  recipientId: text("recipient_id"), // null for broadcast messages to all org members
+  subject: text("subject"),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInternalMessageSchema = createInsertSchema(internalMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertInternalMessage = z.infer<typeof insertInternalMessageSchema>;
+export type InternalMessage = typeof internalMessages.$inferSelect;
+
 // HR Documents (stored signed discipline documents)
 export const hrDocuments = pgTable("hr_documents", {
   id: serial("id").primaryKey(),
