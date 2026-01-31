@@ -83,6 +83,26 @@ Separate authentication system for staff members to access scheduling without fu
 - Employee routes under `/employee/*` with dedicated session management
 - Stripe subscription automatically updated when employees accept invites or are removed
 
+### Food Costing System
+Advanced tools for calculating plate costs and tracking weekly food cost percentages:
+- **Plate Builder**: Add multiple ingredients with quantity, unit, cost per unit, and category
+- **Ingredient Memory**: Save frequently used ingredients to a library for quick reuse
+- **Waste Buffer Presets**: Auto-add waste based on category (protein +5%, produce +10%, dairy +3%, dry goods +2%)
+- **Smart Target Defaults**: Food cost presets by restaurant type (casual 28%, brunch 30%, seafood 32%, quick service 25%)
+- **Reality Check**: Instant feedback on margin status with color-coded warnings
+- **Weekly Tracker**: Compare total food purchases vs total food sales to track actual food cost %
+- **Historical Data**: View past weeks' food cost performance with variance from target
+
+**Database Tables**:
+- `savedIngredients`: User's saved ingredient library with cost, unit, category, waste buffer
+- `savedPlates`: Costed plates with ingredients array, total cost, menu price, food cost %
+- `foodCostPeriods`: Weekly/monthly tracking periods with purchases, sales, actual %, target %
+
+**API Endpoints**:
+- `GET/POST /api/ingredients`: List and save ingredients
+- `GET/POST /api/plates`: List and save costed plates
+- `GET/POST /api/food-cost-periods`: Track weekly/monthly food cost
+
 ### Role-Based Access Control (RBAC)
 The application implements a three-tier role hierarchy:
 - **Owner**: Full access to all features including financial analysis, P&L tools, strategic planning, and staff management
