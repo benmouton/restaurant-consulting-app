@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { jsPDF } from "jspdf";
 import { useAuth } from "@/hooks/use-auth";
 import { useRole } from "@/hooks/use-role";
 import { Button } from "@/components/ui/button";
@@ -996,27 +997,168 @@ Ensure all language is:
   };
 
   const printDocument = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>HR Document - ${employeeName || 'Employee'}</title>
-          <style>
-            body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 20px; max-width: 8.5in; margin: 0 auto; }
-            pre { white-space: pre-wrap; word-wrap: break-word; }
-            @media print { body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <pre>${documentation}</pre>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'in',
+      format: 'letter'
+    });
+    
+    const margin = 0.75;
+    const pageWidth = 8.5;
+    const contentWidth = pageWidth - (margin * 2);
+    let y = margin;
+    
+    const disciplineLevels: Record<string, string> = {
+      first: "Verbal/Written Warning",
+      second: "3 Shift Suspension",
+      third: "5 Shift Suspension / Termination"
+    };
+    
+    const issueLabels: Record<string, string> = {
+      attendance: "Attendance / Tardiness",
+      performance: "Job Performance",
+      conduct: "Workplace Conduct",
+      policy: "Policy Violation",
+      safety: "Safety Violation",
+      insubordination: "Insubordination"
+    };
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("EMPLOYEE DISCIPLINE NOTICE", pageWidth / 2, y, { align: "center" });
+    y += 0.4;
+    
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.02);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 0.35;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("DOCUMENT TYPE:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(disciplineLevels[priorIncidents] || priorIncidents, margin + 1.5, y);
+    y += 0.25;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("DATE OF NOTICE:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(incidentDate || new Date().toLocaleDateString(), margin + 1.5, y);
+    y += 0.25;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("EMPLOYEE NAME:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(employeeName || "_________________________", margin + 1.5, y);
+    y += 0.25;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("POSITION:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(employeeRole || "_________________________", margin + 1.5, y);
+    y += 0.25;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("ISSUE TYPE:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(issueLabels[issueType] || issueType, margin + 1.5, y);
+    y += 0.35;
+    
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 0.3;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("STATEMENT OF FACTS", margin, y);
+    y += 0.25;
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const factLines = doc.splitTextToSize(description || "No description provided.", contentWidth);
+    const maxFactLines = Math.min(factLines.length, 8);
+    for (let i = 0; i < maxFactLines; i++) {
+      doc.text(factLines[i], margin, y);
+      y += 0.18;
     }
+    if (factLines.length > 8) {
+      doc.text("...", margin, y);
+      y += 0.18;
+    }
+    y += 0.15;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("POLICY VIOLATED", margin, y);
+    y += 0.25;
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Employee was aware of policy: ${policyAware === "yes" ? "Yes" : "No/Unclear"}`, margin, y);
+    y += 0.35;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("REQUIRED CORRECTIVE ACTION", margin, y);
+    y += 0.25;
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const actionText = priorIncidents === "first" 
+      ? "Employee must immediately correct behavior. Further violations will result in progressive discipline up to and including termination."
+      : priorIncidents === "second"
+      ? "Employee is suspended for 3 shifts without pay. Return to work contingent on acknowledgment and corrective action."
+      : "Employee is suspended for 5 shifts pending termination review. Management will determine final employment status.";
+    const actionLines = doc.splitTextToSize(actionText, contentWidth);
+    actionLines.forEach((line: string) => {
+      doc.text(line, margin, y);
+      y += 0.18;
+    });
+    y += 0.2;
+
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 0.3;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("SIGNATURES", margin, y);
+    y += 0.35;
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    
+    doc.text("Employee Signature: _________________________________", margin, y);
+    doc.text("Date: _______________", margin + 4.5, y);
+    y += 0.35;
+    
+    doc.text("Manager Signature: __________________________________", margin, y);
+    doc.text("Date: _______________", margin + 4.5, y);
+    y += 0.35;
+    
+    doc.text("Witness Signature: __________________________________", margin, y);
+    doc.text("Date: _______________", margin + 4.5, y);
+    y += 0.4;
+
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 0.25;
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    const disclaimer = "Employee signature indicates receipt of this document, not agreement with its contents. " +
+      "Employment is at-will and may be terminated at any time by either party. " +
+      "Refusal to sign will be noted with witness verification.";
+    const disclaimerLines = doc.splitTextToSize(disclaimer, contentWidth);
+    disclaimerLines.forEach((line: string) => {
+      doc.text(line, margin, y);
+      y += 0.14;
+    });
+    y += 0.15;
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Distribution: [ ] Employee Copy  [ ] Personnel File  [ ] Management Copy", margin, y);
+
+    doc.save(`HR_Notice_${employeeName?.replace(/\s+/g, '_') || 'Employee'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast({ title: "PDF downloaded!" });
   };
 
   const saveDocument = async () => {
@@ -1213,8 +1355,8 @@ Ensure all language is:
                 Copy
               </Button>
               <Button variant="outline" size="sm" onClick={printDocument} data-testid="btn-print-hr-doc">
-                <Printer className="h-4 w-4 mr-2" />
-                Print Document
+                <FileText className="h-4 w-4 mr-2" />
+                Download PDF
               </Button>
               <Button 
                 variant="default" 
