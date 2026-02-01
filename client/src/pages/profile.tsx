@@ -198,7 +198,10 @@ export default function ProfilePage() {
     updateProfileMutation.mutate(data);
   };
 
-  const formatDate = (timestamp: number) => {
+  const formatDate = (timestamp: number | null | undefined) => {
+    if (!timestamp || timestamp <= 0) {
+      return "Not available";
+    }
     return new Date(timestamp * 1000).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
