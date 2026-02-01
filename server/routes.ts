@@ -2136,8 +2136,10 @@ Generate JSON with:
   // Send organization invite (owners only)
   app.post("/api/organization/invite", isAuthenticated, async (req: any, res) => {
     try {
+      console.log("[Invite] Received invite request");
       const userId = req.user.claims.sub;
       const { email } = req.body;
+      console.log(`[Invite] User ${userId} inviting ${email}`);
 
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
@@ -2145,8 +2147,10 @@ Generate JSON with:
 
       const org = await storage.getOrganizationByOwner(userId);
       if (!org) {
+        console.log("[Invite] User is not an organization owner");
         return res.status(403).json({ message: "Only organization owners can send invites" });
       }
+      console.log(`[Invite] Found organization: ${org.name} (id: ${org.id})`);
 
       const user = await storage.getUserById(userId);
       const inviterName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "A team member";
@@ -2155,6 +2159,7 @@ Generate JSON with:
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
+      console.log(`[Invite] Creating invite in database...`);
       const invite = await storage.createOrganizationInvite({
         organizationId: org.id,
         email,
@@ -2163,21 +2168,25 @@ Generate JSON with:
         status: "pending",
         expiresAt,
       });
+      console.log(`[Invite] Invite created with id: ${invite.id}`);
 
       const baseUrl = process.env.REPLIT_DEV_DOMAIN 
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
         : process.env.REPLIT_DEPLOYMENT_URL || "http://localhost:5000";
       const inviteLink = `${baseUrl}/accept-invite/${inviteToken}`;
 
+      console.log(`[Invite] Sending email to ${email}...`);
       const emailSent = await sendOrganizationInviteEmail(email, inviterName, org.name, inviteLink);
       
       if (!emailSent) {
-        console.warn("Failed to send invite email, but invite was created");
+        console.warn("[Invite] Failed to send invite email, but invite was created");
+      } else {
+        console.log("[Invite] Email sent successfully");
       }
 
       res.status(201).json(invite);
     } catch (err) {
-      console.error("Send invite error:", err);
+      console.error("[Invite] Send invite error:", err);
       res.status(500).json({ message: "Failed to send invite" });
     }
   });
