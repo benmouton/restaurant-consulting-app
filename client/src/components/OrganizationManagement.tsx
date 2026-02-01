@@ -142,6 +142,26 @@ export default function OrganizationManagement() {
     },
   });
 
+  const cancelInviteMutation = useMutation({
+    mutationFn: async (inviteId: number) => {
+      await apiRequest("DELETE", `/api/organization/invites/${inviteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organization/invites"] });
+      toast({
+        title: "Invite cancelled",
+        description: "The pending invitation has been cancelled.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel invitation.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateOrg = (e: React.FormEvent) => {
     e.preventDefault();
     if (orgName.trim()) {
@@ -263,11 +283,13 @@ export default function OrganizationManagement() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-medium">
-                      {member.firstName?.[0]}{member.lastName?.[0]}
+                      {member.firstName?.[0] || member.email?.[0]?.toUpperCase()}{member.lastName?.[0] || ''}
                     </div>
                     <div>
                       <p className="text-sm font-medium">
-                        {member.firstName} {member.lastName}
+                        {member.firstName && member.lastName 
+                          ? `${member.firstName} ${member.lastName}`
+                          : member.email?.split('@')[0] || 'Team Member'}
                         {member.role === "owner" && (
                           <Crown className="h-3 w-3 inline ml-1 text-amber-500" />
                         )}
@@ -382,7 +404,18 @@ export default function OrganizationManagement() {
                               </p>
                             </div>
                           </div>
-                          <Badge variant="secondary">Pending</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">Pending</Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => cancelInviteMutation.mutate(invite.id)}
+                              disabled={cancelInviteMutation.isPending}
+                              data-testid={`btn-cancel-invite-${invite.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>

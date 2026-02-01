@@ -2155,6 +2155,16 @@ Generate JSON with:
       const user = await storage.getUserById(userId);
       const inviterName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "A team member";
 
+      // Check for existing pending invites for this email and cancel them
+      const existingInvites = await storage.getOrganizationInvites(org.id);
+      const pendingForEmail = existingInvites.filter(i => i.email === email && i.status === "pending");
+      if (pendingForEmail.length > 0) {
+        console.log(`[Invite] Found ${pendingForEmail.length} existing pending invite(s) for ${email}, cancelling them`);
+        for (const oldInvite of pendingForEmail) {
+          await storage.deleteInvite(oldInvite.id);
+        }
+      }
+
       const inviteToken = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
@@ -2259,6 +2269,30 @@ Generate JSON with:
 
     const org = await storage.getOrganization(invite.organizationId);
     res.json({ organizationName: org?.name, email: invite.email });
+  });
+
+  // Cancel/delete pending invite (owners only)
+  app.delete("/api/organization/invites/:inviteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const inviteId = parseInt(req.params.inviteId);
+
+      const org = await storage.getOrganizationByOwner(userId);
+      if (!org) {
+        return res.status(403).json({ message: "Only organization owners can cancel invites" });
+      }
+
+      const invite = await storage.getInviteById(inviteId);
+      if (!invite || invite.organizationId !== org.id) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+
+      await storage.deleteInvite(inviteId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Cancel invite error:", err);
+      res.status(500).json({ message: "Failed to cancel invite" });
+    }
   });
 
   // Remove organization member (owners only)

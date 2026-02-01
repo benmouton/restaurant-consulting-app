@@ -125,7 +125,9 @@ export interface IStorage {
   createOrganizationInvite(data: InsertOrganizationInvite): Promise<OrganizationInvite>;
   getOrganizationInvites(organizationId: number): Promise<OrganizationInvite[]>;
   getInviteByToken(token: string): Promise<OrganizationInvite | undefined>;
+  getInviteById(id: number): Promise<OrganizationInvite | undefined>;
   updateInviteStatus(id: number, status: string): Promise<void>;
+  deleteInvite(id: number): Promise<void>;
   
   // HR Documents (organization-aware)
   getHRDocumentsForOrganization(organizationId: number): Promise<HRDocument[]>;
@@ -842,9 +844,20 @@ export class DatabaseStorage implements IStorage {
     return invite;
   }
 
+  async getInviteById(id: number): Promise<OrganizationInvite | undefined> {
+    const [invite] = await db.select().from(organizationInvites)
+      .where(eq(organizationInvites.id, id));
+    return invite;
+  }
+
   async updateInviteStatus(id: number, status: string): Promise<void> {
     await db.update(organizationInvites)
       .set({ status })
+      .where(eq(organizationInvites.id, id));
+  }
+
+  async deleteInvite(id: number): Promise<void> {
+    await db.delete(organizationInvites)
       .where(eq(organizationInvites.id, id));
   }
 
