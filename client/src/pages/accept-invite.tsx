@@ -86,7 +86,11 @@ export default function AcceptInvitePage() {
           <CardContent>
             <Button 
               className="w-full" 
-              onClick={() => window.location.href = "/api/auth/login"}
+              onClick={() => {
+                // Pass return URL as query param so we redirect back here after login
+                const returnTo = encodeURIComponent(window.location.pathname);
+                window.location.href = `/api/login?returnTo=${returnTo}`;
+              }}
               data-testid="btn-login-to-accept"
             >
               Sign in to Continue
