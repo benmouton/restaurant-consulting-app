@@ -52,7 +52,13 @@ import {
   Send,
   ChevronLeft,
   Eye,
-  Trash2
+  Trash2,
+  Settings,
+  UserMinus,
+  Timer,
+  MessageCircleWarning,
+  Package,
+  ShieldAlert
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -2954,6 +2960,33 @@ Keep the response practical and immediately actionable. This is real-time guidan
   );
 }
 
+// Restaurant profile types
+interface RestaurantProfile {
+  restaurantName?: string;
+  restaurantType?: string;
+  seatCount?: number;
+  staffCount?: number;
+  location?: string;
+  city?: string;
+  peakDays?: string[];
+  peakHours?: string;
+  keyChallenge1?: string;
+  keyChallenge2?: string;
+  keyChallenge3?: string;
+  averageLaborPercent?: number;
+  averageFoodCostPercent?: number;
+}
+
+// Quick-fix crisis types for leadership command center
+const QUICK_CRISIS_TYPES = [
+  { id: 'no_show', label: 'Staff No-Show', Icon: UserMinus },
+  { id: 'equipment', label: 'Equipment Failure', Icon: Wrench },
+  { id: 'rush', label: 'Unexpected Rush', Icon: Timer },
+  { id: 'complaint', label: 'Guest Complaint', Icon: MessageCircleWarning },
+  { id: 'delivery', label: 'Delivery Problem', Icon: Package },
+  { id: 'health', label: 'Health/Safety Issue', Icon: ShieldAlert },
+];
+
 function DailyTaskReminder() {
   const { toast } = useToast();
   const { permissions } = useRole();
@@ -2962,13 +2995,94 @@ function DailyTaskReminder() {
   const [lastGenerated, setLastGenerated] = useState<string>("");
   const [staffMessage, setStaffMessage] = useState<string>("");
   const [isGeneratingStaffMessage, setIsGeneratingStaffMessage] = useState(false);
+  
+  // New states for enhanced features
+  const [profile, setProfile] = useState<RestaurantProfile | null>(null);
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [activeTab, setActiveTab] = useState<'priorities' | 'crisis' | 'chat'>('priorities');
+  const [crisisType, setCrisisType] = useState<string>('');
+  const [crisisResponse, setCrisisResponse] = useState<string>('');
+  const [isGeneratingCrisis, setIsGeneratingCrisis] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState('');
+  const [chatHistory, setChatHistory] = useState<{role: string; content: string}[]>([]);
+  const [isChattingLoading, setIsChattingLoading] = useState(false);
 
   const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const todayDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
+  // Load restaurant profile on mount
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const res = await fetch('/api/restaurant-profile', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data);
+        if (!data) {
+          setShowProfileSetup(true);
+        }
+      } else {
+        setShowProfileSetup(true);
+      }
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+      setShowProfileSetup(true);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const saveProfile = async (newProfile: RestaurantProfile) => {
+    try {
+      const res = await fetch('/api/restaurant-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProfile),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setProfile(saved);
+        setShowProfileSetup(false);
+        toast({ title: 'Profile saved!', description: 'Your priorities will now be personalized.' });
+      }
+    } catch (err) {
+      toast({ title: 'Failed to save profile', variant: 'destructive' });
+    }
+  };
+
+  const buildPersonalizedPrompt = () => {
+    let contextBlock = '';
+    if (profile) {
+      const parts = [];
+      if (profile.restaurantName) parts.push(`Restaurant: ${profile.restaurantName}`);
+      if (profile.restaurantType) parts.push(`Type: ${profile.restaurantType.replace('_', ' ')}`);
+      if (profile.seatCount) parts.push(`Seats: ${profile.seatCount}`);
+      if (profile.staffCount) parts.push(`Staff: ${profile.staffCount}`);
+      if (profile.location) parts.push(`Location: ${profile.location}`);
+      if (profile.peakDays?.length) parts.push(`Peak days: ${profile.peakDays.join(', ')}`);
+      if (profile.peakHours) parts.push(`Peak hours: ${profile.peakHours}`);
+      if (profile.keyChallenge1) parts.push(`Key challenge: ${profile.keyChallenge1.replace('_', ' ')}`);
+      if (profile.keyChallenge2) parts.push(`Secondary challenge: ${profile.keyChallenge2.replace('_', ' ')}`);
+      if (profile.averageLaborPercent) parts.push(`Target labor: ${profile.averageLaborPercent}%`);
+      if (profile.averageFoodCostPercent) parts.push(`Target food cost: ${profile.averageFoodCostPercent}%`);
+      
+      if (parts.length > 0) {
+        contextBlock = `\n\nRESTAURANT CONTEXT:\n${parts.join('\n')}\n\nPersonalize your recommendations based on this specific restaurant's profile, challenges, and operation style.`;
+      }
+    }
+    return contextBlock;
+  };
+
   const generateDailyTasks = async () => {
     setIsLoading(true);
     setTasks("");
+
+    const personalContext = buildPersonalizedPrompt();
 
     try {
       const res = await fetch("/api/consultant/ask", {
@@ -2976,7 +3090,7 @@ function DailyTaskReminder() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: `As an experienced restaurant consultant, provide today's priority tasks for a restaurant owner/operator. Today is ${dayOfWeek}.
-
+${personalContext}
 Based on typical restaurant operations, provide specific, actionable tasks that should be prioritized on ${dayOfWeek}. Consider:
 
 MONDAY: Week setup, reviewing weekend performance, scheduling adjustments, inventory orders, staff meetings, P&L review from prior week
@@ -3022,6 +3136,126 @@ Format as a clear, prioritized list with 5-7 specific tasks for TODAY (${dayOfWe
       toast({ title: "Failed to generate tasks", variant: "destructive" });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCrisisMode = async (type: string) => {
+    setCrisisType(type);
+    setIsGeneratingCrisis(true);
+    setCrisisResponse("");
+
+    const crisisLabel = QUICK_CRISIS_TYPES.find(c => c.id === type)?.label || type;
+    const personalContext = buildPersonalizedPrompt();
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `URGENT: I'm dealing with a ${crisisLabel} right now and need immediate help.
+${personalContext}
+Provide a 5-step crisis response plan that I can execute RIGHT NOW:
+1. Immediate action (what to do in the next 5 minutes)
+2. Short-term fix (next 30 minutes)
+3. Communication plan (who to notify and what to say)
+4. Guest impact mitigation
+5. Follow-up action (within 24 hours)
+
+Keep it practical, actionable, and specific to restaurant operations. No fluff - I need real solutions fast.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate crisis response");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setCrisisResponse(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate crisis response", variant: "destructive" });
+    } finally {
+      setIsGeneratingCrisis(false);
+    }
+  };
+
+  const handleFollowUp = async () => {
+    if (!followUpQuestion.trim()) return;
+    
+    const userMessage = followUpQuestion.trim();
+    setFollowUpQuestion('');
+    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsChattingLoading(true);
+
+    const personalContext = buildPersonalizedPrompt();
+    const previousContext = tasks ? `\n\nPrevious priorities generated:\n${tasks}` : '';
+    const chatContext = chatHistory.length > 0 
+      ? `\n\nPrevious conversation:\n${chatHistory.map(m => `${m.role}: ${m.content}`).join('\n')}`
+      : '';
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `You are helping a restaurant owner/operator with their daily operations.
+${personalContext}${previousContext}${chatContext}
+
+User's follow-up question: ${userMessage}
+
+Provide a helpful, specific response. Be concise but thorough.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to get response");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+              }
+            } catch {}
+          }
+        }
+        setChatHistory(prev => [...prev, { role: 'assistant', content }]);
+      }
+    } catch (err) {
+      toast({ title: "Failed to get response", variant: "destructive" });
+    } finally {
+      setIsChattingLoading(false);
     }
   };
 
@@ -3100,131 +3334,500 @@ Generate ONLY the staff message, nothing else.`,
     }
   };
 
+  if (isLoadingProfile) {
+    return (
+      <Card className="mb-8">
+        <CardContent className="py-8 flex justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="mb-8">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Daily Operator Priorities
-            </CardTitle>
-            <CardDescription className="mt-1">
-              <span className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                {dayOfWeek}, {todayDate}
-              </span>
-            </CardDescription>
-          </div>
-          {lastGenerated && (
-            <span className="text-xs text-muted-foreground">
-              Generated at {lastGenerated}
-            </span>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Get AI-powered task recommendations based on what successful restaurant operators typically prioritize on {dayOfWeek}s.
-        </p>
+    <>
+      {/* Profile Setup Dialog */}
+      <Dialog open={showProfileSetup} onOpenChange={setShowProfileSetup}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Personalize Your Priorities
+            </DialogTitle>
+            <DialogDescription>
+              Tell us about your restaurant to get tailored recommendations.
+            </DialogDescription>
+          </DialogHeader>
+          <RestaurantProfileForm 
+            initialProfile={profile || {}} 
+            onSave={saveProfile}
+            onCancel={() => setShowProfileSetup(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
-        <Button 
-          onClick={generateDailyTasks} 
-          disabled={isLoading}
-          className="w-full"
-          data-testid="btn-generate-daily-tasks"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating your {dayOfWeek} priorities...
-            </>
-          ) : tasks ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh Today's Priorities
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Get Today's Priorities
-            </>
-          )}
-        </Button>
-
-        {tasks && (
-          <div className="mt-4 p-4 bg-accent/50 rounded-lg">
-            <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-              {tasks}
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Leadership Command Center
+              </CardTitle>
+              <CardDescription className="mt-1">
+                <span className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {dayOfWeek}, {todayDate}
+                  {profile?.restaurantName && (
+                    <Badge variant="secondary" className="ml-2">{profile.restaurantName}</Badge>
+                  )}
+                </span>
+              </CardDescription>
             </div>
-          </div>
-        )}
-
-        {tasks && permissions.canSendToStaff && (
-          <div className="mt-6 pt-4 border-t border-border">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Send to Staff</span>
-            </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Convert today's priorities into a friendly team message ready to share.
-            </p>
-            
-            {!staffMessage ? (
+            <div className="flex items-center gap-2">
+              {lastGenerated && (
+                <span className="text-xs text-muted-foreground">
+                  Last: {lastGenerated}
+                </span>
+              )}
               <Button 
-                onClick={generateStaffMessage} 
-                disabled={isGeneratingStaffMessage}
-                variant="outline"
-                className="w-full"
-                data-testid="btn-generate-staff-message"
+                variant="ghost" 
+                size="icon"
+                onClick={() => setShowProfileSetup(true)}
+                data-testid="btn-edit-profile"
               >
-                {isGeneratingStaffMessage ? (
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Tab Navigation */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="priorities" data-testid="tab-priorities">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Priorities
+              </TabsTrigger>
+              <TabsTrigger value="crisis" data-testid="tab-crisis">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Crisis Mode
+              </TabsTrigger>
+              <TabsTrigger value="chat" data-testid="tab-chat">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Ask Follow-up
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Priorities Tab */}
+            <TabsContent value="priorities" className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                Get AI-powered task recommendations personalized for your restaurant on {dayOfWeek}s.
+              </p>
+
+              <Button 
+                onClick={generateDailyTasks} 
+                disabled={isLoading}
+                className="w-full"
+                data-testid="btn-generate-daily-tasks"
+              >
+                {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating team message...
+                    Generating your {dayOfWeek} priorities...
+                  </>
+                ) : tasks ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Today's Priorities
                   </>
                 ) : (
                   <>
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Generate Staff Message
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Get Today's Priorities
                   </>
                 )}
               </Button>
-            ) : (
-              <div className="space-y-3">
-                <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                  <div className="text-sm whitespace-pre-wrap">
-                    {staffMessage}
+
+              {tasks && (
+                <div className="mt-4 p-4 bg-accent/50 rounded-lg">
+                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                    {tasks}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={copyStaffMessageToClipboard}
-                    className="flex-1"
-                    data-testid="btn-copy-staff-message"
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy to Clipboard
-                  </Button>
-                  <Button 
-                    onClick={generateStaffMessage} 
-                    disabled={isGeneratingStaffMessage}
-                    variant="outline"
-                    data-testid="btn-regenerate-staff-message"
-                  >
-                    {isGeneratingStaffMessage ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
+              )}
+
+              {tasks && permissions.canSendToStaff && (
+                <div className="mt-6 pt-4 border-t border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Send to Staff</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Convert today's priorities into a friendly team message ready to share.
+                  </p>
+                  
+                  {!staffMessage ? (
+                    <Button 
+                      onClick={generateStaffMessage} 
+                      disabled={isGeneratingStaffMessage}
+                      variant="outline"
+                      className="w-full"
+                      data-testid="btn-generate-staff-message"
+                    >
+                      {isGeneratingStaffMessage ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating team message...
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Generate Staff Message
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                        <div className="text-sm whitespace-pre-wrap">
+                          {staffMessage}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={copyStaffMessageToClipboard}
+                          className="flex-1"
+                          data-testid="btn-copy-staff-message"
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy to Clipboard
+                        </Button>
+                        <Button 
+                          onClick={generateStaffMessage} 
+                          disabled={isGeneratingStaffMessage}
+                          variant="outline"
+                          data-testid="btn-regenerate-staff-message"
+                        >
+                          {isGeneratingStaffMessage ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              )}
+            </TabsContent>
+
+            {/* Crisis Mode Tab */}
+            <TabsContent value="crisis" className="space-y-4 mt-4">
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Quick Fix Mode
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Get immediate step-by-step guidance for common restaurant emergencies.
+                </p>
               </div>
-            )}
+
+              <div className="grid grid-cols-2 gap-2">
+                {QUICK_CRISIS_TYPES.map((crisis) => (
+                  <Button
+                    key={crisis.id}
+                    variant={crisisType === crisis.id ? "default" : "outline"}
+                    className="h-auto py-3 flex flex-col items-center gap-1"
+                    onClick={() => handleCrisisMode(crisis.id)}
+                    disabled={isGeneratingCrisis}
+                    data-testid={`btn-crisis-${crisis.id}`}
+                  >
+                    <crisis.Icon className="h-5 w-5" />
+                    <span className="text-xs">{crisis.label}</span>
+                  </Button>
+                ))}
+              </div>
+
+              {isGeneratingCrisis && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span className="ml-2 text-sm">Generating crisis response...</span>
+                </div>
+              )}
+
+              {crisisResponse && !isGeneratingCrisis && (
+                <div className="p-4 bg-accent/50 rounded-lg">
+                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                    {crisisResponse}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Chat/Follow-up Tab */}
+            <TabsContent value="chat" className="space-y-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                Ask follow-up questions about your priorities or get deeper guidance on any topic.
+              </p>
+
+              {/* Chat History */}
+              {chatHistory.length > 0 && (
+                <div className="space-y-3 max-h-64 overflow-y-auto p-2 bg-muted/30 rounded-lg">
+                  {chatHistory.map((msg, idx) => (
+                    <div key={idx} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-primary/10 ml-8' : 'bg-accent mr-8'}`}>
+                      <p className="text-xs font-medium mb-1 text-muted-foreground">
+                        {msg.role === 'user' ? 'You' : 'Consultant'}
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Ask a follow-up question... e.g., 'How should I handle labor assessment for my 20-person team?'"
+                  value={followUpQuestion}
+                  onChange={(e) => setFollowUpQuestion(e.target.value)}
+                  className="flex-1 min-h-[80px]"
+                  data-testid="input-followup"
+                />
+              </div>
+              <Button 
+                onClick={handleFollowUp}
+                disabled={isChattingLoading || !followUpQuestion.trim()}
+                className="w-full"
+                data-testid="btn-send-followup"
+              >
+                {isChattingLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Getting response...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Ask Question
+                  </>
+                )}
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+// Restaurant Profile Setup Form Component
+function RestaurantProfileForm({ 
+  initialProfile, 
+  onSave, 
+  onCancel 
+}: { 
+  initialProfile: RestaurantProfile; 
+  onSave: (profile: RestaurantProfile) => void;
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState<RestaurantProfile>(initialProfile);
+  const [step, setStep] = useState(1);
+  const totalSteps = 3;
+
+  const updateField = (field: keyof RestaurantProfile, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = () => {
+    onSave(formData);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Progress indicator */}
+      <div className="flex gap-1">
+        {[1, 2, 3].map((s) => (
+          <div 
+            key={s} 
+            className={`h-1 flex-1 rounded-full ${s <= step ? 'bg-primary' : 'bg-muted'}`}
+          />
+        ))}
+      </div>
+
+      {step === 1 && (
+        <div className="space-y-4">
+          <h3 className="font-medium">Basic Information</h3>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="restaurantName">Restaurant Name</Label>
+              <Input
+                id="restaurantName"
+                value={formData.restaurantName || ''}
+                onChange={(e) => updateField('restaurantName', e.target.value)}
+                placeholder="Your restaurant name"
+                data-testid="input-restaurant-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="restaurantType">Restaurant Type</Label>
+              <Select value={formData.restaurantType || ''} onValueChange={(v) => updateField('restaurantType', v)}>
+                <SelectTrigger data-testid="select-restaurant-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fine_dining">Fine Dining</SelectItem>
+                  <SelectItem value="casual">Casual Dining</SelectItem>
+                  <SelectItem value="fast_casual">Fast Casual</SelectItem>
+                  <SelectItem value="quick_service">Quick Service</SelectItem>
+                  <SelectItem value="bar">Bar/Lounge</SelectItem>
+                  <SelectItem value="cafe">Cafe/Coffee Shop</SelectItem>
+                  <SelectItem value="brunch">Brunch Spot</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="seatCount">Seat Count</Label>
+                <Input
+                  id="seatCount"
+                  type="number"
+                  value={formData.seatCount || ''}
+                  onChange={(e) => updateField('seatCount', parseInt(e.target.value) || undefined)}
+                  placeholder="e.g., 80"
+                  data-testid="input-seat-count"
+                />
+              </div>
+              <div>
+                <Label htmlFor="staffCount">Staff Count</Label>
+                <Input
+                  id="staffCount"
+                  type="number"
+                  value={formData.staffCount || ''}
+                  onChange={(e) => updateField('staffCount', parseInt(e.target.value) || undefined)}
+                  placeholder="e.g., 25"
+                  data-testid="input-staff-count"
+                />
+              </div>
+            </div>
           </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-4">
+          <h3 className="font-medium">Operations</h3>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="location">Location Type</Label>
+              <Select value={formData.location || ''} onValueChange={(v) => updateField('location', v)}>
+                <SelectTrigger data-testid="select-location">
+                  <SelectValue placeholder="Select location type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="urban">Urban</SelectItem>
+                  <SelectItem value="suburban">Suburban</SelectItem>
+                  <SelectItem value="rural">Rural</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="peakHours">Peak Hours</Label>
+              <Select value={formData.peakHours || ''} onValueChange={(v) => updateField('peakHours', v)}>
+                <SelectTrigger data-testid="select-peak-hours">
+                  <SelectValue placeholder="Select peak hours" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lunch">Lunch</SelectItem>
+                  <SelectItem value="dinner">Dinner</SelectItem>
+                  <SelectItem value="brunch">Brunch</SelectItem>
+                  <SelectItem value="all_day">All Day</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="laborPercent">Avg Labor %</Label>
+                <Input
+                  id="laborPercent"
+                  type="number"
+                  value={formData.averageLaborPercent || ''}
+                  onChange={(e) => updateField('averageLaborPercent', parseInt(e.target.value) || undefined)}
+                  placeholder="e.g., 30"
+                  data-testid="input-labor-percent"
+                />
+              </div>
+              <div>
+                <Label htmlFor="foodCostPercent">Avg Food Cost %</Label>
+                <Input
+                  id="foodCostPercent"
+                  type="number"
+                  value={formData.averageFoodCostPercent || ''}
+                  onChange={(e) => updateField('averageFoodCostPercent', parseInt(e.target.value) || undefined)}
+                  placeholder="e.g., 28"
+                  data-testid="input-food-cost-percent"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-4">
+          <h3 className="font-medium">Key Challenges</h3>
+          <p className="text-sm text-muted-foreground">What are your biggest operational challenges?</p>
+          <div className="space-y-3">
+            {[1, 2, 3].map((num) => (
+              <div key={num}>
+                <Label htmlFor={`challenge${num}`}>Challenge #{num}</Label>
+                <Select 
+                  value={(formData as any)[`keyChallenge${num}`] || ''} 
+                  onValueChange={(v) => updateField(`keyChallenge${num}` as keyof RestaurantProfile, v)}
+                >
+                  <SelectTrigger data-testid={`select-challenge-${num}`}>
+                    <SelectValue placeholder={num === 1 ? "Primary challenge" : "Optional"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high_turnover">High Staff Turnover</SelectItem>
+                    <SelectItem value="food_costs">Food Cost Control</SelectItem>
+                    <SelectItem value="labor_costs">Labor Cost Management</SelectItem>
+                    <SelectItem value="consistency">Service Consistency</SelectItem>
+                    <SelectItem value="scheduling">Scheduling Complexity</SelectItem>
+                    <SelectItem value="training">Staff Training</SelectItem>
+                    <SelectItem value="reviews">Managing Reviews</SelectItem>
+                    <SelectItem value="inventory">Inventory Management</SelectItem>
+                    <SelectItem value="marketing">Marketing/Visibility</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-between pt-4">
+        {step > 1 ? (
+          <Button variant="outline" onClick={() => setStep(step - 1)}>
+            Back
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={onCancel}>
+            Skip for now
+          </Button>
         )}
-      </CardContent>
-    </Card>
+        {step < totalSteps ? (
+          <Button onClick={() => setStep(step + 1)}>
+            Next
+          </Button>
+        ) : (
+          <Button onClick={handleSubmit} data-testid="btn-save-profile">
+            Save Profile
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 

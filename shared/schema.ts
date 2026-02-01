@@ -373,6 +373,59 @@ export const insertInternalMessageSchema = createInsertSchema(internalMessages).
 export type InsertInternalMessage = z.infer<typeof insertInternalMessageSchema>;
 export type InternalMessage = typeof internalMessages.$inferSelect;
 
+// Restaurant Profiles (for personalized AI advice)
+export const restaurantProfiles = pgTable("restaurant_profiles", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(), // one profile per user
+  restaurantName: text("restaurant_name"),
+  restaurantType: text("restaurant_type"), // 'fine_dining', 'casual', 'fast_casual', 'quick_service', 'bar', 'cafe', 'brunch', 'other'
+  seatCount: integer("seat_count"),
+  staffCount: integer("staff_count"),
+  location: text("location"), // 'urban', 'suburban', 'rural'
+  city: text("city"),
+  state: text("state"),
+  peakDays: text("peak_days").array(), // ['friday', 'saturday', 'sunday']
+  peakHours: text("peak_hours"), // 'lunch', 'dinner', 'brunch', 'all_day'
+  keyChallenge1: text("key_challenge_1"), // 'high_turnover', 'food_costs', 'labor_costs', 'consistency', 'scheduling', 'training', 'reviews', 'inventory'
+  keyChallenge2: text("key_challenge_2"),
+  keyChallenge3: text("key_challenge_3"),
+  averageLaborPercent: integer("average_labor_percent"), // e.g., 30 for 30%
+  averageFoodCostPercent: integer("average_food_cost_percent"),
+  posSystem: text("pos_system"), // 'toast', 'square', 'clover', 'other', 'none'
+  schedulingSystem: text("scheduling_system"), // '7shifts', 'hotschedules', 'sling', 'other', 'none'
+  timezone: text("timezone").default("America/Chicago"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRestaurantProfileSchema = createInsertSchema(restaurantProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertRestaurantProfile = z.infer<typeof insertRestaurantProfileSchema>;
+export type RestaurantProfile = typeof restaurantProfiles.$inferSelect;
+
+// Daily Task Completions (tracking task completion for insights)
+export const dailyTaskCompletions = pgTable("daily_task_completions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  taskDate: text("task_date").notNull(), // YYYY-MM-DD format
+  taskDescription: text("task_description").notNull(),
+  category: text("category"), // 'labor', 'inventory', 'training', 'service', 'admin', 'finance'
+  completed: boolean("completed").default(false),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDailyTaskCompletionSchema = createInsertSchema(dailyTaskCompletions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDailyTaskCompletion = z.infer<typeof insertDailyTaskCompletionSchema>;
+export type DailyTaskCompletion = typeof dailyTaskCompletions.$inferSelect;
+
 // HR Documents (stored signed discipline documents)
 export const hrDocuments = pgTable("hr_documents", {
   id: serial("id").primaryKey(),

@@ -589,6 +589,100 @@ export async function registerRoutes(
     }
   });
 
+  // ===== RESTAURANT PROFILE ROUTES =====
+
+  // Get user's restaurant profile
+  app.get("/api/restaurant-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.getRestaurantProfile(userId);
+      res.json(profile || null);
+    } catch (error: any) {
+      console.error('Error fetching restaurant profile:', error);
+      res.status(500).json({ message: "Failed to fetch restaurant profile" });
+    }
+  });
+
+  // Create or update restaurant profile
+  app.post("/api/restaurant-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.upsertRestaurantProfile(userId, req.body);
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Error saving restaurant profile:', error);
+      res.status(500).json({ message: "Failed to save restaurant profile" });
+    }
+  });
+
+  // ===== DAILY TASK COMPLETION ROUTES =====
+
+  // Get tasks for a specific date
+  app.get("/api/daily-tasks/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { date } = req.params;
+      const tasks = await storage.getDailyTaskCompletions(userId, date);
+      res.json(tasks);
+    } catch (error: any) {
+      console.error('Error fetching daily tasks:', error);
+      res.status(500).json({ message: "Failed to fetch daily tasks" });
+    }
+  });
+
+  // Get task completion stats for a date range
+  app.get("/api/daily-tasks/stats/:startDate/:endDate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { startDate, endDate } = req.params;
+      const stats = await storage.getTaskCompletionStats(userId, startDate, endDate);
+      res.json(stats);
+    } catch (error: any) {
+      console.error('Error fetching task stats:', error);
+      res.status(500).json({ message: "Failed to fetch task stats" });
+    }
+  });
+
+  // Create a new task
+  app.post("/api/daily-tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const task = await storage.createDailyTaskCompletion({
+        ...req.body,
+        userId,
+      });
+      res.status(201).json(task);
+    } catch (error: any) {
+      console.error('Error creating daily task:', error);
+      res.status(500).json({ message: "Failed to create daily task" });
+    }
+  });
+
+  // Toggle task completion
+  app.patch("/api/daily-tasks/:id/toggle", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { completed } = req.body;
+      const task = await storage.toggleTaskCompletion(Number(id), completed);
+      res.json(task);
+    } catch (error: any) {
+      console.error('Error toggling task:', error);
+      res.status(500).json({ message: "Failed to toggle task" });
+    }
+  });
+
+  // Delete a task
+  app.delete("/api/daily-tasks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteDailyTaskCompletion(Number(id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error deleting daily task:', error);
+      res.status(500).json({ message: "Failed to delete daily task" });
+    }
+  });
+
   // ===== SCHEDULING ROUTES =====
 
   // Staff Positions

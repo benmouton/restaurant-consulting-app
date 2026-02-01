@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -913,6 +913,110 @@ export class DatabaseStorage implements IStorage {
         eq(internalMessages.id, id),
         eq(internalMessages.senderId, userId)
       ));
+  }
+
+  // Restaurant Profiles
+  async getRestaurantProfile(userId: string): Promise<RestaurantProfile | undefined> {
+    const [profile] = await db.select().from(restaurantProfiles)
+      .where(eq(restaurantProfiles.userId, userId));
+    return profile;
+  }
+
+  async createRestaurantProfile(profile: InsertRestaurantProfile): Promise<RestaurantProfile> {
+    const [newProfile] = await db.insert(restaurantProfiles)
+      .values(profile)
+      .returning();
+    return newProfile;
+  }
+
+  async updateRestaurantProfile(userId: string, data: Partial<InsertRestaurantProfile>): Promise<RestaurantProfile | undefined> {
+    const [updated] = await db.update(restaurantProfiles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(restaurantProfiles.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  async upsertRestaurantProfile(userId: string, data: Partial<InsertRestaurantProfile>): Promise<RestaurantProfile> {
+    const existing = await this.getRestaurantProfile(userId);
+    if (existing) {
+      return (await this.updateRestaurantProfile(userId, data)) as RestaurantProfile;
+    } else {
+      return await this.createRestaurantProfile({ userId, ...data });
+    }
+  }
+
+  // Daily Task Completions
+  async getDailyTaskCompletions(userId: string, date: string): Promise<DailyTaskCompletion[]> {
+    return await db.select().from(dailyTaskCompletions)
+      .where(and(
+        eq(dailyTaskCompletions.userId, userId),
+        eq(dailyTaskCompletions.taskDate, date)
+      ))
+      .orderBy(dailyTaskCompletions.createdAt);
+  }
+
+  async getTaskCompletionStats(userId: string, startDate: string, endDate: string): Promise<{
+    totalTasks: number;
+    completedTasks: number;
+    completionRate: number;
+    byCategory: Record<string, { total: number; completed: number }>;
+  }> {
+    const tasks = await db.select().from(dailyTaskCompletions)
+      .where(and(
+        eq(dailyTaskCompletions.userId, userId),
+        gte(dailyTaskCompletions.taskDate, startDate),
+        lte(dailyTaskCompletions.taskDate, endDate)
+      ));
+
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.completed).length;
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    const byCategory: Record<string, { total: number; completed: number }> = {};
+    tasks.forEach(task => {
+      const cat = task.category || 'uncategorized';
+      if (!byCategory[cat]) {
+        byCategory[cat] = { total: 0, completed: 0 };
+      }
+      byCategory[cat].total++;
+      if (task.completed) {
+        byCategory[cat].completed++;
+      }
+    });
+
+    return { totalTasks, completedTasks, completionRate, byCategory };
+  }
+
+  async createDailyTaskCompletion(task: InsertDailyTaskCompletion): Promise<DailyTaskCompletion> {
+    const [newTask] = await db.insert(dailyTaskCompletions)
+      .values(task)
+      .returning();
+    return newTask;
+  }
+
+  async updateDailyTaskCompletion(id: number, data: Partial<InsertDailyTaskCompletion>): Promise<DailyTaskCompletion | undefined> {
+    const [updated] = await db.update(dailyTaskCompletions)
+      .set(data)
+      .where(eq(dailyTaskCompletions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async toggleTaskCompletion(id: number, completed: boolean): Promise<DailyTaskCompletion | undefined> {
+    const [updated] = await db.update(dailyTaskCompletions)
+      .set({ 
+        completed, 
+        completedAt: completed ? new Date() : null 
+      })
+      .where(eq(dailyTaskCompletions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDailyTaskCompletion(id: number): Promise<void> {
+    await db.delete(dailyTaskCompletions)
+      .where(eq(dailyTaskCompletions.id, id));
   }
 }
 

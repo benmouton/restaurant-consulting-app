@@ -125,6 +125,33 @@ The application implements a three-tier role hierarchy:
   - Social media post generation with platform-specific captions
 - **System Prompt**: Extensive domain-specific prompt for restaurant operations consulting, including proven frameworks like SHADOW → PERFORM → CERTIFY training model and ROAR task management
 
+### Leadership Command Center
+Enhanced daily task tool in the Ownership and Leadership domain with personalized AI recommendations:
+
+**Features**:
+- **Restaurant Profile Setup**: 3-step wizard to capture restaurant context:
+  - Step 1: Basic info (name, type, seat count, staff count)
+  - Step 2: Operations (location type, peak hours, labor %, food cost %)
+  - Step 3: Key challenges (up to 3 operational challenges)
+- **Personalized Priorities**: AI generates daily tasks based on day of week, restaurant profile, and key challenges
+- **Crisis Mode**: Quick-fix emergency guidance for 6 crisis types:
+  - Staff No-Show
+  - Equipment Failure
+  - Unexpected Rush
+  - Guest Complaint
+  - Delivery Problem
+  - Health/Safety Issue
+- **Interactive Follow-up Chat**: Ask follow-up questions about priorities or get deeper guidance
+
+**Database Tables**:
+- `restaurant_profiles`: Stores user restaurant profile data including type, size, challenges, and financial targets
+
+**API Endpoints**:
+- `GET /api/restaurant-profile`: Get user's restaurant profile
+- `POST /api/restaurant-profile`: Save/update restaurant profile
+
+**Component Location**: `client/src/pages/domain.tsx` (DailyTaskReminder component)
+
 ### Social Media Post Builder
 AI-powered social media content creation tool available in the Social Media domain:
 - **Multi-step Wizard**: Post type selection → Platforms → Event details → Tone/style → AI generation
