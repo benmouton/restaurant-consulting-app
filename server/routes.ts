@@ -12,7 +12,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { parseDocument, type FinancialMetrics } from "./document-parser";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { stripeService } from "./stripeService";
-import { getStripePublishableKey } from "./stripeClient";
+import { getStripePublishableKey, getStripeSync } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { restaurantHolidays } from "@shared/schema";
@@ -215,16 +215,53 @@ export async function registerRoutes(
       }
 
       // Get the main subscription price ($10/month), excluding employee seat prices
+      console.log('Fetching subscription prices from database...');
       const prices = await db.execute(
-        sql`SELECT id FROM stripe.prices 
+        sql`SELECT id, unit_amount, metadata FROM stripe.prices 
             WHERE active = true 
             AND (metadata->>'is_employee_seat' IS NULL OR metadata->>'is_employee_seat' != 'true')
             ORDER BY unit_amount ASC LIMIT 1`
       );
       
+      console.log('Prices query result:', JSON.stringify(prices.rows));
+      
       if (!prices.rows || prices.rows.length === 0) {
-        console.error('No valid subscription price found');
-        return res.status(400).json({ error: "No subscription price available. Please contact support." });
+        // Try to sync Stripe data if no prices found
+        console.error('No valid subscription price found, attempting to sync Stripe data...');
+        try {
+          const stripeSync = await getStripeSync();
+          await stripeSync.sync();
+          console.log('Stripe sync completed, retrying price query...');
+          
+          // Retry the query
+          const retryPrices = await db.execute(
+            sql`SELECT id, unit_amount, metadata FROM stripe.prices 
+                WHERE active = true 
+                AND (metadata->>'is_employee_seat' IS NULL OR metadata->>'is_employee_seat' != 'true')
+                ORDER BY unit_amount ASC LIMIT 1`
+          );
+          
+          if (!retryPrices.rows || retryPrices.rows.length === 0) {
+            console.error('Still no prices after sync. Prices in Stripe may need to be created.');
+            return res.status(400).json({ error: "No subscription price available. Please contact support." });
+          }
+          
+          const priceId = retryPrices.rows[0].id as string;
+          console.log('Creating checkout with priceId after retry:', priceId);
+          const baseUrl = `${req.protocol}://${req.get('host')}`;
+          
+          const session = await stripeService.createCheckoutSession(
+            customerId,
+            priceId,
+            `${baseUrl}/subscription/success`,
+            `${baseUrl}/subscription/cancel`
+          );
+          
+          return res.json({ url: session.url });
+        } catch (syncError: any) {
+          console.error('Stripe sync failed:', syncError?.message || syncError);
+          return res.status(400).json({ error: "No subscription price available. Please contact support." });
+        }
       }
 
       const priceId = prices.rows[0].id as string;
