@@ -3,6 +3,10 @@ import { db } from './db';
 import { sql } from 'drizzle-orm';
 
 export class StripeService {
+  async getStripe() {
+    return await getUncachableStripeClient();
+  }
+
   async createCustomer(email: string, userId: string) {
     const stripe = await getUncachableStripeClient();
     return await stripe.customers.create({

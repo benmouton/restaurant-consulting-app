@@ -1,0 +1,56 @@
+What to do right now (step-by-step)
+Step 1 – Check if the package is actually present
+In the Replit Shell (bottom panel or Tools → Shell), run:
+Bashnpm ls stripe-replit-sync
+or
+Bashcat package.json | grep stripe-replit-sync
+What to look for:
+
+If it says missing or nothing appears → the package is not installed
+If it shows a version → it’s installed, but might be broken / outdated
+
+Step 2 – Quick test to see what’s really being returned
+Temporarily change this part of the code (in the file that has the crashing line):
+diff- const stripeSync = await getStripeSync();
+- await stripeSync.sync();
++ const stripeSync = await getStripeSync();
++ console.log('stripeSync:', stripeSync);
++ console.log('typeof stripeSync:', typeof stripeSync);
++ console.log('stripeSync keys:', stripeSync ? Object.keys(stripeSync) : 'null');
++ // await stripeSync.sync();   // comment this out for now
+Then restart the repl and look at the logs.
+Very common outcomes:
+
+stripeSync: null or undefined → import failed silently
+stripeSync: {} → empty object (package didn't export anything useful)
+stripeSync keys: [] or very few keys → wrong class / broken module
+stripeSync keys: ["findOrCreateManagedWebhook", "syncBackfill", ...] → method is called something else
+
+Step 3 – Most realistic fix paths
+Path A: The package is missing / broken (most likely)
+Replace the sync logic with direct Stripe calls — it's much more reliable.
+Example minimal replacement (you can put this instead of stripeSync.sync()):
+TypeScriptimport Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-06-20', // or your preferred version
+});
+
+async function ensurePriceExists() {
+  try {
+    const price = await stripe.prices.retrieve(process.env.STRIPE_PRICE_ID!);
+    console.log('Price exists:', price.id);
+    // optionally store in your DB here
+    return price;
+  } catch (err: any) {
+    if (err.code === 'resource_missing') {
+      console.log('Price not found - but we can continue if you only need checkout');
+      return null;
+    }
+    throw err;
+  }
+}
+
+// Then in your route:
+await ensurePriceExists();
+// or just go straight to checkout without checking
