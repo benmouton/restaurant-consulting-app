@@ -48,9 +48,11 @@ export async function sendOrganizationInviteEmail(
   inviteLink: string
 ): Promise<boolean> {
   try {
+    console.log(`[Email] Attempting to send invite email to ${toEmail}`);
     const { client, fromEmail } = await getResendClient();
+    console.log(`[Email] Got Resend client, fromEmail: ${fromEmail || 'using default'}`);
     
-    await client.emails.send({
+    const result = await client.emails.send({
       from: fromEmail || 'The Restaurant Consultant <noreply@resend.dev>',
       to: toEmail,
       subject: `${inviterName} invited you to join ${organizationName}`,
@@ -75,9 +77,18 @@ export async function sendOrganizationInviteEmail(
       `,
     });
     
+    console.log(`[Email] Resend API response:`, JSON.stringify(result));
+    
+    if (result.error) {
+      console.error('[Email] Resend returned error:', result.error);
+      return false;
+    }
+    
+    console.log(`[Email] Successfully sent invite email to ${toEmail}, id: ${result.data?.id}`);
     return true;
-  } catch (error) {
-    console.error('Failed to send invite email:', error);
+  } catch (error: any) {
+    console.error('[Email] Failed to send invite email:', error?.message || error);
+    console.error('[Email] Full error:', JSON.stringify(error, null, 2));
     return false;
   }
 }
