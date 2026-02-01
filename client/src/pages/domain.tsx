@@ -58,7 +58,9 @@ import {
   Timer,
   MessageCircleWarning,
   Package,
-  ShieldAlert
+  ShieldAlert,
+  Bell,
+  BellRing
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -3000,7 +3002,7 @@ function DailyTaskReminder() {
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [activeTab, setActiveTab] = useState<'priorities' | 'crisis' | 'chat' | 'progress'>('priorities');
+  const [activeTab, setActiveTab] = useState<'priorities' | 'crisis' | 'chat' | 'progress' | 'reminders'>('priorities');
   const [crisisType, setCrisisType] = useState<string>('');
   const [crisisResponse, setCrisisResponse] = useState<string>('');
   const [isGeneratingCrisis, setIsGeneratingCrisis] = useState(false);
@@ -3404,7 +3406,7 @@ Generate ONLY the staff message, nothing else.`,
         <CardContent className="space-y-4">
           {/* Tab Navigation */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="priorities" data-testid="tab-priorities">
                 <Sparkles className="h-4 w-4 mr-2" />
                 Priorities
@@ -3420,6 +3422,10 @@ Generate ONLY the staff message, nothing else.`,
               <TabsTrigger value="progress" data-testid="tab-progress">
                 <CheckSquare className="h-4 w-4 mr-2" />
                 Progress
+              </TabsTrigger>
+              <TabsTrigger value="reminders" data-testid="tab-reminders">
+                <Bell className="h-4 w-4 mr-2" />
+                Reminders
               </TabsTrigger>
             </TabsList>
 
@@ -3622,6 +3628,11 @@ Generate ONLY the staff message, nothing else.`,
             {/* Progress Tracking Tab */}
             <TabsContent value="progress" className="space-y-4 mt-4">
               <TaskProgressDashboard />
+            </TabsContent>
+
+            {/* Reminders Tab */}
+            <TabsContent value="reminders" className="space-y-4 mt-4">
+              <NotificationReminders />
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -3900,6 +3911,240 @@ function DailyHeatmap() {
         </div>
         <span>More</span>
       </div>
+    </div>
+  );
+}
+
+// Notification Reminders Component
+function NotificationReminders() {
+  const { toast } = useToast();
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState('09:00');
+  
+  // Check notification support and permission on mount, and re-check on focus
+  useEffect(() => {
+    const checkPermission = () => {
+      if (!('Notification' in window)) {
+        setNotificationPermission('unsupported');
+      } else {
+        setNotificationPermission(Notification.permission);
+      }
+    };
+    
+    checkPermission();
+    
+    // Re-check permission when window gains focus (user might have changed it in settings)
+    window.addEventListener('focus', checkPermission);
+    
+    // Load saved preferences from localStorage
+    const savedEnabled = localStorage.getItem('dailyReminderEnabled');
+    const savedTime = localStorage.getItem('dailyReminderTime');
+    if (savedEnabled === 'true') setReminderEnabled(true);
+    if (savedTime) setReminderTime(savedTime);
+    
+    return () => window.removeEventListener('focus', checkPermission);
+  }, []);
+  
+  // Set up reminder using setTimeout to fire at exact time, once per day
+  useEffect(() => {
+    if (!reminderEnabled || notificationPermission !== 'granted') return;
+    
+    // Save preferences
+    localStorage.setItem('dailyReminderEnabled', 'true');
+    localStorage.setItem('dailyReminderTime', reminderTime);
+    
+    const scheduleNextReminder = () => {
+      const now = new Date();
+      const [hours, minutes] = reminderTime.split(':').map(Number);
+      
+      // Calculate the next reminder time
+      const nextReminder = new Date(now);
+      nextReminder.setHours(hours, minutes, 0, 0);
+      
+      // If we've passed today's reminder time, schedule for tomorrow
+      if (now >= nextReminder) {
+        nextReminder.setDate(nextReminder.getDate() + 1);
+      }
+      
+      const msUntilReminder = nextReminder.getTime() - now.getTime();
+      
+      // Schedule the notification
+      const timeoutId = setTimeout(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const lastReminderDate = localStorage.getItem('lastReminderDate');
+        
+        // Only show if we haven't already reminded today
+        if (lastReminderDate !== today) {
+          showNotification();
+          localStorage.setItem('lastReminderDate', today);
+        }
+        
+        // Schedule the next day's reminder
+        scheduleNextReminder();
+      }, msUntilReminder);
+      
+      return timeoutId;
+    };
+    
+    const timeoutId = scheduleNextReminder();
+    
+    return () => clearTimeout(timeoutId);
+  }, [reminderEnabled, reminderTime, notificationPermission]);
+  
+  const requestPermission = async () => {
+    if (!('Notification' in window)) {
+      toast({ title: 'Notifications not supported', description: 'Your browser does not support notifications.', variant: 'destructive' });
+      return;
+    }
+    
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      
+      if (permission === 'granted') {
+        toast({ title: 'Notifications enabled', description: 'You can now receive daily reminders.' });
+      } else if (permission === 'denied') {
+        toast({ title: 'Notifications blocked', description: 'Please enable notifications in your browser settings.', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      toast({ title: 'Error', description: 'Failed to request notification permission.', variant: 'destructive' });
+    }
+  };
+  
+  const showNotification = () => {
+    if (notificationPermission !== 'granted') return;
+    
+    const notification = new Notification('Daily Task Reminder', {
+      body: 'Time to check your daily priorities and keep your restaurant running smoothly!',
+      icon: '/favicon.ico',
+      tag: 'daily-reminder', // Prevents duplicate notifications
+    });
+    
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  };
+  
+  const testNotification = () => {
+    if (notificationPermission !== 'granted') {
+      toast({ title: 'Permission required', description: 'Please enable notifications first.', variant: 'destructive' });
+      return;
+    }
+    showNotification();
+    toast({ title: 'Test notification sent', description: 'Check your notifications!' });
+  };
+  
+  const toggleReminder = (enabled: boolean) => {
+    setReminderEnabled(enabled);
+    localStorage.setItem('dailyReminderEnabled', enabled ? 'true' : 'false');
+    
+    if (enabled) {
+      toast({ title: 'Reminder enabled', description: `You'll be reminded at ${reminderTime} every day.` });
+    } else {
+      toast({ title: 'Reminder disabled' });
+    }
+  };
+  
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Set up daily reminders to stay on top of your restaurant priorities.
+      </p>
+      
+      {/* Notification Permission Status */}
+      <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {notificationPermission === 'granted' ? (
+              <BellRing className="h-5 w-5 text-green-500" />
+            ) : (
+              <Bell className="h-5 w-5 text-muted-foreground" />
+            )}
+            <span className="font-medium">Browser Notifications</span>
+          </div>
+          <Badge variant={notificationPermission === 'granted' ? 'default' : 'secondary'}>
+            {notificationPermission === 'granted' ? 'Enabled' : 
+             notificationPermission === 'denied' ? 'Blocked' : 
+             notificationPermission === 'unsupported' ? 'Not Supported' : 'Not Set'}
+          </Badge>
+        </div>
+        
+        {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && (
+          <Button onClick={requestPermission} variant="outline" size="sm" data-testid="btn-enable-notifications">
+            <Bell className="h-4 w-4 mr-2" />
+            Enable Notifications
+          </Button>
+        )}
+        
+        {notificationPermission === 'denied' && (
+          <p className="text-xs text-muted-foreground">
+            Notifications are blocked. Please enable them in your browser settings by clicking the lock icon in the address bar.
+          </p>
+        )}
+      </div>
+      
+      {/* Reminder Settings */}
+      {notificationPermission === 'granted' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+            <div>
+              <p className="font-medium">Daily Priority Reminder</p>
+              <p className="text-sm text-muted-foreground">Get notified to check your daily tasks</p>
+            </div>
+            <Button
+              variant={reminderEnabled ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleReminder(!reminderEnabled)}
+              data-testid="btn-toggle-reminder"
+            >
+              {reminderEnabled ? 'On' : 'Off'}
+            </Button>
+          </div>
+          
+          {reminderEnabled && (
+            <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              <div className="flex-1">
+                <Label htmlFor="reminderTime" className="text-sm font-medium">Reminder Time</Label>
+                <p className="text-xs text-muted-foreground">What time should we remind you?</p>
+              </div>
+              <Input
+                type="time"
+                id="reminderTime"
+                value={reminderTime}
+                onChange={(e) => {
+                  setReminderTime(e.target.value);
+                  localStorage.setItem('dailyReminderTime', e.target.value);
+                }}
+                className="w-32"
+                data-testid="input-reminder-time"
+              />
+            </div>
+          )}
+          
+          <Button 
+            onClick={testNotification} 
+            variant="outline" 
+            size="sm" 
+            className="w-full"
+            data-testid="btn-test-notification"
+          >
+            <BellRing className="h-4 w-4 mr-2" />
+            Test Notification
+          </Button>
+        </div>
+      )}
+      
+      {notificationPermission === 'unsupported' && (
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            Your browser doesn't support notifications. Try using a modern browser like Chrome, Firefox, or Edge.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
