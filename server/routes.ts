@@ -683,6 +683,37 @@ export async function registerRoutes(
     }
   });
 
+  // Get task completion trends (weekly summary for past N weeks)
+  app.get("/api/daily-tasks/trends/:weeks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const weeks = Math.min(Number(req.params.weeks) || 8, 12); // Cap at 12 weeks
+      const trends = await storage.getTaskCompletionTrends(userId, weeks);
+      res.json(trends);
+    } catch (error: any) {
+      console.error('Error fetching task trends:', error);
+      res.status(500).json({ message: "Failed to fetch task trends" });
+    }
+  });
+
+  // Get daily completion heatmap data for date range
+  app.get("/api/daily-tasks/heatmap", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { start, end } = req.query;
+      
+      // Default to past 56 days (8 weeks) if not specified
+      const endDate = end || new Date().toISOString().split('T')[0];
+      const startDate = start || new Date(Date.now() - 56 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      const heatmapData = await storage.getDailyCompletionHeatmap(userId, startDate, endDate);
+      res.json(heatmapData);
+    } catch (error: any) {
+      console.error('Error fetching heatmap data:', error);
+      res.status(500).json({ message: "Failed to fetch heatmap data" });
+    }
+  });
+
   // ===== SCHEDULING ROUTES =====
 
   // Staff Positions

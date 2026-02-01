@@ -131,6 +131,21 @@ export interface IStorage {
   
   // HR Documents (organization-aware)
   getHRDocumentsForOrganization(organizationId: number): Promise<HRDocument[]>;
+  
+  // Daily Task Completions
+  getDailyTaskCompletions(userId: string, date: string): Promise<DailyTaskCompletion[]>;
+  getTaskCompletionStats(userId: string, startDate: string, endDate: string): Promise<{
+    totalTasks: number;
+    completedTasks: number;
+    completionRate: number;
+    byCategory: Record<string, { total: number; completed: number }>;
+  }>;
+  createDailyTaskCompletion(task: InsertDailyTaskCompletion): Promise<DailyTaskCompletion>;
+  updateDailyTaskCompletion(id: number, data: Partial<InsertDailyTaskCompletion>): Promise<DailyTaskCompletion | undefined>;
+  toggleTaskCompletion(id: number, completed: boolean): Promise<DailyTaskCompletion | undefined>;
+  deleteDailyTaskCompletion(id: number): Promise<void>;
+  getTaskCompletionTrends(userId: string, weeks: number): Promise<{ weekStart: string; completed: number; total: number }[]>;
+  getDailyCompletionHeatmap(userId: string, startDate: string, endDate: string): Promise<{ date: string; completed: number; total: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1030,6 +1045,65 @@ export class DatabaseStorage implements IStorage {
   async deleteDailyTaskCompletion(id: number): Promise<void> {
     await db.delete(dailyTaskCompletions)
       .where(eq(dailyTaskCompletions.id, id));
+  }
+
+  async getTaskCompletionTrends(userId: string, weeks: number): Promise<{ weekStart: string; completed: number; total: number }[]> {
+    const results: { weekStart: string; completed: number; total: number }[] = [];
+    const now = new Date();
+    
+    for (let i = weeks - 1; i >= 0; i--) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (now.getDay() + (i * 7)));
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      
+      const startStr = weekStart.toISOString().split('T')[0];
+      const endStr = weekEnd.toISOString().split('T')[0];
+      
+      const tasks = await db.select().from(dailyTaskCompletions)
+        .where(and(
+          eq(dailyTaskCompletions.userId, userId),
+          gte(dailyTaskCompletions.taskDate, startStr),
+          lte(dailyTaskCompletions.taskDate, endStr)
+        ));
+      
+      results.push({
+        weekStart: startStr,
+        completed: tasks.filter(t => t.completed).length,
+        total: tasks.length
+      });
+    }
+    
+    return results;
+  }
+
+  async getDailyCompletionHeatmap(userId: string, startDate: string, endDate: string): Promise<{ date: string; completed: number; total: number }[]> {
+    // Get all tasks in the date range
+    const tasks = await db.select().from(dailyTaskCompletions)
+      .where(and(
+        eq(dailyTaskCompletions.userId, userId),
+        gte(dailyTaskCompletions.taskDate, startDate),
+        lte(dailyTaskCompletions.taskDate, endDate)
+      ));
+    
+    // Group by date
+    const byDate: Record<string, { completed: number; total: number }> = {};
+    tasks.forEach(task => {
+      if (!byDate[task.taskDate]) {
+        byDate[task.taskDate] = { completed: 0, total: 0 };
+      }
+      byDate[task.taskDate].total++;
+      if (task.completed) {
+        byDate[task.taskDate].completed++;
+      }
+    });
+    
+    // Convert to array sorted by date
+    return Object.entries(byDate)
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 }
 

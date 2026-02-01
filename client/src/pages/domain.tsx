@@ -3000,7 +3000,7 @@ function DailyTaskReminder() {
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [activeTab, setActiveTab] = useState<'priorities' | 'crisis' | 'chat'>('priorities');
+  const [activeTab, setActiveTab] = useState<'priorities' | 'crisis' | 'chat' | 'progress'>('priorities');
   const [crisisType, setCrisisType] = useState<string>('');
   const [crisisResponse, setCrisisResponse] = useState<string>('');
   const [isGeneratingCrisis, setIsGeneratingCrisis] = useState(false);
@@ -3404,18 +3404,22 @@ Generate ONLY the staff message, nothing else.`,
         <CardContent className="space-y-4">
           {/* Tab Navigation */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="priorities" data-testid="tab-priorities">
                 <Sparkles className="h-4 w-4 mr-2" />
                 Priorities
               </TabsTrigger>
               <TabsTrigger value="crisis" data-testid="tab-crisis">
                 <AlertTriangle className="h-4 w-4 mr-2" />
-                Crisis Mode
+                Crisis
               </TabsTrigger>
               <TabsTrigger value="chat" data-testid="tab-chat">
                 <MessageSquare className="h-4 w-4 mr-2" />
-                Ask Follow-up
+                Follow-up
+              </TabsTrigger>
+              <TabsTrigger value="progress" data-testid="tab-progress">
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Progress
               </TabsTrigger>
             </TabsList>
 
@@ -3614,10 +3618,289 @@ Generate ONLY the staff message, nothing else.`,
                 )}
               </Button>
             </TabsContent>
+
+            {/* Progress Tracking Tab */}
+            <TabsContent value="progress" className="space-y-4 mt-4">
+              <TaskProgressDashboard />
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
     </>
+  );
+}
+
+// Task Progress Dashboard Component
+function TaskProgressDashboard() {
+  const { toast } = useToast();
+  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month'>('week');
+  
+  const today = new Date().toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  
+  const startDate = selectedPeriod === 'week' ? weekAgo : monthAgo;
+  
+  const { data: stats, isLoading: statsLoading } = useQuery<{
+    totalTasks: number;
+    completedTasks: number;
+    completionRate: number;
+    byCategory: Record<string, { total: number; completed: number }>;
+  }>({
+    queryKey: ['/api/daily-tasks/stats', startDate, today],
+  });
+  
+  const { data: trends, isLoading: trendsLoading } = useQuery<{
+    weekStart: string;
+    completed: number;
+    total: number;
+  }[]>({
+    queryKey: ['/api/daily-tasks/trends', 8],
+  });
+  
+  const { data: todayTasks, isLoading: todayLoading } = useQuery<any[]>({
+    queryKey: ['/api/daily-tasks', today],
+  });
+  
+  const categoryLabels: Record<string, string> = {
+    labor: 'Labor',
+    inventory: 'Inventory', 
+    training: 'Training',
+    service: 'Service',
+    admin: 'Admin',
+    finance: 'Finance',
+    uncategorized: 'Other'
+  };
+  
+  const categoryColors: Record<string, string> = {
+    labor: 'bg-blue-500',
+    inventory: 'bg-green-500',
+    training: 'bg-purple-500', 
+    service: 'bg-orange-500',
+    admin: 'bg-gray-500',
+    finance: 'bg-red-500',
+    uncategorized: 'bg-slate-400'
+  };
+  
+  if (statsLoading || trendsLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-6">
+      {/* Period Selector */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">View:</span>
+        <Button
+          variant={selectedPeriod === 'week' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSelectedPeriod('week')}
+          data-testid="btn-period-week"
+        >
+          This Week
+        </Button>
+        <Button
+          variant={selectedPeriod === 'month' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSelectedPeriod('month')}
+          data-testid="btn-period-month"
+        >
+          This Month
+        </Button>
+      </div>
+      
+      {/* Stats Overview */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="p-4 rounded-lg bg-muted/50 text-center">
+          <p className="text-2xl font-bold text-primary">{stats?.completedTasks || 0}</p>
+          <p className="text-xs text-muted-foreground">Completed</p>
+        </div>
+        <div className="p-4 rounded-lg bg-muted/50 text-center">
+          <p className="text-2xl font-bold">{stats?.totalTasks || 0}</p>
+          <p className="text-xs text-muted-foreground">Total Tasks</p>
+        </div>
+        <div className="p-4 rounded-lg bg-muted/50 text-center">
+          <p className="text-2xl font-bold text-green-600">{stats?.completionRate || 0}%</p>
+          <p className="text-xs text-muted-foreground">Rate</p>
+        </div>
+      </div>
+      
+      {/* Weekly Trend Bars */}
+      {trends && trends.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Weekly Trends</h4>
+          <div className="flex items-end gap-1 h-24 p-3 bg-muted/30 rounded-lg">
+            {trends.map((week, idx) => {
+              const maxTotal = Math.max(...trends.map(w => w.total), 1);
+              const height = week.total > 0 ? (week.completed / maxTotal) * 100 : 0;
+              const rate = week.total > 0 ? Math.round((week.completed / week.total) * 100) : 0;
+              
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                  <div 
+                    className="w-full bg-primary/80 rounded-t transition-all duration-300"
+                    style={{ height: `${Math.max(height, 4)}%` }}
+                    title={`${week.completed}/${week.total} tasks (${rate}%)`}
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    W{trends.length - idx}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Task completion over the past {trends.length} weeks
+          </p>
+        </div>
+      )}
+      
+      {/* Category Breakdown */}
+      {stats?.byCategory && Object.keys(stats.byCategory).length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">By Category</h4>
+          <div className="space-y-2">
+            {Object.entries(stats.byCategory).map(([cat, data]) => {
+              const rate = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+              return (
+                <div key={cat} className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${categoryColors[cat] || 'bg-slate-400'}`} />
+                  <span className="text-sm flex-1">{categoryLabels[cat] || cat}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {data.completed}/{data.total}
+                  </span>
+                  <Badge variant={rate >= 80 ? "default" : rate >= 50 ? "secondary" : "outline"}>
+                    {rate}%
+                  </Badge>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* Day-by-Day Heatmap */}
+      <DailyHeatmap />
+      
+      {/* Empty State */}
+      {(!stats?.totalTasks || stats.totalTasks === 0) && (
+        <div className="text-center py-6 text-muted-foreground">
+          <CheckSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No tasks tracked yet.</p>
+          <p className="text-xs">Tasks you complete from generated priorities will appear here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Daily Heatmap Component for visual task completion insights
+function DailyHeatmap() {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  // Calculate date range for the past 8 weeks
+  const endDate = new Date().toISOString().split('T')[0];
+  const startDate = new Date(Date.now() - 56 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  
+  // Fetch daily completion data
+  const { data: dailyData, isLoading } = useQuery<{ date: string; completed: number; total: number }[]>({
+    queryKey: ['/api/daily-tasks/heatmap', startDate, endDate],
+  });
+  
+  // Generate the grid structure for 8 weeks
+  const now = new Date();
+  const gridData: { date: string; dayOfWeek: number; weekIndex: number }[] = [];
+  
+  for (let week = 0; week < 8; week++) {
+    for (let day = 0; day < 7; day++) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - ((7 - now.getDay()) + (week * 7) + (6 - day)));
+      
+      if (date <= now) {
+        gridData.push({
+          date: date.toISOString().split('T')[0],
+          dayOfWeek: day,
+          weekIndex: week,
+        });
+      }
+    }
+  }
+  
+  const getIntensityColor = (completed: number, total: number) => {
+    if (total === 0) return 'bg-muted';
+    const rate = completed / total;
+    if (rate < 0.25) return 'bg-green-200 dark:bg-green-900';
+    if (rate < 0.5) return 'bg-green-300 dark:bg-green-700';
+    if (rate < 0.75) return 'bg-green-400 dark:bg-green-600';
+    return 'bg-green-500 dark:bg-green-500';
+  };
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-4">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  // Create a lookup map for quick access
+  const dataByDate = new Map(dailyData?.map(d => [d.date, d]) || []);
+  
+  return (
+    <div className="space-y-2">
+      <h4 className="text-sm font-medium">Activity Heatmap</h4>
+      <div className="flex gap-1">
+        <div className="flex flex-col gap-1 text-[10px] text-muted-foreground pr-1">
+          {days.map(day => (
+            <div key={day} className="h-3 flex items-center">{day}</div>
+          ))}
+        </div>
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {[...Array(8)].map((_, weekIdx) => (
+            <div key={weekIdx} className="flex flex-col gap-1">
+              {days.map((_, dayIdx) => {
+                const cell = gridData.find(d => d.weekIndex === (7 - weekIdx) && d.dayOfWeek === dayIdx);
+                const dayData = cell ? dataByDate.get(cell.date) : null;
+                const hasData = dayData && dayData.total > 0;
+                
+                return (
+                  <div
+                    key={`${weekIdx}-${dayIdx}`}
+                    className={`w-3 h-3 rounded-sm ${
+                      cell 
+                        ? (hasData 
+                            ? getIntensityColor(dayData!.completed, dayData!.total)
+                            : 'bg-muted/50')
+                        : 'bg-muted/30'
+                    }`}
+                    title={cell 
+                      ? (hasData 
+                          ? `${cell.date}: ${dayData!.completed}/${dayData!.total} tasks (${Math.round((dayData!.completed / dayData!.total) * 100)}%)` 
+                          : `${cell.date}: No tasks`)
+                      : 'No data'}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
+        <span>Less</span>
+        <div className="flex gap-0.5">
+          <div className="w-3 h-3 rounded-sm bg-muted" />
+          <div className="w-3 h-3 rounded-sm bg-green-200 dark:bg-green-900" />
+          <div className="w-3 h-3 rounded-sm bg-green-300 dark:bg-green-700" />
+          <div className="w-3 h-3 rounded-sm bg-green-400 dark:bg-green-600" />
+          <div className="w-3 h-3 rounded-sm bg-green-500" />
+        </div>
+        <span>More</span>
+      </div>
+    </div>
   );
 }
 
