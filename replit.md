@@ -128,29 +128,49 @@ The application implements a three-tier role hierarchy:
 ### Leadership Command Center
 Enhanced daily task tool in the Ownership and Leadership domain with personalized AI recommendations:
 
-**Features**:
-- **Restaurant Profile Setup**: 3-step wizard to capture restaurant context:
-  - Step 1: Basic info (name, type, seat count, staff count)
-  - Step 2: Operations (location type, peak hours, labor %, food cost %)
-  - Step 3: Key challenges (up to 3 operational challenges)
-- **Personalized Priorities**: AI generates daily tasks based on day of week, restaurant profile, and key challenges
-- **Crisis Mode**: Quick-fix emergency guidance for 6 crisis types:
+**Features** (5 tabs):
+- **Priorities Tab**: AI generates daily tasks based on day of week, restaurant profile, and key challenges
+- **Crisis Tab**: Quick-fix emergency guidance for 6 crisis types:
   - Staff No-Show
   - Equipment Failure
   - Unexpected Rush
   - Guest Complaint
   - Delivery Problem
   - Health/Safety Issue
-- **Interactive Follow-up Chat**: Ask follow-up questions about priorities or get deeper guidance
+- **Follow-up Tab**: Interactive conversational mode to ask follow-up questions about priorities
+- **Progress Tab**: Task completion tracking dashboard with:
+  - Period selector (week/month) for stats filtering
+  - Completion rate statistics and trends
+  - Weekly trends bar chart
+  - Category breakdown (prep, staffing, inventory, etc.)
+  - GitHub-style activity heatmap showing daily completion patterns (8 weeks)
+- **Reminders Tab**: Browser notification reminders for daily tasks:
+  - Request notification permission
+  - Customizable reminder time
+  - localStorage persistence of preferences
+  - lastReminderDate tracking to prevent duplicate same-day notifications
+  - Test notification button
+
+**Restaurant Profile Setup**: 3-step wizard to capture restaurant context:
+- Step 1: Basic info (name, type, seat count, staff count)
+- Step 2: Operations (location type, peak hours, labor %, food cost %)
+- Step 3: Key challenges (up to 3 operational challenges)
 
 **Database Tables**:
 - `restaurant_profiles`: Stores user restaurant profile data including type, size, challenges, and financial targets
+- `dailyTaskCompletions`: Tracks individual task completions with date, category, and completion status
 
 **API Endpoints**:
 - `GET /api/restaurant-profile`: Get user's restaurant profile
 - `POST /api/restaurant-profile`: Save/update restaurant profile
+- `GET /api/daily-tasks`: List daily tasks for user
+- `POST /api/daily-tasks`: Create a daily task completion record
+- `PATCH /api/daily-tasks/:id`: Update task completion status
+- `GET /api/daily-tasks/stats`: Get task completion statistics for a date range
+- `GET /api/daily-tasks/trends/:weeks`: Get weekly completion trends
+- `GET /api/daily-tasks/heatmap`: Get daily completion data for heatmap visualization
 
-**Component Location**: `client/src/pages/domain.tsx` (DailyTaskReminder component)
+**Component Location**: `client/src/pages/domain.tsx` (DailyTaskReminder, TaskProgressDashboard, DailyHeatmap, NotificationReminders components)
 
 ### Social Media Post Builder
 AI-powered social media content creation tool available in the Social Media domain:
