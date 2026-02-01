@@ -214,15 +214,21 @@ export async function registerRoutes(
         customerId = customer.id;
       }
 
+      // Get the main subscription price ($10/month), excluding employee seat prices
       const prices = await db.execute(
-        sql`SELECT id FROM stripe.prices WHERE active = true ORDER BY unit_amount ASC LIMIT 1`
+        sql`SELECT id FROM stripe.prices 
+            WHERE active = true 
+            AND (metadata->>'is_employee_seat' IS NULL OR metadata->>'is_employee_seat' != 'true')
+            ORDER BY unit_amount ASC LIMIT 1`
       );
       
       if (!prices.rows || prices.rows.length === 0) {
-        return res.status(400).json({ error: "No subscription price available. Please run the product seed script." });
+        console.error('No valid subscription price found');
+        return res.status(400).json({ error: "No subscription price available. Please contact support." });
       }
 
       const priceId = prices.rows[0].id as string;
+      console.log('Creating checkout with priceId:', priceId);
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       
       const session = await stripeService.createCheckoutSession(
@@ -233,9 +239,9 @@ export async function registerRoutes(
       );
 
       res.json({ url: session.url });
-    } catch (error) {
-      console.error('Checkout error:', error);
-      res.status(500).json({ error: "Failed to create checkout session" });
+    } catch (error: any) {
+      console.error('Checkout error:', error?.message || error);
+      res.status(500).json({ error: error?.message || "Failed to create checkout session" });
     }
   });
 
