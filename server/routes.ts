@@ -2170,9 +2170,13 @@ Generate JSON with:
       });
       console.log(`[Invite] Invite created with id: ${invite.id}`);
 
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : process.env.REPLIT_DEPLOYMENT_URL || "http://localhost:5000";
+      // Use production domain if available, otherwise dev domain
+      const productionDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
+      const baseUrl = productionDomain 
+        ? `https://${productionDomain}`
+        : process.env.REPLIT_DEV_DOMAIN
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+          : "http://localhost:5000";
       const inviteLink = `${baseUrl}/accept-invite/${inviteToken}`;
 
       console.log(`[Invite] Sending email to ${email}...`);
