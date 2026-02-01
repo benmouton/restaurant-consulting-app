@@ -15,7 +15,7 @@ export function useSubscription() {
   const { isAdmin, isLoading: adminLoading, error: adminError } = useAdmin();
   const { toast } = useToast();
   
-  const { data, isLoading, error } = useQuery<SubscriptionStatus>({
+  const { data, isLoading, error, refetch: refetchStatus } = useQuery<SubscriptionStatus>({
     queryKey: ["/api/subscription/status"],
     staleTime: 30000,
     retry: false,
@@ -25,6 +25,9 @@ export function useSubscription() {
   const checkoutMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/subscription/checkout");
+      if (res.status === 401) {
+        throw new Error("SESSION_EXPIRED");
+      }
       return res.json();
     },
     onSuccess: (data) => {
@@ -40,11 +43,23 @@ export function useSubscription() {
     },
     onError: (error: Error) => {
       console.error("Checkout error:", error);
-      toast({
-        title: "Checkout Failed",
-        description: error.message || "Unable to start checkout. Please try again.",
-        variant: "destructive",
-      });
+      if (error.message === "SESSION_EXPIRED") {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to continue.",
+          variant: "destructive",
+        });
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 1500);
+      } else {
+        toast({
+          title: "Checkout Failed",
+          description: error.message || "Unable to start checkout. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
