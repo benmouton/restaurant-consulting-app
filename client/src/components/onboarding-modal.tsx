@@ -35,13 +35,14 @@ export function OnboardingModal({ user }: OnboardingModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState(user.firstName || "");
+  const [phone, setPhone] = useState(user.phone || "");
   const [restaurantName, setRestaurantName] = useState(user.restaurantName || "");
   const [role, setRole] = useState<UserRole>(USER_ROLES.OWNER);
 
   const isOpen = !user.restaurantName;
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { firstName: string; restaurantName: string; role: UserRole }) => {
+    mutationFn: async (data: { firstName: string; phone: string; restaurantName: string; role: UserRole }) => {
       const res = await fetch("/api/auth/user", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -72,15 +73,15 @@ export function OnboardingModal({ user }: OnboardingModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName.trim() || !restaurantName.trim()) {
+    if (!firstName.trim() || !phone.trim() || !restaurantName.trim()) {
       toast({
         title: "Required fields",
-        description: "Please enter both your name and restaurant name.",
+        description: "Please enter your name, phone number, and restaurant name.",
         variant: "destructive",
       });
       return;
     }
-    updateProfileMutation.mutate({ firstName: firstName.trim(), restaurantName: restaurantName.trim(), role });
+    updateProfileMutation.mutate({ firstName: firstName.trim(), phone: phone.trim(), restaurantName: restaurantName.trim(), role });
   };
 
   return (
@@ -111,6 +112,18 @@ export function OnboardingModal({ user }: OnboardingModalProps) {
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               data-testid="input-first-name"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="Enter your phone number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              data-testid="input-phone"
               required
             />
           </div>

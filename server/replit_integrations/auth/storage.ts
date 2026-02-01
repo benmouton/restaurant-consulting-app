@@ -14,7 +14,7 @@ const ADMIN_EMAILS = [
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserProfile(id: string, firstName: string, restaurantName: string, role?: UserRole): Promise<User>;
+  updateUserProfile(id: string, firstName: string, phone: string, restaurantName: string, role?: UserRole): Promise<User>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -45,9 +45,10 @@ class AuthStorage implements IAuthStorage {
     return user;
   }
 
-  async updateUserProfile(id: string, firstName: string, restaurantName: string, role?: UserRole): Promise<User> {
+  async updateUserProfile(id: string, firstName: string, phone: string, restaurantName: string, role?: UserRole): Promise<User> {
     const updateData: Record<string, unknown> = {
       firstName,
+      phone,
       restaurantName,
       updatedAt: new Date(),
     };
