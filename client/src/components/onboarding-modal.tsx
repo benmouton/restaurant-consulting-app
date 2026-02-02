@@ -87,7 +87,7 @@ export function OnboardingModal({ user }: OnboardingModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent 
-        className="sm:max-w-lg" 
+        className="sm:max-w-lg max-h-[90vh] overflow-y-auto" 
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
