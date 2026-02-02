@@ -460,6 +460,47 @@ export const postResults = pgTable("post_results", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Repair Vendors (vendor directory for crisis management)
+export const repairVendors = pgTable("repair_vendors", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  specialty: text("specialty").notNull(), // 'refrigeration', 'hvac', 'plumbing', 'electrical', 'cooking', 'dish', 'pos', 'general'
+  phone: text("phone"),
+  email: text("email"),
+  website: text("website"),
+  notes: text("notes"),
+  rating: integer("rating").default(0), // 1-5 stars
+  isFavorite: boolean("is_favorite").default(false),
+  isEmergency: boolean("is_emergency").default(false), // 24/7 availability
+  responseTime: text("response_time"), // e.g., "Same day", "2-4 hours", "Next day"
+  callOutFee: text("call_out_fee"), // e.g., "$150"
+  accountNumber: text("account_number"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Facility Issues (logged equipment problems and repairs)
+export const facilityIssues = pgTable("facility_issues", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  equipmentType: text("equipment_type").notNull(),
+  equipmentName: text("equipment_name"),
+  description: text("description").notNull(),
+  urgencyLevel: text("urgency_level").notNull().default("medium"), // 'critical', 'high', 'medium', 'low'
+  status: text("status").notNull().default("open"), // 'open', 'in_progress', 'waiting_parts', 'resolved', 'closed'
+  vendorId: integer("vendor_id").references(() => repairVendors.id),
+  vendorName: text("vendor_name"), // stored separately in case vendor is deleted
+  repairCost: text("repair_cost"),
+  repairNotes: text("repair_notes"),
+  reportedAt: timestamp("reported_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRepairVendorSchema = createInsertSchema(repairVendors).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFacilityIssueSchema = createInsertSchema(facilityIssues).omit({ id: true, createdAt: true, reportedAt: true });
+
 export const insertSocialMediaFolderSchema = createInsertSchema(socialMediaFolders).omit({ id: true, createdAt: true });
 export const insertSocialMediaAssetSchema = createInsertSchema(socialMediaAssets).omit({ id: true, createdAt: true });
 export const insertBrandVoiceSettingsSchema = createInsertSchema(brandVoiceSettings).omit({ id: true, updatedAt: true });
@@ -527,3 +568,7 @@ export type OrganizationInvite = typeof organizationInvites.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
 export type InsertOrganizationInvite = z.infer<typeof insertOrganizationInviteSchema>;
+export type RepairVendor = typeof repairVendors.$inferSelect;
+export type FacilityIssue = typeof facilityIssues.$inferSelect;
+export type InsertRepairVendor = z.infer<typeof insertRepairVendorSchema>;
+export type InsertFacilityIssue = z.infer<typeof insertFacilityIssueSchema>;

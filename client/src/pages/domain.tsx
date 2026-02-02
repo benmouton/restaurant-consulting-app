@@ -66,7 +66,12 @@ import {
   TrendingUp,
   TrendingDown,
   Check,
-  Info
+  Info,
+  LayoutDashboard,
+  Plus,
+  Phone,
+  Mail,
+  Edit,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -5736,7 +5741,7 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
 
 function FacilityCommandCenter() {
   const { toast } = useToast();
-  const [mode, setMode] = useState<"breakdown" | "pm" | "log">("breakdown");
+  const [mode, setMode] = useState<"breakdown" | "pm" | "log" | "vendors" | "dashboard">("breakdown");
   const [inActiveService, setInActiveService] = useState<string>("no");
   const [safetyRisk, setSafetyRisk] = useState<string>("no");
   const [equipmentType, setEquipmentType] = useState<string>("");
@@ -5747,6 +5752,153 @@ function FacilityCommandCenter() {
   const [failSilentMonitors, setFailSilentMonitors] = useState<string[]>([]);
   const [response, setResponse] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Vendor state
+  const [showVendorForm, setShowVendorForm] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<any>(null);
+  const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [vendorSearch, setVendorSearch] = useState<string>("");
+  
+  // Issue logging state
+  const [showIssueForm, setShowIssueForm] = useState(false);
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
+
+  // Fetch vendors
+  const { data: vendors = [], refetch: refetchVendors } = useQuery<any[]>({
+    queryKey: ["/api/vendors"],
+    enabled: mode === "vendors" || mode === "breakdown" || mode === "dashboard",
+  });
+
+  // Fetch facility issues
+  const { data: issues = [], refetch: refetchIssues } = useQuery<any[]>({
+    queryKey: ["/api/facility-issues"],
+    enabled: mode === "dashboard",
+  });
+
+  // Fetch issue stats
+  const { data: issueStats } = useQuery<{ open: number; inProgress: number; resolved: number; avgResolutionDays: number }>({
+    queryKey: ["/api/facility-issues/stats"],
+    enabled: mode === "dashboard",
+  });
+
+  // Create vendor mutation
+  const createVendorMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/vendors", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+      setShowVendorForm(false);
+      setEditingVendor(null);
+      toast({ title: "Vendor added successfully!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add vendor", variant: "destructive" });
+    },
+  });
+
+  // Update vendor mutation
+  const updateVendorMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      return await apiRequest("PUT", `/api/vendors/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+      setShowVendorForm(false);
+      setEditingVendor(null);
+      toast({ title: "Vendor updated successfully!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update vendor", variant: "destructive" });
+    },
+  });
+
+  // Delete vendor mutation
+  const deleteVendorMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/vendors/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+      toast({ title: "Vendor deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete vendor", variant: "destructive" });
+    },
+  });
+
+  // Toggle vendor favorite
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("PATCH", `/api/vendors/${id}/favorite`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+    },
+  });
+
+  // Create facility issue mutation  
+  const createIssueMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/facility-issues", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] });
+      setShowIssueForm(false);
+      toast({ title: "Issue logged successfully!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to log issue", variant: "destructive" });
+    },
+  });
+
+  // Update issue status mutation
+  const updateIssueMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      return await apiRequest("PUT", `/api/facility-issues/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] });
+      toast({ title: "Issue updated" });
+    },
+  });
+
+  // Resolve issue mutation
+  const resolveIssueMutation = useMutation({
+    mutationFn: async ({ id, repairNotes, repairCost }: { id: number; repairNotes?: string; repairCost?: string }) => {
+      return await apiRequest("PATCH", `/api/facility-issues/${id}/resolve`, { repairNotes, repairCost });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] });
+      toast({ title: "Issue resolved!" });
+    },
+  });
+
+  // Filter vendors
+  const filteredVendors = vendors.filter(v => {
+    const matchesFilter = vendorFilter === "all" || v.specialty === vendorFilter || (vendorFilter === "favorite" && v.isFavorite);
+    const matchesSearch = !vendorSearch || v.name.toLowerCase().includes(vendorSearch.toLowerCase()) || v.notes?.toLowerCase().includes(vendorSearch.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  // Get suggested vendors based on equipment type
+  const getSuggestedVendors = () => {
+    if (!equipmentType) return [];
+    const specialtyMap: Record<string, string> = {
+      refrigeration: "refrigeration",
+      cooking: "cooking",
+      dish: "dish",
+      hvac: "hvac",
+      plumbing: "plumbing",
+      electrical: "electrical",
+      pos: "pos",
+    };
+    const specialty = specialtyMap[equipmentType] || "general";
+    return vendors.filter(v => v.specialty === specialty || v.specialty === "general").slice(0, 3);
+  };
 
   const equipmentTypes = [
     { value: "refrigeration", label: "Refrigeration / Ice" },
@@ -5988,19 +6140,32 @@ Emergency After-Hours:
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Tabs value={mode} onValueChange={(v) => { setMode(v as "breakdown" | "pm" | "log"); clearForm(); }}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="breakdown" data-testid="tab-breakdown">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Breakdown
+        <Tabs value={mode} onValueChange={(v) => { setMode(v as "breakdown" | "pm" | "log" | "vendors" | "dashboard"); clearForm(); }}>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="breakdown" data-testid="tab-breakdown" className="text-xs sm:text-sm">
+              <AlertTriangle className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Breakdown</span>
+              <span className="sm:hidden">Issue</span>
             </TabsTrigger>
-            <TabsTrigger value="pm" data-testid="tab-pm">
-              <Calendar className="h-4 w-4 mr-2" />
-              PM Schedule
+            <TabsTrigger value="pm" data-testid="tab-pm" className="text-xs sm:text-sm">
+              <Calendar className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">PM Schedule</span>
+              <span className="sm:hidden">PM</span>
             </TabsTrigger>
-            <TabsTrigger value="log" data-testid="tab-log">
-              <FileOutput className="h-4 w-4 mr-2" />
-              Equipment Log
+            <TabsTrigger value="log" data-testid="tab-log" className="text-xs sm:text-sm">
+              <FileOutput className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Equipment</span>
+              <span className="sm:hidden">Log</span>
+            </TabsTrigger>
+            <TabsTrigger value="vendors" data-testid="tab-vendors" className="text-xs sm:text-sm">
+              <Users className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Vendors</span>
+              <span className="sm:hidden">Vendors</span>
+            </TabsTrigger>
+            <TabsTrigger value="dashboard" data-testid="tab-dashboard" className="text-xs sm:text-sm">
+              <LayoutDashboard className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Dashboard</span>
+              <span className="sm:hidden">Dash</span>
             </TabsTrigger>
           </TabsList>
 
@@ -6082,6 +6247,36 @@ Emergency After-Hours:
                 />
               </div>
             </div>
+
+            {/* Suggested Vendors */}
+            {equipmentType && (
+              <div className="p-3 bg-accent/30 rounded-lg border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Suggested Vendors for {equipmentTypes.find(t => t.value === equipmentType)?.label}</span>
+                </div>
+                {getSuggestedVendors().length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {getSuggestedVendors().map((vendor: any) => (
+                      <div key={vendor.id} className="flex items-center gap-2 p-2 bg-background rounded border text-sm" data-testid={`suggested-vendor-${vendor.id}`}>
+                        <span className="font-medium">{vendor.name}</span>
+                        {vendor.phone && (
+                          <a href={`tel:${vendor.phone}`} className="text-primary hover:underline flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {vendor.phone}
+                          </a>
+                        )}
+                        {vendor.isEmergency && <Badge variant="destructive" className="text-xs">24/7</Badge>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No vendors for this equipment type yet. Add them in the <span className="font-medium">Vendors</span> tab for quick access during emergencies.
+                  </p>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="pm" className="space-y-4 mt-4">
@@ -6181,26 +6376,389 @@ Emergency After-Hours:
               />
             </div>
           </TabsContent>
+
+          {/* Vendor Directory Tab */}
+          <TabsContent value="vendors" className="space-y-4 mt-4">
+            <div className="flex flex-col sm:flex-row gap-2 justify-between">
+              <div className="flex gap-2 flex-1">
+                <Input
+                  placeholder="Search vendors..."
+                  value={vendorSearch}
+                  onChange={(e) => setVendorSearch(e.target.value)}
+                  className="max-w-xs"
+                  data-testid="input-vendor-search"
+                />
+                <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                  <SelectTrigger className="w-40" data-testid="select-vendor-filter">
+                    <SelectValue placeholder="Filter by..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Vendors</SelectItem>
+                    <SelectItem value="favorite">Favorites</SelectItem>
+                    <SelectItem value="refrigeration">Refrigeration</SelectItem>
+                    <SelectItem value="hvac">HVAC</SelectItem>
+                    <SelectItem value="plumbing">Plumbing</SelectItem>
+                    <SelectItem value="electrical">Electrical</SelectItem>
+                    <SelectItem value="cooking">Cooking Equipment</SelectItem>
+                    <SelectItem value="dish">Dish Machine</SelectItem>
+                    <SelectItem value="pos">POS & Network</SelectItem>
+                    <SelectItem value="general">General</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={() => { setEditingVendor(null); setShowVendorForm(true); }} data-testid="btn-add-vendor">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Vendor
+              </Button>
+            </div>
+
+            {/* Vendor Form Dialog */}
+            {showVendorForm && (
+              <div className="p-4 border rounded-lg bg-accent/20 space-y-4">
+                <h4 className="font-semibold">{editingVendor ? "Edit Vendor" : "Add New Vendor"}</h4>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const data = {
+                    name: formData.get("name") as string,
+                    specialty: formData.get("specialty") as string,
+                    phone: formData.get("phone") as string,
+                    email: formData.get("email") as string,
+                    website: formData.get("website") as string,
+                    notes: formData.get("notes") as string,
+                    responseTime: formData.get("responseTime") as string,
+                    callOutFee: formData.get("callOutFee") as string,
+                    accountNumber: formData.get("accountNumber") as string,
+                    rating: parseInt(formData.get("rating") as string) || 0,
+                    isEmergency: formData.get("isEmergency") === "on",
+                  };
+                  if (editingVendor) {
+                    updateVendorMutation.mutate({ id: editingVendor.id, data });
+                  } else {
+                    createVendorMutation.mutate(data);
+                  }
+                }} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Vendor Name *</Label>
+                      <Input name="name" required defaultValue={editingVendor?.name || ""} data-testid="input-vendor-name" />
+                    </div>
+                    <div>
+                      <Label>Specialty *</Label>
+                      <Select name="specialty" defaultValue={editingVendor?.specialty || "general"}>
+                        <SelectTrigger data-testid="select-vendor-specialty">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="refrigeration">Refrigeration</SelectItem>
+                          <SelectItem value="hvac">HVAC</SelectItem>
+                          <SelectItem value="plumbing">Plumbing</SelectItem>
+                          <SelectItem value="electrical">Electrical</SelectItem>
+                          <SelectItem value="cooking">Cooking Equipment</SelectItem>
+                          <SelectItem value="dish">Dish Machine</SelectItem>
+                          <SelectItem value="pos">POS & Network</SelectItem>
+                          <SelectItem value="general">General</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Phone</Label>
+                      <Input name="phone" type="tel" defaultValue={editingVendor?.phone || ""} data-testid="input-vendor-phone" />
+                    </div>
+                    <div>
+                      <Label>Email</Label>
+                      <Input name="email" type="email" defaultValue={editingVendor?.email || ""} data-testid="input-vendor-email" />
+                    </div>
+                    <div>
+                      <Label>Website</Label>
+                      <Input name="website" type="url" placeholder="https://..." defaultValue={editingVendor?.website || ""} data-testid="input-vendor-website" />
+                    </div>
+                    <div>
+                      <Label>Response Time</Label>
+                      <Input name="responseTime" placeholder="e.g., Same day, 2-4 hours" defaultValue={editingVendor?.responseTime || ""} data-testid="input-vendor-response" />
+                    </div>
+                    <div>
+                      <Label>Call-Out Fee</Label>
+                      <Input name="callOutFee" placeholder="e.g., $150" defaultValue={editingVendor?.callOutFee || ""} data-testid="input-vendor-fee" />
+                    </div>
+                    <div>
+                      <Label>Account Number</Label>
+                      <Input name="accountNumber" defaultValue={editingVendor?.accountNumber || ""} data-testid="input-vendor-account" />
+                    </div>
+                    <div>
+                      <Label>Rating (1-5)</Label>
+                      <Select name="rating" defaultValue={String(editingVendor?.rating || 0)}>
+                        <SelectTrigger data-testid="select-vendor-rating">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Not rated</SelectItem>
+                          <SelectItem value="1">1 Star</SelectItem>
+                          <SelectItem value="2">2 Stars</SelectItem>
+                          <SelectItem value="3">3 Stars</SelectItem>
+                          <SelectItem value="4">4 Stars</SelectItem>
+                          <SelectItem value="5">5 Stars</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2 pt-6">
+                      <input type="checkbox" name="isEmergency" id="isEmergency" defaultChecked={editingVendor?.isEmergency} />
+                      <Label htmlFor="isEmergency">24/7 Emergency Available</Label>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Notes</Label>
+                    <Textarea name="notes" placeholder="Additional notes about this vendor..." defaultValue={editingVendor?.notes || ""} data-testid="textarea-vendor-notes" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={createVendorMutation.isPending || updateVendorMutation.isPending} data-testid="btn-save-vendor">
+                      {(createVendorMutation.isPending || updateVendorMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      {editingVendor ? "Update Vendor" : "Add Vendor"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => { setShowVendorForm(false); setEditingVendor(null); }} data-testid="btn-cancel-vendor">
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Vendor List */}
+            <div className="space-y-2">
+              {filteredVendors.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {vendors.length === 0 ? "No vendors added yet. Add your first repair vendor above." : "No vendors match your search."}
+                </div>
+              ) : (
+                filteredVendors.map((vendor: any) => (
+                  <div key={vendor.id} className="p-3 border rounded-lg hover-elevate flex flex-col sm:flex-row sm:items-center gap-2 justify-between" data-testid={`vendor-card-${vendor.id}`}>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{vendor.name}</span>
+                        <Badge variant="outline" className="text-xs">{vendor.specialty}</Badge>
+                        {vendor.isFavorite && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+                        {vendor.isEmergency && <Badge variant="destructive" className="text-xs">24/7</Badge>}
+                        {vendor.rating > 0 && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                            {[...Array(vendor.rating)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                            ))}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground flex flex-wrap gap-3 mt-1">
+                        {vendor.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{vendor.phone}</span>}
+                        {vendor.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{vendor.email}</span>}
+                        {vendor.responseTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{vendor.responseTime}</span>}
+                        {vendor.callOutFee && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" />{vendor.callOutFee}</span>}
+                      </div>
+                      {vendor.notes && <p className="text-sm text-muted-foreground mt-1 italic">{vendor.notes}</p>}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => toggleFavoriteMutation.mutate(vendor.id)} data-testid={`btn-favorite-${vendor.id}`}>
+                        <Star className={`h-4 w-4 ${vendor.isFavorite ? "text-yellow-500 fill-yellow-500" : ""}`} />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => { setEditingVendor(vendor); setShowVendorForm(true); }} data-testid={`btn-edit-vendor-${vendor.id}`}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => deleteVendorMutation.mutate(vendor.id)} data-testid={`btn-delete-vendor-${vendor.id}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Issues Dashboard Tab */}
+          <TabsContent value="dashboard" className="space-y-4 mt-4">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20 text-center">
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{issueStats?.open || 0}</div>
+                <div className="text-xs text-muted-foreground">Open Issues</div>
+              </div>
+              <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20 text-center">
+                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{issueStats?.inProgress || 0}</div>
+                <div className="text-xs text-muted-foreground">In Progress</div>
+              </div>
+              <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20 text-center">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{issueStats?.resolved || 0}</div>
+                <div className="text-xs text-muted-foreground">Resolved</div>
+              </div>
+              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 text-center">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{issueStats?.avgResolutionDays || 0}</div>
+                <div className="text-xs text-muted-foreground">Avg. Days to Fix</div>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <h4 className="font-semibold">Recent Issues</h4>
+              <Button size="sm" onClick={() => setShowIssueForm(true)} data-testid="btn-log-issue">
+                <Plus className="h-4 w-4 mr-2" />
+                Log Issue
+              </Button>
+            </div>
+
+            {/* Issue Form */}
+            {showIssueForm && (
+              <div className="p-4 border rounded-lg bg-accent/20 space-y-3">
+                <h4 className="font-semibold">Log New Issue</h4>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const vendorId = formData.get("vendorId") as string;
+                  const selectedVendor = vendors.find((v: any) => v.id === parseInt(vendorId));
+                  createIssueMutation.mutate({
+                    equipmentType: formData.get("equipmentType") as string,
+                    equipmentName: formData.get("equipmentName") as string,
+                    description: formData.get("description") as string,
+                    urgencyLevel: formData.get("urgencyLevel") as string,
+                    vendorId: vendorId ? parseInt(vendorId) : null,
+                    vendorName: selectedVendor?.name || null,
+                  });
+                }} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Equipment Type *</Label>
+                      <Select name="equipmentType" required>
+                        <SelectTrigger data-testid="select-issue-equipment">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {equipmentTypes.map(type => (
+                            <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Urgency Level</Label>
+                      <Select name="urgencyLevel" defaultValue="medium">
+                        <SelectTrigger data-testid="select-issue-urgency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="critical">Critical - Safety/Service Stop</SelectItem>
+                          <SelectItem value="high">High - Major Impact</SelectItem>
+                          <SelectItem value="medium">Medium - Can Work Around</SelectItem>
+                          <SelectItem value="low">Low - Minor Annoyance</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Equipment Name</Label>
+                      <Input name="equipmentName" placeholder="e.g., Walk-in cooler #1" data-testid="input-issue-name" />
+                    </div>
+                    <div>
+                      <Label>Assigned Vendor</Label>
+                      <Select name="vendorId">
+                        <SelectTrigger data-testid="select-issue-vendor">
+                          <SelectValue placeholder="Select vendor..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No vendor assigned</SelectItem>
+                          {vendors.map((v: any) => (
+                            <SelectItem key={v.id} value={String(v.id)}>{v.name} ({v.specialty})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Description *</Label>
+                    <Textarea name="description" required placeholder="Describe the issue..." data-testid="textarea-issue-description" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={createIssueMutation.isPending} data-testid="btn-submit-issue">
+                      {createIssueMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Log Issue
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setShowIssueForm(false)}>Cancel</Button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Issues List */}
+            <div className="space-y-2">
+              {issues.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No issues logged yet. Track equipment problems and repairs here.
+                </div>
+              ) : (
+                issues.slice(0, 10).map((issue: any) => (
+                  <div key={issue.id} className="p-3 border rounded-lg" data-testid={`issue-card-${issue.id}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant={
+                            issue.urgencyLevel === "critical" ? "destructive" :
+                            issue.urgencyLevel === "high" ? "default" : "outline"
+                          } className="text-xs">{issue.urgencyLevel}</Badge>
+                          <Badge variant="outline" className="text-xs">{issue.equipmentType}</Badge>
+                          <Badge variant={
+                            issue.status === "open" ? "destructive" :
+                            issue.status === "resolved" || issue.status === "closed" ? "default" : "secondary"
+                          } className="text-xs">{issue.status.replace("_", " ")}</Badge>
+                        </div>
+                        <p className="font-medium mt-1">{issue.equipmentName || issue.equipmentType}</p>
+                        <p className="text-sm text-muted-foreground">{issue.description}</p>
+                        {issue.vendorName && <p className="text-sm mt-1">Vendor: {issue.vendorName}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">Reported: {new Date(issue.reportedAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        {issue.status !== "resolved" && issue.status !== "closed" && (
+                          <>
+                            <Select 
+                              value={issue.status} 
+                              onValueChange={(v) => updateIssueMutation.mutate({ id: issue.id, data: { status: v } })}
+                            >
+                              <SelectTrigger className="w-28 text-xs" data-testid={`select-status-${issue.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Open</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="waiting_parts">Waiting Parts</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button size="sm" variant="outline" onClick={() => resolveIssueMutation.mutate({ id: issue.id })} data-testid={`btn-resolve-${issue.id}`}>
+                              <Check className="h-4 w-4 mr-1" />
+                              Resolve
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
 
-        <Button 
-          onClick={generateResponse} 
-          disabled={isGenerating || (mode === "breakdown" && !issueGoal) || (mode === "pm" && !equipmentType)}
-          className="w-full"
-          data-testid="btn-generate-facility"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {mode === "breakdown" ? "Generating triage response..." : mode === "pm" ? "Building PM schedule..." : "Creating equipment log..."}
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              {mode === "breakdown" ? "Log an Issue" : mode === "pm" ? "Build PM Schedule" : "Generate Equipment Log"}
-            </>
-          )}
-        </Button>
+        {(mode === "breakdown" || mode === "pm" || mode === "log") && (
+          <Button 
+            onClick={generateResponse} 
+            disabled={isGenerating || (mode === "breakdown" && !issueGoal) || (mode === "pm" && !equipmentType)}
+            className="w-full"
+            data-testid="btn-generate-facility"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {mode === "breakdown" ? "Generating triage response..." : mode === "pm" ? "Building PM schedule..." : "Creating equipment log..."}
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                {mode === "breakdown" ? "Log an Issue" : mode === "pm" ? "Build PM Schedule" : "Generate Equipment Log"}
+              </>
+            )}
+          </Button>
+        )}
 
         {response && (
           <div className="mt-4 space-y-4">

@@ -714,6 +714,209 @@ export async function registerRoutes(
     }
   });
 
+  // ===== REPAIR VENDORS ROUTES =====
+
+  // Get all vendors for user
+  app.get("/api/vendors", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendors = await storage.getRepairVendors(userId);
+      res.json(vendors);
+    } catch (error: any) {
+      console.error('Error fetching vendors:', error);
+      res.status(500).json({ message: "Failed to fetch vendors" });
+    }
+  });
+
+  // Get vendors by specialty
+  app.get("/api/vendors/specialty/:specialty", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendors = await storage.getRepairVendorsBySpecialty(userId, req.params.specialty);
+      res.json(vendors);
+    } catch (error: any) {
+      console.error('Error fetching vendors by specialty:', error);
+      res.status(500).json({ message: "Failed to fetch vendors" });
+    }
+  });
+
+  // Get single vendor
+  app.get("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendor = await storage.getRepairVendor(Number(req.params.id), userId);
+      if (!vendor) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+      res.json(vendor);
+    } catch (error: any) {
+      console.error('Error fetching vendor:', error);
+      res.status(500).json({ message: "Failed to fetch vendor" });
+    }
+  });
+
+  // Create vendor
+  app.post("/api/vendors", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendor = await storage.createRepairVendor({ ...req.body, userId });
+      res.status(201).json(vendor);
+    } catch (error: any) {
+      console.error('Error creating vendor:', error);
+      res.status(500).json({ message: "Failed to create vendor" });
+    }
+  });
+
+  // Update vendor
+  app.put("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendor = await storage.updateRepairVendor(Number(req.params.id), userId, req.body);
+      if (!vendor) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+      res.json(vendor);
+    } catch (error: any) {
+      console.error('Error updating vendor:', error);
+      res.status(500).json({ message: "Failed to update vendor" });
+    }
+  });
+
+  // Toggle vendor favorite
+  app.patch("/api/vendors/:id/favorite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendor = await storage.toggleVendorFavorite(Number(req.params.id), userId);
+      if (!vendor) {
+        return res.status(404).json({ message: "Vendor not found" });
+      }
+      res.json(vendor);
+    } catch (error: any) {
+      console.error('Error toggling vendor favorite:', error);
+      res.status(500).json({ message: "Failed to toggle favorite" });
+    }
+  });
+
+  // Delete vendor
+  app.delete("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.deleteRepairVendor(Number(req.params.id), userId);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting vendor:', error);
+      res.status(500).json({ message: "Failed to delete vendor" });
+    }
+  });
+
+  // ===== FACILITY ISSUES ROUTES =====
+
+  // Get all facility issues
+  app.get("/api/facility-issues", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const issues = await storage.getFacilityIssues(userId);
+      res.json(issues);
+    } catch (error: any) {
+      console.error('Error fetching facility issues:', error);
+      res.status(500).json({ message: "Failed to fetch issues" });
+    }
+  });
+
+  // Get open facility issues only
+  app.get("/api/facility-issues/open", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const issues = await storage.getOpenFacilityIssues(userId);
+      res.json(issues);
+    } catch (error: any) {
+      console.error('Error fetching open issues:', error);
+      res.status(500).json({ message: "Failed to fetch open issues" });
+    }
+  });
+
+  // Get facility issue stats
+  app.get("/api/facility-issues/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getFacilityIssueStats(userId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error('Error fetching issue stats:', error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // Get single facility issue
+  app.get("/api/facility-issues/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const issue = await storage.getFacilityIssue(Number(req.params.id), userId);
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+      res.json(issue);
+    } catch (error: any) {
+      console.error('Error fetching facility issue:', error);
+      res.status(500).json({ message: "Failed to fetch issue" });
+    }
+  });
+
+  // Create facility issue
+  app.post("/api/facility-issues", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const issue = await storage.createFacilityIssue({ ...req.body, userId });
+      res.status(201).json(issue);
+    } catch (error: any) {
+      console.error('Error creating facility issue:', error);
+      res.status(500).json({ message: "Failed to create issue" });
+    }
+  });
+
+  // Update facility issue
+  app.put("/api/facility-issues/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const issue = await storage.updateFacilityIssue(Number(req.params.id), userId, req.body);
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+      res.json(issue);
+    } catch (error: any) {
+      console.error('Error updating facility issue:', error);
+      res.status(500).json({ message: "Failed to update issue" });
+    }
+  });
+
+  // Resolve facility issue
+  app.patch("/api/facility-issues/:id/resolve", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { repairNotes, repairCost } = req.body;
+      const issue = await storage.resolveFacilityIssue(Number(req.params.id), userId, repairNotes, repairCost);
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+      res.json(issue);
+    } catch (error: any) {
+      console.error('Error resolving facility issue:', error);
+      res.status(500).json({ message: "Failed to resolve issue" });
+    }
+  });
+
+  // Delete facility issue
+  app.delete("/api/facility-issues/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.deleteFacilityIssue(Number(req.params.id), userId);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting facility issue:', error);
+      res.status(500).json({ message: "Failed to delete issue" });
+    }
+  });
+
   // ===== SCHEDULING ROUTES =====
 
   // Staff Positions

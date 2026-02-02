@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
 - **Schema**: Defined in `shared/schema.ts` and `shared/models/`
-- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`.
+- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`, `repair_vendors`, `facility_issues`.
 
 ### Core Features & Implementations
 - **Staff Scheduling System**: Sling-style scheduling with weekly calendar, staff/position management, pay rate tracking, daily labor cost calculation, open shift tracking, and announcements.
@@ -39,6 +39,12 @@ Preferred communication style: Simple, everyday language.
 - **AI Integration**: Utilizes OpenAI API via Replit AI Integrations for restaurant consulting chat, image generation, and social media post generation, driven by a domain-specific system prompt.
 - **Leadership Command Center**: Daily task management tool with AI-generated priorities, crisis guidance, follow-up mode, progress tracking dashboard (completion rates, trends, heatmap), and browser notification reminders. Features a restaurant profile setup wizard.
 - **Social Media Post Builder**: AI-powered content creation for various post types and platforms (Instagram, Facebook, Google Business Profile) with brand voice settings. Includes direct posting integration via OAuth and token encryption, and a holiday calendar.
+- **Facility Command Center**: Crisis management hub with 5 tabs:
+  - **Breakdown**: Equipment issue triage with AI-generated response scripts, vendor suggestions based on equipment type.
+  - **PM Schedule**: Preventative maintenance planning with fail-silent monitoring.
+  - **Equipment Log**: Equipment registration and maintenance history.
+  - **Vendor Directory**: Repair vendor rolodex with specialty filtering, ratings, 24/7 flags, favorites, and contact info.
+  - **Issues Dashboard**: Active issues tracker with status management (open/in progress/waiting parts/resolved), stats cards, and resolution tracking.
 
 ## External Dependencies
 

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -146,6 +146,25 @@ export interface IStorage {
   deleteDailyTaskCompletion(id: number): Promise<void>;
   getTaskCompletionTrends(userId: string, weeks: number): Promise<{ weekStart: string; completed: number; total: number }[]>;
   getDailyCompletionHeatmap(userId: string, startDate: string, endDate: string): Promise<{ date: string; completed: number; total: number }[]>;
+  
+  // Repair Vendors
+  getRepairVendors(userId: string): Promise<RepairVendor[]>;
+  getRepairVendor(id: number, userId: string): Promise<RepairVendor | undefined>;
+  getRepairVendorsBySpecialty(userId: string, specialty: string): Promise<RepairVendor[]>;
+  createRepairVendor(data: InsertRepairVendor): Promise<RepairVendor>;
+  updateRepairVendor(id: number, userId: string, data: Partial<InsertRepairVendor>): Promise<RepairVendor | undefined>;
+  deleteRepairVendor(id: number, userId: string): Promise<void>;
+  toggleVendorFavorite(id: number, userId: string): Promise<RepairVendor | undefined>;
+  
+  // Facility Issues
+  getFacilityIssues(userId: string): Promise<FacilityIssue[]>;
+  getOpenFacilityIssues(userId: string): Promise<FacilityIssue[]>;
+  getFacilityIssue(id: number, userId: string): Promise<FacilityIssue | undefined>;
+  createFacilityIssue(data: InsertFacilityIssue): Promise<FacilityIssue>;
+  updateFacilityIssue(id: number, userId: string, data: Partial<InsertFacilityIssue>): Promise<FacilityIssue | undefined>;
+  resolveFacilityIssue(id: number, userId: string, repairNotes?: string, repairCost?: string): Promise<FacilityIssue | undefined>;
+  deleteFacilityIssue(id: number, userId: string): Promise<void>;
+  getFacilityIssueStats(userId: string): Promise<{ open: number; inProgress: number; resolved: number; avgResolutionDays: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1104,6 +1123,136 @@ export class DatabaseStorage implements IStorage {
     return Object.entries(byDate)
       .map(([date, data]) => ({ date, ...data }))
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // Repair Vendors
+  async getRepairVendors(userId: string): Promise<RepairVendor[]> {
+    return await db.select().from(repairVendors)
+      .where(eq(repairVendors.userId, userId))
+      .orderBy(desc(repairVendors.isFavorite), repairVendors.name);
+  }
+
+  async getRepairVendor(id: number, userId: string): Promise<RepairVendor | undefined> {
+    const [vendor] = await db.select().from(repairVendors)
+      .where(and(eq(repairVendors.id, id), eq(repairVendors.userId, userId)));
+    return vendor;
+  }
+
+  async getRepairVendorsBySpecialty(userId: string, specialty: string): Promise<RepairVendor[]> {
+    return await db.select().from(repairVendors)
+      .where(and(
+        eq(repairVendors.userId, userId),
+        or(eq(repairVendors.specialty, specialty), eq(repairVendors.specialty, "general"))
+      ))
+      .orderBy(desc(repairVendors.isFavorite), desc(repairVendors.rating));
+  }
+
+  async createRepairVendor(data: InsertRepairVendor): Promise<RepairVendor> {
+    const [vendor] = await db.insert(repairVendors).values(data).returning();
+    return vendor;
+  }
+
+  async updateRepairVendor(id: number, userId: string, data: Partial<InsertRepairVendor>): Promise<RepairVendor | undefined> {
+    const [updated] = await db.update(repairVendors)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(repairVendors.id, id), eq(repairVendors.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteRepairVendor(id: number, userId: string): Promise<void> {
+    await db.delete(repairVendors)
+      .where(and(eq(repairVendors.id, id), eq(repairVendors.userId, userId)));
+  }
+
+  async toggleVendorFavorite(id: number, userId: string): Promise<RepairVendor | undefined> {
+    const vendor = await this.getRepairVendor(id, userId);
+    if (!vendor) return undefined;
+    
+    const [updated] = await db.update(repairVendors)
+      .set({ isFavorite: !vendor.isFavorite, updatedAt: new Date() })
+      .where(and(eq(repairVendors.id, id), eq(repairVendors.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  // Facility Issues
+  async getFacilityIssues(userId: string): Promise<FacilityIssue[]> {
+    return await db.select().from(facilityIssues)
+      .where(eq(facilityIssues.userId, userId))
+      .orderBy(desc(facilityIssues.reportedAt));
+  }
+
+  async getOpenFacilityIssues(userId: string): Promise<FacilityIssue[]> {
+    return await db.select().from(facilityIssues)
+      .where(and(
+        eq(facilityIssues.userId, userId),
+        or(
+          eq(facilityIssues.status, "open"),
+          eq(facilityIssues.status, "in_progress"),
+          eq(facilityIssues.status, "waiting_parts")
+        )
+      ))
+      .orderBy(desc(facilityIssues.reportedAt));
+  }
+
+  async getFacilityIssue(id: number, userId: string): Promise<FacilityIssue | undefined> {
+    const [issue] = await db.select().from(facilityIssues)
+      .where(and(eq(facilityIssues.id, id), eq(facilityIssues.userId, userId)));
+    return issue;
+  }
+
+  async createFacilityIssue(data: InsertFacilityIssue): Promise<FacilityIssue> {
+    const [issue] = await db.insert(facilityIssues).values(data).returning();
+    return issue;
+  }
+
+  async updateFacilityIssue(id: number, userId: string, data: Partial<InsertFacilityIssue>): Promise<FacilityIssue | undefined> {
+    const [updated] = await db.update(facilityIssues)
+      .set(data)
+      .where(and(eq(facilityIssues.id, id), eq(facilityIssues.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async resolveFacilityIssue(id: number, userId: string, repairNotes?: string, repairCost?: string): Promise<FacilityIssue | undefined> {
+    const [resolved] = await db.update(facilityIssues)
+      .set({
+        status: "resolved",
+        resolvedAt: new Date(),
+        repairNotes: repairNotes || null,
+        repairCost: repairCost || null
+      })
+      .where(and(eq(facilityIssues.id, id), eq(facilityIssues.userId, userId)))
+      .returning();
+    return resolved;
+  }
+
+  async deleteFacilityIssue(id: number, userId: string): Promise<void> {
+    await db.delete(facilityIssues)
+      .where(and(eq(facilityIssues.id, id), eq(facilityIssues.userId, userId)));
+  }
+
+  async getFacilityIssueStats(userId: string): Promise<{ open: number; inProgress: number; resolved: number; avgResolutionDays: number }> {
+    const issues = await this.getFacilityIssues(userId);
+    
+    const open = issues.filter(i => i.status === "open").length;
+    const inProgress = issues.filter(i => i.status === "in_progress" || i.status === "waiting_parts").length;
+    const resolved = issues.filter(i => i.status === "resolved" || i.status === "closed").length;
+    
+    // Calculate average resolution time for resolved issues
+    const resolvedIssues = issues.filter(i => i.resolvedAt && i.reportedAt);
+    let avgResolutionDays = 0;
+    if (resolvedIssues.length > 0) {
+      const totalDays = resolvedIssues.reduce((sum, issue) => {
+        const reported = new Date(issue.reportedAt!);
+        const resolved = new Date(issue.resolvedAt!);
+        return sum + (resolved.getTime() - reported.getTime()) / (1000 * 60 * 60 * 24);
+      }, 0);
+      avgResolutionDays = Math.round((totalDays / resolvedIssues.length) * 10) / 10;
+    }
+    
+    return { open, inProgress, resolved, avgResolutionDays };
   }
 }
 
