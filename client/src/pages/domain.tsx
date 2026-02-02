@@ -60,7 +60,13 @@ import {
   Package,
   ShieldAlert,
   Bell,
-  BellRing
+  BellRing,
+  History as HistoryIcon,
+  Save,
+  TrendingUp,
+  TrendingDown,
+  Check,
+  Info
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -1934,6 +1940,9 @@ function LaborDemandEngine() {
   const [currentStaff, setCurrentStaff] = useState<string>("");
   const [laborTarget, setLaborTarget] = useState<string>("28");
   const [avgCheck, setAvgCheck] = useState<string>("45");
+  const [avgHourlyWage, setAvgHourlyWage] = useState<string>("18");
+  const [hoursPerShift, setHoursPerShift] = useState<string>("6");
+  const [scheduledPositions, setScheduledPositions] = useState<string>("");
   const [currentTime, setCurrentTime] = useState<string>("");
   const [serviceNotes, setServiceNotes] = useState<string>("");
   const [recommendation, setRecommendation] = useState<string>("");
@@ -1956,6 +1965,131 @@ function LaborDemandEngine() {
     { value: "saturday", label: "Saturday" },
     { value: "sunday", label: "Sunday" },
   ];
+
+  const quickPresets = [
+    { value: "quiet-monday", label: "Quiet Monday Lunch", covers: "45", avgCheck: "32", positions: "4" },
+    { value: "normal-weekday", label: "Normal Weekday Dinner", covers: "75", avgCheck: "48", positions: "6" },
+    { value: "busy-friday", label: "Busy Friday Dinner", covers: "140", avgCheck: "55", positions: "10" },
+    { value: "busy-saturday", label: "Busy Saturday Night", covers: "165", avgCheck: "58", positions: "12" },
+    { value: "sunday-brunch", label: "Sunday Brunch Rush", covers: "120", avgCheck: "35", positions: "8" },
+    { value: "slow-tuesday", label: "Slow Tuesday Evening", covers: "55", avgCheck: "42", positions: "5" },
+  ];
+
+  const calculateLaborMetrics = () => {
+    const covers = parseFloat(projectedCovers) || 0;
+    const check = parseFloat(avgCheck) || 45;
+    const target = parseFloat(laborTarget) || 28;
+    const wage = parseFloat(avgHourlyWage) || 18;
+    const hours = parseFloat(hoursPerShift) || 6;
+    const scheduled = parseFloat(scheduledPositions) || 0;
+
+    const projectedSales = covers * check;
+    const laborBudget = projectedSales * (target / 100);
+    const maxLaborCost = scheduled * wage * hours;
+    const actualLaborPercent = projectedSales > 0 ? (maxLaborCost / projectedSales) * 100 : 0;
+    const neededPositions = wage > 0 && hours > 0 ? laborBudget / (wage * hours) : 0;
+    const positionGap = neededPositions - scheduled;
+
+    return {
+      projectedSales,
+      laborBudget,
+      maxLaborCost,
+      actualLaborPercent,
+      neededPositions,
+      positionGap,
+      scheduled
+    };
+  };
+
+  const metrics = calculateLaborMetrics();
+
+  const getLaborColorClass = (percent: number) => {
+    if (percent === 0) return "bg-muted text-muted-foreground";
+    if (percent < 26) return "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30";
+    if (percent <= 32) return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+    return "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30";
+  };
+
+  const getGapColorClass = (gap: number) => {
+    if (gap === 0) return "text-muted-foreground";
+    if (gap > 0.5) return "text-green-600 dark:text-green-400";
+    if (gap < -0.5) return "text-red-600 dark:text-red-400";
+    return "text-yellow-600 dark:text-yellow-400";
+  };
+
+  const getQuickRecommendation = () => {
+    const { actualLaborPercent, positionGap, projectedSales, scheduled } = metrics;
+    if (!projectedCovers || projectedSales === 0) return null;
+    
+    if (scheduled === 0) {
+      return { text: "Enter scheduled positions to see staffing recommendation", type: "info" };
+    }
+    
+    if (actualLaborPercent > 32 && positionGap < -0.5) {
+      const cutCount = Math.ceil(Math.abs(positionGap));
+      return { 
+        text: `Running ${actualLaborPercent.toFixed(1)}% labor. Consider cutting ${cutCount} position${cutCount > 1 ? 's' : ''} after peak.`, 
+        type: "warning" 
+      };
+    }
+    if (actualLaborPercent < 26 && positionGap > 0.5) {
+      const addCount = Math.floor(positionGap);
+      return { 
+        text: `Labor at ${actualLaborPercent.toFixed(1)}%. Room to add ${addCount} position${addCount > 1 ? 's' : ''} if needed.`, 
+        type: "success" 
+      };
+    }
+    if (Math.abs(positionGap) <= 0.5) {
+      return { 
+        text: `Staffing looks good at ${actualLaborPercent.toFixed(1)}% labor. Hold current levels.`, 
+        type: "success" 
+      };
+    }
+    return { 
+      text: `Projected labor: ${actualLaborPercent.toFixed(1)}%. Monitor and adjust as needed.`, 
+      type: "info" 
+    };
+  };
+
+  const applyPreset = (presetValue: string) => {
+    const preset = quickPresets.find(p => p.value === presetValue);
+    if (preset && preset.covers) {
+      setProjectedCovers(preset.covers);
+      setAvgCheck(preset.avgCheck || "45");
+      setScheduledPositions(preset.positions || "");
+      toast({ title: `Applied "${preset.label}" preset` });
+    }
+  };
+
+  const useLastWeekData = () => {
+    const storageKey = `labor-history-${dayOfWeek}-${daypart}`;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      const data = JSON.parse(saved);
+      setProjectedCovers(data.covers || "");
+      setAvgCheck(data.avgCheck || "45");
+      setScheduledPositions(data.positions || "");
+      setReservations(data.reservations || "");
+      toast({ title: "Loaded last week's data", description: `${data.date || "Previous"} values applied` });
+    } else {
+      toast({ title: "No history found", description: `No saved data for ${dayOfWeek} ${daypart}`, variant: "destructive" });
+    }
+  };
+
+  const saveCurrentData = () => {
+    const storageKey = `labor-history-${dayOfWeek}-${daypart}`;
+    const data = {
+      covers: projectedCovers,
+      avgCheck,
+      positions: scheduledPositions,
+      reservations,
+      date: new Date().toLocaleDateString()
+    };
+    localStorage.setItem(storageKey, JSON.stringify(data));
+    toast({ title: "Data saved", description: "Use 'Last Week' button to recall this data" });
+  };
+
+  const quickRec = getQuickRecommendation();
 
   const generateRecommendation = async () => {
     if (!projectedCovers) {
@@ -2103,6 +2237,76 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Quick Actions Bar */}
+        <div className="flex flex-wrap items-center gap-2 pb-2 border-b">
+          <div className="flex-1 min-w-[200px]">
+            <Select onValueChange={applyPreset}>
+              <SelectTrigger className="h-9" data-testid="select-preset">
+                <SelectValue placeholder="Quick Presets..." />
+              </SelectTrigger>
+              <SelectContent>
+                {quickPresets.map(p => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" size="sm" onClick={useLastWeekData} data-testid="btn-last-week">
+            <HistoryIcon className="h-4 w-4 mr-1" />
+            Last Week
+          </Button>
+          <Button variant="outline" size="sm" onClick={saveCurrentData} data-testid="btn-save-data">
+            <Save className="h-4 w-4 mr-1" />
+            Save
+          </Button>
+        </div>
+
+        {/* Real-time Metrics Dashboard */}
+        {projectedCovers && parseFloat(projectedCovers) > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg bg-accent/30 text-center">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Projected Sales</div>
+              <div className="text-xl font-bold mt-1" data-testid="text-projected-sales">${metrics.projectedSales.toLocaleString()}</div>
+            </div>
+            <div className={`p-3 rounded-lg text-center border ${getLaborColorClass(metrics.actualLaborPercent)}`}>
+              <div className="text-xs uppercase tracking-wide">Labor %</div>
+              <div className="text-xl font-bold mt-1" data-testid="text-labor-percent">
+                {metrics.actualLaborPercent > 0 ? `${metrics.actualLaborPercent.toFixed(1)}%` : "--"}
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-accent/30 text-center">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Needed Positions</div>
+              <div className="text-xl font-bold mt-1" data-testid="text-needed-positions">{metrics.neededPositions.toFixed(1)}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-accent/30 text-center">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide">Gap</div>
+              <div className={`text-xl font-bold mt-1 flex items-center justify-center gap-1 ${getGapColorClass(metrics.positionGap)}`} data-testid="text-position-gap">
+                {metrics.scheduled > 0 ? (
+                  <>
+                    {metrics.positionGap > 0.1 ? <TrendingUp className="h-4 w-4" /> : 
+                     metrics.positionGap < -0.1 ? <TrendingDown className="h-4 w-4" /> : null}
+                    {metrics.positionGap > 0 ? "+" : ""}{metrics.positionGap.toFixed(1)}
+                  </>
+                ) : "--"}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Recommendation */}
+        {quickRec && (
+          <div className={`p-3 rounded-lg border flex items-start gap-2 ${
+            quickRec.type === "warning" ? "bg-yellow-500/10 border-yellow-500/30" :
+            quickRec.type === "success" ? "bg-green-500/10 border-green-500/30" :
+            "bg-accent/30 border-transparent"
+          }`} data-testid="text-quick-recommendation">
+            {quickRec.type === "warning" ? <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" /> :
+             quickRec.type === "success" ? <Check className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" /> :
+             <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />}
+            <span className="text-sm">{quickRec.text}</span>
+          </div>
+        )}
+
         {/* Mode Toggle */}
         <Tabs value={mode} onValueChange={(v) => setMode(v as "preshift" | "midshift")} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -2197,8 +2401,51 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
               </div>
             </div>
 
+            {/* New: Scheduled Positions Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="scheduledPositions">Scheduled Positions (Total)</Label>
+                <Input
+                  id="scheduledPositions"
+                  type="number"
+                  placeholder="e.g., 8"
+                  className="mt-1"
+                  value={scheduledPositions}
+                  onChange={(e) => setScheduledPositions(e.target.value)}
+                  data-testid="input-scheduled-positions"
+                />
+              </div>
+              <div>
+                <Label htmlFor="avgHourlyWage">Avg Hourly Wage ($)</Label>
+                <div className="relative mt-1">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="avgHourlyWage"
+                    type="number"
+                    placeholder="18"
+                    className="pl-9"
+                    value={avgHourlyWage}
+                    onChange={(e) => setAvgHourlyWage(e.target.value)}
+                    data-testid="input-avg-wage"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="hoursPerShift">Hours per Shift</Label>
+                <Input
+                  id="hoursPerShift"
+                  type="number"
+                  placeholder="6"
+                  className="mt-1"
+                  value={hoursPerShift}
+                  onChange={(e) => setHoursPerShift(e.target.value)}
+                  data-testid="input-hours-shift"
+                />
+              </div>
+            </div>
+
             <div>
-              <Label htmlFor="currentStaff">Current Scheduled Staff</Label>
+              <Label htmlFor="currentStaff">Staff Breakdown (optional detail)</Label>
               <Textarea
                 id="currentStaff"
                 placeholder="e.g., 4 servers, 2 bartenders, 1 host, 4 cooks, 1 expo"
