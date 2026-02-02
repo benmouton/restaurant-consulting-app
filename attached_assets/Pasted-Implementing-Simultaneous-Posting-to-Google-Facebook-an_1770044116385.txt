@@ -1,0 +1,146 @@
+Implementing Simultaneous Posting to Google, Facebook, and Instagram in Your App
+Ben, this is a fantastic feature for your AI Restaurant Consultant app—it'll save operators like you in Austin tons of time by turning one post into multi-platform content (e.g., a daily special promo going live on Google Business Profile, Facebook Page, and Instagram all at once).
+Since your app is in Replit (likely Node.js/Express from earlier logs), I'll give high-level directions you can paste into Replit as a new file (e.g., SOCIAL-POSTING-GUIDE.md) or directly into your code comments. These are step-by-step, non-technical where possible, but include simple code snippets for the key parts. If you're not comfortable coding, you can share these with a dev or use Replit's AI to help generate the code.
+The core flow:
+
+Link accounts: Use OAuth to let users connect their social accounts securely.
+Post simultaneously: When generating a post (e.g., via your "Social Media Post Builder"), send it to all linked platforms at once.
+
+Prerequisites (Do These First – 1–2 Hours)
+
+Set Up Developer Accounts (free, but required for APIs):
+Meta (Facebook & Instagram): Go to https://developers.facebook.com → Create App → Choose "Business" type → Get App ID & Secret. Link your Facebook Page and Instagram Business Account via Meta Business Suite (business.facebook.com).
+Google Business Profile: Go to https://developers.google.com/my-business → Enable API in Google Cloud Console → Create OAuth credentials (Client ID & Secret). Note: Users need a verified Google Business location.
+
+Add Secrets in Replit:
+In Replit sidebar → Secrets (lock icon)
+Add:
+META_APP_ID = your Meta App ID
+META_APP_SECRET = your Meta App Secret
+GOOGLE_CLIENT_ID = your Google Client ID
+GOOGLE_CLIENT_SECRET = your Google Client Secret
+APP_URL = your app's URL (e.g., https://moutonsbistro-ai--benmouton.replit.app) for redirects
+
+
+Install Libraries in Replit (if not already):
+In Shell (bottom panel):
+npm install passport passport-facebook passport-instagram passport-google-oauth20 axios
+(Passport for OAuth linking, Axios for API calls)
+
+
+Step 1: Add Account Linking (OAuth Setup – Users Connect Their Profiles)
+Add a new section in your app's UI (e.g., under "Accounts" tab in Social Media Builder):
+
+Button: "Connect Facebook/Instagram"
+Button: "Connect Google Business"
+
+When clicked, redirect to OAuth flow.
+Paste this into your server.js or main backend file:
+JavaScriptconst express = require('express');
+const passport = require('passport');
+const FacebookStrategy = require('passport-facebook').Strategy;
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+// Instagram uses same Meta API as Facebook for Business accounts
+
+const app = express();
+
+// Passport setup for Meta (FB/IG)
+passport.use(new FacebookStrategy({
+  clientID: process.env.META_APP_ID,
+  clientSecret: process.env.META_APP_SECRET,
+  callbackURL: `${process.env.APP_URL}/auth/meta/callback`,
+  profileFields: ['id', 'displayName', 'emails']
+}, (accessToken, refreshToken, profile, done) => {
+  // Save accessToken to database for this user (e.g., user.metaToken = accessToken)
+  return done(null, profile);
+}));
+
+// Google Business
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: `${process.env.APP_URL}/auth/google/callback`
+}, (accessToken, refreshToken, profile, done) => {
+  // Save accessToken to database (user.googleToken = accessToken)
+  return done(null, profile);
+}));
+
+// Routes to start linking
+app.get('/auth/meta', passport.authenticate('facebook', { scope: ['pages_manage_posts', 'instagram_basic', 'business_management'] }));
+
+app.get('/auth/google', passport.authenticate('google', { scope: ['https://www.googleapis.com/auth/business.manage'] }));
+
+// Callback routes (after user approves)
+app.get('/auth/meta/callback', passport.authenticate('facebook', { failureRedirect: '/social' }), (req, res) => {
+  // Success: save token, redirect to social page
+  res.redirect('/social?linked=meta');
+});
+
+app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/social' }), (req, res) => {
+  res.redirect('/social?linked=google');
+});
+In frontend (e.g., React/JS file for Social tab):
+
+Add buttons that link to /auth/meta and /auth/google
+
+After linking, show "Connected" badges next to platforms.
+Step 2: Implement Simultaneous Posting
+In your "Social Media Post Builder":
+
+After "Generate Post" → show preview
+Add checkbox: "Post to: [ ] Facebook [ ] Instagram [ ] Google" (pre-check linked ones)
+Button: "Post Now"
+
+Backend route to handle posting (add to server.js):
+JavaScriptconst axios = require('axios');
+
+app.post('/api/post-social', async (req, res) => {
+  const { content, platforms, userId } = req.body; // content from AI generator
+  const user = await getUserFromDb(userId); // Fetch user with tokens
+
+  try {
+    if (platforms.includes('facebook') && user.metaToken) {
+      // Post to FB Page (replace PAGE_ID with user's page ID from profile)
+      await axios.post(`https://graph.facebook.com/PAGE_ID/feed`, {
+        message: content,
+        access_token: user.metaToken
+      });
+    }
+
+    if (platforms.includes('instagram') && user.metaToken) {
+      // Post to IG (needs container for media, but for text: use Graph API)
+      await axios.post(`https://graph.facebook.com/IG_BUSINESS_ID/media`, {
+        caption: content,
+        access_token: user.metaToken
+      });
+    }
+
+    if (platforms.includes('google') && user.googleToken) {
+      // Post to Google Business (use Business Profile API)
+      await axios.post('https://mybusiness.googleapis.com/v4/accounts/ACCOUNT_ID/locations/LOCATION_ID/localPosts', {
+        summary: content,
+      }, { headers: { Authorization: `Bearer ${user.googleToken}` } });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+Frontend call (after user clicks "Post Now"):
+JavaScriptfetch('/api/post-social', {
+  method: 'POST',
+  body: JSON.stringify({ content: postText, platforms: selectedPlatforms, userId: currentUser.id })
+})
+.then(res => res.json())
+.then(data => {
+  if (data.success) alert('Posted to all platforms!');
+});
+Step 3: Test & Secure
+
+Test with your @ChefBenMouton accounts first.
+Store tokens securely (encrypt in DB).
+Handle errors: e.g., "Re-link account if token expired."
+For Instagram, ensure it's a Business account linked to FB.
+
+This setup lets users link once, then post everywhere with one click. Total time: 2–4 hours if comfortable with code; otherwise, use Replit AI to generate from these snippets.

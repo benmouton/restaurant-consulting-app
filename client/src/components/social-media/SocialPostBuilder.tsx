@@ -301,7 +301,7 @@ export default function SocialPostBuilder() {
   return (
     <Card className="mb-6">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
           <Sparkles className="h-5 w-5 text-primary" />
           Social Media Post Builder
         </CardTitle>
@@ -371,6 +371,7 @@ export default function SocialPostBuilder() {
                       variant={formData.platforms.includes("instagram_story") ? "default" : "outline"}
                       size="sm"
                       onClick={() => handlePlatformToggle("instagram_story")}
+                      data-testid="button-platform-ig-story"
                     >
                       <Instagram className="h-4 w-4 mr-2" />
                       IG Story
@@ -385,7 +386,35 @@ export default function SocialPostBuilder() {
                       <Facebook className="h-4 w-4 mr-2" />
                       Facebook
                     </Button>
+                    <Button
+                      type="button"
+                      variant={formData.platforms.includes("google_business") ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePlatformToggle("google_business")}
+                      data-testid="button-platform-google"
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Google Business
+                    </Button>
                   </div>
+                  {connectedAccounts && connectedAccounts.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      <span>{connectedAccounts.filter(a => a.status === 'active').length} account(s) connected</span>
+                      <Button variant="link" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-manage-accounts">
+                        Manage
+                      </Button>
+                    </div>
+                  )}
+                  {(!connectedAccounts || connectedAccounts.length === 0) && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-amber-600">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>No accounts connected.</span>
+                      <Button variant="link" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-connect-accounts">
+                        Connect now
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -394,7 +423,7 @@ export default function SocialPostBuilder() {
                     value={formData.outputStyle}
                     onValueChange={(v) => setFormData({ ...formData, outputStyle: v })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger data-testid="select-output-style">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -437,6 +466,7 @@ export default function SocialPostBuilder() {
                       type="date"
                       value={formData.eventDate}
                       onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
+                      data-testid="input-event-date"
                     />
                   </div>
                 </div>
@@ -448,6 +478,7 @@ export default function SocialPostBuilder() {
                       type="time"
                       value={formData.startTime}
                       onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                      data-testid="input-start-time"
                     />
                   </div>
                   <div className="space-y-2">
@@ -456,6 +487,7 @@ export default function SocialPostBuilder() {
                       type="time"
                       value={formData.endTime}
                       onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                      data-testid="input-end-time"
                     />
                   </div>
                 </div>
@@ -471,8 +503,8 @@ export default function SocialPostBuilder() {
                   />
                 </div>
 
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1" data-testid="button-back-step-2">
                     Back
                   </Button>
                   <Button onClick={() => setStep(3)} className="flex-1" data-testid="button-next-step-2">
@@ -492,7 +524,7 @@ export default function SocialPostBuilder() {
                       value={formData.targetAudience}
                       onValueChange={(v) => setFormData({ ...formData, targetAudience: v })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger data-testid="select-target-audience">
                         <SelectValue placeholder="Who is this for?" />
                       </SelectTrigger>
                       <SelectContent>
@@ -510,7 +542,7 @@ export default function SocialPostBuilder() {
                       value={formData.tone}
                       onValueChange={(v) => setFormData({ ...formData, tone: v })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger data-testid="select-tone">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -530,7 +562,7 @@ export default function SocialPostBuilder() {
                     value={formData.cta}
                     onValueChange={(v) => setFormData({ ...formData, cta: v })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger data-testid="select-cta">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -545,7 +577,7 @@ export default function SocialPostBuilder() {
 
                 {getUpcomingHolidays().length > 0 && (
                   <div className="space-y-2 p-3 bg-muted rounded-lg">
-                    <Label className="flex items-center gap-2">
+                    <Label className="flex flex-wrap items-center gap-2">
                       <PartyPopper className="h-4 w-4" />
                       Upcoming Holidays
                     </Label>
@@ -562,6 +594,7 @@ export default function SocialPostBuilder() {
                                 formData.selectedHoliday === holiday.name ? "" : holiday.name,
                             })
                           }
+                          data-testid={`badge-holiday-${holiday.id}`}
                         >
                           {holiday.name}
                         </Badge>
@@ -570,8 +603,8 @@ export default function SocialPostBuilder() {
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setStep(2)} className="flex-1" data-testid="button-back-step-3">
                     Back
                   </Button>
                   <Button
@@ -598,57 +631,182 @@ export default function SocialPostBuilder() {
 
             {step === 4 && generatedPost && (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Primary Caption</Label>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => copyToClipboard(generatedPost.primaryCaption, "primary")}
-                    >
-                      {copiedField === "primary" ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap">
-                    {generatedPost.primaryCaption}
-                  </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold flex flex-wrap items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Your Generated Content
+                  </h3>
+                  <Badge variant="outline" className="text-xs" data-testid="badge-platform-count">
+                    {formData.platforms.length} platform{formData.platforms.length !== 1 ? 's' : ''}
+                  </Badge>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Short Caption</Label>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => copyToClipboard(generatedPost.shortCaption, "short")}
-                    >
-                      {copiedField === "short" ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg text-sm">
-                    {generatedPost.shortCaption}
-                  </div>
-                </div>
+                <Tabs defaultValue="all" className="w-full">
+                  <TabsList className="w-full grid grid-cols-4">
+                    <TabsTrigger value="all" className="text-xs" data-testid="tab-preview-all">All</TabsTrigger>
+                    {formData.platforms.includes("instagram_feed") && (
+                      <TabsTrigger value="instagram" className="text-xs" data-testid="tab-preview-instagram">
+                        <Instagram className="h-3 w-3 mr-1" />
+                        IG
+                      </TabsTrigger>
+                    )}
+                    {formData.platforms.includes("facebook") && (
+                      <TabsTrigger value="facebook" className="text-xs" data-testid="tab-preview-facebook">
+                        <Facebook className="h-3 w-3 mr-1" />
+                        FB
+                      </TabsTrigger>
+                    )}
+                    {formData.platforms.includes("google_business") && (
+                      <TabsTrigger value="google" className="text-xs" data-testid="tab-preview-google">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        GBP
+                      </TabsTrigger>
+                    )}
+                  </TabsList>
+
+                  <TabsContent value="all" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Label>Primary Caption</Label>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(generatedPost.primaryCaption, "primary")}
+                          data-testid="button-copy-primary"
+                        >
+                          {copiedField === "primary" ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap" data-testid="text-primary-caption">
+                        {generatedPost.primaryCaption}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Label>Short Caption</Label>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(generatedPost.shortCaption, "short")}
+                          data-testid="button-copy-short"
+                        >
+                          {copiedField === "short" ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <div className="p-3 bg-muted rounded-lg text-sm" data-testid="text-short-caption">
+                        {generatedPost.shortCaption}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  {formData.platforms.includes("instagram_feed") && (
+                    <TabsContent value="instagram" className="mt-4">
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 p-2 flex flex-wrap items-center gap-2">
+                          <Instagram className="h-4 w-4 text-white" />
+                          <span className="text-white text-sm font-medium">Instagram Preview</span>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          <div className="aspect-square bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
+                            [Your image here]
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap">{generatedPost.primaryCaption}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {generatedPost.hashtags.map((tag, i) => (
+                              <span key={i} className="text-xs text-primary">{tag}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-2"
+                        onClick={() => copyToClipboard(generatedPost.primaryCaption + "\n\n" + generatedPost.hashtags.join(" "), "ig-full")}
+                        data-testid="button-copy-instagram"
+                      >
+                        {copiedField === "ig-full" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                        Copy Instagram Caption
+                      </Button>
+                    </TabsContent>
+                  )}
+
+                  {formData.platforms.includes("facebook") && (
+                    <TabsContent value="facebook" className="mt-4">
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="bg-blue-600 p-2 flex flex-wrap items-center gap-2">
+                          <Facebook className="h-4 w-4 text-white" />
+                          <span className="text-white text-sm font-medium">Facebook Preview</span>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          <p className="text-sm whitespace-pre-wrap" data-testid="text-facebook-preview">{generatedPost.primaryCaption}</p>
+                          <div className="aspect-video bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
+                            [Your image here]
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-2"
+                        onClick={() => copyToClipboard(generatedPost.primaryCaption, "fb-full")}
+                        data-testid="button-copy-facebook"
+                      >
+                        {copiedField === "fb-full" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                        Copy Facebook Post
+                      </Button>
+                    </TabsContent>
+                  )}
+
+                  {formData.platforms.includes("google_business") && (
+                    <TabsContent value="google" className="mt-4">
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="bg-green-600 p-2 flex flex-wrap items-center gap-2">
+                          <MapPin className="h-4 w-4 text-white" />
+                          <span className="text-white text-sm font-medium">Google Business Preview</span>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          <p className="text-sm whitespace-pre-wrap" data-testid="text-google-preview">{generatedPost.shortCaption}</p>
+                          <div className="text-xs text-muted-foreground">
+                            Tip: Google Business posts are best kept short (under 300 characters).
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-2"
+                        onClick={() => copyToClipboard(generatedPost.shortCaption, "gbp-full")}
+                        data-testid="button-copy-google"
+                      >
+                        {copiedField === "gbp-full" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                        Copy Google Business Post
+                      </Button>
+                    </TabsContent>
+                  )}
+                </Tabs>
 
                 {generatedPost.storyOverlays.length > 0 && (
                   <div className="space-y-2">
                     <Label>Story Text Overlays</Label>
                     <div className="space-y-2">
                       {generatedPost.storyOverlays.map((overlay, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="flex-1 p-2 bg-muted rounded text-sm">{overlay}</div>
+                        <div key={i} className="flex flex-wrap items-center gap-2">
+                          <div className="flex-1 p-2 bg-muted rounded text-sm" data-testid={`text-overlay-${i}`}>{overlay}</div>
                           <Button
                             size="icon"
                             variant="ghost"
                             onClick={() => copyToClipboard(overlay, `overlay-${i}`)}
+                            data-testid={`button-copy-overlay-${i}`}
                           >
                             {copiedField === `overlay-${i}` ? (
                               <Check className="h-4 w-4" />
@@ -663,12 +821,13 @@ export default function SocialPostBuilder() {
                 )}
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <Label>Hashtags</Label>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => copyToClipboard(generatedPost.hashtags.join(" "), "hashtags")}
+                      data-testid="button-copy-hashtags"
                     >
                       {copiedField === "hashtags" ? (
                         <Check className="h-4 w-4" />
@@ -679,14 +838,14 @@ export default function SocialPostBuilder() {
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {generatedPost.hashtags.map((tag, i) => (
-                      <Badge key={i} variant="secondary">
+                      <Badge key={i} variant="secondary" data-testid={`badge-hashtag-${i}`}>
                         {tag}
                       </Badge>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg">
+                <div className="flex flex-wrap items-center gap-2 p-3 bg-primary/5 rounded-lg" data-testid="text-suggested-time">
                   <Clock className="h-4 w-4 text-primary" />
                   <span className="text-sm">
                     Best time to post: <strong>{generatedPost.suggestedPostTime}</strong>
@@ -694,20 +853,39 @@ export default function SocialPostBuilder() {
                 </div>
 
                 <div className="border-t pt-4 mt-4">
-                  <h3 className="font-medium mb-2 flex items-center gap-2">
+                  <h3 className="font-medium mb-2 flex flex-wrap items-center gap-2">
                     <Send className="h-4 w-4" />
                     Publish to Connected Accounts
                   </h3>
                   {connectedAccounts && connectedAccounts.length > 0 ? (
                     <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        Select which accounts to publish this post to:
-                      </p>
-                      <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm text-muted-foreground">
+                          Select which accounts to publish this post to:
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const activeAccounts = connectedAccounts.filter(a => a.status === 'active');
+                            if (selectedAccountIds.length === activeAccounts.length) {
+                              setSelectedAccountIds([]);
+                            } else {
+                              setSelectedAccountIds(activeAccounts.map(a => a.id));
+                            }
+                          }}
+                          data-testid="button-select-all-accounts"
+                        >
+                          {selectedAccountIds.length === connectedAccounts.filter(a => a.status === 'active').length
+                            ? 'Deselect All'
+                            : 'Select All'}
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {connectedAccounts.filter(a => a.status === 'active').map((account) => (
                           <div
                             key={account.id}
-                            className={`flex items-center gap-3 p-2 border rounded-lg cursor-pointer transition-colors ${
+                            className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
                               selectedAccountIds.includes(account.id)
                                 ? 'border-primary bg-primary/5'
                                 : 'hover:bg-muted/50'
@@ -718,10 +896,19 @@ export default function SocialPostBuilder() {
                             <Checkbox
                               checked={selectedAccountIds.includes(account.id)}
                               onCheckedChange={() => toggleAccountSelection(account.id)}
+                              data-testid={`checkbox-account-${account.id}`}
                             />
-                            <div className="flex items-center gap-2">
-                              {getProviderIcon(account.provider)}
-                              <span className="text-sm">{account.displayName}</span>
+                            <Avatar className="h-8 w-8">
+                              {account.profilePictureUrl ? (
+                                <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
+                              ) : null}
+                              <AvatarFallback className="text-xs">
+                                {getProviderIcon(account.provider)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{account.displayName}</div>
+                              <div className="text-xs text-muted-foreground capitalize">{account.provider.replace('_', ' ')}</div>
                             </div>
                           </div>
                         ))}
@@ -735,27 +922,28 @@ export default function SocialPostBuilder() {
                         {publishMutation.isPending ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Publishing...
+                            Publishing to {selectedAccountIds.length} platform{selectedAccountIds.length !== 1 ? 's' : ''}...
                           </>
                         ) : (
                           <>
                             <Send className="h-4 w-4 mr-2" />
-                            Publish Now to {selectedAccountIds.length} Account{selectedAccountIds.length !== 1 ? 's' : ''}
+                            Publish Now to {selectedAccountIds.length} Platform{selectedAccountIds.length !== 1 ? 's' : ''}
                           </>
                         )}
                       </Button>
                     </div>
                   ) : (
-                    <div className="text-center py-4 border rounded-lg bg-muted/30">
-                      <Link2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm text-muted-foreground">No accounts connected</p>
+                    <div className="text-center py-6 border rounded-lg bg-muted/30">
+                      <Link2 className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                      <p className="font-medium">No accounts connected</p>
+                      <p className="text-sm text-muted-foreground mb-3">Connect your social accounts to post directly</p>
                       <Button
-                        variant="link"
+                        variant="outline"
                         size="sm"
                         onClick={() => setActiveTab("accounts")}
-                        className="mt-1"
                       >
-                        Connect accounts to publish
+                        <Link2 className="h-4 w-4 mr-2" />
+                        Connect Accounts
                       </Button>
                     </div>
                   )}
@@ -823,9 +1011,10 @@ export default function SocialPostBuilder() {
                     {connectedAccounts.map((account) => (
                       <div
                         key={account.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
+                        className="flex flex-wrap items-center justify-between gap-2 p-3 border rounded-lg"
+                        data-testid={`card-account-${account.id}`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                           <Avatar className="h-10 w-10">
                             {account.profilePictureUrl ? (
                               <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
@@ -836,14 +1025,14 @@ export default function SocialPostBuilder() {
                           </Avatar>
                           <div>
                             <div className="font-medium">{account.displayName}</div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1">
                               {getProviderIcon(account.provider)}
                               <span className="capitalize">{account.provider.replace('_', ' ')}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={account.status === 'active' ? 'default' : 'destructive'}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant={account.status === 'active' ? 'default' : 'destructive'} data-testid={`badge-account-status-${account.id}`}>
                             {account.status}
                           </Badge>
                           <Button
@@ -935,10 +1124,10 @@ export default function SocialPostBuilder() {
                 <div className="space-y-3">
                   {postHistory.slice(0, 10).map((post) => (
                     <div key={post.id} className="p-3 border rounded-lg">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="flex-1">
                           <p className="text-sm line-clamp-2">{post.caption}</p>
-                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
                             <Clock className="h-3 w-3" />
                             {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Unknown'}
                           </div>
@@ -1035,6 +1224,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
             value={formData.restaurantName}
             onChange={(e) => setFormData({ ...formData, restaurantName: e.target.value })}
             placeholder="Your restaurant name"
+            data-testid="input-restaurant-name"
           />
         </div>
         <div className="space-y-2">
@@ -1043,6 +1233,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
             value={formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             placeholder="e.g., Cedar Park, TX"
+            data-testid="input-location"
           />
         </div>
       </div>
@@ -1056,6 +1247,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
               variant={formData.voiceAdjectives.includes(voice) ? "default" : "outline"}
               className="cursor-pointer"
               onClick={() => toggleVoice(voice)}
+              data-testid={`badge-voice-${voice.toLowerCase().replace(/\s+/g, '-')}`}
             >
               {voice}
             </Badge>
@@ -1070,7 +1262,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
             value={formData.defaultCta}
             onValueChange={(v) => setFormData({ ...formData, defaultCta: v })}
           >
-            <SelectTrigger>
+            <SelectTrigger data-testid="select-default-cta">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1086,7 +1278,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
             value={formData.emojiLevel}
             onValueChange={(v) => setFormData({ ...formData, emojiLevel: v })}
           >
-            <SelectTrigger>
+            <SelectTrigger data-testid="select-emoji-level">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1104,7 +1296,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
           value={formData.hashtagStyle}
           onValueChange={(v) => setFormData({ ...formData, hashtagStyle: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger data-testid="select-hashtag-style">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1121,6 +1313,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
           value={formData.neverSayList}
           onChange={(e) => setFormData({ ...formData, neverSayList: e.target.value })}
           placeholder="e.g., cheap, best ever, guaranteed"
+          data-testid="input-never-say"
         />
         <p className="text-xs text-muted-foreground">
           Words to avoid in generated content
