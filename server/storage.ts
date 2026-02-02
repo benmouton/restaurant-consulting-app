@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -173,6 +173,10 @@ export interface IStorage {
   saveKitchenShiftData(data: InsertKitchenShiftData): Promise<KitchenShiftData>;
   updateKitchenShiftData(id: number, userId: string, data: Partial<InsertKitchenShiftData>): Promise<KitchenShiftData | undefined>;
   saveKitchenDebrief(userId: string, shiftDate: string, daypart: string, debrief: { whatWentWell?: string; whatSucked?: string; fixForTomorrow?: string }): Promise<KitchenShiftData>;
+  
+  // Handbook Settings
+  getHandbookSettings(userId: string): Promise<HandbookSettings | undefined>;
+  upsertHandbookSettings(userId: string, data: Partial<InsertHandbookSettings>): Promise<HandbookSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -998,6 +1002,29 @@ export class DatabaseStorage implements IStorage {
       return (await this.updateRestaurantProfile(userId, data)) as RestaurantProfile;
     } else {
       return await this.createRestaurantProfile({ userId, ...data });
+    }
+  }
+
+  // Handbook Settings
+  async getHandbookSettings(userId: string): Promise<HandbookSettings | undefined> {
+    const [settings] = await db.select().from(handbookSettings)
+      .where(eq(handbookSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertHandbookSettings(userId: string, data: Partial<InsertHandbookSettings>): Promise<HandbookSettings> {
+    const existing = await this.getHandbookSettings(userId);
+    if (existing) {
+      const [updated] = await db.update(handbookSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(handbookSettings.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(handbookSettings)
+        .values({ userId, ...data })
+        .returning();
+      return created;
     }
   }
 

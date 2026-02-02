@@ -406,6 +406,40 @@ export const insertRestaurantProfileSchema = createInsertSchema(restaurantProfil
 export type InsertRestaurantProfile = z.infer<typeof insertRestaurantProfileSchema>;
 export type RestaurantProfile = typeof restaurantProfiles.$inferSelect;
 
+// Employee Handbook Settings (customizable handbook content)
+export const handbookSettings = pgTable("handbook_settings", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  restaurantName: text("restaurant_name"),
+  restaurantAddress: text("restaurant_address"),
+  restaurantPhone: text("restaurant_phone"),
+  restaurantEmail: text("restaurant_email"),
+  restaurantWebsite: text("restaurant_website"),
+  ownerNames: text("owner_names"), // e.g., "Ben and Rachel Mouton"
+  missionStatement: text("mission_statement"),
+  uniformDiningRoom: text("uniform_dining_room"),
+  uniformKitchen: text("uniform_kitchen"),
+  employeeMealPolicy: text("employee_meal_policy"),
+  parkingPolicy: text("parking_policy"),
+  schedulingApp: text("scheduling_app"), // e.g., "Homebase", "7shifts", "HotSchedules"
+  evaluationSchedule: text("evaluation_schedule"), // e.g., "January and June"
+  orientationDays: integer("orientation_days").default(30),
+  closedHolidays: text("closed_holidays").array(), // e.g., ["Thanksgiving", "Christmas", "Easter"]
+  alcoholPolicy: text("alcohol_policy"), // custom modifications
+  socialMediaPolicy: text("social_media_policy"),
+  additionalPolicies: text("additional_policies"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHandbookSettingsSchema = createInsertSchema(handbookSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertHandbookSettings = z.infer<typeof insertHandbookSettingsSchema>;
+export type HandbookSettings = typeof handbookSettings.$inferSelect;
+
 // Daily Task Completions (tracking task completion for insights)
 export const dailyTaskCompletions = pgTable("daily_task_completions", {
   id: serial("id").primaryKey(),

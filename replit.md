@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
 - **Schema**: Defined in `shared/schema.ts` and `shared/models/`
-- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`, `repair_vendors`, `facility_issues`, `kitchen_shift_data`, `playbooks`, `playbook_steps`, `playbook_assignments`, `playbook_acknowledgments`, `playbook_audits`.
+- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`, `repair_vendors`, `facility_issues`, `kitchen_shift_data`, `playbooks`, `playbook_steps`, `playbook_assignments`, `playbook_acknowledgments`, `playbook_audits`, `handbook_settings`.
 
 ### Core Features & Implementations
 - **Staff Scheduling System**: Sling-style scheduling with weekly calendar, staff/position management, pay rate tracking, daily labor cost calculation, open shift tracking, and announcements.
@@ -61,6 +61,12 @@ Preferred communication style: Simple, everyday language.
   - **Acknowledgment Tracking**: Daily "I have read & understand" per role/shift.
   - **Duplicate & Copy**: Clone existing playbooks for quick variations.
   - **Version Tracking**: Track changes over time with audit pass rates.
+- **Employee Handbook Builder**: Comprehensive handbook generation tool integrated into Templates page:
+  - **Customizable Restaurant Info**: Restaurant name, phone, address, owner/operator names, mission statement.
+  - **Policy Configuration**: Uniform policies (dining room and kitchen), employee meal policy, parking policy, closed holidays, scheduling app used.
+  - **Complete Handbook Generation**: 20+ sections covering employment policies, conduct standards, harassment, safety, customer service, payroll, and emergency procedures.
+  - **Print-Ready Output**: Professional formatting with XSS protection, signature acknowledgment section.
+  - **Auto-Save**: Settings persist to database via `handbook_settings` table.
 
 ## External Dependencies
 

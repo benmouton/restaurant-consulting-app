@@ -31,6 +31,7 @@ import {
   UserCog,
   ChevronDown
 } from "lucide-react";
+import { HandbookBuilder } from "@/components/handbook/HandbookBuilder";
 import type { TrainingTemplate } from "@shared/schema";
 
 function personalizeContent(content: string, restaurantName: string | null | undefined): string {
@@ -169,23 +170,30 @@ export default function TemplatesPage() {
         </div>
 
         <Tabs value={activeCategory} onValueChange={setActiveCategory} className="mb-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="server" className="flex items-center gap-2" data-testid="tab-server">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
+            <TabsTrigger value="server" className="flex flex-wrap items-center gap-2" data-testid="tab-server">
               <Users className="h-4 w-4" />
               Server Training
             </TabsTrigger>
-            <TabsTrigger value="kitchen" className="flex items-center gap-2" data-testid="tab-kitchen">
+            <TabsTrigger value="kitchen" className="flex flex-wrap items-center gap-2" data-testid="tab-kitchen">
               <ChefHat className="h-4 w-4" />
               Kitchen Training
+            </TabsTrigger>
+            <TabsTrigger value="handbook" className="flex flex-wrap items-center gap-2" data-testid="tab-handbook">
+              <BookOpen className="h-4 w-4" />
+              Handbook
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {activeCategory === "handbook" ? (
+          <HandbookBuilder />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
+                <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
                   <GraduationCap className="h-5 w-5 text-primary" />
                   {activeCategory === "server" ? "Server Manual" : "Kitchen Manual"}
                 </CardTitle>
@@ -375,6 +383,7 @@ export default function TemplatesPage() {
             )}
           </div>
         </div>
+        )}
       </main>
     </div>
   );

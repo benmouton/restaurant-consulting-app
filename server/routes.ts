@@ -15,7 +15,7 @@ import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { restaurantHolidays } from "@shared/schema";
+import { restaurantHolidays, insertHandbookSettingsSchema } from "@shared/schema";
 import { sendOrganizationInviteEmail } from "./emailService";
 
 const openai = new OpenAI({
@@ -612,6 +612,34 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('Error saving restaurant profile:', error);
       res.status(500).json({ message: "Failed to save restaurant profile" });
+    }
+  });
+
+  // ===== HANDBOOK SETTINGS ROUTES =====
+  
+  app.get("/api/handbook-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getHandbookSettings(userId);
+      res.json(settings || null);
+    } catch (error: any) {
+      console.error('Error fetching handbook settings:', error);
+      res.status(500).json({ message: "Failed to fetch handbook settings" });
+    }
+  });
+
+  app.post("/api/handbook-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertHandbookSettingsSchema.partial().parse(req.body);
+      const settings = await storage.upsertHandbookSettings(userId, validatedData);
+      res.json(settings);
+    } catch (error: any) {
+      console.error('Error saving handbook settings:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to save handbook settings" });
     }
   });
 
