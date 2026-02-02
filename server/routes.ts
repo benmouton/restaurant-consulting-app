@@ -1001,6 +1001,201 @@ export async function registerRoutes(
     }
   });
 
+  // ===== LIVING PLAYBOOKS ROUTES =====
+
+  app.get("/api/playbooks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playbooks = await storage.getPlaybooks(userId);
+      res.json(playbooks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch playbooks" });
+    }
+  });
+
+  app.get("/api/playbooks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playbook = await storage.getPlaybook(Number(req.params.id), userId);
+      if (!playbook) return res.status(404).json({ message: "Playbook not found" });
+      res.json(playbook);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch playbook" });
+    }
+  });
+
+  app.post("/api/playbooks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playbook = await storage.createPlaybook({ ...req.body, userId });
+      res.status(201).json(playbook);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create playbook" });
+    }
+  });
+
+  app.put("/api/playbooks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playbook = await storage.updatePlaybook(Number(req.params.id), userId, req.body);
+      if (!playbook) return res.status(404).json({ message: "Playbook not found" });
+      res.json(playbook);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update playbook" });
+    }
+  });
+
+  app.delete("/api/playbooks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.deletePlaybook(Number(req.params.id), userId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete playbook" });
+    }
+  });
+
+  app.post("/api/playbooks/:id/duplicate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playbook = await storage.duplicatePlaybook(Number(req.params.id), userId);
+      if (!playbook) return res.status(404).json({ message: "Playbook not found" });
+      res.status(201).json(playbook);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to duplicate playbook" });
+    }
+  });
+
+  app.get("/api/playbooks/:id/steps", isAuthenticated, async (req: any, res) => {
+    try {
+      const steps = await storage.getPlaybookSteps(Number(req.params.id));
+      res.json(steps);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch playbook steps" });
+    }
+  });
+
+  app.post("/api/playbooks/:id/steps", isAuthenticated, async (req: any, res) => {
+    try {
+      const step = await storage.createPlaybookStep({ ...req.body, playbookId: Number(req.params.id) });
+      res.status(201).json(step);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create step" });
+    }
+  });
+
+  app.put("/api/playbooks/:playbookId/steps/:stepId", isAuthenticated, async (req: any, res) => {
+    try {
+      const step = await storage.updatePlaybookStep(Number(req.params.stepId), req.body);
+      if (!step) return res.status(404).json({ message: "Step not found" });
+      res.json(step);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update step" });
+    }
+  });
+
+  app.delete("/api/playbooks/:playbookId/steps/:stepId", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deletePlaybookStep(Number(req.params.stepId));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete step" });
+    }
+  });
+
+  app.put("/api/playbooks/:id/steps/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const steps = await storage.bulkUpdatePlaybookSteps(Number(req.params.id), req.body.steps);
+      res.json(steps);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update steps" });
+    }
+  });
+
+  app.get("/api/playbooks/:id/assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const assignments = await storage.getPlaybookAssignments(Number(req.params.id));
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  app.post("/api/playbooks/:id/assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const assignment = await storage.createPlaybookAssignment({ ...req.body, playbookId: Number(req.params.id) });
+      res.status(201).json(assignment);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create assignment" });
+    }
+  });
+
+  app.delete("/api/playbooks/:playbookId/assignments/:assignmentId", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deletePlaybookAssignment(Number(req.params.assignmentId));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete assignment" });
+    }
+  });
+
+  app.get("/api/playbooks/:id/acknowledgments", isAuthenticated, async (req: any, res) => {
+    try {
+      const shiftDate = req.query.shiftDate as string | undefined;
+      const acks = await storage.getPlaybookAcknowledgments(Number(req.params.id), shiftDate);
+      res.json(acks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch acknowledgments" });
+    }
+  });
+
+  app.post("/api/playbooks/:id/acknowledgments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const ack = await storage.createPlaybookAcknowledgment({ 
+        ...req.body, 
+        playbookId: Number(req.params.id),
+        userId 
+      });
+      res.status(201).json(ack);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create acknowledgment" });
+    }
+  });
+
+  app.get("/api/playbooks/:id/audits", isAuthenticated, async (req: any, res) => {
+    try {
+      const audits = await storage.getPlaybookAudits(Number(req.params.id));
+      res.json(audits);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch audits" });
+    }
+  });
+
+  app.post("/api/playbooks/:id/audits", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const audit = await storage.createPlaybookAudit({ 
+        ...req.body, 
+        playbookId: Number(req.params.id),
+        auditorUserId: userId 
+      });
+      res.status(201).json(audit);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create audit" });
+    }
+  });
+
+  app.put("/api/playbooks/:playbookId/audits/:auditId", isAuthenticated, async (req: any, res) => {
+    try {
+      const audit = await storage.updatePlaybookAudit(Number(req.params.auditId), req.body);
+      if (!audit) return res.status(404).json({ message: "Audit not found" });
+      res.json(audit);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update audit" });
+    }
+  });
+
   // ===== SCHEDULING ROUTES =====
 
   // Staff Positions

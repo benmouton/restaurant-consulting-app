@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -1340,6 +1340,159 @@ export class DatabaseStorage implements IStorage {
       fixForTomorrow: debrief.fixForTomorrow
     }).returning();
     return shift;
+  }
+
+  // ===== LIVING PLAYBOOKS =====
+
+  async getPlaybooks(userId: string): Promise<Playbook[]> {
+    return await db.select().from(playbooks)
+      .where(eq(playbooks.userId, userId))
+      .orderBy(desc(playbooks.updatedAt));
+  }
+
+  async getPlaybook(id: number, userId: string): Promise<Playbook | undefined> {
+    const [playbook] = await db.select().from(playbooks)
+      .where(and(eq(playbooks.id, id), eq(playbooks.userId, userId)));
+    return playbook;
+  }
+
+  async createPlaybook(data: InsertPlaybook): Promise<Playbook> {
+    const [playbook] = await db.insert(playbooks).values(data).returning();
+    return playbook;
+  }
+
+  async updatePlaybook(id: number, userId: string, data: Partial<InsertPlaybook>): Promise<Playbook | undefined> {
+    const [updated] = await db.update(playbooks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(playbooks.id, id), eq(playbooks.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deletePlaybook(id: number, userId: string): Promise<void> {
+    await db.delete(playbooks).where(and(eq(playbooks.id, id), eq(playbooks.userId, userId)));
+  }
+
+  async duplicatePlaybook(id: number, userId: string): Promise<Playbook | undefined> {
+    const original = await this.getPlaybook(id, userId);
+    if (!original) return undefined;
+    
+    const newPlaybook = await this.createPlaybook({
+      userId,
+      title: `${original.title} (Copy)`,
+      description: original.description,
+      category: original.category,
+      role: original.role,
+      mode: original.mode,
+      status: "draft",
+      version: 1,
+    });
+    
+    const steps = await this.getPlaybookSteps(id);
+    for (const step of steps) {
+      await this.createPlaybookStep({
+        playbookId: newPlaybook.id,
+        stepNumber: step.stepNumber,
+        content: step.content,
+        photoUrl: step.photoUrl,
+        visualCue: step.visualCue,
+        commonFailure: step.commonFailure,
+        requiredPhoto: step.requiredPhoto,
+        isCheckpoint: step.isCheckpoint,
+      });
+    }
+    
+    return newPlaybook;
+  }
+
+  async getPlaybookSteps(playbookId: number): Promise<PlaybookStep[]> {
+    return await db.select().from(playbookSteps)
+      .where(eq(playbookSteps.playbookId, playbookId))
+      .orderBy(playbookSteps.stepNumber);
+  }
+
+  async createPlaybookStep(data: InsertPlaybookStep): Promise<PlaybookStep> {
+    const [step] = await db.insert(playbookSteps).values(data).returning();
+    return step;
+  }
+
+  async updatePlaybookStep(id: number, data: Partial<InsertPlaybookStep>): Promise<PlaybookStep | undefined> {
+    const [updated] = await db.update(playbookSteps)
+      .set(data)
+      .where(eq(playbookSteps.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePlaybookStep(id: number): Promise<void> {
+    await db.delete(playbookSteps).where(eq(playbookSteps.id, id));
+  }
+
+  async bulkUpdatePlaybookSteps(playbookId: number, stepsData: InsertPlaybookStep[]): Promise<PlaybookStep[]> {
+    await db.delete(playbookSteps).where(eq(playbookSteps.playbookId, playbookId));
+    if (stepsData.length === 0) return [];
+    const steps = await db.insert(playbookSteps).values(stepsData).returning();
+    return steps;
+  }
+
+  async getPlaybookAssignments(playbookId: number): Promise<PlaybookAssignment[]> {
+    return await db.select().from(playbookAssignments)
+      .where(eq(playbookAssignments.playbookId, playbookId));
+  }
+
+  async createPlaybookAssignment(data: InsertPlaybookAssignment): Promise<PlaybookAssignment> {
+    const [assignment] = await db.insert(playbookAssignments).values(data).returning();
+    return assignment;
+  }
+
+  async deletePlaybookAssignment(id: number): Promise<void> {
+    await db.delete(playbookAssignments).where(eq(playbookAssignments.id, id));
+  }
+
+  async getPlaybookAcknowledgments(playbookId: number, shiftDate?: string): Promise<PlaybookAcknowledgment[]> {
+    if (shiftDate) {
+      return await db.select().from(playbookAcknowledgments)
+        .where(and(eq(playbookAcknowledgments.playbookId, playbookId), eq(playbookAcknowledgments.shiftDate, shiftDate)));
+    }
+    return await db.select().from(playbookAcknowledgments)
+      .where(eq(playbookAcknowledgments.playbookId, playbookId))
+      .orderBy(desc(playbookAcknowledgments.acknowledgedAt));
+  }
+
+  async createPlaybookAcknowledgment(data: InsertPlaybookAcknowledgment): Promise<PlaybookAcknowledgment> {
+    const [ack] = await db.insert(playbookAcknowledgments).values(data).returning();
+    await db.update(playbooks)
+      .set({ totalAcknowledgments: sql`COALESCE(${playbooks.totalAcknowledgments}, 0) + 1` })
+      .where(eq(playbooks.id, data.playbookId));
+    return ack;
+  }
+
+  async getPlaybookAudits(playbookId: number): Promise<PlaybookAudit[]> {
+    return await db.select().from(playbookAudits)
+      .where(eq(playbookAudits.playbookId, playbookId))
+      .orderBy(desc(playbookAudits.auditDate));
+  }
+
+  async createPlaybookAudit(data: InsertPlaybookAudit): Promise<PlaybookAudit> {
+    const [audit] = await db.insert(playbookAudits).values(data).returning();
+    const allAudits = await this.getPlaybookAudits(data.playbookId);
+    const totalScore = allAudits.reduce((sum, a) => sum + (a.overallScore || 0), 0);
+    const avgScore = Math.round(totalScore / allAudits.length);
+    await db.update(playbooks)
+      .set({ 
+        totalAudits: allAudits.length,
+        auditPassRate: avgScore
+      })
+      .where(eq(playbooks.id, data.playbookId));
+    return audit;
+  }
+
+  async updatePlaybookAudit(id: number, data: Partial<InsertPlaybookAudit>): Promise<PlaybookAudit | undefined> {
+    const [updated] = await db.update(playbookAudits)
+      .set(data)
+      .where(eq(playbookAudits.id, id))
+      .returning();
+    return updated;
   }
 }
 

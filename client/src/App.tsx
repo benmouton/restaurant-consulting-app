@@ -13,6 +13,7 @@ import Dashboard from "@/pages/dashboard";
 import DomainPage from "@/pages/domain";
 import ConsultantPage from "@/pages/consultant";
 import TemplatesPage from "@/pages/templates";
+import PlaybooksPage from "@/pages/playbooks";
 import FinancialPage from "@/pages/financial";
 import SchedulingPage from "@/pages/scheduling";
 import SubscriptionPage from "@/pages/subscription";
@@ -65,6 +66,9 @@ function Router() {
         </Route>
         <Route path="/templates">
           {user ? <ProtectedPage component={TemplatesPage} /> : <Landing />}
+        </Route>
+        <Route path="/playbooks">
+          {user ? <ProtectedPage component={PlaybooksPage} /> : <Landing />}
         </Route>
         <Route path="/scheduling">
           {user ? <ProtectedPage component={SchedulingPage} /> : <Landing />}

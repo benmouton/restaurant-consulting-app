@@ -1,0 +1,113 @@
+tell iot to link to my labor section, and scharge $5 to stipe for each new employee addedHere's a practical, step-by-step plan to implement the two features you requested:
+
+Link the Staff Scheduling section to the Staffing & Labor section
+Charge $5 via Stripe every time a new employee is added
+
+1. Linking Staff Scheduling → Labor section
+Goal: Make it easy for the user to jump from the scheduling screen to the labor planning / demand engine so they can see how the schedule affects projected labor %.
+Recommended ways (choose 1 or combine them)
+Option A – Most visible (recommended)
+Add a prominent button or link right above / below the calendar:
+text[Big blue button]
+→ See how this schedule impacts labor cost & coverage
+(links to the Labor Demand & Cut-Decision Engine)
+Option B – Contextual help text
+Add a small persistent banner or tooltip near the labor % display (once you add it):
+textThis schedule projects ~$2,140 in labor this week.
+→ Open Labor Engine to adjust staffing targets or see cuts
+Option C – Quick sidebar / navigation link
+In the left sidebar (or top nav) add:
+textStaff Scheduling
+Labor Planning & Cuts ← new link
+Implementation tip
+Use a simple internal link or button that navigates to the Staffing & Labor page URL (e.g. /labor or /staffing-labor).
+Example button code (pseudo-code):
+HTML<button 
+  class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium"
+  onclick="window.location.href='/labor'"
+>
+  → Check Labor Impact & Suggestions
+</button>
+This is the fastest way to create a connection between the two sections.
+2. Charge $5 via Stripe for each new employee added
+Goal: Add a $5 one-time fee every time someone clicks “Add Staff” and successfully creates a new team member.
+Recommended implementation path
+Step 1 – Decide on the exact trigger
+Most logical moment:
+Charge after the user clicks “Add Staff” in the modal and the employee is successfully saved to the database.
+Step 2 – Create a $5 one-time product/price in Stripe
+
+Go to your Stripe Dashboard → Products → + Create product
+Name: “New Employee Add-on Fee”
+Pricing: One-time fee → $5.00 USD
+Save → note the Price ID (looks like price_1xxxxxxxxxxxxx)
+
+Step 3 – Add Stripe checkout in your app
+Two clean ways to do it:
+Way A – Redirect to Stripe Checkout (easiest & most secure)
+When user clicks “Add Staff” and the employee is created successfully:
+
+Create a Stripe Checkout Session on your backend
+Redirect user to Stripe to pay $5
+After successful payment → redirect back to your app and show “Employee added”
+
+Backend flow (Node.js example):
+JavaScript// POST /api/add-employee
+async function addEmployee(req, res) {
+  // 1. Save the employee to your database first
+  const newEmployee = await db.staff.create({ ...req.body });
+
+  // 2. Create Stripe Checkout Session
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: [{
+      price: 'price_xxxxxxxxxxxxxxx', // your $5 price ID
+      quantity: 1,
+    }],
+    mode: 'payment',
+    success_url: `${YOUR_APP_URL}/staff?success=true&employeeId=${newEmployee.id}`,
+    cancel_url: `${YOUR_APP_URL}/staff?cancel=true`,
+    metadata: { employeeId: newEmployee.id }
+  });
+
+  // 3. Redirect user to Stripe
+  res.json({ url: session.url });
+}
+Frontend (after clicking Add):
+JavaScript// On successful form submit
+fetch('/api/add-employee', { method: 'POST', body: JSON.stringify(formData) })
+  .then(res => res.json())
+  .then(data => {
+    if (data.url) {
+      window.location.href = data.url; // go to Stripe checkout
+    }
+  });
+Way B – Charge immediately with Payment Element (no redirect)
+Use Stripe Elements to collect card inside your modal → charge $5 instantly → then save the employee only if payment succeeds.
+This is cleaner UX but more code.
+Step 4 – Handle success & failure
+
+After payment success → show “Employee added successfully!”
+If payment fails/cancelled → show “Payment required to add new staff members” and don’t save the employee (or save as draft)
+
+Step 5 – Optional: Subscription-style approach
+Instead of $5 per employee forever, you could later change to:
+
+First 5 employees free
+Then $5 per additional employee (one-time)
+Or $9–$19/month unlimited employees (future upgrade path)
+
+Quick summary – what to do first
+
+Add the “→ Check Labor Impact” button/link on the scheduling page
+(quick visual connection – do this today)
+In Stripe: create a $5 one-time price → copy the Price ID
+Decide: redirect to Checkout (easier) or collect card in-app
+Add backend endpoint that:
+Saves employee
+Creates Checkout Session
+Returns the Stripe URL
+
+Update frontend “Add Staff” button to trigger the payment flow
+
+This combo (labor link + $5 fee per new hire) makes the scheduling section feel more professional and monetizable.

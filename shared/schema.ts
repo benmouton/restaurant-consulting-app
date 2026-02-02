@@ -599,3 +599,80 @@ export type KitchenShiftData = typeof kitchenShiftData.$inferSelect;
 export type InsertRepairVendor = z.infer<typeof insertRepairVendorSchema>;
 export type InsertFacilityIssue = z.infer<typeof insertFacilityIssueSchema>;
 export type InsertKitchenShiftData = z.infer<typeof insertKitchenShiftDataSchema>;
+
+// ===== LIVING PLAYBOOKS =====
+
+export const playbooks = pgTable("playbooks", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // 'opening', 'closing', 'prep', 'service', 'cleaning', 'safety', 'training', 'other'
+  role: text("role"), // 'boh', 'foh', 'management', 'all'
+  mode: text("mode").notNull().default("checklist"), // 'checklist', 'step_by_step', 'deep_procedure'
+  status: text("status").notNull().default("draft"), // 'draft', 'active', 'archived'
+  version: integer("version").notNull().default(1),
+  auditPassRate: integer("audit_pass_rate"), // percentage 0-100
+  totalAudits: integer("total_audits").default(0),
+  totalAcknowledgments: integer("total_acknowledgments").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const playbookSteps = pgTable("playbook_steps", {
+  id: serial("id").primaryKey(),
+  playbookId: integer("playbook_id").notNull().references(() => playbooks.id, { onDelete: "cascade" }),
+  stepNumber: integer("step_number").notNull(),
+  content: text("content").notNull(),
+  photoUrl: text("photo_url"),
+  visualCue: text("visual_cue"), // e.g., "Plate should look like this"
+  commonFailure: text("common_failure"), // AI-suggested failure point
+  requiredPhoto: boolean("required_photo").default(false), // photo proof required during audit
+  isCheckpoint: boolean("is_checkpoint").default(false), // critical step that needs special attention
+});
+
+export const playbookAssignments = pgTable("playbook_assignments", {
+  id: serial("id").primaryKey(),
+  playbookId: integer("playbook_id").notNull().references(() => playbooks.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'boh', 'foh', 'management'
+  shift: text("shift"), // 'am', 'pm', 'close', 'all'
+  isRequired: boolean("is_required").default(true),
+});
+
+export const playbookAcknowledgments = pgTable("playbook_acknowledgments", {
+  id: serial("id").primaryKey(),
+  playbookId: integer("playbook_id").notNull().references(() => playbooks.id, { onDelete: "cascade" }),
+  staffMemberId: integer("staff_member_id").references(() => staffMembers.id),
+  userId: text("user_id"), // for owner/manager acknowledgments
+  acknowledgedAt: timestamp("acknowledged_at").defaultNow(),
+  shiftDate: text("shift_date").notNull(),
+});
+
+export const playbookAudits = pgTable("playbook_audits", {
+  id: serial("id").primaryKey(),
+  playbookId: integer("playbook_id").notNull().references(() => playbooks.id, { onDelete: "cascade" }),
+  auditorUserId: text("auditor_user_id").notNull(),
+  staffMemberId: integer("staff_member_id").references(() => staffMembers.id),
+  auditDate: timestamp("audit_date").defaultNow(),
+  overallScore: integer("overall_score"), // percentage 0-100
+  stepResults: jsonb("step_results"), // { stepId: { passed: boolean, photoUrl?: string, notes?: string } }
+  notes: text("notes"),
+  status: text("status").notNull().default("completed"), // 'in_progress', 'completed'
+});
+
+export const insertPlaybookSchema = createInsertSchema(playbooks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlaybookStepSchema = createInsertSchema(playbookSteps).omit({ id: true });
+export const insertPlaybookAssignmentSchema = createInsertSchema(playbookAssignments).omit({ id: true });
+export const insertPlaybookAcknowledgmentSchema = createInsertSchema(playbookAcknowledgments).omit({ id: true, acknowledgedAt: true });
+export const insertPlaybookAuditSchema = createInsertSchema(playbookAudits).omit({ id: true, auditDate: true });
+
+export type Playbook = typeof playbooks.$inferSelect;
+export type PlaybookStep = typeof playbookSteps.$inferSelect;
+export type PlaybookAssignment = typeof playbookAssignments.$inferSelect;
+export type PlaybookAcknowledgment = typeof playbookAcknowledgments.$inferSelect;
+export type PlaybookAudit = typeof playbookAudits.$inferSelect;
+export type InsertPlaybook = z.infer<typeof insertPlaybookSchema>;
+export type InsertPlaybookStep = z.infer<typeof insertPlaybookStepSchema>;
+export type InsertPlaybookAssignment = z.infer<typeof insertPlaybookAssignmentSchema>;
+export type InsertPlaybookAcknowledgment = z.infer<typeof insertPlaybookAcknowledgmentSchema>;
+export type InsertPlaybookAudit = z.infer<typeof insertPlaybookAuditSchema>;

@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
 - **Schema**: Defined in `shared/schema.ts` and `shared/models/`
-- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`, `repair_vendors`, `facility_issues`, `kitchen_shift_data`.
+- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`, `repair_vendors`, `facility_issues`, `kitchen_shift_data`, `playbooks`, `playbook_steps`, `playbook_assignments`, `playbook_acknowledgments`, `playbook_audits`.
 
 ### Core Features & Implementations
 - **Staff Scheduling System**: Sling-style scheduling with weekly calendar, staff/position management, pay rate tracking, daily labor cost calculation, open shift tracking, and announcements.
@@ -52,6 +52,15 @@ Preferred communication style: Simple, everyday language.
   - **Full Debrief**: Comprehensive post-shift analysis with AI-generated system-level breakdown.
   - **Coaching**: Single behavior coaching focus with AI-generated coaching script.
   - Historical data persistence via `kitchen_shift_data` table for pattern detection and trend analysis.
+- **Living Playbooks**: SOP management system redesigned for actual restaurant adoption:
+  - **Quick Checklist Mode**: Bullet points, voice dictation, photo upload (60-180 sec creation time).
+  - **Step-by-Step Mode**: Numbered steps with decision points (3-8 min creation).
+  - **Deep Procedure Mode**: Full narrative with context for complex tasks.
+  - **Mobile Checklist View**: One task per screen with big checkmarks for phone use.
+  - **Audit/Spot-Check**: Walk through steps, mark pass/fail, photo proof capture.
+  - **Acknowledgment Tracking**: Daily "I have read & understand" per role/shift.
+  - **Duplicate & Copy**: Clone existing playbooks for quick variations.
+  - **Version Tracking**: Track changes over time with audit pass rates.
 
 ## External Dependencies
 

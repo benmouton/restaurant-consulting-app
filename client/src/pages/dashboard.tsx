@@ -37,7 +37,8 @@ import {
   UserCog,
   ChevronDown,
   Menu,
-  Share2
+  Share2,
+  BookOpen
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 import logoImage from "@/assets/logo.png";
@@ -93,6 +94,12 @@ export default function Dashboard() {
                   Templates
                 </Button>
               </Link>
+              <Link href="/playbooks">
+                <Button variant="outline" size="sm" data-testid="button-playbooks-nav">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Playbooks
+                </Button>
+              </Link>
               {permissions.canAccessFinancials && (
                 <Link href="/financial">
                   <Button variant="outline" size="sm" data-testid="button-financial-nav">
@@ -130,6 +137,10 @@ export default function Dashboard() {
                 <DropdownMenuItem onClick={() => navigate("/templates")} className="cursor-pointer">
                   <GraduationCap className="mr-2 h-4 w-4" />
                   Templates
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/playbooks")} className="cursor-pointer">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  Playbooks
                 </DropdownMenuItem>
                 {permissions.canAccessFinancials && (
                   <DropdownMenuItem onClick={() => navigate("/financial")} className="cursor-pointer">
