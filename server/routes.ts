@@ -917,6 +917,90 @@ export async function registerRoutes(
     }
   });
 
+  // ===== KITCHEN SHIFT DATA ROUTES =====
+
+  // Get all kitchen shift data for user
+  app.get("/api/kitchen-shifts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const shifts = await storage.getKitchenShiftData(userId);
+      res.json(shifts);
+    } catch (error: any) {
+      console.error('Error fetching kitchen shift data:', error);
+      res.status(500).json({ message: "Failed to fetch shifts" });
+    }
+  });
+
+  // Get kitchen shift by date and daypart
+  app.get("/api/kitchen-shifts/:date/:daypart", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { date, daypart } = req.params;
+      const shift = await storage.getKitchenShiftByDate(userId, date, daypart);
+      res.json(shift || null);
+    } catch (error: any) {
+      console.error('Error fetching kitchen shift:', error);
+      res.status(500).json({ message: "Failed to fetch shift" });
+    }
+  });
+
+  // Get recent kitchen shift data (last 14 days)
+  app.get("/api/kitchen-shifts/recent/:dayOfWeek/:daypart", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { dayOfWeek, daypart } = req.params;
+      const shifts = await storage.getRecentKitchenShifts(userId, dayOfWeek, daypart);
+      res.json(shifts);
+    } catch (error: any) {
+      console.error('Error fetching recent kitchen shifts:', error);
+      res.status(500).json({ message: "Failed to fetch recent shifts" });
+    }
+  });
+
+  // Save kitchen shift data
+  app.post("/api/kitchen-shifts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const shift = await storage.saveKitchenShiftData({ ...req.body, userId });
+      res.status(201).json(shift);
+    } catch (error: any) {
+      console.error('Error saving kitchen shift data:', error);
+      res.status(500).json({ message: "Failed to save shift" });
+    }
+  });
+
+  // Update kitchen shift data
+  app.put("/api/kitchen-shifts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const shift = await storage.updateKitchenShiftData(Number(req.params.id), userId, req.body);
+      if (!shift) {
+        return res.status(404).json({ message: "Shift not found" });
+      }
+      res.json(shift);
+    } catch (error: any) {
+      console.error('Error updating kitchen shift data:', error);
+      res.status(500).json({ message: "Failed to update shift" });
+    }
+  });
+
+  // Save quick debrief
+  app.post("/api/kitchen-shifts/debrief", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { shiftDate, daypart, whatWentWell, whatSucked, fixForTomorrow } = req.body;
+      const shift = await storage.saveKitchenDebrief(userId, shiftDate, daypart, {
+        whatWentWell,
+        whatSucked,
+        fixForTomorrow
+      });
+      res.status(201).json(shift);
+    } catch (error: any) {
+      console.error('Error saving debrief:', error);
+      res.status(500).json({ message: "Failed to save debrief" });
+    }
+  });
+
   // ===== SCHEDULING ROUTES =====
 
   // Staff Positions

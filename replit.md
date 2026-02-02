@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
 - **Schema**: Defined in `shared/schema.ts` and `shared/models/`
-- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`, `repair_vendors`, `facility_issues`.
+- **Core Tables**: `users`, `sessions`, `conversations`, `messages`, `domains`, `framework_content`, `user_bookmarks`, `training_templates`, `staff_positions`, `staff_members`, `shifts`, `shift_applications`, `staff_announcements`, `announcement_reads`, `savedIngredients`, `savedPlates`, `foodCostPeriods`, `restaurant_profiles`, `dailyTaskCompletions`, `brand_voice_settings`, `restaurant_holidays`, `connected_accounts`, `scheduled_posts`, `post_results`, `repair_vendors`, `facility_issues`, `kitchen_shift_data`.
 
 ### Core Features & Implementations
 - **Staff Scheduling System**: Sling-style scheduling with weekly calendar, staff/position management, pay rate tracking, daily labor cost calculation, open shift tracking, and announcements.
@@ -45,6 +45,13 @@ Preferred communication style: Simple, everyday language.
   - **Equipment Log**: Equipment registration and maintenance history.
   - **Vendor Directory**: Repair vendor rolodex with specialty filtering, ratings, 24/7 flags, favorites, and contact info.
   - **Issues Dashboard**: Active issues tracker with status management (open/in progress/waiting parts/resolved), stats cards, and resolution tracking.
+- **Kitchen Command Center**: Real-time kitchen readiness and execution engine with 5 tabs:
+  - **Readiness**: Pre-service readiness check with AI-generated score (Green/Yellow/Red/Critical), load-yesterday and load-last-week buttons, daypart presets (Normal lunch, Busy Friday, Large party, Holiday weekend), voice input for all fields.
+  - **Alerts**: During-service execution alerts for ticket timing and window delays.
+  - **Quick Debrief**: 60-second post-service capture (What went well, What sucked, One fix for tomorrow) with voice input and auto-save.
+  - **Full Debrief**: Comprehensive post-shift analysis with AI-generated system-level breakdown.
+  - **Coaching**: Single behavior coaching focus with AI-generated coaching script.
+  - Historical data persistence via `kitchen_shift_data` table for pattern detection and trend analysis.
 
 ## External Dependencies
 

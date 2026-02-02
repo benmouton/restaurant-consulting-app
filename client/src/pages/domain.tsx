@@ -61,7 +61,6 @@ import {
   ShieldAlert,
   Bell,
   BellRing,
-  History as HistoryIcon,
   Save,
   TrendingUp,
   TrendingDown,
@@ -72,6 +71,8 @@ import {
   Phone,
   Mail,
   Edit,
+  Mic,
+  History,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -652,15 +653,243 @@ function FoodCostCalculator() {
 
 function KitchenComplianceEngine() {
   const { toast } = useToast();
-  const [mode, setMode] = useState<"readiness" | "alerts" | "debrief" | "coaching">("readiness");
+  const [mode, setMode] = useState<"readiness" | "alerts" | "debrief" | "coaching" | "quick-debrief">("readiness");
   const [prepCompletion, setPrepCompletion] = useState<string>("");
   const [wasteNotes, setWasteNotes] = useState<string>("");
   const [ticketTimes, setTicketTimes] = useState<string>("");
   const [windowDelays, setWindowDelays] = useState<string>("");
   const [volumeStaffing, setVolumeStaffing] = useState<string>("");
   const [managerNotes, setManagerNotes] = useState<string>("");
+  const [projectedCovers, setProjectedCovers] = useState<string>("");
+  const [staffCount, setStaffCount] = useState<string>("");
   const [analysis, setAnalysis] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
+  const [readinessLevel, setReadinessLevel] = useState<"green" | "yellow" | "red" | "critical" | null>(null);
+  const [selectedDaypart, setSelectedDaypart] = useState<string>("dinner");
+  const [selectedPreset, setSelectedPreset] = useState<string>("");
+  
+  // Quick debrief state
+  const [whatWentWell, setWhatWentWell] = useState<string>("");
+  const [whatSucked, setWhatSucked] = useState<string>("");
+  const [fixForTomorrow, setFixForTomorrow] = useState<string>("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingField, setRecordingField] = useState<string | null>(null);
+
+  const today = new Date();
+  const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+  const shiftDate = today.toISOString().split('T')[0];
+
+  // Preset configurations
+  const daypartPresets: Record<string, { covers: string; staff: string; notes: string }> = {
+    "normal-weekday-lunch": { covers: "60-80", staff: "3 cooks, 2 prep", notes: "Standard lunch service" },
+    "normal-weekday-dinner": { covers: "80-100", staff: "4 cooks, 1 prep", notes: "Standard dinner service" },
+    "busy-friday-dinner": { covers: "140-160", staff: "5 cooks, 2 prep", notes: "High volume expected, ensure backup pars" },
+    "busy-saturday-dinner": { covers: "150-180", staff: "5 cooks, 2 prep", notes: "Peak volume, full backup pars required" },
+    "large-party": { covers: "150+", staff: "5 cooks, 2 prep", notes: "Large party expected - confirm timing with FOH" },
+    "holiday-weekend": { covers: "120-150", staff: "5 cooks, 2 prep", notes: "Holiday weekend - expect walk-in traffic" },
+    "slow-monday": { covers: "40-60", staff: "2 cooks, 1 prep", notes: "Lighter volume - opportunity for deep cleaning" },
+  };
+
+  // Load historical data
+  const loadYesterday = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      
+      const res = await fetch(`/api/kitchen-shifts/${yesterdayStr}/${selectedDaypart}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data) {
+          setPrepCompletion(data.prepCompletion || "");
+          setWasteNotes(data.wasteNotes || "");
+          setVolumeStaffing(data.volumeStaffing || `${data.projectedCovers || ""} covers, ${data.staffCount || ""} staff`);
+          setProjectedCovers(data.projectedCovers?.toString() || "");
+          setStaffCount(data.staffCount?.toString() || "");
+          toast({ title: "Loaded yesterday's data" });
+        } else {
+          toast({ title: "No data from yesterday", variant: "destructive" });
+        }
+      }
+    } catch (error) {
+      toast({ title: "Failed to load historical data", variant: "destructive" });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const loadLastWeek = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/kitchen-shifts/recent/${dayOfWeek}/${selectedDaypart}`, { credentials: "include" });
+      if (res.ok) {
+        const shifts = await res.json();
+        if (shifts && shifts.length > 0) {
+          const lastShift = shifts[0];
+          setPrepCompletion(lastShift.prepCompletion || "");
+          setWasteNotes(lastShift.wasteNotes || "");
+          setVolumeStaffing(`${lastShift.projectedCovers || ""} covers, ${lastShift.staffCount || ""} staff`);
+          setProjectedCovers(lastShift.projectedCovers?.toString() || "");
+          setStaffCount(lastShift.staffCount?.toString() || "");
+          toast({ title: `Loaded last ${dayOfWeek}'s data` });
+        } else {
+          toast({ title: `No data from last ${dayOfWeek}`, variant: "destructive" });
+        }
+      }
+    } catch (error) {
+      toast({ title: "Failed to load historical data", variant: "destructive" });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const applyPreset = (presetKey: string) => {
+    const preset = daypartPresets[presetKey];
+    if (preset) {
+      // Extract numeric cover count from range (e.g., "60-80" -> 70)
+      const coverMatch = preset.covers.match(/(\d+)/);
+      const numCovers = coverMatch ? coverMatch[1] : preset.covers;
+      setProjectedCovers(numCovers);
+      
+      // Extract staff count from preset (e.g., "3 cooks, 2 prep" -> 5)
+      const staffMatch = preset.staff.match(/(\d+)/g);
+      if (staffMatch) {
+        const totalStaff = staffMatch.reduce((sum, n) => sum + parseInt(n), 0);
+        setStaffCount(totalStaff.toString());
+      }
+      
+      setVolumeStaffing(`${preset.covers} covers projected, ${preset.staff}`);
+      setManagerNotes(preset.notes);
+      setSelectedPreset(presetKey);
+      toast({ title: "Preset applied" });
+    }
+  };
+
+  // Save current shift data
+  const saveShiftData = async () => {
+    setIsSaving(true);
+    try {
+      // Parse numeric values from strings, handling ranges like "60-80"
+      const parseCovers = (val: string) => {
+        const match = val.match(/(\d+)/);
+        return match ? parseInt(match[1]) : null;
+      };
+      
+      await apiRequest("/api/kitchen-shifts", {
+        method: "POST",
+        body: JSON.stringify({
+          shiftDate,
+          dayOfWeek,
+          daypart: selectedDaypart,
+          projectedCovers: projectedCovers ? parseCovers(projectedCovers) : null,
+          staffCount: staffCount ? parseInt(staffCount) : null,
+          prepCompletion,
+          wasteNotes,
+          ticketTimes,
+          windowDelays,
+          managerNotes,
+          readinessScore,
+        }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts"] });
+      toast({ title: "Shift data saved" });
+    } catch (error) {
+      toast({ title: "Failed to save shift data", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Quick debrief save
+  const saveQuickDebrief = async () => {
+    if (!whatWentWell && !whatSucked && !fixForTomorrow) {
+      toast({ title: "Please fill in at least one field", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await apiRequest("/api/kitchen-shifts/debrief", {
+        method: "POST",
+        body: JSON.stringify({
+          shiftDate,
+          dayOfWeek,
+          daypart: selectedDaypart,
+          whatWentWell,
+          whatSucked,
+          fixForTomorrow,
+        }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts"] });
+      toast({ title: "Debrief saved! Great work." });
+      setWhatWentWell("");
+      setWhatSucked("");
+      setFixForTomorrow("");
+    } catch (error) {
+      toast({ title: "Failed to save debrief", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Voice input support
+  const startVoiceInput = (field: string) => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({ title: "Voice input not supported in this browser", variant: "destructive" });
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    setIsRecording(true);
+    setRecordingField(field);
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      switch (field) {
+        case "prep": setPrepCompletion(prev => prev + " " + transcript); break;
+        case "waste": setWasteNotes(prev => prev + " " + transcript); break;
+        case "tickets": setTicketTimes(prev => prev + " " + transcript); break;
+        case "window": setWindowDelays(prev => prev + " " + transcript); break;
+        case "manager": setManagerNotes(prev => prev + " " + transcript); break;
+        case "wellDone": setWhatWentWell(prev => prev + " " + transcript); break;
+        case "sucked": setWhatSucked(prev => prev + " " + transcript); break;
+        case "fix": setFixForTomorrow(prev => prev + " " + transcript); break;
+      }
+      toast({ title: "Voice captured" });
+    };
+
+    recognition.onerror = () => {
+      toast({ title: "Voice recognition failed", variant: "destructive" });
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      setRecordingField(null);
+    };
+
+    recognition.start();
+  };
+
+  // Parse readiness score from AI response
+  const parseReadinessScore = (text: string) => {
+    const match = text.match(/KITCHEN READINESS SCORE:\s*\[?(\d+)/i);
+    if (match) {
+      const score = parseInt(match[1]);
+      setReadinessScore(score);
+      if (score >= 85) setReadinessLevel("green");
+      else if (score >= 70) setReadinessLevel("yellow");
+      else if (score >= 50) setReadinessLevel("red");
+      else setReadinessLevel("critical");
+    }
+  };
 
   const generateAnalysis = async () => {
     setIsGenerating(true);
@@ -898,10 +1127,18 @@ One behavior. One conversation. Consistent follow-up.`;
               if (data.content) {
                 content += data.content;
                 setAnalysis(content);
+                if (mode === "readiness") {
+                  parseReadinessScore(content);
+                }
               }
             } catch {}
           }
         }
+      }
+      
+      // Auto-save shift data after generating analysis
+      if (mode === "readiness") {
+        await saveShiftData();
       }
     } catch (err) {
       toast({ title: "Failed to generate analysis", variant: "destructive" });
@@ -915,37 +1152,158 @@ One behavior. One conversation. Consistent follow-up.`;
     toast({ title: "Copied to clipboard!" });
   };
 
-  const modeLabels = {
+  const modeLabels: Record<string, string> = {
     readiness: "Readiness Score",
     alerts: "Service Alerts",
     debrief: "KM Debrief",
-    coaching: "Coaching Focus"
+    coaching: "Coaching Focus",
+    "quick-debrief": "Quick Debrief"
   };
+
+  const VoiceButton = ({ field, label }: { field: string; label: string }) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className={`ml-2 ${isRecording && recordingField === field ? "text-destructive animate-pulse" : ""}`}
+      onClick={() => startVoiceInput(field)}
+      disabled={isRecording}
+      data-testid={`btn-voice-${field}`}
+    >
+      <Mic className="h-4 w-4" />
+    </Button>
+  );
 
   return (
     <Card className="mb-8">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          Kitchen Execution & Line Discipline Engine
+          Kitchen Command Center
         </CardTitle>
         <CardDescription>
-          Turn prep, ticket flow, and window discipline into measurable standards. Where is the system failing — not who?
+          Real-time kitchen readiness, service alerts, and post-shift debriefs. Data-driven decisions, not gut feelings.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Readiness Score Gauge - shows when score is available */}
+        {readinessScore !== null && readinessLevel && (
+          <div className={`p-4 rounded-lg border-2 ${
+            readinessLevel === "green" ? "border-green-500 bg-green-500/10" :
+            readinessLevel === "yellow" ? "border-yellow-500 bg-yellow-500/10" :
+            readinessLevel === "red" ? "border-red-500 bg-red-500/10" :
+            "border-red-700 bg-red-700/20"
+          }`}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className={`text-4xl font-bold ${
+                  readinessLevel === "green" ? "text-green-600 dark:text-green-400" :
+                  readinessLevel === "yellow" ? "text-yellow-600 dark:text-yellow-400" :
+                  readinessLevel === "red" ? "text-red-600 dark:text-red-400" :
+                  "text-red-700 dark:text-red-300"
+                }`}>
+                  {readinessScore}/100
+                </div>
+                <div>
+                  <div className={`text-lg font-semibold ${
+                    readinessLevel === "green" ? "text-green-700 dark:text-green-300" :
+                    readinessLevel === "yellow" ? "text-yellow-700 dark:text-yellow-300" :
+                    readinessLevel === "red" ? "text-red-700 dark:text-red-300" :
+                    "text-red-800 dark:text-red-200"
+                  }`}>
+                    {readinessLevel === "green" ? "Ready - Go crush it!" :
+                     readinessLevel === "yellow" ? "Manageable - Address issues" :
+                     readinessLevel === "red" ? "At Risk - Immediate action needed" :
+                     "Critical - Escalate now"}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{dayOfWeek} {selectedDaypart}</p>
+                </div>
+              </div>
+              <div className="w-full md:w-48 h-3 bg-secondary rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 ${
+                    readinessLevel === "green" ? "bg-green-500" :
+                    readinessLevel === "yellow" ? "bg-yellow-500" :
+                    readinessLevel === "red" ? "bg-red-500" :
+                    "bg-red-700"
+                  }`}
+                  style={{ width: `${readinessScore}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="readiness" data-testid="tab-readiness">Readiness</TabsTrigger>
             <TabsTrigger value="alerts" data-testid="tab-alerts">Alerts</TabsTrigger>
-            <TabsTrigger value="debrief" data-testid="tab-debrief">Debrief</TabsTrigger>
+            <TabsTrigger value="quick-debrief" data-testid="tab-quick-debrief">Quick Debrief</TabsTrigger>
+            <TabsTrigger value="debrief" data-testid="tab-debrief">Full Debrief</TabsTrigger>
             <TabsTrigger value="coaching" data-testid="tab-coaching">Coaching</TabsTrigger>
           </TabsList>
 
           <TabsContent value="readiness" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">Pre-service readiness check. Are we actually prepared?</p>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-sm text-muted-foreground">Pre-service readiness check. Are we actually prepared?</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={selectedDaypart} onValueChange={setSelectedDaypart}>
+                  <SelectTrigger className="w-28" data-testid="select-daypart">
+                    <SelectValue placeholder="Daypart" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lunch">Lunch</SelectItem>
+                    <SelectItem value="dinner">Dinner</SelectItem>
+                    <SelectItem value="brunch">Brunch</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={loadYesterday}
+                  disabled={isLoadingHistory}
+                  data-testid="btn-load-yesterday"
+                >
+                  {isLoadingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4 mr-1" />}
+                  Yesterday
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={loadLastWeek}
+                  disabled={isLoadingHistory}
+                  data-testid="btn-load-last-week"
+                >
+                  {isLoadingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4 mr-1" />}
+                  Last {dayOfWeek}
+                </Button>
+              </div>
+            </div>
+
+            {/* Quick Presets */}
             <div>
-              <Label htmlFor="prepCompletion">Prep Completion Status</Label>
+              <Label>Quick Preset</Label>
+              <Select value={selectedPreset} onValueChange={applyPreset}>
+                <SelectTrigger className="mt-1" data-testid="select-preset">
+                  <SelectValue placeholder="Load a scenario preset..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal-weekday-lunch">Normal Weekday Lunch</SelectItem>
+                  <SelectItem value="normal-weekday-dinner">Normal Weekday Dinner</SelectItem>
+                  <SelectItem value="busy-friday-dinner">Busy Friday Dinner</SelectItem>
+                  <SelectItem value="busy-saturday-dinner">Busy Saturday Dinner</SelectItem>
+                  <SelectItem value="large-party">Large Party (150+)</SelectItem>
+                  <SelectItem value="holiday-weekend">Holiday Weekend</SelectItem>
+                  <SelectItem value="slow-monday">Slow Monday</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <div className="flex items-center">
+                <Label htmlFor="prepCompletion">Prep Completion Status</Label>
+                <VoiceButton field="prep" label="Dictate prep status" />
+              </div>
               <Textarea
                 id="prepCompletion"
                 placeholder="e.g., Prep signed off at 4:45 (15 min late), protein par adjusted down yesterday, sauté station behind on mise..."
@@ -957,7 +1315,10 @@ One behavior. One conversation. Consistent follow-up.`;
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="wasteNotes">Waste Log Trends</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="wasteNotes">Waste Log Trends</Label>
+                  <VoiceButton field="waste" label="Dictate waste notes" />
+                </div>
                 <Textarea
                   id="wasteNotes"
                   placeholder="e.g., Repeating waste on sauté station, over-prepped garnishes last 3 days..."
@@ -1017,6 +1378,79 @@ One behavior. One conversation. Consistent follow-up.`;
                 onChange={(e) => setVolumeStaffing(e.target.value)}
                 data-testid="input-volume-staffing-alerts"
               />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="quick-debrief" className="space-y-4 mt-4">
+            <div className="text-center pb-4 border-b">
+              <h3 className="text-lg font-semibold">60-Second Post-Service Debrief</h3>
+              <p className="text-sm text-muted-foreground">Quick capture while it's fresh. Don't overthink it.</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center">
+                  <Label htmlFor="whatWentWell" className="text-green-600 dark:text-green-400 font-medium">What went well?</Label>
+                  <VoiceButton field="wellDone" label="Dictate what went well" />
+                </div>
+                <Textarea
+                  id="whatWentWell"
+                  placeholder="One thing that worked tonight..."
+                  className="mt-1 min-h-[60px] border-green-500/30 focus:border-green-500"
+                  value={whatWentWell}
+                  onChange={(e) => setWhatWentWell(e.target.value)}
+                  data-testid="input-what-went-well"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center">
+                  <Label htmlFor="whatSucked" className="text-red-600 dark:text-red-400 font-medium">What sucked?</Label>
+                  <VoiceButton field="sucked" label="Dictate what went wrong" />
+                </div>
+                <Textarea
+                  id="whatSucked"
+                  placeholder="One thing that broke down..."
+                  className="mt-1 min-h-[60px] border-red-500/30 focus:border-red-500"
+                  value={whatSucked}
+                  onChange={(e) => setWhatSucked(e.target.value)}
+                  data-testid="input-what-sucked"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center">
+                  <Label htmlFor="fixForTomorrow" className="text-blue-600 dark:text-blue-400 font-medium">One fix for tomorrow</Label>
+                  <VoiceButton field="fix" label="Dictate tomorrow's fix" />
+                </div>
+                <Textarea
+                  id="fixForTomorrow"
+                  placeholder="The one thing we're changing..."
+                  className="mt-1 min-h-[60px] border-blue-500/30 focus:border-blue-500"
+                  value={fixForTomorrow}
+                  onChange={(e) => setFixForTomorrow(e.target.value)}
+                  data-testid="input-fix-tomorrow"
+                />
+              </div>
+
+              <Button 
+                onClick={saveQuickDebrief}
+                disabled={isSaving || (!whatWentWell && !whatSucked && !fixForTomorrow)}
+                className="w-full"
+                data-testid="btn-save-quick-debrief"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Log Debrief & Close Out
+                  </>
+                )}
+              </Button>
             </div>
           </TabsContent>
 
@@ -2257,7 +2691,7 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
             </Select>
           </div>
           <Button variant="outline" size="sm" onClick={useLastWeekData} data-testid="btn-last-week">
-            <HistoryIcon className="h-4 w-4 mr-1" />
+            <History className="h-4 w-4 mr-1" />
             Last Week
           </Button>
           <Button variant="outline" size="sm" onClick={saveCurrentData} data-testid="btn-save-data">

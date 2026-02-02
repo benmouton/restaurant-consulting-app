@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -165,6 +165,14 @@ export interface IStorage {
   resolveFacilityIssue(id: number, userId: string, repairNotes?: string, repairCost?: string): Promise<FacilityIssue | undefined>;
   deleteFacilityIssue(id: number, userId: string): Promise<void>;
   getFacilityIssueStats(userId: string): Promise<{ open: number; inProgress: number; resolved: number; avgResolutionDays: number }>;
+  
+  // Kitchen Shift Data
+  getKitchenShiftData(userId: string): Promise<KitchenShiftData[]>;
+  getKitchenShiftByDate(userId: string, shiftDate: string, daypart: string): Promise<KitchenShiftData | undefined>;
+  getRecentKitchenShifts(userId: string, dayOfWeek: string, daypart: string): Promise<KitchenShiftData[]>;
+  saveKitchenShiftData(data: InsertKitchenShiftData): Promise<KitchenShiftData>;
+  updateKitchenShiftData(id: number, userId: string, data: Partial<InsertKitchenShiftData>): Promise<KitchenShiftData | undefined>;
+  saveKitchenDebrief(userId: string, shiftDate: string, daypart: string, debrief: { whatWentWell?: string; whatSucked?: string; fixForTomorrow?: string }): Promise<KitchenShiftData>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1253,6 +1261,85 @@ export class DatabaseStorage implements IStorage {
     }
     
     return { open, inProgress, resolved, avgResolutionDays };
+  }
+
+  // Kitchen Shift Data
+  async getKitchenShiftData(userId: string): Promise<KitchenShiftData[]> {
+    return await db.select().from(kitchenShiftData)
+      .where(eq(kitchenShiftData.userId, userId))
+      .orderBy(desc(kitchenShiftData.createdAt));
+  }
+
+  async getKitchenShiftByDate(userId: string, shiftDate: string, daypart: string): Promise<KitchenShiftData | undefined> {
+    const [shift] = await db.select().from(kitchenShiftData)
+      .where(and(
+        eq(kitchenShiftData.userId, userId),
+        eq(kitchenShiftData.shiftDate, shiftDate),
+        eq(kitchenShiftData.daypart, daypart)
+      ));
+    return shift;
+  }
+
+  async getRecentKitchenShifts(userId: string, dayOfWeek: string, daypart: string): Promise<KitchenShiftData[]> {
+    return await db.select().from(kitchenShiftData)
+      .where(and(
+        eq(kitchenShiftData.userId, userId),
+        eq(kitchenShiftData.dayOfWeek, dayOfWeek),
+        eq(kitchenShiftData.daypart, daypart)
+      ))
+      .orderBy(desc(kitchenShiftData.createdAt))
+      .limit(4);
+  }
+
+  async saveKitchenShiftData(data: InsertKitchenShiftData): Promise<KitchenShiftData> {
+    // Check if a shift already exists for this date/daypart
+    const existing = await this.getKitchenShiftByDate(data.userId, data.shiftDate, data.daypart);
+    if (existing) {
+      // Update existing
+      const [updated] = await db.update(kitchenShiftData)
+        .set(data)
+        .where(eq(kitchenShiftData.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [shift] = await db.insert(kitchenShiftData).values(data).returning();
+    return shift;
+  }
+
+  async updateKitchenShiftData(id: number, userId: string, data: Partial<InsertKitchenShiftData>): Promise<KitchenShiftData | undefined> {
+    const [updated] = await db.update(kitchenShiftData)
+      .set(data)
+      .where(and(eq(kitchenShiftData.id, id), eq(kitchenShiftData.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async saveKitchenDebrief(userId: string, shiftDate: string, daypart: string, debrief: { whatWentWell?: string; whatSucked?: string; fixForTomorrow?: string }): Promise<KitchenShiftData> {
+    const dayOfWeek = new Date(shiftDate).toLocaleDateString('en-US', { weekday: 'long' });
+    const existing = await this.getKitchenShiftByDate(userId, shiftDate, daypart);
+    
+    if (existing) {
+      const [updated] = await db.update(kitchenShiftData)
+        .set({
+          whatWentWell: debrief.whatWentWell,
+          whatSucked: debrief.whatSucked,
+          fixForTomorrow: debrief.fixForTomorrow
+        })
+        .where(eq(kitchenShiftData.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [shift] = await db.insert(kitchenShiftData).values({
+      userId,
+      shiftDate,
+      dayOfWeek,
+      daypart,
+      whatWentWell: debrief.whatWentWell,
+      whatSucked: debrief.whatSucked,
+      fixForTomorrow: debrief.fixForTomorrow
+    }).returning();
+    return shift;
   }
 }
 

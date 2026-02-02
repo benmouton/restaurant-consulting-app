@@ -501,6 +501,31 @@ export const facilityIssues = pgTable("facility_issues", {
 export const insertRepairVendorSchema = createInsertSchema(repairVendors).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFacilityIssueSchema = createInsertSchema(facilityIssues).omit({ id: true, createdAt: true, reportedAt: true });
 
+export const kitchenShiftData = pgTable("kitchen_shift_data", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  shiftDate: text("shift_date").notNull(),
+  dayOfWeek: text("day_of_week").notNull(),
+  daypart: text("daypart").notNull(),
+  projectedCovers: integer("projected_covers"),
+  actualCovers: integer("actual_covers"),
+  staffCount: integer("staff_count"),
+  prepCompletion: text("prep_completion"),
+  wasteNotes: text("waste_notes"),
+  wasteAmount: text("waste_amount"),
+  ticketTimes: text("ticket_times"),
+  windowDelays: text("window_delays"),
+  managerNotes: text("manager_notes"),
+  readinessScore: integer("readiness_score"),
+  debriefNotes: text("debrief_notes"),
+  whatWentWell: text("what_went_well"),
+  whatSucked: text("what_sucked"),
+  fixForTomorrow: text("fix_for_tomorrow"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKitchenShiftDataSchema = createInsertSchema(kitchenShiftData).omit({ id: true, createdAt: true });
+
 export const insertSocialMediaFolderSchema = createInsertSchema(socialMediaFolders).omit({ id: true, createdAt: true });
 export const insertSocialMediaAssetSchema = createInsertSchema(socialMediaAssets).omit({ id: true, createdAt: true });
 export const insertBrandVoiceSettingsSchema = createInsertSchema(brandVoiceSettings).omit({ id: true, updatedAt: true });
@@ -570,5 +595,7 @@ export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSc
 export type InsertOrganizationInvite = z.infer<typeof insertOrganizationInviteSchema>;
 export type RepairVendor = typeof repairVendors.$inferSelect;
 export type FacilityIssue = typeof facilityIssues.$inferSelect;
+export type KitchenShiftData = typeof kitchenShiftData.$inferSelect;
 export type InsertRepairVendor = z.infer<typeof insertRepairVendorSchema>;
 export type InsertFacilityIssue = z.infer<typeof insertFacilityIssueSchema>;
+export type InsertKitchenShiftData = z.infer<typeof insertKitchenShiftDataSchema>;
