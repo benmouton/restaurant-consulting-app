@@ -84,6 +84,54 @@ export class StripeService {
     return result.rows[0]?.id as string || null;
   }
 
+  async createEmployeeAddCheckout(
+    customerId: string | null, 
+    successUrl: string, 
+    cancelUrl: string,
+    employeeData: { firstName: string; lastName: string; email?: string; phone?: string; positionId?: number; hourlyRate?: string; ownerId: string }
+  ) {
+    const stripe = await getUncachableStripeClient();
+    
+    const sessionConfig: any = {
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'New Employee Fee',
+            description: `Add ${employeeData.firstName} ${employeeData.lastName} to your team`,
+          },
+          unit_amount: 500, // $5.00 in cents
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        type: 'employee_add',
+        firstName: employeeData.firstName,
+        lastName: employeeData.lastName,
+        email: employeeData.email || '',
+        phone: employeeData.phone || '',
+        positionId: employeeData.positionId?.toString() || '',
+        hourlyRate: employeeData.hourlyRate || '',
+        ownerId: employeeData.ownerId,
+      },
+    };
+
+    if (customerId) {
+      sessionConfig.customer = customerId;
+    }
+
+    return await stripe.checkout.sessions.create(sessionConfig);
+  }
+
+  async getCheckoutSession(sessionId: string) {
+    const stripe = await getUncachableStripeClient();
+    return await stripe.checkout.sessions.retrieve(sessionId);
+  }
+
   async updateEmployeeSeatQuantity(customerId: string, seatCount: number): Promise<boolean> {
     try {
       const stripe = await getUncachableStripeClient();

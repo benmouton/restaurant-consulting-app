@@ -1245,6 +1245,79 @@ export async function registerRoutes(
     res.json(member);
   });
 
+  // Initiate checkout session for adding new employee ($5 fee)
+  app.post("/api/scheduling/staff/checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName, email, phone, positionId, hourlyRate } = req.body;
+      
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: "First name and last name are required" });
+      }
+
+      // Get the user's Stripe customer ID if they have one
+      const user = await storage.getUserById(userId);
+      const customerId = user?.stripeCustomerId || null;
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const successUrl = `${baseUrl}/scheduling?tab=staff&payment=success&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${baseUrl}/scheduling?tab=staff&payment=cancelled`;
+
+      const session = await stripeService.createEmployeeAddCheckout(
+        customerId,
+        successUrl,
+        cancelUrl,
+        { firstName, lastName, email, phone, positionId, hourlyRate, ownerId: userId }
+      );
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (err: any) {
+      console.error("Failed to create checkout session:", err);
+      res.status(500).json({ message: err.message || "Failed to create checkout session" });
+    }
+  });
+
+  // Complete employee creation after successful payment
+  app.post("/api/scheduling/staff/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      // Retrieve the checkout session to verify payment and get employee data
+      const session = await stripeService.getCheckoutSession(sessionId);
+      
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      // Verify ownership
+      if (session.metadata?.ownerId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Create the employee from session metadata
+      const member = await storage.createStaffMember({
+        firstName: session.metadata?.firstName || '',
+        lastName: session.metadata?.lastName || '',
+        email: session.metadata?.email || null,
+        phone: session.metadata?.phone || null,
+        positionId: session.metadata?.positionId ? parseInt(session.metadata.positionId) : null,
+        hourlyRate: session.metadata?.hourlyRate || null,
+        ownerId: userId,
+      });
+
+      res.status(201).json(member);
+    } catch (err: any) {
+      console.error("Failed to complete employee creation:", err);
+      res.status(500).json({ message: err.message || "Failed to create staff member" });
+    }
+  });
+
+  // Keep the original endpoint for backwards compatibility (admin bypass)
   app.post("/api/scheduling/staff", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

@@ -30,7 +30,8 @@ import {
   Copy,
   Check,
   Loader2,
-  DollarSign
+  DollarSign,
+  TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -173,7 +174,8 @@ export default function SchedulingPage() {
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: typeof newStaff) => {
-      return apiRequest("POST", "/api/scheduling/staff", {
+      // Initiate Stripe checkout for $5 employee fee
+      const response = await apiRequest("POST", "/api/scheduling/staff/checkout", {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email || null,
@@ -181,16 +183,43 @@ export default function SchedulingPage() {
         positionId: data.positionId ? parseInt(data.positionId) : null,
         hourlyRate: data.hourlyRate || null,
       });
+      const result = await response.json();
+      if (result.url) {
+        window.location.href = result.url;
+      }
+      return result;
+    },
+    onError: () => toast({ title: "Failed to start checkout", variant: "destructive" }),
+  });
+
+  // Handle payment success - complete employee creation
+  const completeStaffMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      return apiRequest("POST", "/api/scheduling/staff/complete", { sessionId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/staff"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scheduling/stats"] });
-      setShowAddStaff(false);
-      setNewStaff({ firstName: "", lastName: "", email: "", phone: "", positionId: "", hourlyRate: "" });
-      toast({ title: "Staff member added" });
+      toast({ title: "Staff member added successfully!" });
+      // Clear the URL params
+      window.history.replaceState({}, '', '/scheduling?tab=staff');
     },
-    onError: () => toast({ title: "Failed to add staff member", variant: "destructive" }),
+    onError: () => toast({ title: "Failed to complete staff creation", variant: "destructive" }),
   });
+
+  // Check for payment success on page load
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const payment = params.get('payment');
+    const sessionId = params.get('session_id');
+    
+    if (payment === 'success' && sessionId) {
+      completeStaffMutation.mutate(sessionId);
+    } else if (payment === 'cancelled') {
+      toast({ title: "Payment cancelled", description: "Employee was not added" });
+      window.history.replaceState({}, '', '/scheduling?tab=staff');
+    }
+  }, [searchString]);
 
   const deleteStaffMutation = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/scheduling/staff/${id}`),
@@ -393,13 +422,20 @@ export default function SchedulingPage() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <Dialog open={showAddShift} onOpenChange={setShowAddShift}>
-                <DialogTrigger asChild>
-                  <Button data-testid="btn-add-shift">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Shift
+              <div className="flex items-center gap-2">
+                <Link href="/domain/staffing">
+                  <Button variant="outline" data-testid="btn-labor-impact">
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Check Labor Impact
                   </Button>
-                </DialogTrigger>
+                </Link>
+                <Dialog open={showAddShift} onOpenChange={setShowAddShift}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="btn-add-shift">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Shift
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add New Shift</DialogTitle>
@@ -487,6 +523,7 @@ export default function SchedulingPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              </div>
             </div>
 
             <div className="grid grid-cols-7 gap-2">
@@ -652,15 +689,19 @@ export default function SchedulingPage() {
                       </div>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowAddStaff(false)}>Cancel</Button>
-                    <Button 
-                      onClick={() => createStaffMutation.mutate(newStaff)}
-                      disabled={!newStaff.firstName || !newStaff.lastName || createStaffMutation.isPending}
-                      data-testid="btn-save-staff"
-                    >
-                      {createStaffMutation.isPending ? "Saving..." : "Add Staff"}
-                    </Button>
+                  <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <p className="text-xs text-muted-foreground w-full sm:w-auto">A $5 fee applies per new employee</p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setShowAddStaff(false)}>Cancel</Button>
+                      <Button 
+                        onClick={() => createStaffMutation.mutate(newStaff)}
+                        disabled={!newStaff.firstName || !newStaff.lastName || createStaffMutation.isPending}
+                        data-testid="btn-save-staff"
+                      >
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        {createStaffMutation.isPending ? "Processing..." : "Add Staff - $5"}
+                      </Button>
+                    </div>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
