@@ -53,7 +53,7 @@ export async function sendOrganizationInviteEmail(
     console.log(`[Email] Got Resend client, fromEmail: ${fromEmail || 'using default'}`);
     
     const result = await client.emails.send({
-      from: fromEmail || 'The Restaurant Consultant <noreply@resend.dev>',
+      from: fromEmail || 'The Restaurant Consultant <noreply@restaurantai.consulting>',
       to: toEmail,
       subject: `${inviterName} invited you to join ${organizationName}`,
       html: `
