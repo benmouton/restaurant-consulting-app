@@ -479,32 +479,105 @@ Date: ________________________________
         <head>
           <title>${escapedTitle} Employee Handbook</title>
           <style>
-            body { 
-              font-family: 'Georgia', serif; 
-              padding: 40px 60px; 
-              max-width: 800px; 
-              margin: 0 auto;
-              line-height: 1.6;
-              color: #333;
+            @page {
+              size: letter;
+              margin: 0.75in 1in;
             }
-            pre {
+            * {
+              box-sizing: border-box;
+            }
+            body { 
+              font-family: 'Georgia', 'Times New Roman', serif; 
+              font-size: 11pt;
+              line-height: 1.5;
+              color: #000;
+              margin: 0;
+              padding: 0;
+            }
+            .handbook-content {
               white-space: pre-wrap;
               word-wrap: break-word;
-              font-family: 'Georgia', serif;
-              font-size: 12pt;
+              font-family: 'Georgia', 'Times New Roman', serif;
+              font-size: 11pt;
+              line-height: 1.5;
+            }
+            h1, h2, h3 {
+              font-family: 'Georgia', 'Times New Roman', serif;
+              margin-top: 1.5em;
+              margin-bottom: 0.5em;
+            }
+            @media screen {
+              body {
+                max-width: 8.5in;
+                margin: 0 auto;
+                padding: 40px 60px;
+                background: #fff;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+              }
+              .print-only { display: none; }
             }
             @media print {
-              body { padding: 20px; }
+              body { 
+                padding: 0;
+                background: none;
+                box-shadow: none;
+              }
+              .screen-only { display: none; }
+              .handbook-content {
+                orphans: 3;
+                widows: 3;
+              }
+              .page-break {
+                page-break-before: always;
+              }
+              .no-break {
+                page-break-inside: avoid;
+              }
+            }
+            .print-header {
+              text-align: center;
+              margin-bottom: 2em;
+              padding-bottom: 1em;
+              border-bottom: 2px solid #333;
+            }
+            .print-header h1 {
+              font-size: 24pt;
+              margin: 0 0 0.25em 0;
+            }
+            .print-header p {
+              font-size: 14pt;
+              margin: 0;
+              color: #555;
+            }
+            .print-button {
+              position: fixed;
+              top: 20px;
+              right: 20px;
+              background: #2563eb;
+              color: white;
+              border: none;
+              padding: 12px 24px;
+              font-size: 14pt;
+              border-radius: 6px;
+              cursor: pointer;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+            .print-button:hover {
+              background: #1d4ed8;
             }
           </style>
         </head>
         <body>
-          <pre>${escapedContent}</pre>
+          <button class="print-button screen-only" onclick="window.print()">Print Handbook</button>
+          <div class="print-header">
+            <h1>${escapedTitle}</h1>
+            <p>Employee Handbook</p>
+          </div>
+          <pre class="handbook-content">${escapedContent}</pre>
         </body>
         </html>
       `);
       printWindow.document.close();
-      printWindow.print();
     }
   };
 
