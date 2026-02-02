@@ -78,12 +78,12 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50">
+      {/* Header with glassmorphism */}
+      <header className="border-b border-border sticky top-0 glass-header z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <img src={logoImage} alt="The AI Restaurant Consultant" className="h-8 w-8 rounded-lg object-contain flex-shrink-0" />
-            <span className="font-bold text-sm sm:text-base truncate">The AI Restaurant Consultant</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <img src={logoImage} alt="The AI Restaurant Consultant" className="h-9 w-9 rounded-xl object-contain flex-shrink-0 ring-1 ring-primary/20" />
+            <span className="font-bold text-sm sm:text-base tracking-tight truncate">The AI Restaurant Consultant</span>
           </div>
           <div className="flex items-center gap-2">
             {/* Desktop Navigation */}
@@ -215,46 +215,48 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        {/* Welcome */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+      <main className="container mx-auto px-4 py-10 sm:py-16">
+        {/* Welcome - Premium typography */}
+        <div className="mb-10 sm:mb-14">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 tracking-tight">
             Welcome{user?.firstName ? `, ${user.firstName}` : ""}
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
+          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
             Select a domain to explore frameworks, checklists, and scripts.
           </p>
         </div>
 
-        {/* Domains Grid */}
-        <div className="mb-8 sm:mb-12">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4">Operational Domains</h2>
+        {/* Domains Grid - Premium Cards */}
+        <div className="mb-12 sm:mb-16">
+          <h2 className="text-xl sm:text-2xl font-semibold mb-6 tracking-tight">Operational Domains</h2>
           {domainsLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
               {[...Array(10)].map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-4 sm:pt-6">
-                    <Skeleton className="h-6 w-6 sm:h-8 sm:w-8 mb-2 sm:mb-3" />
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-3 w-full" />
+                <Card key={i} className="premium-card">
+                  <CardContent className="p-5 sm:p-7">
+                    <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 mb-4 rounded-md" />
+                    <Skeleton className="h-5 w-24 mb-2" />
+                    <Skeleton className="h-4 w-full" />
                   </CardContent>
                 </Card>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
               {domains?.map((domain) => {
                 const IconComponent = iconMap[domain.icon] || ClipboardList;
                 return (
                   <Link key={domain.id} href={`/domain/${domain.slug}`}>
                     <Card 
-                      className="hover-elevate cursor-pointer h-full transition-all"
+                      className="premium-card hover-elevate cursor-pointer h-full"
                       data-testid={`card-domain-${domain.slug}`}
                     >
-                      <CardContent className="p-4 sm:pt-6">
-                        <IconComponent className="h-6 w-6 sm:h-8 sm:w-8 text-primary mb-2 sm:mb-3" />
-                        <h3 className="font-semibold text-xs sm:text-sm mb-1">{domain.name}</h3>
-                        <p className="text-xs text-muted-foreground line-clamp-2 hidden sm:block">
+                      <CardContent className="p-5 sm:p-7">
+                        <div className="mb-4">
+                          <IconComponent className="h-10 w-10 sm:h-12 sm:w-12 text-primary" />
+                        </div>
+                        <h3 className="font-semibold text-sm sm:text-base mb-2 tracking-tight">{domain.name}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                           {domain.description}
                         </p>
                       </CardContent>
@@ -266,16 +268,18 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Scheduling Section */}
-        <Card className="mb-8 bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
+        {/* Scheduling Section - Premium Card */}
+        <Card className="mb-6 premium-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-3 text-lg sm:text-xl">
+              <div className="p-2 rounded-md bg-primary/10">
+                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              </div>
               Staff Scheduling
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
+          <CardContent className="pt-2">
+            <p className="text-muted-foreground mb-5 text-sm sm:text-base">
               Manage your team schedule, staff roster, positions, and announcements. 
               Build shifts, track open coverage, and keep your team informed.
             </p>
@@ -288,16 +292,18 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Quick Access: AI Consultant */}
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-primary" />
+        {/* Quick Access: AI Consultant - Premium Card */}
+        <Card className="premium-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-3 text-lg sm:text-xl">
+              <div className="p-2 rounded-md bg-primary/10">
+                <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              </div>
               AI Consultant
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
+          <CardContent className="pt-2">
+            <p className="text-muted-foreground mb-5 text-sm sm:text-base">
               Got a specific question? Ask the consultant anything about restaurant operations. 
               No fluff, just practical answers.
             </p>

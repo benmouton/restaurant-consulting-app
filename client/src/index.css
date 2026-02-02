@@ -80,59 +80,71 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
-/* DARK MODE - "Quiet Authority" Palette (adapted for dark) */
+/* DARK MODE - "Cutting Edge" Premium Dark Theme */
+/* Near-black background with cyan/electric blue accent */
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(255,255,255, .12);
+  --badge-outline: rgba(255,255,255, .08);
 
   --opaque-button-border-intensity: 9;
 
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  --elevate-1: rgba(255,255,255, .05);
+  --elevate-2: rgba(255,255,255, .10);
 
-  --background: 220 15% 10%;
-  --foreground: 210 20% 94%;
-  --border: 220 12% 22%;
-  --card: 220 15% 13%;
-  --card-foreground: 210 20% 94%;
-  --card-border: 220 12% 22%;
-  --sidebar: 220 18% 11%;
-  --sidebar-foreground: 210 15% 88%;
-  --sidebar-border: 220 12% 20%;
-  --sidebar-primary: 212 45% 45%;
+  /* Near-black backgrounds for premium feel */
+  --background: 240 10% 4%;
+  --foreground: 214 32% 91%;
+  --border: 240 6% 15%;
+  
+  /* Slightly lighter card with glass effect support */
+  --card: 240 8% 8%;
+  --card-foreground: 214 32% 91%;
+  --card-border: 240 6% 18%;
+  
+  /* Sidebar - subtle distinction */
+  --sidebar: 240 10% 5%;
+  --sidebar-foreground: 214 20% 85%;
+  --sidebar-border: 240 6% 14%;
+  --sidebar-primary: 187 100% 42%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 15% 18%;
-  --sidebar-accent-foreground: 210 15% 88%;
-  --sidebar-ring: 212 45% 45%;
-  --popover: 220 15% 13%;
-  --popover-foreground: 210 20% 94%;
-  --popover-border: 220 12% 22%;
-  --primary: 212 45% 45%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 12% 18%;
-  --secondary-foreground: 210 15% 88%;
-  --muted: 220 12% 18%;
-  --muted-foreground: 220 10% 55%;
-  --accent: 220 12% 20%;
-  --accent-foreground: 210 15% 88%;
-  --destructive: 0 62% 50%;
+  --sidebar-accent: 240 8% 12%;
+  --sidebar-accent-foreground: 214 20% 85%;
+  --sidebar-ring: 187 100% 42%;
+  
+  --popover: 240 8% 8%;
+  --popover-foreground: 214 32% 91%;
+  --popover-border: 240 6% 18%;
+  
+  /* Electric cyan accent for cutting-edge feel */
+  --primary: 187 100% 42%;
+  --primary-foreground: 240 10% 4%;
+  --secondary: 240 6% 14%;
+  --secondary-foreground: 214 20% 85%;
+  --muted: 240 6% 14%;
+  --muted-foreground: 215 16% 55%;
+  --accent: 240 6% 16%;
+  --accent-foreground: 214 20% 85%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --input: 220 12% 28%;
-  --ring: 212 45% 45%;
-  --chart-1: 212 45% 50%;
-  --chart-2: 160 40% 45%;
-  --chart-3: 40 45% 50%;
-  --chart-4: 220 25% 55%;
-  --chart-5: 200 35% 50%;
+  --input: 240 6% 20%;
+  --ring: 187 100% 42%;
+  
+  /* Charts with vibrant colors */
+  --chart-1: 187 100% 42%;
+  --chart-2: 160 84% 39%;
+  --chart-3: 262 83% 58%;
+  --chart-4: 217 91% 60%;
+  --chart-5: 330 81% 60%;
 
-  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
-  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
-  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
-  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
-  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 2px 4px -1px hsl(0 0% 0% / 0.20);
-  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 4px 6px -1px hsl(0 0% 0% / 0.20);
-  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 8px 10px -1px hsl(0 0% 0% / 0.20);
-  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
+  /* Premium shadows with cyan glow hints */
+  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.25);
+  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.30);
+  --shadow-sm: 0px 2px 4px 0px hsl(0 0% 0% / 0.30), 0px 1px 2px -1px hsl(0 0% 0% / 0.30);
+  --shadow: 0px 4px 8px 0px hsl(0 0% 0% / 0.35), 0px 2px 4px -1px hsl(0 0% 0% / 0.30);
+  --shadow-md: 0px 6px 12px 0px hsl(0 0% 0% / 0.35), 0px 4px 8px -2px hsl(0 0% 0% / 0.30);
+  --shadow-lg: 0px 8px 24px 0px hsl(0 0% 0% / 0.40), 0px 6px 12px -3px hsl(0 0% 0% / 0.35);
+  --shadow-xl: 0px 12px 40px 0px hsl(0 0% 0% / 0.45), 0px 8px 16px -4px hsl(0 0% 0% / 0.35);
+  --shadow-2xl: 0px 16px 50px 0px hsl(0 0% 0% / 0.50);
 }
 
 @layer base {
@@ -213,5 +225,19 @@
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+
+  /* Premium card styling for dark mode dashboard */
+  .dark .premium-card {
+    background: rgba(20, 20, 28, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Header styling for dark mode */
+  .dark .glass-header {
+    background: rgba(10, 10, 14, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 }
