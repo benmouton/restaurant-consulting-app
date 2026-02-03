@@ -77,12 +77,10 @@ export const socialMediaService = {
     const redirectUri = `${getBaseUrl()}/api/oauth/meta/callback`;
     
     const scopes = [
+      'public_profile',
+      'email',
       'pages_show_list',
-      'pages_read_engagement',
-      'pages_manage_posts',
-      'instagram_basic',
-      'instagram_content_publish',
-      'business_management'
+      'pages_read_engagement'
     ].join(',');
     
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
