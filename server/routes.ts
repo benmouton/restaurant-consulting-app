@@ -145,7 +145,7 @@ export async function registerRoutes(
             subscriptionStatus: subscription.status as string,
           });
           return res.json({ 
-            hasSubscription: subscription.status === 'active',
+            hasSubscription: subscription.status === 'active' || subscription.status === 'trialing',
             subscriptionStatus: subscription.status,
             subscriptionId: subscription.id
           });

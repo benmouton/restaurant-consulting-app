@@ -24,6 +24,9 @@ export class StripeService {
       mode: 'subscription',
       success_url: successUrl,
       cancel_url: cancelUrl,
+      subscription_data: {
+        trial_period_days: 7,
+      },
     });
   }
 
@@ -65,7 +68,7 @@ export class StripeService {
 
   async getActiveSubscriptionForCustomer(customerId: string) {
     const result = await db.execute(
-      sql`SELECT * FROM stripe.subscriptions WHERE customer = ${customerId} AND status = 'active' LIMIT 1`
+      sql`SELECT * FROM stripe.subscriptions WHERE customer = ${customerId} AND (status = 'active' OR status = 'trialing') LIMIT 1`
     );
     return result.rows[0] || null;
   }
