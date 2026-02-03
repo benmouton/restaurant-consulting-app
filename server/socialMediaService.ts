@@ -78,9 +78,7 @@ export const socialMediaService = {
     
     const scopes = [
       'public_profile',
-      'email',
-      'pages_show_list',
-      'pages_read_engagement'
+      'email'
     ].join(',');
     
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +

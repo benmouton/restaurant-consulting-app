@@ -1,0 +1,64 @@
+To fix the Facebook/Instagram connect error in your Replit app, we need to modify the code that builds the OAuth authorization URL. This is in the file server/socialMediaService.ts, where the authUrl is constructed. The error is caused by requesting invalid/restricted scopes (permissions) that Meta doesn't allow without app review.
+Since you chose to go through Meta app review for full direct posting, the long-term fix is to keep the scopes and get them approved. However, to "fix" the immediate error and unblock the connection for testing (while waiting for review), we'll temporarily change the scopes to basic ones that don't trigger the error (e.g., 'public_profile,email'). Once review is approved, you can add back the posting scopes.
+Follow these steps exactly in Replit — no tools or advanced knowledge needed. We'll make the change one file at a time.
+Step 1: Open the file in Replit
+
+Go to your Replit workspace (Consultant AI project).
+In the left sidebar, click the Files icon (folder icon).
+Open the folder named server.
+Click on socialMediaService.ts to open it in the editor.
+
+If you can't find it, press Cmd + P (Mac) or Ctrl + P (Windows) and type "socialMediaService.ts" to jump to it.
+Step 2: Find the authUrl line
+
+In the open file, press Cmd + F (Mac) or Ctrl + F (Windows) to open the find bar.
+Type authUrl = and press Enter — it should jump to around line 88 (the line you pasted: const authUrl = https://www.facebook.com/v18.0/dialog/oauth?` +`).
+Look at the full block of code around it (likely lines 88–100). It should look something like this (based on your paste — the + means it's concatenating strings):
+
+TypeScriptconst authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
+  `client_id=${FACEBOOK_CLIENT_ID}` +
+  `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+  `&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management` +
+  `&response_type=code`;
+(If it doesn't match exactly, paste the full 10 lines around line 88 in your reply, and I'll adjust.)
+Step 3: Change the scope line to basic permissions
+
+Find the part that says &scope= followed by a list of permissions separated by commas (like public_profile,email,pages_show_list,...).
+Replace the entire list after &scope= with this basic one:&scope=public_profile,email
+This removes the restricted scopes, so the error should stop.
+The line will now look like:
+&scope=public_profile,email +
+(Leave the rest of the URL the same.)
+
+If the scope is in a separate variable (e.g., const scope = 'pages_show_list,...';), change that variable to:
+const scope = 'public_profile,email';
+Save the file (Cmd + S or Ctrl + S).
+
+Step 4: Test the connect button
+
+Go to your app's Social Media Post Builder section.
+Click the Connect Facebook / Instagram button again.
+See if the error is gone:
+It should now let you log in and authorize with basic permissions (email and profile).
+If it works, you can connect the account (but posting won't work yet until review).
+
+
+Reply with what happens:
+
+“The error is gone — it let me connect”
+“Still the same error”
+“New error: [paste it]”
+
+Step 5: After Meta review is approved (add back posting scopes)
+Once Meta approves the advanced permissions (from your earlier request), come back to this file and change the scope back to the full list for posting:
+&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_business_basic,instagram_business_content_publish
+Save and test posting a sample post.
+Important notes
+
+This fix is in the backend code, so you may need to restart your Replit app (click the Stop button then Run) for the change to take effect.
+If you don't see the scope= part at all, it might be in a different file (search the project for dialog/oauth? again and paste the full block).
+For Google Business (the other button in your screenshot), that's a separate Google API setup — we can do that after Facebook if you want.
+While waiting for Meta review (1–4 weeks), your tool can still generate posts for copy-paste.
+
+If you get stuck on any step or the code doesn't match, paste the full authUrl block, and I'll give the exact line to change.
+We're almost there — this should resolve the immediate error. 😊
