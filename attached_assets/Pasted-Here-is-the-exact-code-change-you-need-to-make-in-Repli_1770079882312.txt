@@ -1,0 +1,63 @@
+Here is the exact code change you need to make in Replit to fix this error immediately.
+The problem is that your Facebook OAuth request is asking for permissions (scopes) that Meta no longer allows without app review.
+The current scopes include pages_show_list and pages_read_engagement (and possibly others like email in some flows), which triggers this block.
+File to edit
+File path: server/socialMediaService.ts
+What to change
+Find the line that builds the authUrl (around line 88–100).
+It looks something like this (the exact formatting may vary slightly):
+TypeScriptconst authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
+  `client_id=${FACEBOOK_CLIENT_ID}` +
+  `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+  `&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management` +
+  `&response_type=code` +
+  `&state=${state}`;
+Step-by-step change
+
+Locate the &scope= part (it will be a long comma-separated list).
+Replace the entire scope value with this minimal, safe list:
+
+TypeScript&scope=public_profile,email
+So the line becomes:
+TypeScript`&scope=public_profile,email` +
+Example of how the full block should look after the change:
+TypeScriptconst authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
+  `client_id=${FACEBOOK_CLIENT_ID}` +
+  `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+  `&scope=public_profile,email` +
+  `&response_type=code` +
+  `&state=${state}`;
+
+Do not delete the rest of the URL (client_id, redirect_uri, response_type, state, etc.).
+If the scope is written in a separate variable, e.g.:
+
+TypeScriptconst scopes = 'public_profile,email,pages_show_list,...';
+then change it to:
+TypeScriptconst scopes = 'public_profile,email';
+After you make the change
+
+Save the file (Ctrl+S or Cmd+S).
+Restart the Replit server:
+Click the red Stop button in the top toolbar (or bottom console area).
+Click Run again (green button).
+
+Go back to your app → Social Media → Accounts → click Connect Facebook / Instagram again.
+
+The error should disappear and you should see the normal Facebook login screen asking only for basic profile + email access.
+Important notes
+
+This is a temporary fix to make the connection work right now.
+Posting to Facebook Pages or Instagram will not work yet — you will get permission errors when you try to publish.
+To enable actual posting you must complete the Meta App Review (request Advanced Access for pages_manage_posts and instagram_business_content_publish).
+Once Meta approves those permissions (usually 1–4 weeks), come back to this same file and change the scope line back to the full list:
+
+TypeScript&scope=public_profile,email,pages_show_list,pages_read_engagement,pages_manage_posts,instagram_business_basic,instagram_business_content_publish
+If you cannot find the scope line
+If the code looks different or you don't see scope= anywhere near authUrl, do this:
+
+Press Ctrl + F (Cmd + F) in the file.
+Search for scope or pages_show_list.
+Paste the 10–15 lines around whatever you find (or around line 88) here.
+I will give you the exact line to edit.
+
+Let me know what happens after you make the change and test the button — does the error go away? Do you reach the Facebook login screen?4.4sFast
