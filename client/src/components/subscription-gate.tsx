@@ -66,6 +66,10 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="bg-primary/10 border border-primary/20 rounded-md p-3 text-center mb-2">
+              <p className="text-sm font-medium text-primary">7-Day Free Trial</p>
+              <p className="text-xs text-muted-foreground">No charge until trial ends</p>
+            </div>
             <Button 
               className="w-full" 
               onClick={() => checkout()}
@@ -77,7 +81,7 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
               ) : (
                 <CreditCard className="h-4 w-4 mr-2" />
               )}
-              Subscribe - $10/month
+              Start Free Trial - Then $10/month
             </Button>
             <Button 
               className="w-full" 

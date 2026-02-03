@@ -106,6 +106,13 @@ export default function SubscriptionPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="bg-primary/10 border border-primary/20 rounded-md p-4 text-center">
+                <p className="font-semibold text-primary">7-Day Free Trial</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Try everything free for 7 days. You won't be charged until the trial ends.
+                </p>
+              </div>
+
               <ul className="space-y-3">
                 {features.map((feature, i) => (
                   <li key={i} className="flex items-center gap-3">
@@ -129,11 +136,11 @@ export default function SubscriptionPage() {
                 ) : (
                   <CreditCard className="h-4 w-4 mr-2" />
                 )}
-                Subscribe Now
+                Start 7-Day Free Trial
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
-                Cancel anytime. Secure payment via Stripe.
+                No charge for 7 days. Cancel anytime. Secure payment via Stripe.
               </p>
             </CardContent>
           </Card>
