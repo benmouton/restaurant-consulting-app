@@ -169,7 +169,7 @@ export async function registerRoutes(
           // Check owner's subscription
           if (owner.stripeCustomerId) {
             const ownerSubscription = await stripeService.getActiveSubscriptionForCustomer(owner.stripeCustomerId);
-            if (ownerSubscription && ownerSubscription.status === 'active') {
+            if (ownerSubscription && (ownerSubscription.status === 'active' || ownerSubscription.status === 'trialing')) {
               return res.json({
                 hasSubscription: true,
                 subscriptionStatus: "organization_member",
@@ -178,7 +178,7 @@ export async function registerRoutes(
             }
           }
           // Check cached subscription status for owner
-          if (owner.subscriptionStatus === 'active') {
+          if (owner.subscriptionStatus === 'active' || owner.subscriptionStatus === 'trialing') {
             return res.json({
               hasSubscription: true,
               subscriptionStatus: "organization_member",
@@ -189,7 +189,7 @@ export async function registerRoutes(
       }
 
       res.json({ 
-        hasSubscription: user.subscriptionStatus === 'active',
+        hasSubscription: user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trialing',
         subscriptionStatus: user.subscriptionStatus 
       });
     } catch (error) {
