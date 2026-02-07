@@ -1,0 +1,14 @@
+Instructions for Building a Better AI Tool Companion on Replit
+Based on the data from your training guide at https://training.moutonsbistro.com (which I’ve analyzed, including core values like Warmth, Quality, Growth, and Community, as well as sections on employee handbook, service standards, alcohol service, 4-day training breakdowns, operations, and knowledge tests), I’ll provide step-by-step instructions to create an improved AI tool companion on Replit. This assumes your “current tool” is a basic AI-generated chatbot or app (e.g., a simple Q&A bot for server training, perhaps initially built via Replit’s AI Agent from a generic prompt like “build a restaurant training chatbot”).
+The goal is to make it “better” by:
+•  Integrating specific Mouton’s Bistro details for personalized, interactive training.
+•  Enhancing engagement with quizzes, role-playing scenarios, and feedback loops tied to your core values.
+•  Making it more comprehensive, covering all 13 sections of the guide.
+•  Adding features like progress tracking, multilingual support (if needed for your team), and integration with your restaurant’s ops (e.g., menu updates via API if you expand it).
+Replit is ideal for this because its AI Agent can generate code instantly from natural language prompts, and you can refine it collaboratively. You’ll need a free Replit account (or upgrade for more features). If your current tool is already on Replit, fork it as a starting point.
+Step 1: Set Up Your Replit Project
+1.  Go to Replit.com and sign in (or create an account).
+2.  Click “Create” > “AI Agent” (or search for “Restaurant App Builder” in their templates, as it aligns with restaurant training tools).
+3.  If you have the current tool’s code (e.g., a Python or Node.js script), import it by uploading files or pasting code into a new Repl. Otherwise, start fresh.
+Step 2: Craft an Improved Prompt for Replit’s AI Agent
+Use Replit’s AI to generate the base code. Enter a detailed prompt like this in the AI Agent interface (adapt if your current tool has specific elements, e.g., if it’s already using Streamlit or Flask):
