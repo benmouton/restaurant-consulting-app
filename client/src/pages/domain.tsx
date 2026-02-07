@@ -2198,8 +2198,50 @@ Ensure all language is:
         {documentation && (
           <div className="mt-4 space-y-4">
             <div className="p-4 bg-accent/50 rounded-lg border">
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap font-mono text-sm overflow-x-auto" style={{ overflowWrap: 'break-word', wordWrap: 'break-word' }}>
-                {documentation}
+              <div className="prose prose-sm dark:prose-invert max-w-none text-sm overflow-x-auto" style={{ overflowWrap: 'break-word', wordWrap: 'break-word' }}>
+                {documentation.split('\n').map((line, i) => {
+                  const trimmed = line.trim();
+                  if (/^\s*[=]{3,}\s*$/.test(line) || /^\s*[-]{3,}\s*$/.test(line)) {
+                    return <hr key={i} className="my-2 border-muted-foreground/30" />;
+                  }
+                  if (!trimmed) return <div key={i} className="h-2" />;
+                  const bold = (t: string) => t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                  const keywords = ['EMPLOYEE DISCIPLINE', 'ACKNOWLEDGMENT', 'AT-WILL', 'DOCUMENT COPY'];
+                  const isTitleLine = keywords.some(k => trimmed.includes(k));
+                  const isAllCaps = trimmed === trimmed.toUpperCase() && trimmed.length > 3 && /[A-Z]/.test(trimmed) && !/^[_\s]+$/.test(trimmed) && !/^[^A-Za-z]*$/.test(trimmed);
+                  const isCheckbox = trimmed.startsWith('[ ]') || trimmed.startsWith('[X]') || trimmed.startsWith('[x]');
+                  const isLabelLine = /^[A-Z][A-Z\s\/]*:/.test(trimmed) && trimmed.indexOf(':') < 35;
+
+                  if (isTitleLine) {
+                    return <h2 key={i} className="text-base font-bold text-center my-1">{trimmed.replace(/\*\*/g, '')}</h2>;
+                  }
+                  if (isAllCaps) {
+                    return <h3 key={i} className="text-sm font-bold mt-3 mb-1">{trimmed}</h3>;
+                  }
+                  if (isCheckbox) {
+                    const checked = trimmed.startsWith('[X]') || trimmed.startsWith('[x]');
+                    const label = trimmed.substring(3).trim().replace(/^-\s*/, '');
+                    return (
+                      <div key={i} className="flex items-start gap-2 ml-1 my-0.5">
+                        <div className={`mt-0.5 w-4 h-4 border rounded flex-shrink-0 flex items-center justify-center ${checked ? 'bg-primary border-primary' : 'border-muted-foreground/50'}`}>
+                          {checked && <Check className="h-3 w-3 text-primary-foreground" />}
+                        </div>
+                        <span className="text-sm">{label}</span>
+                      </div>
+                    );
+                  }
+                  if (isLabelLine) {
+                    const colonIdx = trimmed.indexOf(':');
+                    const label = trimmed.substring(0, colonIdx + 1);
+                    const value = trimmed.substring(colonIdx + 1).trim();
+                    return (
+                      <p key={i} className="text-sm my-0.5">
+                        <span className="font-semibold">{label}</span>{value ? ` ${value}` : ''}
+                      </p>
+                    );
+                  }
+                  return <p key={i} className="text-sm my-0.5" dangerouslySetInnerHTML={{ __html: bold(trimmed) }} />;
+                })}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -2214,10 +2256,6 @@ Ensure all language is:
               <Button variant="outline" size="sm" onClick={shareDocument} data-testid="btn-share-hr-doc">
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
-              </Button>
-              <Button variant="outline" size="sm" onClick={emailDocument} data-testid="btn-email-hr-doc">
-                <Mail className="h-4 w-4 mr-2" />
-                Email
               </Button>
               <Button 
                 variant="default" 
