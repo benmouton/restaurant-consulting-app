@@ -73,6 +73,7 @@ import {
   Edit,
   Mic,
   History,
+  Share2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -1801,11 +1802,10 @@ Ensure all language is:
     toast({ title: "Copied to clipboard!" });
   };
 
-  const printDocument = () => {
-    if (!documentation) {
-      toast({ title: "Please generate the documentation first", variant: "destructive" });
-      return;
-    }
+  const getPdfFileName = () => `HR_Notice_${employeeName?.replace(/\s+/g, '_') || 'Employee'}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+  const buildPdf = (): jsPDF | null => {
+    if (!documentation) return null;
 
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -1943,8 +1943,75 @@ Ensure all language is:
       }
     }
 
-    doc.save(`HR_Notice_${employeeName?.replace(/\s+/g, '_') || 'Employee'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    return doc;
+  };
+
+  const printDocument = () => {
+    if (!documentation) {
+      toast({ title: "Please generate the documentation first", variant: "destructive" });
+      return;
+    }
+    const doc = buildPdf();
+    if (!doc) return;
+    doc.save(getPdfFileName());
     toast({ title: "PDF downloaded!" });
+  };
+
+  const shareDocument = async () => {
+    if (!documentation) {
+      toast({ title: "Please generate the documentation first", variant: "destructive" });
+      return;
+    }
+    const doc = buildPdf();
+    if (!doc) return;
+
+    const fileName = getPdfFileName();
+    const pdfBlob = doc.output('blob');
+    const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+    if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
+      try {
+        await navigator.share({
+          title: `HR Notice - ${employeeName || 'Employee'}`,
+          text: `Employee discipline documentation for ${employeeName || 'employee'}`,
+          files: [pdfFile],
+        });
+        toast({ title: "Shared successfully!" });
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          toast({ title: "Share cancelled or failed", variant: "destructive" });
+        }
+      }
+    } else if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `HR Notice - ${employeeName || 'Employee'}`,
+          text: documentation,
+        });
+        toast({ title: "Shared successfully!" });
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          toast({ title: "Share cancelled or failed", variant: "destructive" });
+        }
+      }
+    } else {
+      emailDocument();
+    }
+  };
+
+  const emailDocument = () => {
+    if (!documentation) {
+      toast({ title: "Please generate the documentation first", variant: "destructive" });
+      return;
+    }
+    const subject = encodeURIComponent(`HR Notice - ${employeeName || 'Employee'} - ${incidentDate || new Date().toLocaleDateString()}`);
+    const bodyText = documentation
+      .replace(/\*\*/g, '')
+      .replace(/(?<!\S)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '$1')
+      .replace(/^#{1,6}\s/gm, '');
+    const body = encodeURIComponent(bodyText);
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
+    toast({ title: "Opening email client..." });
   };
 
   const saveDocument = async () => {
@@ -2143,6 +2210,14 @@ Ensure all language is:
               <Button variant="outline" size="sm" onClick={printDocument} data-testid="btn-print-hr-doc">
                 <FileText className="h-4 w-4 mr-2" />
                 Download PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={shareDocument} data-testid="btn-share-hr-doc">
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button variant="outline" size="sm" onClick={emailDocument} data-testid="btn-email-hr-doc">
+                <Mail className="h-4 w-4 mr-2" />
+                Email
               </Button>
               <Button 
                 variant="default" 
