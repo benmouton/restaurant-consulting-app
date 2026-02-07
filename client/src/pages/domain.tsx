@@ -1802,6 +1802,11 @@ Ensure all language is:
   };
 
   const printDocument = () => {
+    if (!documentation) {
+      toast({ title: "Please generate the documentation first", variant: "destructive" });
+      return;
+    }
+
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'in',
@@ -1810,157 +1815,133 @@ Ensure all language is:
     
     const margin = 0.75;
     const pageWidth = 8.5;
+    const pageHeight = 11;
     const contentWidth = pageWidth - (margin * 2);
+    const bottomMargin = 0.75;
     let y = margin;
-    
-    const disciplineLevels: Record<string, string> = {
-      first: "Verbal/Written Warning",
-      second: "3 Shift Suspension",
-      third: "5 Shift Suspension / Termination"
-    };
-    
-    const issueLabels: Record<string, string> = {
-      attendance: "Attendance / Tardiness",
-      performance: "Job Performance",
-      conduct: "Workplace Conduct",
-      policy: "Policy Violation",
-      safety: "Safety Violation",
-      insubordination: "Insubordination"
+
+    const addNewPageIfNeeded = (spaceNeeded: number = 0.3) => {
+      if (y + spaceNeeded > pageHeight - bottomMargin) {
+        doc.addPage();
+        y = margin;
+        return true;
+      }
+      return false;
     };
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("EMPLOYEE DISCIPLINE NOTICE", pageWidth / 2, y, { align: "center" });
-    y += 0.4;
-    
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.02);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 0.35;
+    const cleanText = documentation
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/(?<!\S)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '$1')
+      .replace(/^#{1,6}\s/gm, '');
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("DOCUMENT TYPE:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(disciplineLevels[priorIncidents] || priorIncidents, margin + 1.5, y);
-    y += 0.25;
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("DATE OF NOTICE:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(incidentDate || new Date().toLocaleDateString(), margin + 1.5, y);
-    y += 0.25;
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("EMPLOYEE NAME:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(employeeName || "_________________________", margin + 1.5, y);
-    y += 0.25;
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("POSITION:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(employeeRole || "_________________________", margin + 1.5, y);
-    y += 0.25;
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("ISSUE TYPE:", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(issueLabels[issueType] || issueType, margin + 1.5, y);
-    y += 0.35;
-    
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 0.3;
+    const lines = cleanText.split('\n');
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("STATEMENT OF FACTS", margin, y);
-    y += 0.25;
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const factLines = doc.splitTextToSize(description || "No description provided.", contentWidth);
-    const maxFactLines = Math.min(factLines.length, 8);
-    for (let i = 0; i < maxFactLines; i++) {
-      doc.text(factLines[i], margin, y);
-      y += 0.18;
+    const isSeparator = (l: string) => /^\s*[=]{3,}\s*$/.test(l) || /^\s*[-]{3,}\s*$/.test(l);
+    const isTitleHeading = (t: string) => {
+      const keywords = ['EMPLOYEE DISCIPLINE', 'ACKNOWLEDGMENT', 'AT-WILL', 'DOCUMENT COPY'];
+      return keywords.some(k => t.includes(k));
+    };
+    const isSectionHeading = (t: string) => {
+      if (t.length < 4 || t.length > 80) return false;
+      if (!/[A-Z]/.test(t)) return false;
+      return t === t.toUpperCase() && !/^[_\s]+$/.test(t) && !/^[^A-Za-z]*$/.test(t);
+    };
+
+    const renderWrappedText = (text: string, fontSize: number, font: string, fontStyle: string, maxWidth: number, lineHeight: number) => {
+      doc.setFont(font, fontStyle);
+      doc.setFontSize(fontSize);
+      const wrappedLines = doc.splitTextToSize(text, maxWidth);
+      const totalHeight = wrappedLines.length * lineHeight;
+      addNewPageIfNeeded(totalHeight);
+      wrappedLines.forEach((wl: string) => {
+        addNewPageIfNeeded(lineHeight);
+        doc.text(wl, margin, y);
+        y += lineHeight;
+      });
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (isSeparator(line)) {
+        addNewPageIfNeeded(0.15);
+        doc.setDrawColor(0);
+        doc.setLineWidth(line.trim().startsWith('=') ? 0.02 : 0.01);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 0.2;
+        continue;
+      }
+
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        y += 0.1;
+        continue;
+      }
+
+      const isCheckbox = trimmed.startsWith('[ ]') || trimmed.startsWith('[X]') || trimmed.startsWith('[x]');
+
+      if (isTitleHeading(trimmed)) {
+        addNewPageIfNeeded(0.4);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        const headingLines = doc.splitTextToSize(trimmed, contentWidth);
+        headingLines.forEach((hl: string) => {
+          addNewPageIfNeeded(0.22);
+          doc.text(hl, pageWidth / 2, y, { align: "center" });
+          y += 0.22;
+        });
+        y += 0.08;
+      } else if (isSectionHeading(trimmed)) {
+        addNewPageIfNeeded(0.35);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        const headingLines = doc.splitTextToSize(trimmed, contentWidth);
+        headingLines.forEach((hl: string) => {
+          addNewPageIfNeeded(0.22);
+          doc.text(hl, margin, y);
+          y += 0.22;
+        });
+        y += 0.05;
+      } else if (isCheckbox) {
+        renderWrappedText(trimmed, 10, "helvetica", "normal", contentWidth, 0.18);
+      } else if (/^[A-Z][A-Z\s\/]*:/.test(trimmed) && trimmed.indexOf(':') < 35) {
+        const colonIdx = trimmed.indexOf(':');
+        const label = trimmed.substring(0, colonIdx + 1);
+        const value = trimmed.substring(colonIdx + 1).trim();
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        const labelWidth = doc.getTextWidth(label + " ");
+
+        if (value && contentWidth - labelWidth > 1.5) {
+          const valueLines = doc.splitTextToSize(value, contentWidth - labelWidth);
+          const totalHeight = Math.max(0.2, valueLines.length * 0.18);
+          addNewPageIfNeeded(totalHeight);
+          doc.text(label, margin, y);
+          doc.setFont("helvetica", "normal");
+          valueLines.forEach((vl: string, idx: number) => {
+            if (idx === 0) {
+              doc.text(vl, margin + labelWidth, y);
+            } else {
+              y += 0.18;
+              doc.text(vl, margin + labelWidth, y);
+            }
+          });
+          y += 0.2;
+        } else {
+          addNewPageIfNeeded(0.4);
+          doc.text(label, margin, y);
+          y += 0.18;
+          if (value) {
+            doc.setFont("helvetica", "normal");
+            renderWrappedText(value, 10, "helvetica", "normal", contentWidth, 0.18);
+          }
+        }
+      } else {
+        renderWrappedText(trimmed, 10, "helvetica", "normal", contentWidth, 0.18);
+      }
     }
-    if (factLines.length > 8) {
-      doc.text("...", margin, y);
-      y += 0.18;
-    }
-    y += 0.15;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("POLICY VIOLATED", margin, y);
-    y += 0.25;
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Employee was aware of policy: ${policyAware === "yes" ? "Yes" : "No/Unclear"}`, margin, y);
-    y += 0.35;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("REQUIRED CORRECTIVE ACTION", margin, y);
-    y += 0.25;
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const actionText = priorIncidents === "first" 
-      ? "Employee must immediately correct behavior. Further violations will result in progressive discipline up to and including termination."
-      : priorIncidents === "second"
-      ? "Employee is suspended for 3 shifts without pay. Return to work contingent on acknowledgment and corrective action."
-      : "Employee is suspended for 5 shifts pending termination review. Management will determine final employment status.";
-    const actionLines = doc.splitTextToSize(actionText, contentWidth);
-    actionLines.forEach((line: string) => {
-      doc.text(line, margin, y);
-      y += 0.18;
-    });
-    y += 0.2;
-
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 0.3;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("SIGNATURES", margin, y);
-    y += 0.35;
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    
-    doc.text("Employee Signature: _________________________________", margin, y);
-    doc.text("Date: _______________", margin + 4.5, y);
-    y += 0.35;
-    
-    doc.text("Manager Signature: __________________________________", margin, y);
-    doc.text("Date: _______________", margin + 4.5, y);
-    y += 0.35;
-    
-    doc.text("Witness Signature: __________________________________", margin, y);
-    doc.text("Date: _______________", margin + 4.5, y);
-    y += 0.4;
-
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 0.25;
-    
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "italic");
-    const disclaimer = "Employee signature indicates receipt of this document, not agreement with its contents. " +
-      "Employment is at-will and may be terminated at any time by either party. " +
-      "Refusal to sign will be noted with witness verification.";
-    const disclaimerLines = doc.splitTextToSize(disclaimer, contentWidth);
-    disclaimerLines.forEach((line: string) => {
-      doc.text(line, margin, y);
-      y += 0.14;
-    });
-    y += 0.15;
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("Distribution: [ ] Employee Copy  [ ] Personnel File  [ ] Management Copy", margin, y);
 
     doc.save(`HR_Notice_${employeeName?.replace(/\s+/g, '_') || 'Employee'}_${new Date().toISOString().split('T')[0]}.pdf`);
     toast({ title: "PDF downloaded!" });
@@ -2150,7 +2131,7 @@ Ensure all language is:
         {documentation && (
           <div className="mt-4 space-y-4">
             <div className="p-4 bg-accent/50 rounded-lg border">
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap font-mono text-sm">
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap font-mono text-sm overflow-x-auto" style={{ overflowWrap: 'break-word', wordWrap: 'break-word' }}>
                 {documentation}
               </div>
             </div>
