@@ -6970,7 +6970,7 @@ export default function DomainPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50">
+        <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ChefHat className="h-6 w-6 text-primary" />
@@ -7009,7 +7009,7 @@ export default function DomainPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50">
+      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/">
