@@ -15,7 +15,7 @@ import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { restaurantHolidays, insertHandbookSettingsSchema } from "@shared/schema";
+import { restaurantHolidays, insertHandbookSettingsSchema, insertRestaurantStandardsSchema, insertCertificationAttemptSchema } from "@shared/schema";
 import { sendOrganizationInviteEmail } from "./emailService";
 
 const openai = new OpenAI({
@@ -3124,6 +3124,306 @@ Generate JSON with:
       }
       console.error("Financial AI error:", err);
       res.status(500).json({ message: "Failed to get response" });
+    }
+  });
+
+  // ===== RESTAURANT STANDARDS (CERTIFICATION) ROUTES =====
+
+  app.get("/api/standards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const standards = await storage.getRestaurantStandards(userId);
+      res.json(standards);
+    } catch (error: any) {
+      console.error('Error fetching standards:', error);
+      res.status(500).json({ message: "Failed to fetch standards" });
+    }
+  });
+
+  app.get("/api/standards/active", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const standards = await storage.getActiveStandards(userId);
+      res.json(standards || null);
+    } catch (error: any) {
+      console.error('Error fetching active standards:', error);
+      res.status(500).json({ message: "Failed to fetch active standards" });
+    }
+  });
+
+  app.post("/api/standards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const data = insertRestaurantStandardsSchema.parse({ ...req.body, userId });
+      const standards = await storage.createRestaurantStandards(data);
+      res.status(201).json(standards);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      console.error('Error creating standards:', err);
+      res.status(500).json({ message: "Failed to create standards" });
+    }
+  });
+
+  app.put("/api/standards/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = Number(req.params.id);
+      const updated = await storage.updateRestaurantStandards(id, userId, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Standards not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error updating standards:', error);
+      res.status(500).json({ message: "Failed to update standards" });
+    }
+  });
+
+  app.delete("/api/standards/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = Number(req.params.id);
+      await storage.deleteRestaurantStandards(id, userId);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting standards:', error);
+      res.status(500).json({ message: "Failed to delete standards" });
+    }
+  });
+
+  // ===== CERTIFICATION ROUTES =====
+
+  app.post("/api/certification/generate-scenario", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { standardsId, role, phase } = req.body;
+
+      if (!standardsId || !role || !phase) {
+        return res.status(400).json({ message: "standardsId, role, and phase are required" });
+      }
+
+      const standards = await storage.getRestaurantStandardsById(standardsId);
+      if (!standards) {
+        return res.status(404).json({ message: "Standards not found" });
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const difficultyMap: Record<string, string> = {
+        Shadow: "EASY - Simple, single-table scenario with straightforward guests. Minimal complications. Trainee is observing and learning basics.",
+        Perform: "MEDIUM - Multi-table scenario with moderate complexity. Some timing pressure, a minor complaint or special request. Trainee handles tasks with oversight.",
+        Certify: "HARD - High-pressure, multi-table scenario with overlapping demands. Includes at least one critical challenge (complaint, allergy, intoxicated guest, kitchen issue). Trainee must handle independently at certification level."
+      };
+
+      const prompt = `You are a restaurant training scenario generator. Generate a realistic, detailed certification scenario for a ${role} at the "${standards.name}" restaurant.
+
+RESTAURANT STANDARDS:
+- Service Philosophy: ${standards.servicePhilosophy || "Not specified"}
+- Steps of Service: ${JSON.stringify(standards.stepsOfService || {})}
+- Speed Targets: ${JSON.stringify(standards.speedTargets || {})}
+- Recovery Framework: ${JSON.stringify(standards.recoveryFramework || {})}
+- Alcohol Policy: ${JSON.stringify(standards.alcoholPolicy || {})}
+- Safety Rules: ${JSON.stringify(standards.safetyRules || {})}
+- Critical Errors (auto-fail): ${JSON.stringify(standards.criticalErrors || [])}
+- Pass Threshold: ${standards.passThreshold}%
+
+ROLE: ${role}
+PHASE: ${phase}
+DIFFICULTY: ${difficultyMap[phase] || difficultyMap["Perform"]}
+
+Generate a scenario in this format:
+
+SCENARIO CONTEXT:
+- Shift type (lunch/dinner/brunch), day of week, expected volume
+- Current staffing situation
+- Any relevant kitchen/bar status
+
+CURRENT TABLE STATES:
+(List 2-5 tables depending on difficulty, each with):
+- Table number, party size, course stage
+- Any special notes (allergies, celebrations, VIPs, mood)
+
+EVENTS / CHALLENGES:
+(List 2-4 events that will occur during this scenario):
+- What happens, when it happens, what the trainee needs to handle
+
+REQUIRED COMPETENCIES BEING TESTED:
+- List the specific skills from the standards this scenario evaluates
+
+QUESTIONS FOR THE TRAINEE:
+1. Walk me through your first 5 minutes - what do you DO? (List your physical actions step by step)
+2. Write the exact SCRIPTS you would say to each table/guest interaction
+3. How do you handle [specific challenge from the events]?
+4. What is your priority order and why?
+
+Make the scenario feel real - use specific details, realistic guest behavior, and situations that actually happen in restaurants.`;
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        stream: true,
+        max_tokens: 3000,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("Scenario generation error:", err);
+      res.status(500).json({ message: "Failed to generate scenario" });
+    }
+  });
+
+  app.post("/api/certification/evaluate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { standardsId, scenarioText, traineeDo, traineeSay, role, phase } = req.body;
+
+      if (!standardsId || !scenarioText || !traineeDo || !traineeSay) {
+        return res.status(400).json({ message: "standardsId, scenarioText, traineeDo, and traineeSay are required" });
+      }
+
+      const standards = await storage.getRestaurantStandardsById(standardsId);
+      if (!standards) {
+        return res.status(404).json({ message: "Standards not found" });
+      }
+
+      const rubricWeights = (standards.rubricWeights as Record<string, number>) || {
+        Prioritization: 25,
+        "Guest Communication": 25,
+        Recovery: 20,
+        "Policy Compliance": 20,
+        Professionalism: 10,
+      };
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const prompt = `You are a senior restaurant trainer evaluating a ${role}'s certification attempt (${phase} phase) against the restaurant's standards.
+
+RESTAURANT STANDARDS:
+- Name: ${standards.name}
+- Service Philosophy: ${standards.servicePhilosophy || "Not specified"}
+- Steps of Service: ${JSON.stringify(standards.stepsOfService || {})}
+- Speed Targets: ${JSON.stringify(standards.speedTargets || {})}
+- Recovery Framework: ${JSON.stringify(standards.recoveryFramework || {})}
+- Alcohol Policy: ${JSON.stringify(standards.alcoholPolicy || {})}
+- Safety Rules: ${JSON.stringify(standards.safetyRules || {})}
+- Critical Errors (auto-fail conditions): ${JSON.stringify(standards.criticalErrors || [])}
+- Pass Threshold: ${standards.passThreshold}%
+
+RUBRIC WEIGHTS (total = 100):
+${Object.entries(rubricWeights).map(([k, v]) => `- ${k}: ${v} points`).join("\n")}
+
+THE SCENARIO:
+${scenarioText}
+
+TRAINEE'S DO STEPS (physical actions):
+${traineeDo}
+
+TRAINEE'S SAY SCRIPTS (verbal responses):
+${traineeSay}
+
+EVALUATE THE TRAINEE'S RESPONSE. Provide your evaluation in these clear sections:
+
+=== SCORES BY CATEGORY ===
+For each rubric category, give a score out of the max points and a brief justification:
+${Object.entries(rubricWeights).map(([k, v]) => `- ${k} (out of ${v}):`).join("\n")}
+
+=== TOTAL SCORE ===
+Total: X / 100
+Result: PASS or FAIL (threshold: ${standards.passThreshold}%)
+
+=== CRITICAL ERRORS ===
+List any critical errors committed (from the standards list above). If none, state "No critical errors detected."
+If a critical error is present, the result is AUTO-FAIL regardless of score.
+
+=== WHAT WENT WELL ===
+Specific things the trainee did correctly, referencing the standards.
+
+=== WHAT WAS MISSED ===
+Specific things the trainee missed or got wrong, referencing the standards.
+
+=== BETTER SCRIPTS ===
+For any guest interaction that could be improved, provide the exact script the trainee should have used.
+
+=== REMEDIATION DRILLS ===
+If the trainee failed or had weak areas, list specific practice exercises they should complete before retesting.
+
+Be fair but rigorous. A real restaurant's reputation depends on this evaluation being honest.`;
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        stream: true,
+        max_tokens: 3000,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("Evaluation error:", err);
+      res.status(500).json({ message: "Failed to evaluate response" });
+    }
+  });
+
+  app.get("/api/certification/attempts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const traineeName = req.query.traineeName as string | undefined;
+      if (traineeName) {
+        const attempts = await storage.getCertificationAttemptsByTrainee(userId, traineeName);
+        return res.json(attempts);
+      }
+      const attempts = await storage.getCertificationAttempts(userId);
+      res.json(attempts);
+    } catch (error: any) {
+      console.error('Error fetching certification attempts:', error);
+      res.status(500).json({ message: "Failed to fetch attempts" });
+    }
+  });
+
+  app.get("/api/certification/attempts/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getCertificationStats(userId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error('Error fetching certification stats:', error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  app.post("/api/certification/attempts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const data = insertCertificationAttemptSchema.parse({ ...req.body, userId });
+      const attempt = await storage.createCertificationAttempt(data);
+      res.status(201).json(attempt);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      console.error('Error creating certification attempt:', err);
+      res.status(500).json({ message: "Failed to save attempt" });
     }
   });
 

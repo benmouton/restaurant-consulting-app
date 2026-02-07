@@ -710,3 +710,49 @@ export type InsertPlaybookStep = z.infer<typeof insertPlaybookStepSchema>;
 export type InsertPlaybookAssignment = z.infer<typeof insertPlaybookAssignmentSchema>;
 export type InsertPlaybookAcknowledgment = z.infer<typeof insertPlaybookAcknowledgmentSchema>;
 export type InsertPlaybookAudit = z.infer<typeof insertPlaybookAuditSchema>;
+
+// ===== SKILLS CERTIFICATION ENGINE =====
+
+export const restaurantStandards = pgTable("restaurant_standards", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  servicePhilosophy: text("service_philosophy"),
+  stepsOfService: jsonb("steps_of_service"),
+  speedTargets: jsonb("speed_targets"),
+  recoveryFramework: jsonb("recovery_framework"),
+  alcoholPolicy: jsonb("alcohol_policy"),
+  safetyRules: jsonb("safety_rules"),
+  criticalErrors: jsonb("critical_errors"),
+  rubricWeights: jsonb("rubric_weights"),
+  passThreshold: integer("pass_threshold").notNull().default(85),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const certificationAttempts = pgTable("certification_attempts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  standardsId: integer("standards_id").references(() => restaurantStandards.id),
+  traineeName: text("trainee_name").notNull(),
+  role: text("role").notNull(),
+  phase: text("phase").notNull(),
+  scenarioJson: jsonb("scenario_json"),
+  traineeDo: text("trainee_do"),
+  traineeSay: text("trainee_say"),
+  evaluationJson: jsonb("evaluation_json"),
+  totalScore: integer("total_score"),
+  passed: boolean("passed"),
+  hasCriticalError: boolean("has_critical_error").default(false),
+  criticalErrorDetails: text("critical_error_details"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRestaurantStandardsSchema = createInsertSchema(restaurantStandards).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCertificationAttemptSchema = createInsertSchema(certificationAttempts).omit({ id: true, createdAt: true });
+
+export type RestaurantStandards = typeof restaurantStandards.$inferSelect;
+export type CertificationAttempt = typeof certificationAttempts.$inferSelect;
+export type InsertRestaurantStandards = z.infer<typeof insertRestaurantStandardsSchema>;
+export type InsertCertificationAttempt = z.infer<typeof insertCertificationAttemptSchema>;

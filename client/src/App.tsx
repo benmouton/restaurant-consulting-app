@@ -30,6 +30,7 @@ import ProfilePage from "@/pages/profile";
 import PrivacyPolicy from "@/pages/privacy";
 import DataDeletion from "@/pages/data-deletion";
 import TermsOfService from "@/pages/terms";
+import CertificationPage from "@/pages/certification";
 import NotFound from "@/pages/not-found";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
@@ -89,6 +90,9 @@ function Router() {
         </Route>
         <Route path="/messages">
           {user ? <ProtectedPage component={MessagesPage} /> : <Landing />}
+        </Route>
+        <Route path="/certification">
+          {user ? <ProtectedPage component={CertificationPage} /> : <Landing />}
         </Route>
         {/* Public Pages */}
         <Route path="/privacy" component={PrivacyPolicy} />

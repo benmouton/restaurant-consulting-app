@@ -38,7 +38,8 @@ import {
   ChevronDown,
   Menu,
   Share2,
-  BookOpen
+  BookOpen,
+  Sparkles
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 import logoImage from "@/assets/logo.png";
@@ -108,6 +109,12 @@ export default function Dashboard() {
                   </Button>
                 </Link>
               )}
+              <Link href="/certification">
+                <Button variant="outline" size="sm" data-testid="button-certification-nav">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Certification
+                </Button>
+              </Link>
               <Link href="/consultant">
                 <Button variant="outline" size="sm" data-testid="button-consultant-nav">
                   <MessageSquare className="h-4 w-4 mr-2" />
@@ -148,6 +155,10 @@ export default function Dashboard() {
                     Financial
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem onClick={() => navigate("/certification")} className="cursor-pointer">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Certification
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/consultant")} className="cursor-pointer">
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Ask Consultant

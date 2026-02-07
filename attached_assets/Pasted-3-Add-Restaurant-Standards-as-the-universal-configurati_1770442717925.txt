@@ -1,0 +1,292 @@
+3) Add “Restaurant Standards” as the universal configuration layer
+
+Why: Your training data is strong, but right now it’s hard-coded. Make it configurable.
+
+Build a Standards Editor UI
+
+In Replit, add a settings page where any operator can enter:
+
+A) Service Philosophy (short)
+	•	e.g., “Warm, fast, professional; never argue with guests.”
+
+B) Steps of Service
+	•	greeting timing (e.g., 30 seconds)
+	•	check-back timing (e.g., 2 minutes)
+	•	pre-bus expectations
+	•	payment flow
+
+C) Speed Targets
+	•	drinks/apps/entrées targets (optional by concept)
+
+D) Recovery Framework
+	•	e.g., HEAR/ROAR/LEAD or custom steps
+
+E) Alcohol Policy
+	•	ID rules, max drinks at a time, cut-off rules, manager escalation thresholds
+
+F) Safety/Sanitation Basics
+	•	top 10 rules you enforce (danger zone, chicken shelf, etc.)
+
+Save this as JSON per restaurant.
+
+Implementation
+	•	Store in DB (Supabase/SQLite/Postgres) or start simple with a JSON file + per-tenant key.
+	•	Add /api/standards endpoints: GET, POST, PUT.
+
+⸻
+
+4) Upgrade scenarios to be structured, not just text
+
+Right now scenarios are “wall of text.” Make them machine-readable so evaluation is consistent.
+
+Scenario JSON schema (universal)
+
+Each scenario should include:
+	•	context: shift, volume, staffing
+	•	tables: list of active tables with states
+	•	events: kitchen delay, cold dish, allergy note, intoxication signal, etc.
+	•	required_competencies: what this scenario is testing
+	•	operator_rules: pulled from restaurant standards
+
+Example competencies:
+	•	Prioritization
+	•	Guest communication
+	•	Recovery / escalation
+	•	Policy compliance (alcohol, allergy)
+	•	Teamwork & delegation
+	•	Time management
+
+Replit tasks
+	•	Create /api/scenarios that generates scenario JSON using the saved standards.
+
+⸻
+
+5) Split trainee input into “SAY” and “DO”
+
+In the UI, replace one textbox with:
+	1.	What you DO (sequence)
+
+	•	bullet list, step-by-step
+
+	2.	What you SAY (per table, verbatim)
+
+	•	Table 12:
+	•	Table 15:
+	•	Table 20:
+
+This will dramatically improve grading accuracy.
+
+Add a “Quick Template” button that inserts:
+	•	“DO:” numbered steps
+	•	“SAY:” table-by-table headers
+
+⸻
+
+6) Add a transparent rubric with weighted scoring
+
+This is the biggest improvement.
+
+Universal rubric categories (recommended)
+
+Use a 100-point model:
+	1.	Prioritization & Triage (25)
+
+	•	addresses highest-risk issue first
+	•	batches tasks efficiently
+	•	avoids “reactive pinballing”
+
+	2.	Guest Communication (25)
+
+	•	apology + ownership
+	•	clear expectations/timeframes
+	•	calm, respectful tone
+	•	no blaming kitchen/staff
+
+	3.	Recovery & Escalation (20)
+
+	•	correct fix offered
+	•	manager escalation when warranted
+	•	closes the loop
+
+	4.	Policy & Safety Compliance (20)
+
+	•	alcohol rules, allergy protocol, sanitation awareness
+	•	correct “don’t do” items
+
+	5.	Professionalism & Brand Fit (10)
+
+	•	warmth, confidence
+	•	aligns with restaurant style
+
+Scoring outputs
+
+Return:
+	•	Score per category
+	•	Total score
+	•	Pass/fail threshold configurable by operator (e.g., 85+ to pass)
+
+Replit tasks
+	•	Build /api/evaluate that takes:
+	•	scenario_json
+	•	trainee_response_do
+	•	trainee_response_say
+	•	standards_json
+	•	returns scores, notes, missed_critical, suggested_script
+
+⸻
+
+7) Add “Critical Errors” (auto-fail rules)
+
+Restaurants need bright lines. Make these universal but configurable.
+
+Examples:
+	•	fails to address food safety issue
+	•	serves alcohol to intoxicated guest
+	•	ignores allergy warning
+	•	argues with guest / hostile language
+	•	no-call/no-show behavior in policy scenario
+	•	suggests falsifying tips/time
+
+If any critical error triggers, the tool should show:
+	•	Auto-fail reason
+	•	Required remediation scenario(s)
+
+⸻
+
+8) Make coaching actionable and consistent (not generic)
+
+After evaluation, output:
+
+A) What you did well
+
+1–3 bullets, specific
+
+B) What you missed
+
+“Here’s what you should have done instead” with exact steps
+
+C) Script Upgrade
+
+Provide “better words” to say to each table (or guest) in that scenario.
+
+D) Remediation plan
+
+Assign 1–3 targeted drills:
+	•	“Delay expectation setting”
+	•	“Cold food recovery”
+	•	“Two-minute check-back discipline”
+
+Replit tasks
+	•	/api/coach produces a coaching card + next steps.
+
+⸻
+
+9) Add scenario tiers for Shadow → Perform → Certify
+
+Your UI already has phases; make them meaningful.
+
+Shadow Phase
+	•	Knowledge + judgment scenarios (text-based)
+	•	Lower difficulty, more guidance
+	•	“Show me the script”
+
+Perform Phase
+	•	Less guidance, more complexity
+	•	Adds interruptions (phone call, bar tickets, host seating)
+	•	More strict scoring
+
+Certify Phase
+	•	Requires “perfect compliance” on critical errors
+	•	Randomized scenarios
+	•	Must pass 3 in a row
+
+Replit tasks
+	•	Add difficulty parameter to scenario generation.
+	•	Store attempt history.
+
+⸻
+
+10) Track readiness over time (operator dashboard)
+
+Universal operators will want:
+	•	Who is ready?
+	•	What skills are weak across the team?
+	•	Who needs retraining?
+
+Build dashboard views
+	•	Trainee list with phase + last score + pass/fail
+	•	Skill heatmap (e.g., Recovery low, Policy high)
+	•	Auto-assign training plan
+
+⸻
+
+11) Use your training data as the default “baseline standards”
+
+From the content you provided, your baseline defaults can populate default_standards.json:
+	•	greeting within 30 sec
+	•	check-back within 2 minutes
+	•	ROAR prioritization
+	•	recovery script expectation
+	•	alcohol policy constraints
+	•	safety basics
+
+But the key is: operators can edit this. That makes it universal.
+
+⸻
+
+12) Implementation details for Replit (practical steps)
+	1.	Add a “Standards” page
+
+	•	form inputs
+	•	save JSON
+
+	2.	Replace freeform scenario text with Scenario JSON
+
+	•	render scenario nicely in the UI
+
+	3.	Refactor response input
+
+	•	DO + SAY inputs
+
+	4.	Build evaluation endpoint
+
+	•	rubric scoring
+	•	critical errors
+	•	coaching output
+
+	5.	Persist attempts
+
+	•	store scores and phase progress
+
+	6.	Add dashboard
+
+	•	readiness + heatmaps
+
+⸻
+
+13) Prompting strategy (keep it consistent)
+
+Inside /lib/prompt.ts, your evaluation prompt should always include:
+	•	The restaurant’s standards JSON
+	•	The scenario JSON
+	•	The rubric definition + weights
+	•	The trainee’s DO and SAY
+	•	Instructions to:
+	•	score per category
+	•	list critical errors (if any)
+	•	rewrite scripts for improvement
+	•	output strict JSON
+
+Even if you swap models, this stays stable.
+
+⸻
+
+14) Minimum viable upgrade (fastest high-impact)
+
+If you want the quickest improvement without building everything:
+	1.	Add Standards JSON (even if just one editable file)
+	2.	Split response into DO vs SAY
+	3.	Add Rubric scoring + critical errors
+	4.	Add coaching output with better scripts
+
+That alone turns this into a real certification tool.

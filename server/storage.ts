@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, restaurantStandards, certificationAttempts, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings, type RestaurantStandards, type CertificationAttempt, type InsertRestaurantStandards, type InsertCertificationAttempt } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -177,6 +177,20 @@ export interface IStorage {
   // Handbook Settings
   getHandbookSettings(userId: string): Promise<HandbookSettings | undefined>;
   upsertHandbookSettings(userId: string, data: Partial<InsertHandbookSettings>): Promise<HandbookSettings>;
+
+  // Restaurant Standards (Certification)
+  getRestaurantStandards(userId: string): Promise<RestaurantStandards[]>;
+  getActiveStandards(userId: string): Promise<RestaurantStandards | undefined>;
+  getRestaurantStandardsById(id: number): Promise<RestaurantStandards | undefined>;
+  createRestaurantStandards(data: InsertRestaurantStandards): Promise<RestaurantStandards>;
+  updateRestaurantStandards(id: number, userId: string, data: Partial<InsertRestaurantStandards>): Promise<RestaurantStandards | undefined>;
+  deleteRestaurantStandards(id: number, userId: string): Promise<void>;
+
+  // Certification Attempts
+  getCertificationAttempts(userId: string): Promise<CertificationAttempt[]>;
+  getCertificationAttemptsByTrainee(userId: string, traineeName: string): Promise<CertificationAttempt[]>;
+  createCertificationAttempt(data: InsertCertificationAttempt): Promise<CertificationAttempt>;
+  getCertificationStats(userId: string): Promise<{ totalAttempts: number; passed: number; failed: number; avgScore: number; byRole: Record<string, { attempts: number; passed: number; avgScore: number }>; byCategory: Record<string, number> }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1520,6 +1534,96 @@ export class DatabaseStorage implements IStorage {
       .where(eq(playbookAudits.id, id))
       .returning();
     return updated;
+  }
+
+  // Restaurant Standards (Certification)
+  async getRestaurantStandards(userId: string): Promise<RestaurantStandards[]> {
+    return await db.select().from(restaurantStandards)
+      .where(eq(restaurantStandards.userId, userId))
+      .orderBy(desc(restaurantStandards.createdAt));
+  }
+
+  async getActiveStandards(userId: string): Promise<RestaurantStandards | undefined> {
+    const results = await db.select().from(restaurantStandards)
+      .where(and(eq(restaurantStandards.userId, userId), eq(restaurantStandards.isActive, true)))
+      .limit(1);
+    return results[0];
+  }
+
+  async getRestaurantStandardsById(id: number): Promise<RestaurantStandards | undefined> {
+    const results = await db.select().from(restaurantStandards)
+      .where(eq(restaurantStandards.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createRestaurantStandards(data: InsertRestaurantStandards): Promise<RestaurantStandards> {
+    const [created] = await db.insert(restaurantStandards).values(data).returning();
+    return created;
+  }
+
+  async updateRestaurantStandards(id: number, userId: string, data: Partial<InsertRestaurantStandards>): Promise<RestaurantStandards | undefined> {
+    const [updated] = await db.update(restaurantStandards)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(restaurantStandards.id, id), eq(restaurantStandards.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteRestaurantStandards(id: number, userId: string): Promise<void> {
+    await db.delete(restaurantStandards)
+      .where(and(eq(restaurantStandards.id, id), eq(restaurantStandards.userId, userId)));
+  }
+
+  // Certification Attempts
+  async getCertificationAttempts(userId: string): Promise<CertificationAttempt[]> {
+    return await db.select().from(certificationAttempts)
+      .where(eq(certificationAttempts.userId, userId))
+      .orderBy(desc(certificationAttempts.createdAt));
+  }
+
+  async getCertificationAttemptsByTrainee(userId: string, traineeName: string): Promise<CertificationAttempt[]> {
+    return await db.select().from(certificationAttempts)
+      .where(and(eq(certificationAttempts.userId, userId), eq(certificationAttempts.traineeName, traineeName)))
+      .orderBy(desc(certificationAttempts.createdAt));
+  }
+
+  async createCertificationAttempt(data: InsertCertificationAttempt): Promise<CertificationAttempt> {
+    const [created] = await db.insert(certificationAttempts).values(data).returning();
+    return created;
+  }
+
+  async getCertificationStats(userId: string): Promise<{ totalAttempts: number; passed: number; failed: number; avgScore: number; byRole: Record<string, { attempts: number; passed: number; avgScore: number }>; byCategory: Record<string, number> }> {
+    const attempts = await db.select().from(certificationAttempts)
+      .where(eq(certificationAttempts.userId, userId));
+
+    const totalAttempts = attempts.length;
+    const passed = attempts.filter(a => a.passed === true).length;
+    const failed = attempts.filter(a => a.passed === false).length;
+    const scores = attempts.filter(a => a.totalScore !== null).map(a => a.totalScore!);
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length) : 0;
+
+    const byRole: Record<string, { attempts: number; passed: number; avgScore: number }> = {};
+    for (const attempt of attempts) {
+      if (!byRole[attempt.role]) {
+        byRole[attempt.role] = { attempts: 0, passed: 0, avgScore: 0 };
+      }
+      byRole[attempt.role].attempts++;
+      if (attempt.passed) byRole[attempt.role].passed++;
+    }
+    for (const role of Object.keys(byRole)) {
+      const roleAttempts = attempts.filter(a => a.role === role);
+      const roleScores = roleAttempts.filter(a => a.totalScore !== null).map(a => a.totalScore!);
+      byRole[role].avgScore = roleScores.length > 0 ? Math.round(roleScores.reduce((sum, s) => sum + s, 0) / roleScores.length) : 0;
+    }
+
+    const byCategory: Record<string, number> = {};
+    for (const attempt of attempts) {
+      const phase = attempt.phase;
+      byCategory[phase] = (byCategory[phase] || 0) + 1;
+    }
+
+    return { totalAttempts, passed, failed, avgScore, byRole, byCategory };
   }
 }
 
