@@ -79,13 +79,11 @@ export const socialMediaService = {
     pendingOAuthStates.set(state, { userId, timestamp: Date.now(), provider: 'meta' });
     const redirectUri = `${getBaseUrl()}/api/oauth/meta/callback`;
     
-    const scopes = 'pages_show_list,pages_read_engagement,pages_manage_posts';
-    
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
       `client_id=${META_APP_ID}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&state=${state}` +
-      `&scope=${scopes}` +
+      `&config_id=1387221869875164` +
       `&response_type=code`;
     
     return { authUrl, state };
