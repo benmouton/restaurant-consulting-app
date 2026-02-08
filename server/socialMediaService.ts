@@ -2,13 +2,15 @@ import { encrypt, decrypt } from './encryption';
 import { storage } from './storage';
 import crypto from 'crypto';
 import type { ConnectedAccount, InsertConnectedAccount } from '@shared/schema';
+import { oauthStates } from '@shared/schema';
+import { db } from './db';
+import { eq, lt } from 'drizzle-orm';
 
 const META_APP_ID = process.env.META_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
-const pendingOAuthStates = new Map<string, { userId: string; timestamp: number; provider: string }>();
 const STATE_EXPIRY_MS = 10 * 60 * 1000;
 
 function getBaseUrl(): string {
@@ -21,14 +23,9 @@ function getBaseUrl(): string {
   return 'http://localhost:5000';
 }
 
-function cleanupExpiredStates() {
-  const now = Date.now();
-  const entries = Array.from(pendingOAuthStates.entries());
-  for (const [state, data] of entries) {
-    if (now - data.timestamp > STATE_EXPIRY_MS) {
-      pendingOAuthStates.delete(state);
-    }
-  }
+async function cleanupExpiredStates() {
+  const expiryTime = new Date(Date.now() - STATE_EXPIRY_MS);
+  await db.delete(oauthStates).where(lt(oauthStates.createdAt, expiryTime));
 }
 
 export interface OAuthStartResult {
@@ -61,28 +58,35 @@ export interface GoogleLocation {
 }
 
 export const socialMediaService = {
-  // OAuth state management
-  validateAndConsumeState(state: string): { userId: string; provider: string } | null {
-    cleanupExpiredStates();
-    const data = pendingOAuthStates.get(state);
+  async validateAndConsumeState(state: string): Promise<{ userId: string; provider: string } | null> {
+    await cleanupExpiredStates();
+    const [data] = await db.select().from(oauthStates).where(eq(oauthStates.state, state));
     if (!data) {
       return null;
     }
-    pendingOAuthStates.delete(state);
+    await db.delete(oauthStates).where(eq(oauthStates.state, state));
     return { userId: data.userId, provider: data.provider };
   },
 
-  // Meta (Facebook + Instagram) OAuth
-  startMetaOAuth(userId: string): OAuthStartResult {
-    cleanupExpiredStates();
+  async startMetaOAuth(userId: string): Promise<OAuthStartResult> {
+    await cleanupExpiredStates();
     const state = crypto.randomBytes(32).toString('hex');
-    pendingOAuthStates.set(state, { userId, timestamp: Date.now(), provider: 'meta' });
+    await db.insert(oauthStates).values({ state, userId, provider: 'meta' });
     const redirectUri = `${getBaseUrl()}/api/oauth/meta/callback`;
+    
+    const scopes = [
+      'pages_show_list',
+      'pages_read_engagement',
+      'pages_manage_posts',
+      'instagram_basic',
+      'instagram_content_publish',
+    ].join(',');
     
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
       `client_id=${META_APP_ID}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&state=${state}` +
+      `&scope=${encodeURIComponent(scopes)}` +
       `&config_id=1387221869875164` +
       `&response_type=code`;
     
@@ -169,10 +173,10 @@ export const socialMediaService = {
   },
 
   // Google Business Profile OAuth
-  startGoogleOAuth(userId: string): OAuthStartResult {
-    cleanupExpiredStates();
+  async startGoogleOAuth(userId: string): Promise<OAuthStartResult> {
+    await cleanupExpiredStates();
     const state = crypto.randomBytes(32).toString('hex');
-    pendingOAuthStates.set(state, { userId, timestamp: Date.now(), provider: 'google' });
+    await db.insert(oauthStates).values({ state, userId, provider: 'google' });
     const redirectUri = `${getBaseUrl()}/api/oauth/google/callback`;
     
     const scopes = [

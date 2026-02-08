@@ -1956,7 +1956,7 @@ Generate JSON with:
   app.get("/api/oauth/meta/start", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { authUrl } = socialMediaService.startMetaOAuth(userId);
+      const { authUrl } = await socialMediaService.startMetaOAuth(userId);
       res.json({ authUrl });
     } catch (error) {
       console.error("Error starting Meta OAuth:", error);
@@ -1975,9 +1975,9 @@ Generate JSON with:
         return;
       }
 
-      const stateData = socialMediaService.validateAndConsumeState(state as string);
+      const stateData = await socialMediaService.validateAndConsumeState(state as string);
       if (!stateData || stateData.provider !== 'meta') {
-        console.error("Meta OAuth invalid state - state not found in pending map");
+        console.error("Meta OAuth invalid state - state not found in database");
         res.redirect("/domain/social-media?error=invalid_state");
         return;
       }
@@ -2040,7 +2040,7 @@ Generate JSON with:
   app.get("/api/oauth/google/start", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { authUrl } = socialMediaService.startGoogleOAuth(userId);
+      const { authUrl } = await socialMediaService.startGoogleOAuth(userId);
       res.json({ authUrl });
     } catch (error) {
       console.error("Error starting Google OAuth:", error);
@@ -2057,7 +2057,7 @@ Generate JSON with:
         return;
       }
 
-      const stateData = socialMediaService.validateAndConsumeState(state as string);
+      const stateData = await socialMediaService.validateAndConsumeState(state as string);
       if (!stateData || stateData.provider !== 'google') {
         res.redirect("/domain/social-media?error=invalid_state");
         return;

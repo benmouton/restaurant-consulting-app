@@ -761,3 +761,12 @@ export type RestaurantStandards = typeof restaurantStandards.$inferSelect;
 export type CertificationAttempt = typeof certificationAttempts.$inferSelect;
 export type InsertRestaurantStandards = z.infer<typeof insertRestaurantStandardsSchema>;
 export type InsertCertificationAttempt = z.infer<typeof insertCertificationAttemptSchema>;
+
+export const oauthStates = pgTable("oauth_states", {
+  state: text("state").primaryKey(),
+  userId: text("user_id").notNull(),
+  provider: text("provider").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type OAuthState = typeof oauthStates.$inferSelect;
