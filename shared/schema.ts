@@ -555,6 +555,11 @@ export const kitchenShiftData = pgTable("kitchen_shift_data", {
   whatWentWell: text("what_went_well"),
   whatSucked: text("what_sucked"),
   fixForTomorrow: text("fix_for_tomorrow"),
+  readinessInputs: jsonb("readiness_inputs"),
+  alertsInputs: jsonb("alerts_inputs"),
+  debriefStructured: jsonb("debrief_structured"),
+  scoreBreakdown: jsonb("score_breakdown"),
+  coachingFocus: text("coaching_focus"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

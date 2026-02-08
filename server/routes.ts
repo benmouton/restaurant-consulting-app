@@ -1012,15 +1012,28 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/kitchen-shifts/last-debrief", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const shifts = await storage.getKitchenShiftData(userId);
+      const lastWithDebrief = shifts.find((s: any) => s.debriefStructured || s.fixForTomorrow);
+      res.json(lastWithDebrief || null);
+    } catch (error: any) {
+      console.error('Error fetching last debrief:', error);
+      res.status(500).json({ message: "Failed to fetch last debrief" });
+    }
+  });
+
   // Save quick debrief
   app.post("/api/kitchen-shifts/debrief", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { shiftDate, daypart, whatWentWell, whatSucked, fixForTomorrow } = req.body;
+      const { shiftDate, daypart, whatWentWell, whatSucked, fixForTomorrow, debriefStructured } = req.body;
       const shift = await storage.saveKitchenDebrief(userId, shiftDate, daypart, {
         whatWentWell,
         whatSucked,
-        fixForTomorrow
+        fixForTomorrow,
+        debriefStructured
       });
       res.status(201).json(shift);
     } catch (error: any) {

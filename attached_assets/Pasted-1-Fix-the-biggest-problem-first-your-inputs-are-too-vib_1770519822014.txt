@@ -1,0 +1,168 @@
+1) Fix the biggest problem first: your inputs are too “vibe-based.”
+
+Across Readiness, Alerts, Debrief, and Coaching, you rely almost entirely on free-text boxes. That forces your AI to hedge (“assume…”, “unknown status…”) and makes your readiness score feel soft.
+
+Replace most big text boxes with fast structured inputs (clicks > typing)
+
+READINESS (pre-service) — make this a 45–60 second checklist:
+
+A. Prep
+	•	Prep signed off? → Yes / No
+	•	Time signed off → time picker
+	•	Station status (tap to set):
+	•	Sauté / Grill / Fry / Pantry / Expo → 🟢 🟡 🔴
+	•	Top 3 at-risk items → multi-select from your actual prep list
+
+B. Pars / 86 Risk
+	•	Any par shortages? → None / Minor / Severe
+	•	86 list → multi-select
+	•	“Next 60 min risk” → Low / Medium / High
+
+C. Staffing
+	•	Headcount vs plan → –2 / –1 / On plan / +1 / +2
+	•	Expo strength → Weak / OK / Strong
+	•	Weakest station today → dropdown
+
+D. Volume
+	•	Forecasted covers → number
+	•	Large parties? → Yes / No (size?)
+	•	To-go load → Low / Med / High
+
+👉 Keep one small notes box at the bottom — everything else should be buttons.
+
+⸻
+
+2) Make the Readiness Score explainable (so it’s actually trusted)
+
+Right now: “85/100” feels arbitrary.
+
+Instead, show this breakdown on screen:
+
+Kitchen Readiness Score: 85/100
+	•	Prep readiness: 24/30
+	•	Pars & 86 risk: 15/20
+	•	Staffing coverage: 16/20
+	•	Ticket-flow risk: 18/20
+	•	Line set & sanitation: 12/10
+
+Then — and this is the key part — show:
+
+Top 3 drivers that lowered the score
+	1.	Sauté marked 🟡
+	2.	Prep sign-off missing
+	3.	Large party at 7pm
+
+Top 3 fixes (+ point impact)
+	•	Move senior cook to sauté (+6)
+	•	Verify backup pars on proteins (+4)
+	•	Confirm expo runner coverage (+3)
+
+Now your AI is a coach, not a poet.
+
+⸻
+
+3) Turn “Alerts” into real-time decision support
+
+Your Alerts tab is still free text. Convert it into “if/then” style triggers.
+
+Collect:
+	•	Avg app time (mins)
+	•	Avg entrée time (mins)
+	•	Window holding food? → Yes / No
+	•	Current cover pace → Low / Medium / High
+	•	Bottleneck station → dropdown
+
+Then have the AI output something like:
+
+Service Alerts (Now)
+	•	Risk: Grill backing up
+	•	Action: Shift fry cook to grill support
+	•	Trigger: If entrées exceed 22 min for 10 minutes
+	•	86 risk: Shrimp — push chicken/sausage as default upsell
+
+This is what separates a toy from a tool.
+
+⸻
+
+4) Make the Quick Debrief actually feed tomorrow
+
+Right now it’s three nice boxes — but they disappear into the void.
+
+Add a simple structure behind it:
+
+After “Log Debrief”:
+	•	Store:
+	•	Bottleneck: (expo / sauté / grill / fry / prep / runners)
+	•	Root cause: (prep short / staffing / comms / equipment / menu)
+	•	One fix: (dropdown + owner + due time)
+
+Then — on the NEXT day’s Readiness screen — surface this:
+
+Carryover from last shift
+	•	“Yesterday: sauté ran out of compound butter (Owner: Prep, Due: 3:45pm)”
+
+That creates real accountability.
+
+⸻
+
+5) Make “Coaching” sharper — one behavior, one fix
+
+Your Coaching tab is good in spirit, but still too open.
+
+Change it to:
+
+Pick ONE to coach today:
+	•	Timing discipline
+	•	Callouts / heard backs
+	•	Station organization
+	•	Prep ownership
+	•	Expo communication
+
+Then AI outputs:
+	•	30-second talk track
+	•	One observable standard (“I expect two ‘heard’ confirmations per ticket”)
+	•	One drill for that station
+
+This keeps managers from trying to fix everything at once.
+
+⸻
+
+6) Your Presets are good — make them smarter
+
+Your preset list is strong. Make each one auto-fill risks:
+
+Example — Busy Friday Dinner auto-loads:
+	•	Covers: 140–180
+	•	Staffing: On plan
+	•	Sauté → 🟡 by default
+	•	“Next 60 min risk” → Medium
+	•	Suggested plan pre-written
+
+You’re basically building a library of battle plans.
+
+⸻
+
+7) Mobile usability fixes (small, high impact)
+	•	Move your tabs to a bottom bar:
+	•	Readiness | Alerts | Debrief | Coaching
+	•	Keep “Generate Score” sticky at the bottom while scrolling.
+	•	Put Preset selector higher (it’s too buried now).
+
+⸻
+
+8) If you want one “pro” upgrade: light POS + schedule inputs
+
+Even without full integration, add two simple fields:
+	•	Forecasted covers (number)
+	•	Cooks on the line (number)
+
+If you ever plug in Toast later, this module will get much smarter instantly.
+
+⸻
+
+If I were you — do this in order (fast wins):
+	1.	Convert Readiness to structured inputs
+	2.	Make the score explainable with a breakdown
+	3.	Add “Tonight’s Plan” after scoring
+	4.	Make Quick Debrief feed tomorrow’s Readiness
+	5.	Tighten Coaching to one behavior

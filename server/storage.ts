@@ -172,7 +172,7 @@ export interface IStorage {
   getRecentKitchenShifts(userId: string, dayOfWeek: string, daypart: string): Promise<KitchenShiftData[]>;
   saveKitchenShiftData(data: InsertKitchenShiftData): Promise<KitchenShiftData>;
   updateKitchenShiftData(id: number, userId: string, data: Partial<InsertKitchenShiftData>): Promise<KitchenShiftData | undefined>;
-  saveKitchenDebrief(userId: string, shiftDate: string, daypart: string, debrief: { whatWentWell?: string; whatSucked?: string; fixForTomorrow?: string }): Promise<KitchenShiftData>;
+  saveKitchenDebrief(userId: string, shiftDate: string, daypart: string, debrief: { whatWentWell?: string; whatSucked?: string; fixForTomorrow?: string; debriefStructured?: any }): Promise<KitchenShiftData>;
   
   // Handbook Settings
   getHandbookSettings(userId: string): Promise<HandbookSettings | undefined>;
@@ -1355,7 +1355,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async saveKitchenDebrief(userId: string, shiftDate: string, daypart: string, debrief: { whatWentWell?: string; whatSucked?: string; fixForTomorrow?: string }): Promise<KitchenShiftData> {
+  async saveKitchenDebrief(userId: string, shiftDate: string, daypart: string, debrief: { whatWentWell?: string; whatSucked?: string; fixForTomorrow?: string; debriefStructured?: any }): Promise<KitchenShiftData> {
     const dayOfWeek = new Date(shiftDate).toLocaleDateString('en-US', { weekday: 'long' });
     const existing = await this.getKitchenShiftByDate(userId, shiftDate, daypart);
     
@@ -1364,7 +1364,8 @@ export class DatabaseStorage implements IStorage {
         .set({
           whatWentWell: debrief.whatWentWell,
           whatSucked: debrief.whatSucked,
-          fixForTomorrow: debrief.fixForTomorrow
+          fixForTomorrow: debrief.fixForTomorrow,
+          debriefStructured: debrief.debriefStructured
         })
         .where(eq(kitchenShiftData.id, existing.id))
         .returning();
@@ -1378,7 +1379,8 @@ export class DatabaseStorage implements IStorage {
       daypart,
       whatWentWell: debrief.whatWentWell,
       whatSucked: debrief.whatSucked,
-      fixForTomorrow: debrief.fixForTomorrow
+      fixForTomorrow: debrief.fixForTomorrow,
+      debriefStructured: debrief.debriefStructured
     }).returning();
     return shift;
   }
