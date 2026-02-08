@@ -1,0 +1,135 @@
+it seems to allow ne to connect now, but when I go back to my app it still says connect now
+
+Good news: the Meta side is now working. That “Reconnect Ben Mouton…” screen means your OAuth flow is valid again.
+
+What’s broken now is almost always one of these two things on your app side:
+
+Your callback isn’t completing (code exchange / token save fails), or
+
+It completes, but your UI is checking the wrong place (cookie/session mismatch, wrong DB key, wrong tenant/domain, etc.)
+
+We’ll isolate it step-by-step.
+
+Step 1 — Click Reconnect, then watch the URL after it finishes
+
+After you click Reconnect, Facebook will redirect you back to your site.
+
+On the page you land on, look at the browser address bar and tell me which one you see:
+
+A) You land on something like:
+
+https://restaurantai.consulting/api/oauth/meta/callback?code=...&state=...
+
+or it flashes quickly then redirects.
+
+B) You land back on:
+
+https://restaurantai.consulting/domain/social-media?connected=meta
+
+C) You get an error page (even briefly)
+
+Reply with A / B / C.
+(If you can paste the final URL without the code parameter, even better.)
+
+Step 2 — Check the callback response (fast sanity check)
+
+In a new tab, open:
+
+https://restaurantai.consulting/api/oauth/meta/callback
+
+You should get NOT FOUND or “Method not allowed” (because it needs query params). That’s fine.
+
+But if you get something like 500 or Cloudflare error, that’s a sign your callback route is failing.
+
+Tell me what you get (just the status / message).
+
+Step 3 — Most common fix (do this now if you want)
+
+Right now your app screen shows:
+
+.../domain/social-media?connected=meta#_=_
+
+That #_=_ is a Facebook artifact and can mess with some “connected” checks if your frontend is reading the URL literally.
+
+Quick test:
+
+Click in your address bar
+
+Delete #_=_ (everything after the #)
+
+Press Enter to reload
+
+Does it still say “Connect now”?
+
+Why I’m asking these in this order
+
+If the redirect back to your site never includes a code=, then your OAuth URL is still wrong.
+If it does include code= but your app still says “Connect now,” your backend likely isn’t saving the token or your frontend isn’t seeing it.
+
+Your next reply
+
+Answer these three:
+
+After clicking Reconnect, do you end at A / B / C?
+
+What happens when you open /api/oauth/meta/callback directly?
+
+After removing #_=_ and reloading, does it still say “Connect now”?
+
+takes me back to this url:
+https://restaurantai.consulting/domain/social-media?connected=meta#_=_
+Thought for 12s
+
+Got it. That final URL is normal (Facebook adds #_=_), but it doesn’t prove your backend actually saved tokens.
+
+What we need to confirm is this:
+
+✅ Did Facebook hit your callback with a code=, and did your server successfully exchange it + store it?
+
+We’ll verify that in one clean step.
+
+Step 1 — Confirm your callback is being hit and contains code=
+Do this:
+
+Open a new tab to your app.
+
+Open DevTools → Network
+
+Chrome: View → Developer → Developer Tools → Network
+
+Check Preserve log
+
+Now click Connect / Reconnect again and complete the Facebook prompt.
+
+When you land back on
+.../domain/social-media?connected=meta#_=_
+look in the Network list for a request to:
+
+✅ /api/oauth/meta/callback
+
+Tell me exactly what you see for that request:
+
+Does the request URL include ?code=...&state=... ?
+
+What is the Status? (200 / 302 / 400 / 500)
+
+If it’s 302, what does it redirect to?
+
+(You don’t need to paste the full code value—just tell me if code= is present.)
+
+Why this matters
+
+If /api/oauth/meta/callback is not being hit, then your frontend is redirecting wrong.
+
+If it is being hit with code= but you still show “Connect now,” then your backend is failing at one of these:
+
+token exchange (bad META_APP_SECRET, mismatch redirect_uri, etc.)
+
+saving tokens to DB
+
+frontend “connected” check is looking in the wrong place
+
+Optional quick cleanup (won’t fix tokens, but cleans UI)
+
+After you land on the page, delete the #_=_ from the URL and reload.
+If it still says “Connect now,” that’s expected—just confirming.

@@ -1968,23 +1968,37 @@ Generate JSON with:
   app.get("/api/oauth/meta/callback", async (req: any, res) => {
     try {
       const { code, state } = req.query;
+      console.log("Meta OAuth callback received, code present:", !!code, "state present:", !!state);
       if (!code || !state) {
+        console.error("Meta OAuth callback missing params");
         res.redirect("/domain/social-media?error=missing_params");
         return;
       }
 
       const stateData = socialMediaService.validateAndConsumeState(state as string);
       if (!stateData || stateData.provider !== 'meta') {
+        console.error("Meta OAuth invalid state - state not found in pending map");
         res.redirect("/domain/social-media?error=invalid_state");
         return;
       }
       const userId = stateData.userId;
+      console.log("Meta OAuth state valid for user:", userId);
 
       const shortToken = await socialMediaService.exchangeMetaCode(code as string);
+      console.log("Meta OAuth short token obtained");
       const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
+      console.log("Meta OAuth long-lived token obtained");
       const pages = await socialMediaService.getFacebookPages(longToken.accessToken);
+      console.log("Meta OAuth pages found:", pages.length, pages.map(p => p.name));
+
+      if (pages.length === 0) {
+        console.warn("Meta OAuth: No pages returned. User may not have page admin access.");
+        res.redirect("/domain/social-media?error=no_pages");
+        return;
+      }
 
       for (const page of pages) {
+        console.log("Saving Facebook page:", page.name, page.id);
         await socialMediaService.saveConnectedAccount(
           userId,
           'facebook',
@@ -1998,6 +2012,7 @@ Generate JSON with:
         );
 
         const igAccounts = await socialMediaService.getInstagramAccounts(page.id, page.access_token);
+        console.log("Instagram accounts for page", page.name, ":", igAccounts.length);
         for (const ig of igAccounts) {
           await socialMediaService.saveConnectedAccount(
             userId,
@@ -2013,6 +2028,7 @@ Generate JSON with:
         }
       }
 
+      console.log("Meta OAuth completed successfully");
       res.redirect("/domain/social-media?connected=meta");
     } catch (error) {
       console.error("Meta OAuth callback error:", error);
