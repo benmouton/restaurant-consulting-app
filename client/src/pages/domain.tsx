@@ -834,25 +834,13 @@ function KitchenComplianceEngine() {
 
   const scoreData = calculateReadinessScore();
 
-  useEffect(() => {
-    if (mode === "readiness") {
-      setReadinessScore(scoreData.total);
-      if (scoreData.total >= 85) setReadinessLevel("green");
-      else if (scoreData.total >= 70) setReadinessLevel("yellow");
-      else if (scoreData.total >= 50) setReadinessLevel("red");
-      else setReadinessLevel("critical");
-    }
-  }, [
-    readinessInputs.prepSignedOff,
-    readinessInputs.prepSignOffTime,
-    readinessInputs.stations,
-    readinessInputs.parShortages,
-    readinessInputs.eightyShortages,
-    readinessInputs.headcount,
-    readinessInputs.forecastedCovers,
-    selectedDaypart,
-    mode,
-  ]);
+  const applyScore = (total: number) => {
+    setReadinessScore(total);
+    if (total >= 85) setReadinessLevel("green");
+    else if (total >= 70) setReadinessLevel("yellow");
+    else if (total >= 50) setReadinessLevel("red");
+    else setReadinessLevel("critical");
+  };
 
   const hydrateFromShift = (data: any) => {
     if (data.readinessInputs) {
@@ -1032,6 +1020,7 @@ function KitchenComplianceEngine() {
       let prompt = "";
 
       if (mode === "readiness") {
+        applyScore(scoreData.total);
         const stationStatus = stationList.map(s => `${s.label}: ${readinessInputs.stations[s.key] ? "Ready" : "NOT READY"}`).join(", ");
         prompt = `Generate a Kitchen Readiness Assessment.
 
