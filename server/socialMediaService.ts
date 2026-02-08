@@ -77,9 +77,6 @@ export const socialMediaService = {
     const scopes = [
       'pages_show_list',
       'pages_read_engagement',
-      'pages_manage_posts',
-      'instagram_basic',
-      'instagram_content_publish',
     ].join(',');
     
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
