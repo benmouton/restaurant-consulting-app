@@ -45,13 +45,13 @@ Preferred communication style: Simple, everyday language.
   - **Equipment Log**: Equipment registration and maintenance history.
   - **Vendor Directory**: Repair vendor rolodex with specialty filtering, ratings, 24/7 flags, favorites, and contact info.
   - **Issues Dashboard**: Active issues tracker with status management (open/in progress/waiting parts/resolved), stats cards, and resolution tracking.
-- **Kitchen Command Center**: Real-time kitchen readiness and execution engine with 5 tabs:
-  - **Readiness**: Pre-service readiness check with AI-generated score (Green/Yellow/Red/Critical), load-yesterday and load-last-week buttons, daypart presets (Normal lunch, Busy Friday, Large party, Holiday weekend), voice input for all fields.
-  - **Alerts**: During-service execution alerts for ticket timing and window delays.
-  - **Quick Debrief**: 60-second post-service capture (What went well, What sucked, One fix for tomorrow) with voice input and auto-save.
-  - **Full Debrief**: Comprehensive post-shift analysis with AI-generated system-level breakdown.
-  - **Coaching**: Single behavior coaching focus with AI-generated coaching script.
-  - Historical data persistence via `kitchen_shift_data` table for pattern detection and trend analysis.
+- **Kitchen Command Center**: Real-time kitchen readiness and execution engine with 5 tabs, structured data-driven inputs, and deterministic scoring:
+  - **Readiness**: Structured inputs (prep sign-off toggle + time, 5 station status toggles, par shortage tags, 86 list, headcount, forecasted covers, large party toggle). Deterministic scoring breakdown (Prep 30pts, Pars 20pts, Staffing 20pts, Ticket Flow 20pts, Line Set 10pts) with top improvement areas. Carryover from last shift's debrief. Load-yesterday/last-week buttons hydrate full structured data. Daypart presets auto-fill structured inputs.
+  - **Alerts**: Structured metrics (avg app/entrée times with standard references, window holding toggle, cover pace select, bottleneck station select) with color-coded status badges and AI decision support.
+  - **Quick Debrief**: 60-second capture with structured dropdowns (bottleneck station, root cause, fix owner, due by) plus voice-enabled text areas. Saves debriefStructured JSON for carryover.
+  - **Full Debrief**: Comprehensive post-shift analysis with free-text inputs and AI-generated system-level breakdown.
+  - **Coaching**: Single-behavior picker (target station + behavior select with 7 common options) generating AI talk track, observable standard, and verification drill.
+  - Historical data persistence via `kitchen_shift_data` table with JSONB columns (readiness_inputs, alerts_inputs, debrief_structured, score_breakdown, coaching_focus) for pattern detection and structured data recall.
 - **Living Playbooks**: SOP management system redesigned for actual restaurant adoption:
   - **Quick Checklist Mode**: Bullet points, voice dictation, photo upload (60-180 sec creation time).
   - **Step-by-Step Mode**: Numbered steps with decision points (3-8 min creation).
