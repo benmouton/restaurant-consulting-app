@@ -12,10 +12,13 @@ const pendingOAuthStates = new Map<string, { userId: string; timestamp: number; 
 const STATE_EXPIRY_MS = 10 * 60 * 1000;
 
 function getBaseUrl(): string {
-  if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
-    return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL;
   }
-  return process.env.BASE_URL || 'http://localhost:5000';
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  return 'http://localhost:5000';
 }
 
 function cleanupExpiredStates() {
