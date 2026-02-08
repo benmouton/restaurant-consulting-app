@@ -150,6 +150,31 @@ export default function SocialPostBuilder() {
 
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("connected");
+    const error = params.get("error");
+    if (connected) {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-media/accounts"] });
+      toast({ title: "Account Connected", description: `Your ${connected} account has been connected successfully.` });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        no_pages: "No Facebook Pages found. You must be an admin of at least one Facebook Page to connect.",
+        invalid_state: "Connection session expired. Please try again.",
+        oauth_failed: "Connection failed. Please try again.",
+        missing_params: "Connection was incomplete. Please try again.",
+      };
+      toast({
+        title: "Connection Failed",
+        description: errorMessages[error] || `Connection error: ${error}`,
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const generateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const response = await apiRequest("POST", "/api/social-media/generate-post", data);
@@ -401,7 +426,7 @@ export default function SocialPostBuilder() {
                     <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
                       <CheckCircle2 className="h-3 w-3 text-green-500" />
                       <span>{connectedAccounts.filter(a => a.status === 'active').length} account(s) connected</span>
-                      <Button variant="link" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-manage-accounts">
+                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-manage-accounts">
                         Manage
                       </Button>
                     </div>
@@ -410,7 +435,7 @@ export default function SocialPostBuilder() {
                     <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-amber-600">
                       <AlertCircle className="h-3 w-3" />
                       <span>No accounts connected.</span>
-                      <Button variant="link" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-connect-accounts">
+                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-connect-accounts">
                         Connect now
                       </Button>
                     </div>
