@@ -74,6 +74,13 @@ import {
   Mic,
   History,
   Share2,
+  Target,
+  Flame,
+  ThermometerSun,
+  Utensils,
+  XCircle,
+  CheckCircle2,
+  ArrowRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -655,14 +662,6 @@ function FoodCostCalculator() {
 function KitchenComplianceEngine() {
   const { toast } = useToast();
   const [mode, setMode] = useState<"readiness" | "alerts" | "debrief" | "coaching" | "quick-debrief">("readiness");
-  const [prepCompletion, setPrepCompletion] = useState<string>("");
-  const [wasteNotes, setWasteNotes] = useState<string>("");
-  const [ticketTimes, setTicketTimes] = useState<string>("");
-  const [windowDelays, setWindowDelays] = useState<string>("");
-  const [volumeStaffing, setVolumeStaffing] = useState<string>("");
-  const [managerNotes, setManagerNotes] = useState<string>("");
-  const [projectedCovers, setProjectedCovers] = useState<string>("");
-  const [staffCount, setStaffCount] = useState<string>("");
   const [analysis, setAnalysis] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -671,52 +670,225 @@ function KitchenComplianceEngine() {
   const [readinessLevel, setReadinessLevel] = useState<"green" | "yellow" | "red" | "critical" | null>(null);
   const [selectedDaypart, setSelectedDaypart] = useState<string>("dinner");
   const [selectedPreset, setSelectedPreset] = useState<string>("");
-  
-  // Quick debrief state
-  const [whatWentWell, setWhatWentWell] = useState<string>("");
-  const [whatSucked, setWhatSucked] = useState<string>("");
-  const [fixForTomorrow, setFixForTomorrow] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingField, setRecordingField] = useState<string | null>(null);
+
+  const [readinessInputs, setReadinessInputs] = useState({
+    prepSignedOff: false,
+    prepSignOffTime: "",
+    stations: { saute: true, grill: true, fry: true, pantry: true, expo: true } as Record<string, boolean>,
+    parShortages: [] as string[],
+    eightyShortages: "",
+    headcount: "",
+    forecastedCovers: "",
+    largeParty: false,
+    largePartySize: "",
+    largePartyTime: "",
+  });
+
+  const [alertsInputs, setAlertsInputs] = useState({
+    avgAppTime: "",
+    avgEntreeTime: "",
+    windowHolding: false,
+    coverPace: "",
+    bottleneckStation: "",
+    managerNotes: "",
+  });
+
+  const [debriefInputs, setDebriefInputs] = useState({
+    bottleneck: "",
+    rootCause: "",
+    fixOwner: "",
+    fixDueBy: "next-shift",
+    whatWentWell: "",
+    whatSucked: "",
+    fixForTomorrow: "",
+  });
+
+  const [coachingInputs, setCoachingInputs] = useState({
+    targetStation: "",
+    behavior: "",
+    customBehavior: "",
+  });
+
+  const [fullDebriefInputs, setFullDebriefInputs] = useState({
+    ticketTimes: "",
+    windowDelays: "",
+    prepIssues: "",
+    serviceWaste: "",
+    managerNotes: "",
+  });
+
+  const [parShortageInput, setParShortageInput] = useState("");
 
   const today = new Date();
   const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
   const shiftDate = today.toISOString().split('T')[0];
 
-  // Preset configurations
-  const daypartPresets: Record<string, { covers: string; staff: string; notes: string }> = {
-    "normal-weekday-lunch": { covers: "60-80", staff: "3 cooks, 2 prep", notes: "Standard lunch service" },
-    "normal-weekday-dinner": { covers: "80-100", staff: "4 cooks, 1 prep", notes: "Standard dinner service" },
-    "busy-friday-dinner": { covers: "140-160", staff: "5 cooks, 2 prep", notes: "High volume expected, ensure backup pars" },
-    "busy-saturday-dinner": { covers: "150-180", staff: "5 cooks, 2 prep", notes: "Peak volume, full backup pars required" },
-    "large-party": { covers: "150+", staff: "5 cooks, 2 prep", notes: "Large party expected - confirm timing with FOH" },
-    "holiday-weekend": { covers: "120-150", staff: "5 cooks, 2 prep", notes: "Holiday weekend - expect walk-in traffic" },
-    "slow-monday": { covers: "40-60", staff: "2 cooks, 1 prep", notes: "Lighter volume - opportunity for deep cleaning" },
+  const { data: lastDebrief } = useQuery<any>({
+    queryKey: ["/api/kitchen-shifts/last-debrief"],
+  });
+
+  const stationList = [
+    { key: "saute", label: "Saut\u00e9", icon: Flame },
+    { key: "grill", label: "Grill", icon: ThermometerSun },
+    { key: "fry", label: "Fry", icon: Utensils },
+    { key: "pantry", label: "Pantry", icon: Package },
+    { key: "expo", label: "Expo", icon: Target },
+  ];
+
+  const coachingBehaviors = [
+    "Not calling picks up",
+    "Slow station recovery",
+    "Not communicating timing",
+    "Mise en place breakdown",
+    "Not reading tickets ahead",
+    "Plating inconsistency",
+    "Not maintaining clean station",
+    "custom",
+  ];
+
+  const rootCauseOptions = [
+    { value: "prep-issue", label: "Prep issue" },
+    { value: "staffing-gap", label: "Staffing gap" },
+    { value: "communication", label: "Communication breakdown" },
+    { value: "equipment", label: "Equipment failure" },
+    { value: "volume-spike", label: "Volume spike" },
+    { value: "training-gap", label: "Training gap" },
+    { value: "other", label: "Other" },
+  ];
+
+  const daypartPresets: Record<string, { covers: string; headcount: string }> = {
+    "normal-weekday-lunch": { covers: "70", headcount: "5" },
+    "normal-weekday-dinner": { covers: "90", headcount: "5" },
+    "busy-friday-dinner": { covers: "150", headcount: "7" },
+    "busy-saturday-dinner": { covers: "165", headcount: "7" },
+    "large-party": { covers: "150", headcount: "7" },
+    "holiday-weekend": { covers: "135", headcount: "7" },
+    "slow-monday": { covers: "50", headcount: "3" },
   };
 
-  // Load historical data
+  const getServiceStartHour = () => {
+    if (selectedDaypart === "lunch") return 11;
+    if (selectedDaypart === "brunch") return 10;
+    return 17;
+  };
+
+  const calculateReadinessScore = () => {
+    let prep = 0;
+    if (readinessInputs.prepSignedOff) {
+      prep = 30;
+      if (readinessInputs.prepSignOffTime) {
+        const [h, m] = readinessInputs.prepSignOffTime.split(":").map(Number);
+        const signOffMinutes = h * 60 + m;
+        const serviceMinutes = getServiceStartHour() * 60;
+        const minutesBefore = serviceMinutes - signOffMinutes;
+        if (minutesBefore < 15) prep = 15;
+      }
+    }
+
+    const shortageCount = readinessInputs.parShortages.length;
+    const pars = Math.max(0, 20 - shortageCount * 5);
+
+    const hc = parseInt(readinessInputs.headcount) || 0;
+    const covers = parseInt(readinessInputs.forecastedCovers) || 0;
+    let staffing = 5;
+    if (hc > 0 && covers > 0) {
+      const ratio = covers / hc;
+      if (ratio <= 25) staffing = 20;
+      else if (ratio <= 30) staffing = 15;
+      else staffing = 5;
+    } else if (hc > 0) {
+      staffing = 15;
+    }
+
+    const stationsDown = Object.values(readinessInputs.stations).filter(v => !v).length;
+    const ticketFlow = Math.max(0, 20 - stationsDown * 4);
+
+    const eightySixItems = readinessInputs.eightyShortages.trim()
+      ? readinessInputs.eightyShortages.split(",").map(s => s.trim()).filter(Boolean).length
+      : 0;
+    const lineSet = Math.max(0, 10 - eightySixItems * 2);
+
+    const total = prep + pars + staffing + ticketFlow + lineSet;
+
+    const breakdown = { prep, pars, staffing, ticketFlow, lineSet };
+    const categories = [
+      { label: "Prep", score: prep, max: 30 },
+      { label: "Pars", score: pars, max: 20 },
+      { label: "Staffing", score: staffing, max: 20 },
+      { label: "Ticket Flow", score: ticketFlow, max: 20 },
+      { label: "Line Set", score: lineSet, max: 10 },
+    ];
+
+    const topDrivers = [...categories].sort((a, b) => b.score - a.score).slice(0, 3).map(c => c.label);
+
+    const topFixes = categories
+      .filter(c => c.score < c.max)
+      .map(c => ({ label: c.label, points: c.max - c.score }))
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 3);
+
+    return { total, breakdown, topDrivers, topFixes, categories };
+  };
+
+  const scoreData = calculateReadinessScore();
+
+  useEffect(() => {
+    if (mode === "readiness") {
+      setReadinessScore(scoreData.total);
+      if (scoreData.total >= 85) setReadinessLevel("green");
+      else if (scoreData.total >= 70) setReadinessLevel("yellow");
+      else if (scoreData.total >= 50) setReadinessLevel("red");
+      else setReadinessLevel("critical");
+    }
+  }, [
+    readinessInputs.prepSignedOff,
+    readinessInputs.prepSignOffTime,
+    readinessInputs.stations,
+    readinessInputs.parShortages,
+    readinessInputs.eightyShortages,
+    readinessInputs.headcount,
+    readinessInputs.forecastedCovers,
+    selectedDaypart,
+    mode,
+  ]);
+
+  const hydrateFromShift = (data: any) => {
+    if (data.readinessInputs) {
+      setReadinessInputs(prev => ({ ...prev, ...data.readinessInputs }));
+    } else {
+      setReadinessInputs(prev => ({
+        ...prev,
+        forecastedCovers: data.projectedCovers?.toString() || prev.forecastedCovers,
+        headcount: data.staffCount?.toString() || prev.headcount,
+      }));
+    }
+    if (data.alertsInputs) {
+      setAlertsInputs(prev => ({ ...prev, ...data.alertsInputs }));
+    }
+    if (data.debriefStructured) {
+      setDebriefInputs(prev => ({ ...prev, ...data.debriefStructured }));
+    }
+  };
+
   const loadYesterday = async () => {
     setIsLoadingHistory(true);
     try {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
-      
       const res = await fetch(`/api/kitchen-shifts/${yesterdayStr}/${selectedDaypart}`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         if (data) {
-          setPrepCompletion(data.prepCompletion || "");
-          setWasteNotes(data.wasteNotes || "");
-          setVolumeStaffing(data.volumeStaffing || `${data.projectedCovers || ""} covers, ${data.staffCount || ""} staff`);
-          setProjectedCovers(data.projectedCovers?.toString() || "");
-          setStaffCount(data.staffCount?.toString() || "");
+          hydrateFromShift(data);
           toast({ title: "Loaded yesterday's data" });
         } else {
           toast({ title: "No data from yesterday", variant: "destructive" });
         }
       }
-    } catch (error) {
+    } catch {
       toast({ title: "Failed to load historical data", variant: "destructive" });
     } finally {
       setIsLoadingHistory(false);
@@ -730,18 +902,13 @@ function KitchenComplianceEngine() {
       if (res.ok) {
         const shifts = await res.json();
         if (shifts && shifts.length > 0) {
-          const lastShift = shifts[0];
-          setPrepCompletion(lastShift.prepCompletion || "");
-          setWasteNotes(lastShift.wasteNotes || "");
-          setVolumeStaffing(`${lastShift.projectedCovers || ""} covers, ${lastShift.staffCount || ""} staff`);
-          setProjectedCovers(lastShift.projectedCovers?.toString() || "");
-          setStaffCount(lastShift.staffCount?.toString() || "");
+          hydrateFromShift(shifts[0]);
           toast({ title: `Loaded last ${dayOfWeek}'s data` });
         } else {
           toast({ title: `No data from last ${dayOfWeek}`, variant: "destructive" });
         }
       }
-    } catch (error) {
+    } catch {
       toast({ title: "Failed to load historical data", variant: "destructive" });
     } finally {
       setIsLoadingHistory(false);
@@ -751,354 +918,256 @@ function KitchenComplianceEngine() {
   const applyPreset = (presetKey: string) => {
     const preset = daypartPresets[presetKey];
     if (preset) {
-      // Extract numeric cover count from range (e.g., "60-80" -> 70)
-      const coverMatch = preset.covers.match(/(\d+)/);
-      const numCovers = coverMatch ? coverMatch[1] : preset.covers;
-      setProjectedCovers(numCovers);
-      
-      // Extract staff count from preset (e.g., "3 cooks, 2 prep" -> 5)
-      const staffMatch = preset.staff.match(/(\d+)/g);
-      if (staffMatch) {
-        const totalStaff = staffMatch.reduce((sum, n) => sum + parseInt(n), 0);
-        setStaffCount(totalStaff.toString());
-      }
-      
-      setVolumeStaffing(`${preset.covers} covers projected, ${preset.staff}`);
-      setManagerNotes(preset.notes);
+      setReadinessInputs(prev => ({
+        ...prev,
+        forecastedCovers: preset.covers,
+        headcount: preset.headcount,
+      }));
       setSelectedPreset(presetKey);
       toast({ title: "Preset applied" });
     }
   };
 
-  // Save current shift data
   const saveShiftData = async () => {
     setIsSaving(true);
     try {
-      // Parse numeric values from strings, handling ranges like "60-80"
-      const parseCovers = (val: string) => {
-        const match = val.match(/(\d+)/);
-        return match ? parseInt(match[1]) : null;
-      };
-      
-      await apiRequest("/api/kitchen-shifts", {
-        method: "POST",
-        body: JSON.stringify({
-          shiftDate,
-          dayOfWeek,
-          daypart: selectedDaypart,
-          projectedCovers: projectedCovers ? parseCovers(projectedCovers) : null,
-          staffCount: staffCount ? parseInt(staffCount) : null,
-          prepCompletion,
-          wasteNotes,
-          ticketTimes,
-          windowDelays,
-          managerNotes,
-          readinessScore,
-        }),
+      await apiRequest("POST", "/api/kitchen-shifts", {
+        shiftDate,
+        dayOfWeek,
+        daypart: selectedDaypart,
+        projectedCovers: readinessInputs.forecastedCovers ? parseInt(readinessInputs.forecastedCovers) : null,
+        staffCount: readinessInputs.headcount ? parseInt(readinessInputs.headcount) : null,
+        prepCompletion: readinessInputs.prepSignedOff ? `Signed off at ${readinessInputs.prepSignOffTime || "on time"}` : "Not signed off",
+        wasteNotes: readinessInputs.eightyShortages ? `86'd: ${readinessInputs.eightyShortages}` : "",
+        managerNotes: alertsInputs.managerNotes,
+        readinessScore: scoreData.total,
+        readinessInputs,
+        alertsInputs,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts"] });
       toast({ title: "Shift data saved" });
-    } catch (error) {
+    } catch {
       toast({ title: "Failed to save shift data", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Quick debrief save
   const saveQuickDebrief = async () => {
-    if (!whatWentWell && !whatSucked && !fixForTomorrow) {
+    if (!debriefInputs.whatWentWell && !debriefInputs.whatSucked && !debriefInputs.fixForTomorrow) {
       toast({ title: "Please fill in at least one field", variant: "destructive" });
       return;
     }
     setIsSaving(true);
     try {
-      await apiRequest("/api/kitchen-shifts/debrief", {
-        method: "POST",
-        body: JSON.stringify({
-          shiftDate,
-          dayOfWeek,
-          daypart: selectedDaypart,
-          whatWentWell,
-          whatSucked,
-          fixForTomorrow,
-        }),
+      await apiRequest("POST", "/api/kitchen-shifts/debrief", {
+        shiftDate,
+        dayOfWeek,
+        daypart: selectedDaypart,
+        whatWentWell: debriefInputs.whatWentWell,
+        whatSucked: debriefInputs.whatSucked,
+        fixForTomorrow: debriefInputs.fixForTomorrow,
+        debriefStructured: {
+          bottleneck: debriefInputs.bottleneck,
+          rootCause: debriefInputs.rootCause,
+          fixOwner: debriefInputs.fixOwner,
+          fixDueBy: debriefInputs.fixDueBy,
+        },
       });
       queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts/last-debrief"] });
       toast({ title: "Debrief saved! Great work." });
-      setWhatWentWell("");
-      setWhatSucked("");
-      setFixForTomorrow("");
-    } catch (error) {
+      setDebriefInputs({
+        bottleneck: "",
+        rootCause: "",
+        fixOwner: "",
+        fixDueBy: "next-shift",
+        whatWentWell: "",
+        whatSucked: "",
+        fixForTomorrow: "",
+      });
+    } catch {
       toast({ title: "Failed to save debrief", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Voice input support
   const startVoiceInput = (field: string) => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       toast({ title: "Voice input not supported in this browser", variant: "destructive" });
       return;
     }
-
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
-
     setIsRecording(true);
     setRecordingField(field);
-
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       switch (field) {
-        case "prep": setPrepCompletion(prev => prev + " " + transcript); break;
-        case "waste": setWasteNotes(prev => prev + " " + transcript); break;
-        case "tickets": setTicketTimes(prev => prev + " " + transcript); break;
-        case "window": setWindowDelays(prev => prev + " " + transcript); break;
-        case "manager": setManagerNotes(prev => prev + " " + transcript); break;
-        case "wellDone": setWhatWentWell(prev => prev + " " + transcript); break;
-        case "sucked": setWhatSucked(prev => prev + " " + transcript); break;
-        case "fix": setFixForTomorrow(prev => prev + " " + transcript); break;
+        case "wellDone": setDebriefInputs(prev => ({ ...prev, whatWentWell: prev.whatWentWell + " " + transcript })); break;
+        case "sucked": setDebriefInputs(prev => ({ ...prev, whatSucked: prev.whatSucked + " " + transcript })); break;
+        case "fix": setDebriefInputs(prev => ({ ...prev, fixForTomorrow: prev.fixForTomorrow + " " + transcript })); break;
+        case "managerNotes": setAlertsInputs(prev => ({ ...prev, managerNotes: prev.managerNotes + " " + transcript })); break;
+        case "fullTickets": setFullDebriefInputs(prev => ({ ...prev, ticketTimes: prev.ticketTimes + " " + transcript })); break;
+        case "fullWindow": setFullDebriefInputs(prev => ({ ...prev, windowDelays: prev.windowDelays + " " + transcript })); break;
+        case "fullPrep": setFullDebriefInputs(prev => ({ ...prev, prepIssues: prev.prepIssues + " " + transcript })); break;
+        case "fullWaste": setFullDebriefInputs(prev => ({ ...prev, serviceWaste: prev.serviceWaste + " " + transcript })); break;
+        case "fullManager": setFullDebriefInputs(prev => ({ ...prev, managerNotes: prev.managerNotes + " " + transcript })); break;
       }
       toast({ title: "Voice captured" });
     };
-
-    recognition.onerror = () => {
-      toast({ title: "Voice recognition failed", variant: "destructive" });
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-      setRecordingField(null);
-    };
-
+    recognition.onerror = () => { toast({ title: "Voice recognition failed", variant: "destructive" }); };
+    recognition.onend = () => { setIsRecording(false); setRecordingField(null); };
     recognition.start();
-  };
-
-  // Parse readiness score from AI response
-  const parseReadinessScore = (text: string) => {
-    const match = text.match(/KITCHEN READINESS SCORE:\s*\[?(\d+)/i);
-    if (match) {
-      const score = parseInt(match[1]);
-      setReadinessScore(score);
-      if (score >= 85) setReadinessLevel("green");
-      else if (score >= 70) setReadinessLevel("yellow");
-      else if (score >= 50) setReadinessLevel("red");
-      else setReadinessLevel("critical");
-    }
   };
 
   const generateAnalysis = async () => {
     setIsGenerating(true);
     setAnalysis("");
-
     try {
       let prompt = "";
-      
+
       if (mode === "readiness") {
-        prompt = `Generate a Kitchen Readiness Score for pre-service assessment.
+        const stationStatus = stationList.map(s => `${s.label}: ${readinessInputs.stations[s.key] ? "Ready" : "NOT READY"}`).join(", ");
+        prompt = `Generate a Kitchen Readiness Assessment.
 
-PREP COMPLETION STATUS:
-${prepCompletion || "Not specified"}
+DETERMINISTIC SCORE: ${scoreData.total}/100
+Breakdown: Prep ${scoreData.breakdown.prep}/30, Pars ${scoreData.breakdown.pars}/20, Staffing ${scoreData.breakdown.staffing}/20, Ticket Flow ${scoreData.breakdown.ticketFlow}/20, Line Set ${scoreData.breakdown.lineSet}/10
 
-WASTE LOG TRENDS:
-${wasteNotes || "No waste issues noted"}
+STRUCTURED DATA:
+- Prep signed off: ${readinessInputs.prepSignedOff ? `Yes at ${readinessInputs.prepSignOffTime || "on time"}` : "No"}
+- Station Status: ${stationStatus}
+- Par shortages: ${readinessInputs.parShortages.length > 0 ? readinessInputs.parShortages.join(", ") : "None"}
+- 86'd items: ${readinessInputs.eightyShortages || "None"}
+- BOH headcount: ${readinessInputs.headcount || "Not set"}
+- Forecasted covers: ${readinessInputs.forecastedCovers || "Not set"}
+${readinessInputs.largeParty ? `- Large party: ${readinessInputs.largePartySize} at ${readinessInputs.largePartyTime}` : ""}
 
-VOLUME VS STAFFING:
-${volumeStaffing || "Standard"}
+Top improvement areas: ${scoreData.topFixes.map(f => `${f.label} (+${f.points} pts)`).join(", ") || "None"}
 
-MANAGER NOTES:
-${managerNotes || "None"}
+Based on this data, provide:
 
-Analyze and produce a structured readiness assessment:
-
-KITCHEN READINESS SCORE: [XX/100]
-
-Based on:
-• Prep completion timing and quality
-• Par level accuracy
-• Waste pattern analysis
-• Staffing vs projected volume
+KITCHEN READINESS SCORE: [${scoreData.total}/100]
 
 RISK FACTORS:
-• [Flag specific risks before doors open]
-• [Identify stations at risk]
-• [Note any repeating patterns]
-
-STATION-BY-STATION CHECK:
-□ Grill: [status]
-□ Sauté: [status]
-□ Pantry/Cold: [status]
-□ Fry: [status]
-□ Expo: [status]
+- [Flag specific risks]
 
 PRE-SERVICE ACTIONS REQUIRED:
 1. [Immediate priority]
 2. [Secondary priority]
-3. [Watch items]
 
 KM BRIEFING POINTS:
-[2-3 specific messages for the team based on risk areas]
+[2-3 messages for the team]
 
 Flag risks before they become service failures.`;
       } else if (mode === "alerts") {
-        prompt = `Generate Service Execution Alerts based on during-service observations.
+        const appTime = parseInt(alertsInputs.avgAppTime) || 0;
+        const entreeTime = parseInt(alertsInputs.avgEntreeTime) || 0;
+        prompt = `Generate Service Execution Alerts.
 
-TICKET TIMING DATA:
-${ticketTimes || "Not specified"}
+STRUCTURED METRICS:
+- Avg appetizer time: ${appTime > 0 ? `${appTime} min` : "Not tracked"} (standard: 8-10 min)
+- Avg entr\u00e9e time: ${entreeTime > 0 ? `${entreeTime} min` : "Not tracked"} (standard: 15-18 min)
+- Window holding: ${alertsInputs.windowHolding ? "YES - food sitting" : "No"}
+- Cover pace: ${alertsInputs.coverPace || "Not set"}
+- Bottleneck station: ${alertsInputs.bottleneckStation || "None identified"}
+- Manager notes: ${alertsInputs.managerNotes || "None"}
 
-WINDOW/EXPO DELAYS:
-${windowDelays || "None noted"}
-
-VOLUME VS STAFFING:
-${volumeStaffing || "Standard"}
-
-MANAGER NOTES:
-${managerNotes || "None"}
-
-Standards for reference:
-• Appetizers: 8–10 minutes
-• Entrées: 15–18 minutes after apps clear
-• Desserts: 6–8 minutes
-• Window dwell max: 90 seconds
-
-Generate real-time style alerts:
+Generate real-time alerts:
 
 ACTIVE ALERTS:
-
-[CRITICAL] Immediate action required:
-[e.g., "Entrée tickets exceeding 18 minutes. Check grill station pacing."]
-
-[WARNING] Monitor closely:
-[e.g., "Window dwell approaching 90 seconds on 3 tickets. Call runners."]
-
-[ON TRACK]:
-[What's working well]
+[CRITICAL] / [WARNING] / [ON TRACK] based on the metrics above.
 
 BOTTLENECK ANALYSIS:
-• Primary bottleneck: [station/position]
-• Root cause: [system issue, not person]
-• Immediate fix: [specific action]
-
-EXPO COMMUNICATION CHECK:
-• Are "heard" calls happening? [Yes/No/Partial]
-• Are "walking" calls clear? [Yes/No/Partial]
-• Are "pick up" calls timely? [Yes/No/Partial]
+- Primary bottleneck and root cause
+- Immediate fix
 
 RUNNER DEPLOYMENT:
-[Recommendation for runner positioning based on flow]
-
-These are real-time corrections, not post-shift analysis.`;
+[Recommendation based on flow]`;
       } else if (mode === "debrief") {
-        prompt = `Generate a Post-Shift KM Debrief based on service performance.
+        const quickDebriefContext = debriefInputs.bottleneck || debriefInputs.rootCause
+          ? `\nQUICK DEBRIEF DATA:\n- Bottleneck: ${debriefInputs.bottleneck || "Not set"}\n- Root cause: ${debriefInputs.rootCause || "Not set"}\n- Fix owner: ${debriefInputs.fixOwner || "Not set"}\n- What went well: ${debriefInputs.whatWentWell || "Not captured"}\n- What sucked: ${debriefInputs.whatSucked || "Not captured"}\n- Fix for tomorrow: ${debriefInputs.fixForTomorrow || "Not captured"}\n`
+          : "";
+        prompt = `Generate a Post-Shift KM Debrief.
 
 TICKET TIMING OBSERVATIONS:
-${ticketTimes || "Not specified"}
+${fullDebriefInputs.ticketTimes || "Not specified"}
 
 WINDOW/EXPO ISSUES:
-${windowDelays || "None noted"}
+${fullDebriefInputs.windowDelays || "None noted"}
 
 PREP ISSUES DISCOVERED:
-${prepCompletion || "None"}
+${fullDebriefInputs.prepIssues || "None"}
 
 WASTE DURING SERVICE:
-${wasteNotes || "None noted"}
-
-VOLUME VS STAFFING:
-${volumeStaffing || "Standard"}
+${fullDebriefInputs.serviceWaste || "None noted"}
 
 MANAGER NOTES:
-${managerNotes || "None"}
-
+${fullDebriefInputs.managerNotes || "None"}
+${quickDebriefContext}
 Generate a structured KM debrief:
 
 SERVICE SUMMARY:
-[Overall assessment - 2-3 sentences]
+[Overall assessment]
 
 WHAT BROKE:
 1. [Primary breakdown]
 2. [Secondary breakdown]
-3. [Third issue if applicable]
 
-WHY IT BROKE (System-Level Analysis):
-• [Root cause 1 - focus on system, not person]
-• [Root cause 2]
-• [Root cause 3]
+WHY IT BROKE (System-Level):
+- [Root causes]
 
 WHAT TO FIX TOMORROW:
-□ [Specific prep adjustment]
-□ [Staffing/positioning change]
-□ [Communication improvement]
-□ [Equipment or par level fix]
-
-TOP BREAKDOWN DETAIL:
-• Issue: [specific description]
-• Root Cause: [system-level why]
-• Fix: [concrete action for next shift]
+- [Specific actions]
 
 PATTERN WATCH:
-[Any issues that have occurred multiple shifts - flag for system redesign]
+[Recurring issues]
 
-DOCUMENTATION REQUIRED:
-[Any incidents that need formal documentation]
+Focus on systems, not personalities.`;
+      } else if (mode === "coaching") {
+        const behaviorText = coachingInputs.behavior === "custom" ? coachingInputs.customBehavior : coachingInputs.behavior;
+        prompt = `Generate a BOH Coaching Focus recommendation.
 
-Focus on systems, not personalities. If the same issue repeats, redesign first.`;
-      } else {
-        prompt = `Generate a BOH Coaching Focus recommendation based on service observations.
+TARGET STATION: ${coachingInputs.targetStation || "Not specified"}
+BEHAVIOR TO COACH: ${behaviorText || "Not specified"}
 
-TICKET TIMING DATA:
-${ticketTimes || "Not specified"}
-
-WINDOW/EXPO ISSUES:
-${windowDelays || "None noted"}
-
-MANAGER NOTES:
-${managerNotes || "None"}
-
-Identify ONE specific coaching focus to prevent scattershot corrections:
+Generate ONE specific coaching focus:
 
 BOH COACHING FOCUS
 
-TARGET: [Station or Position]
+TARGET: ${coachingInputs.targetStation || "[Station]"}
 
 BEHAVIOR TO COACH:
-[Specific, observable behavior - not attitude or effort]
+${behaviorText || "[Behavior]"}
 
-STANDARD BEING MISSED:
-[What should happen instead]
-
-EVIDENCE:
-[Specific observations that support this focus]
-• [Example 1]
-• [Example 2]
-
-COACHING SCRIPT:
+TALK TRACK:
 "Hey, can I grab you for a second?"
-
 [Opening - acknowledge the work]
-
 [Specific observation - no accusations]
-
-[Standard reminder - what we need]
-
+[Standard reminder]
 [Commitment ask]
+[Close]
 
-[Close - back to work]
+OBSERVABLE STANDARD:
+[What correct behavior looks like]
 
-WHY THIS MATTERS:
-[Connect to guest experience or team impact]
-
-VERIFICATION:
+VERIFICATION DRILL:
 [How to check if coaching worked next shift]
 
-DO NOT COACH:
-[Other issues to ignore for now - one focus at a time]
-
 One behavior. One conversation. Consistent follow-up.`;
+      } else {
+        prompt = `Generate a quick debrief summary.
+What went well: ${debriefInputs.whatWentWell || "Not specified"}
+What sucked: ${debriefInputs.whatSucked || "Not specified"}
+Fix for tomorrow: ${debriefInputs.fixForTomorrow || "Not specified"}
+Bottleneck: ${debriefInputs.bottleneck || "Not specified"}
+Root cause: ${debriefInputs.rootCause || "Not specified"}
+
+Provide actionable summary and follow-up plan.`;
       }
 
       const res = await fetch("/api/consultant/ask", {
@@ -1118,30 +1187,24 @@ One behavior. One conversation. Consistent follow-up.`;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
           for (const line of lines) {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 content += data.content;
                 setAnalysis(content);
-                if (mode === "readiness") {
-                  parseReadinessScore(content);
-                }
               }
             } catch {}
           }
         }
       }
-      
-      // Auto-save shift data after generating analysis
+
       if (mode === "readiness") {
         await saveShiftData();
       }
-    } catch (err) {
+    } catch {
       toast({ title: "Failed to generate analysis", variant: "destructive" });
     } finally {
       setIsGenerating(false);
@@ -1158,7 +1221,7 @@ One behavior. One conversation. Consistent follow-up.`;
     alerts: "Service Alerts",
     debrief: "KM Debrief",
     coaching: "Coaching Focus",
-    "quick-debrief": "Quick Debrief"
+    "quick-debrief": "Quick Debrief",
   };
 
   const VoiceButton = ({ field, label }: { field: string; label: string }) => (
@@ -1175,6 +1238,37 @@ One behavior. One conversation. Consistent follow-up.`;
     </Button>
   );
 
+  const addParShortage = () => {
+    const items = parShortageInput.split(",").map(s => s.trim()).filter(Boolean);
+    if (items.length > 0) {
+      setReadinessInputs(prev => ({
+        ...prev,
+        parShortages: [...prev.parShortages, ...items],
+      }));
+      setParShortageInput("");
+    }
+  };
+
+  const removeParShortage = (idx: number) => {
+    setReadinessInputs(prev => ({
+      ...prev,
+      parShortages: prev.parShortages.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const getScoreBarColor = (score: number, max: number) => {
+    const pct = (score / max) * 100;
+    if (pct >= 80) return "bg-green-500";
+    if (pct >= 50) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
+  const getAlertBadge = (value: number, low: number, high: number, label: string) => {
+    if (value === 0) return <Badge variant="outline" data-testid={`badge-${label}`}>{label}: --</Badge>;
+    if (value >= low && value <= high) return <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30" data-testid={`badge-${label}`}><CheckCircle2 className="h-3 w-3 mr-1" />{label}: {value}m</Badge>;
+    return <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30" data-testid={`badge-${label}`}><AlertTriangle className="h-3 w-3 mr-1" />{label}: {value}m</Badge>;
+  };
+
   return (
     <Card className="mb-8">
       <CardHeader>
@@ -1187,8 +1281,7 @@ One behavior. One conversation. Consistent follow-up.`;
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Readiness Score Gauge - shows when score is available */}
-        {readinessScore !== null && readinessLevel && (
+        {readinessScore !== null && readinessLevel && mode === "readiness" && (
           <div className={`p-4 rounded-lg border-2 ${
             readinessLevel === "green" ? "border-green-500 bg-green-500/10" :
             readinessLevel === "yellow" ? "border-yellow-500 bg-yellow-500/10" :
@@ -1202,7 +1295,7 @@ One behavior. One conversation. Consistent follow-up.`;
                   readinessLevel === "yellow" ? "text-yellow-600 dark:text-yellow-400" :
                   readinessLevel === "red" ? "text-red-600 dark:text-red-400" :
                   "text-red-700 dark:text-red-300"
-                }`}>
+                }`} data-testid="text-readiness-score">
                   {readinessScore}/100
                 </div>
                 <div>
@@ -1211,7 +1304,7 @@ One behavior. One conversation. Consistent follow-up.`;
                     readinessLevel === "yellow" ? "text-yellow-700 dark:text-yellow-300" :
                     readinessLevel === "red" ? "text-red-700 dark:text-red-300" :
                     "text-red-800 dark:text-red-200"
-                  }`}>
+                  }`} data-testid="text-readiness-level">
                     {readinessLevel === "green" ? "Ready - Go crush it!" :
                      readinessLevel === "yellow" ? "Manageable - Address issues" :
                      readinessLevel === "red" ? "At Risk - Immediate action needed" :
@@ -1221,7 +1314,7 @@ One behavior. One conversation. Consistent follow-up.`;
                 </div>
               </div>
               <div className="w-full md:w-48 h-3 bg-secondary rounded-full overflow-hidden">
-                <div 
+                <div
                   className={`h-full transition-all duration-500 ${
                     readinessLevel === "green" ? "bg-green-500" :
                     readinessLevel === "yellow" ? "bg-yellow-500" :
@@ -1237,14 +1330,29 @@ One behavior. One conversation. Consistent follow-up.`;
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="readiness" data-testid="tab-readiness">Readiness</TabsTrigger>
-            <TabsTrigger value="alerts" data-testid="tab-alerts">Alerts</TabsTrigger>
-            <TabsTrigger value="quick-debrief" data-testid="tab-quick-debrief">Quick Debrief</TabsTrigger>
-            <TabsTrigger value="debrief" data-testid="tab-debrief">Full Debrief</TabsTrigger>
-            <TabsTrigger value="coaching" data-testid="tab-coaching">Coaching</TabsTrigger>
+            <TabsTrigger value="readiness" data-testid="tab-readiness" className="text-xs sm:text-sm">Readiness</TabsTrigger>
+            <TabsTrigger value="alerts" data-testid="tab-alerts" className="text-xs sm:text-sm">Alerts</TabsTrigger>
+            <TabsTrigger value="quick-debrief" data-testid="tab-quick-debrief" className="text-xs sm:text-sm">Quick</TabsTrigger>
+            <TabsTrigger value="debrief" data-testid="tab-debrief" className="text-xs sm:text-sm">Debrief</TabsTrigger>
+            <TabsTrigger value="coaching" data-testid="tab-coaching" className="text-xs sm:text-sm">Coach</TabsTrigger>
           </TabsList>
 
           <TabsContent value="readiness" className="space-y-4 mt-4">
+            {lastDebrief && (lastDebrief.fixForTomorrow || lastDebrief.debriefStructured?.fixForTomorrow) && (
+              <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/5">
+                <div className="flex items-start gap-2">
+                  <ArrowRight className="h-4 w-4 mt-0.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Last shift's fix</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-last-debrief-fix">
+                      {lastDebrief.debriefStructured?.fixForTomorrow || lastDebrief.fixForTomorrow}
+                      {(lastDebrief.debriefStructured?.fixOwner) && <span> &mdash; Owner: {lastDebrief.debriefStructured.fixOwner}</span>}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground">Pre-service readiness check. Are we actually prepared?</p>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1258,30 +1366,17 @@ One behavior. One conversation. Consistent follow-up.`;
                     <SelectItem value="brunch">Brunch</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={loadYesterday}
-                  disabled={isLoadingHistory}
-                  data-testid="btn-load-yesterday"
-                >
+                <Button variant="outline" size="sm" onClick={loadYesterday} disabled={isLoadingHistory} data-testid="btn-load-yesterday">
                   {isLoadingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4 mr-1" />}
                   Yesterday
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={loadLastWeek}
-                  disabled={isLoadingHistory}
-                  data-testid="btn-load-last-week"
-                >
+                <Button variant="outline" size="sm" onClick={loadLastWeek} disabled={isLoadingHistory} data-testid="btn-load-last-week">
                   {isLoadingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4 mr-1" />}
                   Last {dayOfWeek}
                 </Button>
               </div>
             </div>
 
-            {/* Quick Presets */}
             <div>
               <Label>Quick Preset</Label>
               <Select value={selectedPreset} onValueChange={applyPreset}>
@@ -1301,83 +1396,327 @@ One behavior. One conversation. Consistent follow-up.`;
             </div>
 
             <div>
-              <div className="flex items-center">
-                <Label htmlFor="prepCompletion">Prep Completion Status</Label>
-                <VoiceButton field="prep" label="Dictate prep status" />
+              <Label className="mb-1 block">Prep Sign-Off</Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant={readinessInputs.prepSignedOff ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setReadinessInputs(prev => ({ ...prev, prepSignedOff: true }))}
+                  data-testid="btn-prep-yes"
+                >
+                  <Check className="h-4 w-4 mr-1" /> Yes
+                </Button>
+                <Button
+                  variant={!readinessInputs.prepSignedOff ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setReadinessInputs(prev => ({ ...prev, prepSignedOff: false, prepSignOffTime: "" }))}
+                  data-testid="btn-prep-no"
+                >
+                  <XCircle className="h-4 w-4 mr-1" /> No
+                </Button>
+                {readinessInputs.prepSignedOff && (
+                  <Input
+                    type="time"
+                    className="w-36"
+                    value={readinessInputs.prepSignOffTime}
+                    onChange={(e) => setReadinessInputs(prev => ({ ...prev, prepSignOffTime: e.target.value }))}
+                    data-testid="input-prep-time"
+                  />
+                )}
               </div>
-              <Textarea
-                id="prepCompletion"
-                placeholder="e.g., Prep signed off at 4:45 (15 min late), protein par adjusted down yesterday, sauté station behind on mise..."
-                className="mt-1 min-h-[80px]"
-                value={prepCompletion}
-                onChange={(e) => setPrepCompletion(e.target.value)}
-                data-testid="input-prep-completion"
+            </div>
+
+            <div>
+              <Label className="mb-1 block">Station Status</Label>
+              <div className="flex flex-wrap gap-2">
+                {stationList.map(station => {
+                  const isReady = readinessInputs.stations[station.key];
+                  const Icon = station.icon;
+                  return (
+                    <Button
+                      key={station.key}
+                      variant={isReady ? "default" : "outline"}
+                      size="sm"
+                      className={isReady ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                      onClick={() => setReadinessInputs(prev => ({
+                        ...prev,
+                        stations: { ...prev.stations, [station.key]: !prev.stations[station.key] },
+                      }))}
+                      data-testid={`btn-station-${station.key}`}
+                    >
+                      <Icon className="h-4 w-4 mr-1" />
+                      {station.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-1 block">Par Shortages</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Item(s) short, comma-separated"
+                  value={parShortageInput}
+                  onChange={(e) => setParShortageInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addParShortage(); } }}
+                  data-testid="input-par-shortage"
+                />
+                <Button variant="outline" size="sm" onClick={addParShortage} data-testid="btn-add-shortage">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {readinessInputs.parShortages.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {readinessInputs.parShortages.map((item, idx) => (
+                    <Badge key={idx} variant="secondary" className="gap-1" data-testid={`badge-shortage-${idx}`}>
+                      {item}
+                      <button onClick={() => removeParShortage(idx)} className="ml-1 hover:text-destructive">
+                        <XCircle className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="eightySixList">86 List</Label>
+              <Input
+                id="eightySixList"
+                placeholder="Items currently 86'd, comma-separated"
+                className="mt-1"
+                value={readinessInputs.eightyShortages}
+                onChange={(e) => setReadinessInputs(prev => ({ ...prev, eightyShortages: e.target.value }))}
+                data-testid="input-86-list"
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="flex items-center">
-                  <Label htmlFor="wasteNotes">Waste Log Trends</Label>
-                  <VoiceButton field="waste" label="Dictate waste notes" />
+                <Label htmlFor="headcount">BOH Headcount</Label>
+                <Input
+                  id="headcount"
+                  type="number"
+                  placeholder="Staff on shift"
+                  className="mt-1"
+                  value={readinessInputs.headcount}
+                  onChange={(e) => setReadinessInputs(prev => ({ ...prev, headcount: e.target.value }))}
+                  data-testid="input-headcount"
+                />
+              </div>
+              <div>
+                <Label htmlFor="forecastedCovers">Forecasted Covers</Label>
+                <Input
+                  id="forecastedCovers"
+                  type="number"
+                  placeholder="Expected covers"
+                  className="mt-1"
+                  value={readinessInputs.forecastedCovers}
+                  onChange={(e) => setReadinessInputs(prev => ({ ...prev, forecastedCovers: e.target.value }))}
+                  data-testid="input-forecasted-covers"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-1 block">Large Party</Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant={readinessInputs.largeParty ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setReadinessInputs(prev => ({ ...prev, largeParty: !prev.largeParty }))}
+                  data-testid="btn-large-party"
+                >
+                  {readinessInputs.largeParty ? <Check className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                  Large Party
+                </Button>
+                {readinessInputs.largeParty && (
+                  <>
+                    <Input
+                      type="number"
+                      placeholder="Party size"
+                      className="w-28"
+                      value={readinessInputs.largePartySize}
+                      onChange={(e) => setReadinessInputs(prev => ({ ...prev, largePartySize: e.target.value }))}
+                      data-testid="input-large-party-size"
+                    />
+                    <Input
+                      type="time"
+                      className="w-36"
+                      value={readinessInputs.largePartyTime}
+                      onChange={(e) => setReadinessInputs(prev => ({ ...prev, largePartyTime: e.target.value }))}
+                      data-testid="input-large-party-time"
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg border bg-accent/30 space-y-3">
+              <h4 className="text-sm font-semibold flex items-center gap-1">
+                <TrendingUp className="h-4 w-4" /> Score Breakdown
+              </h4>
+              {scoreData.categories.map(cat => (
+                <div key={cat.label} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium">{cat.label}</span>
+                    <span className="text-xs text-muted-foreground">{cat.score}/{cat.max}</span>
+                  </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${getScoreBarColor(cat.score, cat.max)}`}
+                      style={{ width: `${(cat.score / cat.max) * 100}%` }}
+                    />
+                  </div>
                 </div>
-                <Textarea
-                  id="wasteNotes"
-                  placeholder="e.g., Repeating waste on sauté station, over-prepped garnishes last 3 days..."
-                  className="mt-1 min-h-[60px]"
-                  value={wasteNotes}
-                  onChange={(e) => setWasteNotes(e.target.value)}
-                  data-testid="input-waste-notes"
-                />
-              </div>
-              <div>
-                <Label htmlFor="volumeStaffingReadiness">Volume vs Staffing</Label>
-                <Textarea
-                  id="volumeStaffingReadiness"
-                  placeholder="e.g., 130 covers projected, full staff, large party at 7..."
-                  className="mt-1 min-h-[60px]"
-                  value={volumeStaffing}
-                  onChange={(e) => setVolumeStaffing(e.target.value)}
-                  data-testid="input-volume-staffing-readiness"
-                />
-              </div>
+              ))}
+              {scoreData.topFixes.length > 0 && (
+                <div className="pt-2 border-t space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Top improvements</p>
+                  {scoreData.topFixes.map((fix, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="flex items-center gap-1">
+                        <ArrowRight className="h-3 w-3 text-blue-500" /> {fix.label}
+                      </span>
+                      <span className="text-green-600 dark:text-green-400 font-medium">+{fix.points} pts</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-4 mt-4">
             <p className="text-sm text-muted-foreground">During-service execution alerts. Is ticket flow breaking down?</p>
+
+            <div className="flex flex-wrap gap-2">
+              {getAlertBadge(parseInt(alertsInputs.avgAppTime) || 0, 8, 10, "Apps")}
+              {getAlertBadge(parseInt(alertsInputs.avgEntreeTime) || 0, 15, 18, "Entr\u00e9es")}
+              <Badge
+                className={alertsInputs.windowHolding
+                  ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30"
+                  : "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"}
+                data-testid="badge-window"
+              >
+                {alertsInputs.windowHolding ? <AlertTriangle className="h-3 w-3 mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                Window: {alertsInputs.windowHolding ? "Holding" : "Clear"}
+              </Badge>
+              {alertsInputs.coverPace && (
+                <Badge
+                  className={
+                    alertsInputs.coverPace === "behind"
+                      ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30"
+                      : alertsInputs.coverPace === "ahead"
+                      ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
+                      : "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+                  }
+                  data-testid="badge-pace"
+                >
+                  {alertsInputs.coverPace === "behind" ? <TrendingDown className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
+                  {alertsInputs.coverPace === "ahead" ? "Ahead" : alertsInputs.coverPace === "on-pace" ? "On Pace" : "Behind"}
+                </Badge>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="ticketTimesAlerts">Ticket Timing Observations</Label>
-                <Textarea
-                  id="ticketTimesAlerts"
-                  placeholder="e.g., Apps at 12 min, entrées pushing 20 min, grill backed up..."
-                  className="mt-1 min-h-[80px]"
-                  value={ticketTimes}
-                  onChange={(e) => setTicketTimes(e.target.value)}
-                  data-testid="input-ticket-times-alerts"
-                />
+                <Label htmlFor="avgAppTime">Avg App Time (min)</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    id="avgAppTime"
+                    type="number"
+                    placeholder="e.g. 9"
+                    value={alertsInputs.avgAppTime}
+                    onChange={(e) => setAlertsInputs(prev => ({ ...prev, avgAppTime: e.target.value }))}
+                    data-testid="input-avg-app-time"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Std: 8-10</span>
+                </div>
               </div>
               <div>
-                <Label htmlFor="windowDelaysAlerts">Window / Expo Delays</Label>
-                <Textarea
-                  id="windowDelaysAlerts"
-                  placeholder="e.g., Food sitting 2+ min multiple times, runners not responding to calls..."
-                  className="mt-1 min-h-[80px]"
-                  value={windowDelays}
-                  onChange={(e) => setWindowDelays(e.target.value)}
-                  data-testid="input-window-delays-alerts"
-                />
+                <Label htmlFor="avgEntreeTime">Avg Entr\u00e9e Time (min)</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    id="avgEntreeTime"
+                    type="number"
+                    placeholder="e.g. 16"
+                    value={alertsInputs.avgEntreeTime}
+                    onChange={(e) => setAlertsInputs(prev => ({ ...prev, avgEntreeTime: e.target.value }))}
+                    data-testid="input-avg-entree-time"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Std: 15-18</span>
+                </div>
               </div>
             </div>
+
             <div>
-              <Label htmlFor="volumeStaffingAlerts">Current Volume vs Staffing</Label>
-              <Input
-                id="volumeStaffingAlerts"
-                placeholder="e.g., 85 covers in, 4 servers, 3 cooks"
-                className="mt-1"
-                value={volumeStaffing}
-                onChange={(e) => setVolumeStaffing(e.target.value)}
-                data-testid="input-volume-staffing-alerts"
+              <Label className="mb-1 block">Window Holding</Label>
+              <div className="flex gap-2">
+                <Button
+                  variant={alertsInputs.windowHolding ? "default" : "outline"}
+                  size="sm"
+                  className={alertsInputs.windowHolding ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                  onClick={() => setAlertsInputs(prev => ({ ...prev, windowHolding: true }))}
+                  data-testid="btn-window-yes"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-1" /> Yes
+                </Button>
+                <Button
+                  variant={!alertsInputs.windowHolding ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAlertsInputs(prev => ({ ...prev, windowHolding: false }))}
+                  data-testid="btn-window-no"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" /> No
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Cover Pace</Label>
+                <Select value={alertsInputs.coverPace} onValueChange={(v) => setAlertsInputs(prev => ({ ...prev, coverPace: v }))}>
+                  <SelectTrigger className="mt-1" data-testid="select-cover-pace">
+                    <SelectValue placeholder="Select pace..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ahead">Ahead</SelectItem>
+                    <SelectItem value="on-pace">On Pace</SelectItem>
+                    <SelectItem value="behind">Behind</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Bottleneck Station</Label>
+                <Select value={alertsInputs.bottleneckStation} onValueChange={(v) => setAlertsInputs(prev => ({ ...prev, bottleneckStation: v }))}>
+                  <SelectTrigger className="mt-1" data-testid="select-bottleneck-alerts">
+                    <SelectValue placeholder="Select station..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="saute">Saut\u00e9</SelectItem>
+                    <SelectItem value="grill">Grill</SelectItem>
+                    <SelectItem value="fry">Fry</SelectItem>
+                    <SelectItem value="pantry">Pantry</SelectItem>
+                    <SelectItem value="expo">Expo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center">
+                <Label htmlFor="managerNotesAlerts">Manager Notes</Label>
+                <VoiceButton field="managerNotes" label="Dictate manager notes" />
+              </div>
+              <Textarea
+                id="managerNotesAlerts"
+                placeholder="Additional context about current service..."
+                className="mt-1 min-h-[60px]"
+                value={alertsInputs.managerNotes}
+                onChange={(e) => setAlertsInputs(prev => ({ ...prev, managerNotes: e.target.value }))}
+                data-testid="input-manager-notes-alerts"
               />
             </div>
           </TabsContent>
@@ -1387,7 +1726,66 @@ One behavior. One conversation. Consistent follow-up.`;
               <h3 className="text-lg font-semibold">60-Second Post-Service Debrief</h3>
               <p className="text-sm text-muted-foreground">Quick capture while it's fresh. Don't overthink it.</p>
             </div>
-            
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Bottleneck Station</Label>
+                <Select value={debriefInputs.bottleneck} onValueChange={(v) => setDebriefInputs(prev => ({ ...prev, bottleneck: v }))}>
+                  <SelectTrigger className="mt-1" data-testid="select-bottleneck-debrief">
+                    <SelectValue placeholder="Select station..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="saute">Saut\u00e9</SelectItem>
+                    <SelectItem value="grill">Grill</SelectItem>
+                    <SelectItem value="fry">Fry</SelectItem>
+                    <SelectItem value="pantry">Pantry</SelectItem>
+                    <SelectItem value="expo">Expo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Root Cause</Label>
+                <Select value={debriefInputs.rootCause} onValueChange={(v) => setDebriefInputs(prev => ({ ...prev, rootCause: v }))}>
+                  <SelectTrigger className="mt-1" data-testid="select-root-cause">
+                    <SelectValue placeholder="Select root cause..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rootCauseOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="fixOwner">Fix Owner</Label>
+                <Input
+                  id="fixOwner"
+                  placeholder="Who's responsible?"
+                  className="mt-1"
+                  value={debriefInputs.fixOwner}
+                  onChange={(e) => setDebriefInputs(prev => ({ ...prev, fixOwner: e.target.value }))}
+                  data-testid="input-fix-owner"
+                />
+              </div>
+              <div>
+                <Label>Fix Due By</Label>
+                <Select value={debriefInputs.fixDueBy} onValueChange={(v) => setDebriefInputs(prev => ({ ...prev, fixDueBy: v }))}>
+                  <SelectTrigger className="mt-1" data-testid="select-fix-due-by">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="next-shift">Next shift</SelectItem>
+                    <SelectItem value="tomorrow-am">Tomorrow AM</SelectItem>
+                    <SelectItem value="end-of-week">End of week</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-4">
               <div>
                 <div className="flex items-center">
@@ -1398,8 +1796,8 @@ One behavior. One conversation. Consistent follow-up.`;
                   id="whatWentWell"
                   placeholder="One thing that worked tonight..."
                   className="mt-1 min-h-[60px] border-green-500/30 focus:border-green-500"
-                  value={whatWentWell}
-                  onChange={(e) => setWhatWentWell(e.target.value)}
+                  value={debriefInputs.whatWentWell}
+                  onChange={(e) => setDebriefInputs(prev => ({ ...prev, whatWentWell: e.target.value }))}
                   data-testid="input-what-went-well"
                 />
               </div>
@@ -1413,8 +1811,8 @@ One behavior. One conversation. Consistent follow-up.`;
                   id="whatSucked"
                   placeholder="One thing that broke down..."
                   className="mt-1 min-h-[60px] border-red-500/30 focus:border-red-500"
-                  value={whatSucked}
-                  onChange={(e) => setWhatSucked(e.target.value)}
+                  value={debriefInputs.whatSucked}
+                  onChange={(e) => setDebriefInputs(prev => ({ ...prev, whatSucked: e.target.value }))}
                   data-testid="input-what-sucked"
                 />
               </div>
@@ -1428,15 +1826,15 @@ One behavior. One conversation. Consistent follow-up.`;
                   id="fixForTomorrow"
                   placeholder="The one thing we're changing..."
                   className="mt-1 min-h-[60px] border-blue-500/30 focus:border-blue-500"
-                  value={fixForTomorrow}
-                  onChange={(e) => setFixForTomorrow(e.target.value)}
+                  value={debriefInputs.fixForTomorrow}
+                  onChange={(e) => setDebriefInputs(prev => ({ ...prev, fixForTomorrow: e.target.value }))}
                   data-testid="input-fix-tomorrow"
                 />
               </div>
 
-              <Button 
+              <Button
                 onClick={saveQuickDebrief}
-                disabled={isSaving || (!whatWentWell && !whatSucked && !fixForTomorrow)}
+                disabled={isSaving || (!debriefInputs.whatWentWell && !debriefInputs.whatSucked && !debriefInputs.fixForTomorrow)}
                 className="w-full"
                 data-testid="btn-save-quick-debrief"
               >
@@ -1459,60 +1857,75 @@ One behavior. One conversation. Consistent follow-up.`;
             <p className="text-sm text-muted-foreground">Post-shift analysis. What broke, why, and what to fix tomorrow.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="ticketTimesDebrief">Ticket Timing Issues</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="ticketTimesDebrief">Ticket Timing Issues</Label>
+                  <VoiceButton field="fullTickets" label="Dictate ticket times" />
+                </div>
                 <Textarea
                   id="ticketTimesDebrief"
-                  placeholder="e.g., Entrées averaged 22 min during 7-8pm push..."
+                  placeholder="e.g., Entr\u00e9es averaged 22 min during 7-8pm push..."
                   className="mt-1 min-h-[80px]"
-                  value={ticketTimes}
-                  onChange={(e) => setTicketTimes(e.target.value)}
+                  value={fullDebriefInputs.ticketTimes}
+                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, ticketTimes: e.target.value }))}
                   data-testid="input-ticket-times-debrief"
                 />
               </div>
               <div>
-                <Label htmlFor="windowDelaysDebrief">Window Problems</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="windowDelaysDebrief">Window Problems</Label>
+                  <VoiceButton field="fullWindow" label="Dictate window issues" />
+                </div>
                 <Textarea
                   id="windowDelaysDebrief"
                   placeholder="e.g., Window congestion 7:15-8:00, 6 instances of food dying..."
                   className="mt-1 min-h-[80px]"
-                  value={windowDelays}
-                  onChange={(e) => setWindowDelays(e.target.value)}
+                  value={fullDebriefInputs.windowDelays}
+                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, windowDelays: e.target.value }))}
                   data-testid="input-window-delays-debrief"
                 />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="prepIssuesDebrief">Prep Issues Discovered</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="prepIssuesDebrief">Prep Issues Discovered</Label>
+                  <VoiceButton field="fullPrep" label="Dictate prep issues" />
+                </div>
                 <Textarea
                   id="prepIssuesDebrief"
                   placeholder="e.g., Ran out of compound butter, mislabeled containers..."
                   className="mt-1 min-h-[60px]"
-                  value={prepCompletion}
-                  onChange={(e) => setPrepCompletion(e.target.value)}
+                  value={fullDebriefInputs.prepIssues}
+                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, prepIssues: e.target.value }))}
                   data-testid="input-prep-issues-debrief"
                 />
               </div>
               <div>
-                <Label htmlFor="wasteDebrief">Service Waste</Label>
+                <div className="flex items-center">
+                  <Label htmlFor="wasteDebrief">Service Waste</Label>
+                  <VoiceButton field="fullWaste" label="Dictate waste notes" />
+                </div>
                 <Textarea
                   id="wasteDebrief"
                   placeholder="e.g., 4 remakes on grill, 2 wrong-plate fires..."
                   className="mt-1 min-h-[60px]"
-                  value={wasteNotes}
-                  onChange={(e) => setWasteNotes(e.target.value)}
+                  value={fullDebriefInputs.serviceWaste}
+                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, serviceWaste: e.target.value }))}
                   data-testid="input-waste-debrief"
                 />
               </div>
             </div>
             <div>
-              <Label htmlFor="managerNotesDebrief">Manager Notes</Label>
+              <div className="flex items-center">
+                <Label htmlFor="managerNotesDebrief">Manager Notes</Label>
+                <VoiceButton field="fullManager" label="Dictate manager notes" />
+              </div>
               <Textarea
                 id="managerNotesDebrief"
                 placeholder="e.g., Runner coverage insufficient, new cook struggled on grill..."
                 className="mt-1 min-h-[60px]"
-                value={managerNotes}
-                onChange={(e) => setManagerNotes(e.target.value)}
+                value={fullDebriefInputs.managerNotes}
+                onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, managerNotes: e.target.value }))}
                 data-testid="input-manager-notes-debrief"
               />
             </div>
@@ -1520,62 +1933,77 @@ One behavior. One conversation. Consistent follow-up.`;
 
           <TabsContent value="coaching" className="space-y-4 mt-4">
             <p className="text-sm text-muted-foreground">Identify ONE behavior to coach. Prevents scattershot corrections.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="ticketTimesCoaching">Ticket/Timing Observations</Label>
-                <Textarea
-                  id="ticketTimesCoaching"
-                  placeholder="e.g., Consistent delays from sauté, grill timing off..."
-                  className="mt-1 min-h-[80px]"
-                  value={ticketTimes}
-                  onChange={(e) => setTicketTimes(e.target.value)}
-                  data-testid="input-ticket-times-coaching"
-                />
-              </div>
-              <div>
-                <Label htmlFor="windowDelaysCoaching">Communication Issues</Label>
-                <Textarea
-                  id="windowDelaysCoaching"
-                  placeholder="e.g., Missed 'pick up' calls, no 'heard' confirmations..."
-                  className="mt-1 min-h-[80px]"
-                  value={windowDelays}
-                  onChange={(e) => setWindowDelays(e.target.value)}
-                  data-testid="input-window-delays-coaching"
-                />
-              </div>
-            </div>
+
             <div>
-              <Label htmlFor="managerNotesCoaching">Specific Observations</Label>
-              <Textarea
-                id="managerNotesCoaching"
-                placeholder="e.g., Expo not calling clear pick-ups, delays correlated with expo silence..."
-                className="mt-1 min-h-[60px]"
-                value={managerNotes}
-                onChange={(e) => setManagerNotes(e.target.value)}
-                data-testid="input-manager-notes-coaching"
-              />
+              <Label>Target Station</Label>
+              <Select value={coachingInputs.targetStation} onValueChange={(v) => setCoachingInputs(prev => ({ ...prev, targetStation: v }))}>
+                <SelectTrigger className="mt-1" data-testid="select-coaching-station">
+                  <SelectValue placeholder="Select station..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="saute">Saut\u00e9</SelectItem>
+                  <SelectItem value="grill">Grill</SelectItem>
+                  <SelectItem value="fry">Fry</SelectItem>
+                  <SelectItem value="pantry">Pantry</SelectItem>
+                  <SelectItem value="expo">Expo</SelectItem>
+                  <SelectItem value="dish">Dish</SelectItem>
+                  <SelectItem value="foh-support">FOH Support</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            <div>
+              <Label>Behavior to Coach</Label>
+              <Select value={coachingInputs.behavior} onValueChange={(v) => setCoachingInputs(prev => ({ ...prev, behavior: v }))}>
+                <SelectTrigger className="mt-1" data-testid="select-coaching-behavior">
+                  <SelectValue placeholder="Select behavior..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {coachingBehaviors.map(b => (
+                    <SelectItem key={b} value={b}>{b === "custom" ? "Custom..." : b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {coachingInputs.behavior === "custom" && (
+              <div>
+                <Label htmlFor="customBehavior">Describe the behavior</Label>
+                <Input
+                  id="customBehavior"
+                  placeholder="Specific observable behavior..."
+                  className="mt-1"
+                  value={coachingInputs.customBehavior}
+                  onChange={(e) => setCoachingInputs(prev => ({ ...prev, customBehavior: e.target.value }))}
+                  data-testid="input-custom-behavior"
+                />
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
-        <Button 
-          onClick={generateAnalysis} 
-          disabled={isGenerating}
-          className="w-full"
-          data-testid="btn-generate-kitchen"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating {modeLabels[mode]}...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Generate {modeLabels[mode]}
-            </>
-          )}
-        </Button>
+        {mode !== "quick-debrief" && (
+          <div className="sticky bottom-0 z-50 pt-3 pb-[env(safe-area-inset-bottom)] bg-card -mx-6 px-6 border-t">
+            <Button
+              onClick={generateAnalysis}
+              disabled={isGenerating}
+              className="w-full"
+              data-testid="btn-generate-kitchen"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating {modeLabels[mode]}...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate {modeLabels[mode]}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
         {analysis && (
           <div className="mt-4 space-y-4">
