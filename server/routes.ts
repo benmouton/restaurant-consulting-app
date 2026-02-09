@@ -1987,36 +1987,19 @@ Generate JSON with:
       const shortToken = await socialMediaService.exchangeMetaCode(code as string);
       console.log("Meta OAuth short token obtained");
       
-      // Try with short-lived token first
-      let { pages, diagnostics } = await socialMediaService.getFacebookPages(shortToken.accessToken);
-      console.log("Meta OAuth pages (short token):", pages.length, pages.map(p => p.name));
-      diagnostics.token_used = "short";
-
-      // If short token returned no pages, try with long-lived token
-      if (pages.length === 0) {
-        console.log("Meta OAuth: Short token returned 0 pages, trying long-lived token...");
-        const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
-        console.log("Meta OAuth long-lived token obtained");
-        const longResult = await socialMediaService.getFacebookPages(longToken.accessToken);
-        if (longResult.pages.length > 0) {
-          pages = longResult.pages;
-          diagnostics = longResult.diagnostics;
-          diagnostics.token_used = "long";
-        } else {
-          diagnostics.long_token_scopes = longResult.diagnostics.scopes;
-          diagnostics.long_token_accounts_count = longResult.diagnostics.accounts_count;
-        }
-      }
-
-      // Convert short token to long-lived for storage
-      let storageToken = shortToken.accessToken;
+      // Exchange to long-lived token once (can only be done once per short token)
+      let longLivedAccessToken = shortToken.accessToken;
       try {
         const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
-        storageToken = longToken.accessToken;
+        longLivedAccessToken = longToken.accessToken;
+        console.log("Meta OAuth long-lived token obtained");
       } catch (e) {
-        console.warn("Could not get long-lived token for storage, using short token:", e);
+        console.warn("Could not get long-lived token, using short token:", e);
       }
 
+      // Get pages using the long-lived token
+      let { pages, diagnostics } = await socialMediaService.getFacebookPages(longLivedAccessToken);
+      console.log("Meta OAuth pages found:", pages.length, pages.map(p => p.name));
       console.log("Meta OAuth diagnostics:", JSON.stringify(diagnostics));
 
       if (pages.length === 0) {

@@ -1,0 +1,90 @@
+Yeah — that red “Connection failed. Please try again.” is almost always coming from your Replit backend, not Meta.
+
+At this point Meta is letting you authorize (you’re getting through the consent screens), but your callback → token exchange → page fetch → save flow is still erroring, and your UI is just showing the generic toast.
+
+Here’s the fastest way to know if you need code changes (and exactly where).
+
+1) Check the one thing that tells the truth: Replit server logs
+
+In Replit:
+
+Open Logs (or Console)
+
+Reconnect again
+
+Look for the request to:
+
+GET /api/oauth/meta/callback?...
+
+You’re looking for any 400/401/500 and the message around it.
+
+If you don’t see that callback hit at all, then your route/redirect isn’t wired correctly in code.
+If you see it hit and error, you need a small code fix (below).
+
+2) Check your browser Network tab (this tells you what your UI is failing on)
+
+Chrome DevTools → Network → reconnect again.
+
+After the redirect back to:
+/domain/social-media?connected=meta#_=_
+
+watch for a failing API call like:
+
+/api/social/meta/pages
+
+/api/social-media/accounts
+
+/api/meta/status
+
+anything returning 4xx/5xx
+
+Click it → Response. That error text is what we fix.
+
+3) The two most common Replit-side problems right here
+A) Callback succeeds, but your code is still calling the wrong endpoints / missing fields
+
+For Pages, your fetch must be something like:
+
+GET https://graph.facebook.com/vXX.X/me/accounts?fields=id,name,access_token
+
+If your code calls /me/accounts without fields=...access_token, Meta often returns pages but without page tokens, and your saver may throw → UI shows “connection failed”.
+
+B) “Connected=meta” is being set even when saving failed
+
+A lot of apps redirect to ?connected=meta no matter what, but then the “fetch accounts” call fails and you get the toast.
+
+Fix: Only redirect connected=meta after you successfully saved at least one page.
+
+4) Quick “do I need changes?” checklist
+
+You need changes in Replit if ANY of these are true:
+
+Callback route logs show error (400/401/500)
+
+/me/accounts is returning data: [] (or the call isn’t even being made)
+
+Your toast still says Pages count: 0 or Biz API status: 400
+
+Your UI is failing on a follow-up call after redirect (network tab shows 4xx/5xx)
+
+5) One high-probability fix based on what you’ve shown earlier
+
+Earlier your diagnostics said:
+
+Pages count: 0
+
+Biz API status: 400
+
+Missing business discovery (/me/businesses) / permissions
+
+So if your new config still doesn’t put business_management into the token, your “business-owned pages” path will keep failing.
+
+What to do in Replit if that’s the case:
+
+Add a fallback strategy:
+
+Try /me/accounts
+
+If empty, try business discovery (only if token has business_management)
+
+If biz discovery fails, return a clear error explaining which scope is missing (instead of generic “try again”)
