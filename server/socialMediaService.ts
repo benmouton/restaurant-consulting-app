@@ -129,18 +129,28 @@ export const socialMediaService = {
   },
 
   async getFacebookPages(userToken: string): Promise<FacebookPage[]> {
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?` +
+    const debugUrl = `https://graph.facebook.com/debug_token?input_token=${userToken}&access_token=${META_APP_ID}|${META_APP_SECRET}`;
+    try {
+      const debugRes = await fetch(debugUrl);
+      const debugText = await debugRes.text();
+      console.log("META DEBUG_TOKEN:", debugText);
+    } catch (e) {
+      console.error("META DEBUG_TOKEN error:", e);
+    }
+
+    const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?` +
       `fields=id,name,access_token,picture` +
-      `&access_token=${userToken}`
-    );
+      `&access_token=${userToken}`;
+    const response = await fetch(accountsUrl);
+    const rawText = await response.text();
+    console.log("META /me/accounts status:", response.status);
+    console.log("META /me/accounts body:", rawText);
     
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to get pages: ${error}`);
+      throw new Error(`Failed to get pages: ${rawText}`);
     }
     
-    const data = await response.json();
+    const data = JSON.parse(rawText);
     return data.data || [];
   },
 

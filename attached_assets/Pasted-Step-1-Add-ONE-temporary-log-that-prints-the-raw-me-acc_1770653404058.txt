@@ -1,0 +1,79 @@
+Step 1 — Add ONE temporary log that prints the raw /me/accounts result
+
+In Replit, open the file where you fetch pages after OAuth (sounds like you already found it):
+
+server/socialMediaService.ts (likely)
+
+or the callback handler in server/routes.ts
+
+Find the section that does something like:
+
+exchanges code → access_token
+
+then calls GET https://graph.facebook.com/.../me/accounts
+
+Add this right after the fetch of /me/accounts:
+
+const res = await fetch(accountsUrl);
+const text = await res.text();
+
+console.log("META /me/accounts status:", res.status);
+console.log("META /me/accounts body:", text);
+
+// then parse if you want:
+const data = JSON.parse(text);
+
+
+Republish.
+
+Step 2 — Reconnect once, then read the Replit logs
+
+Do the connect flow again (pick Mouton’s Bistro & Bar Cedar Park).
+
+As soon as your app shows the error, go to Replit → Console/Logs and find:
+
+META /me/accounts status: ...
+
+META /me/accounts body: ...
+
+✅ Paste me the status and the body (you can redact tokens).
+
+This single output tells us immediately which bucket you’re in:
+
+Bucket A: Meta returned EMPTY
+{"data":[]}
+
+
+That means your token does not have the right permissions (even if the screen showed pages). Then we fix the login/token.
+
+Bucket B: Meta returned an ERROR
+
+Common ones:
+
+OAuthException
+
+“(#200) Permissions error”
+
+“Unsupported get request”
+Then we fix the endpoint/version/token type.
+
+Bucket C: Meta returned pages, but your app still says none
+
+Then it’s your parsing/saving logic (like expecting a different field name, or throwing if access_token missing, etc.)
+
+Step 3 — If you want the “fastest possible” confirmation
+
+Also log the token scopes right after exchange using Debug Token:
+
+const debugUrl =
+  `https://graph.facebook.com/debug_token?input_token=${userToken}&access_token=${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`;
+
+const dbgRes = await fetch(debugUrl);
+console.log("DEBUG_TOKEN:", await dbgRes.text());
+
+
+We’re looking for scopes containing at least:
+
+pages_show_list
+
+pages_read_engagement
