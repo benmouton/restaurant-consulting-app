@@ -146,7 +146,7 @@ export const socialMediaService = {
     }
 
     const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?` +
-      `fields=id,name,access_token,picture` +
+      `fields=id,name,access_token,picture&limit=100` +
       `&access_token=${userToken}`;
     const response = await fetch(accountsUrl);
     const rawText = await response.text();
@@ -160,8 +160,77 @@ export const socialMediaService = {
     }
     
     const data = JSON.parse(rawText);
-    diagnostics.accounts_count = (data.data || []).length;
-    return { pages: data.data || [], diagnostics };
+    let pages: FacebookPage[] = data.data || [];
+    diagnostics.accounts_count = pages.length;
+
+    if (pages.length === 0) {
+      console.log("META: /me/accounts returned 0 pages, trying Business Portfolio fallback...");
+      try {
+        const bizRes = await fetch(
+          `https://graph.facebook.com/v18.0/me/businesses?` +
+          `fields=id,name&access_token=${userToken}`
+        );
+        const bizText = await bizRes.text();
+        console.log("META /me/businesses status:", bizRes.status, "body:", bizText);
+        diagnostics.businesses_status = bizRes.status;
+
+        if (bizRes.ok) {
+          const bizData = JSON.parse(bizText);
+          const businesses = bizData.data || [];
+          diagnostics.businesses_count = businesses.length;
+
+          for (const biz of businesses) {
+            console.log("META: Checking business:", biz.id, biz.name);
+            const bizPagesRes = await fetch(
+              `https://graph.facebook.com/v18.0/${biz.id}/owned_pages?` +
+              `fields=id,name,access_token,picture&limit=100` +
+              `&access_token=${userToken}`
+            );
+            const bizPagesText = await bizPagesRes.text();
+            console.log("META business", biz.id, "owned_pages status:", bizPagesRes.status, "body:", bizPagesText);
+
+            if (bizPagesRes.ok) {
+              const bizPagesData = JSON.parse(bizPagesText);
+              const bizPages = bizPagesData.data || [];
+              pages = pages.concat(bizPages);
+            }
+          }
+          diagnostics.accounts_count = pages.length;
+          diagnostics.source = "business_portfolio";
+        }
+      } catch (bizErr) {
+        console.error("META Business Portfolio fallback error:", bizErr);
+        diagnostics.business_error = String(bizErr);
+      }
+    }
+
+    if (pages.length === 0) {
+      console.log("META: Still 0 pages, trying /me?fields=accounts fallback...");
+      try {
+        const altRes = await fetch(
+          `https://graph.facebook.com/v18.0/me?` +
+          `fields=accounts{id,name,access_token,picture}` +
+          `&access_token=${userToken}`
+        );
+        const altText = await altRes.text();
+        console.log("META /me?fields=accounts status:", altRes.status, "body:", altText);
+        diagnostics.alt_status = altRes.status;
+
+        if (altRes.ok) {
+          const altData = JSON.parse(altText);
+          const altPages = altData?.accounts?.data || [];
+          if (altPages.length > 0) {
+            pages = altPages;
+            diagnostics.accounts_count = pages.length;
+            diagnostics.source = "me_fields_accounts";
+          }
+        }
+      } catch (altErr) {
+        console.error("META /me?fields=accounts fallback error:", altErr);
+      }
+    }
+
+    return { pages, diagnostics };
   },
 
   async getInstagramAccounts(pageId: string, pageToken: string): Promise<InstagramAccount[]> {

@@ -166,7 +166,11 @@ export default function SocialPostBuilder() {
         try {
           const d = JSON.parse(diag);
           diagInfo = ` | Scopes: ${(d.scopes || []).join(", ") || "none"} | Token type: ${d.type || "unknown"} | Valid: ${d.is_valid} | API status: ${d.accounts_status} | Pages count: ${d.accounts_count ?? "N/A"}`;
+          if (d.source) diagInfo += ` | Source: ${d.source}`;
+          if (d.businesses_count !== undefined) diagInfo += ` | Businesses found: ${d.businesses_count}`;
+          if (d.businesses_status) diagInfo += ` | Biz API status: ${d.businesses_status}`;
           if (d.accounts_error) diagInfo += ` | Error: ${d.accounts_error}`;
+          if (d.business_error) diagInfo += ` | Biz Error: ${d.business_error}`;
         } catch {}
       }
       const errorMessages: Record<string, string> = {
