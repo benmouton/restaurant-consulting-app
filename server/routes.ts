@@ -1986,10 +1986,37 @@ Generate JSON with:
 
       const shortToken = await socialMediaService.exchangeMetaCode(code as string);
       console.log("Meta OAuth short token obtained");
-      const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
-      console.log("Meta OAuth long-lived token obtained");
-      const { pages, diagnostics } = await socialMediaService.getFacebookPages(longToken.accessToken);
-      console.log("Meta OAuth pages found:", pages.length, pages.map(p => p.name));
+      
+      // Try with short-lived token first
+      let { pages, diagnostics } = await socialMediaService.getFacebookPages(shortToken.accessToken);
+      console.log("Meta OAuth pages (short token):", pages.length, pages.map(p => p.name));
+      diagnostics.token_used = "short";
+
+      // If short token returned no pages, try with long-lived token
+      if (pages.length === 0) {
+        console.log("Meta OAuth: Short token returned 0 pages, trying long-lived token...");
+        const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
+        console.log("Meta OAuth long-lived token obtained");
+        const longResult = await socialMediaService.getFacebookPages(longToken.accessToken);
+        if (longResult.pages.length > 0) {
+          pages = longResult.pages;
+          diagnostics = longResult.diagnostics;
+          diagnostics.token_used = "long";
+        } else {
+          diagnostics.long_token_scopes = longResult.diagnostics.scopes;
+          diagnostics.long_token_accounts_count = longResult.diagnostics.accounts_count;
+        }
+      }
+
+      // Convert short token to long-lived for storage
+      let storageToken = shortToken.accessToken;
+      try {
+        const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
+        storageToken = longToken.accessToken;
+      } catch (e) {
+        console.warn("Could not get long-lived token for storage, using short token:", e);
+      }
+
       console.log("Meta OAuth diagnostics:", JSON.stringify(diagnostics));
 
       if (pages.length === 0) {
@@ -2001,6 +2028,10 @@ Generate JSON with:
           accounts_status: diagnostics.accounts_status,
           accounts_count: diagnostics.accounts_count,
           accounts_error: diagnostics.accounts_error,
+          businesses_count: diagnostics.businesses_count,
+          businesses_status: diagnostics.businesses_status,
+          business_error: diagnostics.business_error,
+          token_used: diagnostics.token_used,
         }));
         res.redirect(`/domain/social-media?error=no_pages&diag=${diagParam}`);
         return;

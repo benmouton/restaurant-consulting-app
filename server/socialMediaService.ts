@@ -74,7 +74,7 @@ export const socialMediaService = {
     await db.insert(oauthStates).values({ state, userId, provider: 'meta' });
     const redirectUri = `${getBaseUrl()}/api/oauth/meta/callback`;
     
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
+    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?` +
       `client_id=${META_APP_ID}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&state=${state}` +
@@ -88,7 +88,7 @@ export const socialMediaService = {
     const redirectUri = `${getBaseUrl()}/api/oauth/meta/callback`;
     
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/oauth/access_token?` +
+      `https://graph.facebook.com/v21.0/oauth/access_token?` +
       `client_id=${META_APP_ID}` +
       `&client_secret=${META_APP_SECRET}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -109,7 +109,7 @@ export const socialMediaService = {
 
   async getMetaLongLivedToken(shortLivedToken: string): Promise<TokenExchangeResult> {
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/oauth/access_token?` +
+      `https://graph.facebook.com/v21.0/oauth/access_token?` +
       `grant_type=fb_exchange_token` +
       `&client_id=${META_APP_ID}` +
       `&client_secret=${META_APP_SECRET}` +
@@ -145,7 +145,7 @@ export const socialMediaService = {
       diagnostics.debug_error = String(e);
     }
 
-    const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?` +
+    const accountsUrl = `https://graph.facebook.com/v21.0/me/accounts?` +
       `fields=id,name,access_token,picture&limit=100` +
       `&access_token=${userToken}`;
     const response = await fetch(accountsUrl);
@@ -167,7 +167,7 @@ export const socialMediaService = {
       console.log("META: /me/accounts returned 0 pages, trying Business Portfolio fallback...");
       try {
         const bizRes = await fetch(
-          `https://graph.facebook.com/v18.0/me/businesses?` +
+          `https://graph.facebook.com/v21.0/me/businesses?` +
           `fields=id,name&access_token=${userToken}`
         );
         const bizText = await bizRes.text();
@@ -182,7 +182,7 @@ export const socialMediaService = {
           for (const biz of businesses) {
             console.log("META: Checking business:", biz.id, biz.name);
             const bizPagesRes = await fetch(
-              `https://graph.facebook.com/v18.0/${biz.id}/owned_pages?` +
+              `https://graph.facebook.com/v21.0/${biz.id}/owned_pages?` +
               `fields=id,name,access_token,picture&limit=100` +
               `&access_token=${userToken}`
             );
@@ -208,7 +208,7 @@ export const socialMediaService = {
       console.log("META: Still 0 pages, trying /me?fields=accounts fallback...");
       try {
         const altRes = await fetch(
-          `https://graph.facebook.com/v18.0/me?` +
+          `https://graph.facebook.com/v21.0/me?` +
           `fields=accounts{id,name,access_token,picture}` +
           `&access_token=${userToken}`
         );
@@ -235,7 +235,7 @@ export const socialMediaService = {
 
   async getInstagramAccounts(pageId: string, pageToken: string): Promise<InstagramAccount[]> {
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${pageId}?` +
+      `https://graph.facebook.com/v21.0/${pageId}?` +
       `fields=instagram_business_account{id,username,profile_picture_url}` +
       `&access_token=${pageToken}`
     );
@@ -369,14 +369,14 @@ export const socialMediaService = {
     message: string,
     imageUrl?: string
   ): Promise<{ id: string }> {
-    let url = `https://graph.facebook.com/v18.0/${pageId}/feed`;
+    let url = `https://graph.facebook.com/v21.0/${pageId}/feed`;
     const params: any = {
       message,
       access_token: pageToken,
     };
     
     if (imageUrl) {
-      url = `https://graph.facebook.com/v18.0/${pageId}/photos`;
+      url = `https://graph.facebook.com/v21.0/${pageId}/photos`;
       params.url = imageUrl;
       params.caption = message;
       delete params.message;
@@ -404,7 +404,7 @@ export const socialMediaService = {
     imageUrl: string
   ): Promise<{ id: string }> {
     const createResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${igUserId}/media`,
+      `https://graph.facebook.com/v21.0/${igUserId}/media`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -426,7 +426,7 @@ export const socialMediaService = {
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     const publishResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${igUserId}/media_publish`,
+      `https://graph.facebook.com/v21.0/${igUserId}/media_publish`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
