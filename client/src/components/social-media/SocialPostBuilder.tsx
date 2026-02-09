@@ -160,8 +160,17 @@ export default function SocialPostBuilder() {
       window.history.replaceState({}, "", window.location.pathname);
     }
     if (error) {
+      const diag = params.get("diag");
+      let diagInfo = "";
+      if (diag) {
+        try {
+          const d = JSON.parse(diag);
+          diagInfo = ` | Scopes: ${(d.scopes || []).join(", ") || "none"} | Token type: ${d.type || "unknown"} | Valid: ${d.is_valid} | API status: ${d.accounts_status} | Pages count: ${d.accounts_count ?? "N/A"}`;
+          if (d.accounts_error) diagInfo += ` | Error: ${d.accounts_error}`;
+        } catch {}
+      }
       const errorMessages: Record<string, string> = {
-        no_pages: "No Facebook Pages found. You must be an admin of at least one Facebook Page to connect.",
+        no_pages: `No Facebook Pages found.${diagInfo}`,
         invalid_state: "Connection session expired. Please try again.",
         oauth_failed: "Connection failed. Please try again.",
         missing_params: "Connection was incomplete. Please try again.",

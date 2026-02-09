@@ -128,14 +128,21 @@ export const socialMediaService = {
     };
   },
 
-  async getFacebookPages(userToken: string): Promise<FacebookPage[]> {
+  async getFacebookPages(userToken: string): Promise<{pages: FacebookPage[], diagnostics: any}> {
+    let diagnostics: any = {};
+    
     const debugUrl = `https://graph.facebook.com/debug_token?input_token=${userToken}&access_token=${META_APP_ID}|${META_APP_SECRET}`;
     try {
       const debugRes = await fetch(debugUrl);
-      const debugText = await debugRes.text();
-      console.log("META DEBUG_TOKEN:", debugText);
+      const debugData = await debugRes.json();
+      diagnostics.scopes = debugData?.data?.scopes || [];
+      diagnostics.app_id = debugData?.data?.app_id;
+      diagnostics.type = debugData?.data?.type;
+      diagnostics.is_valid = debugData?.data?.is_valid;
+      console.log("META DEBUG_TOKEN:", JSON.stringify(debugData));
     } catch (e) {
       console.error("META DEBUG_TOKEN error:", e);
+      diagnostics.debug_error = String(e);
     }
 
     const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?` +
@@ -145,13 +152,16 @@ export const socialMediaService = {
     const rawText = await response.text();
     console.log("META /me/accounts status:", response.status);
     console.log("META /me/accounts body:", rawText);
+    diagnostics.accounts_status = response.status;
     
     if (!response.ok) {
-      throw new Error(`Failed to get pages: ${rawText}`);
+      diagnostics.accounts_error = rawText;
+      return { pages: [], diagnostics };
     }
     
     const data = JSON.parse(rawText);
-    return data.data || [];
+    diagnostics.accounts_count = (data.data || []).length;
+    return { pages: data.data || [], diagnostics };
   },
 
   async getInstagramAccounts(pageId: string, pageToken: string): Promise<InstagramAccount[]> {

@@ -1988,12 +1988,21 @@ Generate JSON with:
       console.log("Meta OAuth short token obtained");
       const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
       console.log("Meta OAuth long-lived token obtained");
-      const pages = await socialMediaService.getFacebookPages(longToken.accessToken);
+      const { pages, diagnostics } = await socialMediaService.getFacebookPages(longToken.accessToken);
       console.log("Meta OAuth pages found:", pages.length, pages.map(p => p.name));
+      console.log("Meta OAuth diagnostics:", JSON.stringify(diagnostics));
 
       if (pages.length === 0) {
-        console.warn("Meta OAuth: No pages returned. User may not have page admin access.");
-        res.redirect("/domain/social-media?error=no_pages");
+        console.warn("Meta OAuth: No pages returned. Diagnostics:", JSON.stringify(diagnostics));
+        const diagParam = encodeURIComponent(JSON.stringify({
+          scopes: diagnostics.scopes,
+          type: diagnostics.type,
+          is_valid: diagnostics.is_valid,
+          accounts_status: diagnostics.accounts_status,
+          accounts_count: diagnostics.accounts_count,
+          accounts_error: diagnostics.accounts_error,
+        }));
+        res.redirect(`/domain/social-media?error=no_pages&diag=${diagParam}`);
         return;
       }
 
