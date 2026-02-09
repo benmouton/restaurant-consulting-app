@@ -74,18 +74,12 @@ export const socialMediaService = {
     await db.insert(oauthStates).values({ state, userId, provider: 'meta' });
     const redirectUri = `${getBaseUrl()}/api/oauth/meta/callback`;
     
-    const scopes = [
-      'pages_show_list',
-      'pages_read_engagement',
-    ].join(',');
-    
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
       `client_id=${META_APP_ID}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&state=${state}` +
-      `&scope=${encodeURIComponent(scopes)}` +
-      `&config_id=1387221869875164` +
-      `&response_type=code`;
+      `&response_type=code` +
+      `&config_id=1387221869875164`;
     
     return { authUrl, state };
   },

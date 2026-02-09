@@ -1,0 +1,79 @@
+Alright — if you fully removed the app, reconnected, and still get “No Facebook Pages found,” then it’s not a stale token anymore.
+
+At this point there are only two realistic causes:
+
+Your app is still using the OLD login URL (scope=public_profile,email) so Facebook never grants Page access.
+
+Your backend is filtering Pages out (very common: it only keeps Pages that have an Instagram business account linked, or only keeps Pages where you have certain perms).
+
+We’re going to knock these out in order.
+
+Step 3 — Confirm your app is using the right OAuth URL (this is usually the culprit)
+
+The URL you pasted earlier was:
+
+.../dialog/oauth?...&scope=public_profile%2Cemail...
+
+That login flow is wrong for “Facebook Login for Business” / Page asset selection.
+
+✅ For your setup, your login URL must include config_id=1387221869875164
+❌ and it should NOT rely on scope=public_profile,email alone.
+
+What to change in your code
+
+Wherever you build the Meta auth URL, change it to this shape:
+
+https://www.facebook.com/v18.0/dialog/oauth
+  ?client_id=1227044978892092
+  &redirect_uri=https://restaurantai.consulting/api/oauth/meta/callback
+  &state=<random>
+  &response_type=code
+  &config_id=1387221869875164
+
+
+Do NOT include scope=public_profile,email in this Business Login flow.
+(If you include scope, you often end up in a non-business permission path and /me/accounts comes back empty / restricted.)
+
+✅ After you deploy this change, reconnect again.
+
+Step 4 — If the URL is correct, your backend is filtering out the Page
+
+Your screenshot shows your Page is selectable and has an ID:
+
+Mouton’s Bistro & Bar Cedar Park (313469605726557)
+
+So if your app still says “No Pages found,” it’s almost certainly doing something like:
+
+Fetch pages
+
+For each page, try to fetch instagram_business_account
+
+Only keep pages with IG attached
+
+If none → show “No Facebook Pages found”
+
+Quick real-world check
+
+Is your Instagram account linked to that Facebook Page?
+
+Go to:
+Facebook Page → Settings → Linked accounts → Instagram
+(or Meta Business Suite → Settings → Accounts → Instagram accounts)
+
+If IG is not linked, your code might be discarding the Page.
+
+One fast “prove it” test (no guessing)
+
+After you click Connect and it errors, open your backend logs (Replit logs) and look for the call that fetches pages.
+
+You want to see whether /me/accounts returned:
+
+data: [] ✅ = permissions/login URL issue (Step 3)
+
+data: [ ...pages... ] but your app still errors ✅ = filtering logic issue (Step 4)
+
+If you paste just the /me/accounts response (remove tokens), I can tell you which one it is immediately.
+
+Do this now
+
+Which login URL does your app currently send you to?
