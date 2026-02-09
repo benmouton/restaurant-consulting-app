@@ -1,0 +1,122 @@
+Good news: your callback is being hit and it’s finishing fast enough to 302 every time. Bad news: those logs are only the access log. They don’t prove the backend actually saved pages/tokens — your code can still be erroring internally and then redirecting anyway.
+
+Right now, your app is basically doing:
+
+✅ /api/oauth/meta/callback runs
+✅ returns 302 back to /domain/social-media?connected=meta
+❌ but nothing gets persisted / or the next “load accounts” call fails, so UI still shows “Connect now” (or generic “Connection failed”).
+
+The #1 likely cause (based on what you’ve shown)
+
+Your OAuth callback is not reliably tied to your logged-in user, so your code can’t save the connection to the right account.
+
+Why this happens a lot:
+
+Meta hits your callback server-to-server with the user’s browser
+
+If your app relies on req.user / session cookie to know who is connecting, that cookie is often missing/blocked (SameSite issues) or you’re not logged into your app in that browser context.
+
+Result: callback runs, exchanges token, maybe even fetches pages, but when it tries to save it has no user id → save fails or no-ops → still redirects.
+
+This also matches your symptom: you can get through Meta consent and even select the Page, yet your app still says “No pages / not connected”.
+
+What to change in Replit (the fix)
+1) Stop relying on session/req.user inside the callback
+
+Instead, use the OAuth state param to carry your app user id (or a signed token) so callback can save the connection correctly every time.
+
+Flow:
+
+When user clicks “Connect”, you generate state containing { userId, returnTo }, sign it, and send them to Meta.
+
+In /api/oauth/meta/callback, you verify state, extract userId, and save tokens/pages to that user.
+
+2) Make the callback show the real error (stop swallowing failures)
+
+Right now you’re always redirecting with connected=meta. Change it so:
+
+success → ?connected=meta
+
+failure → ?error=meta_oauth_failed&msg=...
+
+So you stop guessing.
+
+Drop-in Express/TS pattern (copy this structure)
+
+Use this as the shape even if your functions differ:
+
+// when building the auth url
+const state = signState({ userId: req.user.id, returnTo: "/domain/social-media" }); // JWT or HMAC
+const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT)}&state=${encodeURIComponent(state)}&response_type=code&config_id=${CONFIG_ID}`;
+
+// callback
+app.get("/api/oauth/meta/callback", async (req, res) => {
+  const code = String(req.query.code || "");
+  const state = String(req.query.state || "");
+  const returnToDefault = "/domain/social-media";
+
+  try {
+    const { userId, returnTo } = verifyState(state); // MUST exist
+    if (!userId) throw new Error("Missing userId in state");
+
+    // 1) exchange code -> short token
+    const shortToken = await exchangeCodeForToken(code);
+
+    // 2) optionally exchange -> long token
+    const longToken = await exchangeForLongLived(shortToken);
+
+    // 3) fetch pages
+    const pages = await getPages(longToken); // /me/accounts?fields=id,name,access_token
+
+    if (!pages?.length) {
+      throw new Error("No Pages returned from /me/accounts");
+    }
+
+    // 4) save to *this* app user
+    await saveMetaConnection({ userId, token: longToken, pages });
+
+    // ✅ success
+    return res.redirect(`${returnTo || returnToDefault}?connected=meta`);
+  } catch (err: any) {
+    console.error("[META_CALLBACK_ERROR]", err?.message, err?.response?.data || err);
+    const msg = encodeURIComponent(err?.message || "unknown");
+    return res.redirect(`${returnToDefault}?error=meta_oauth_failed&msg=${msg}`);
+  }
+});
+
+
+Key point: userId must come from state, not from cookies.
+
+Why your current logs look “clean”
+
+Your access log only shows:
+
+GET /api/oauth/meta/callback 302
+
+Even if inside the callback you did:
+
+got token ✅
+
+failed on /me/accounts ❌
+
+failed saving to DB ❌
+
+caught error and still redirected ✅
+
+…it would still look exactly like what you pasted.
+
+So we need to make failures visible.
+
+One quick test before coding (to confirm it’s a user/session binding issue)
+
+Do this:
+
+Open your app and log in
+
+In the same browser tab/session, click Connect
+
+After the Meta flow, if it still fails, open DevTools → Application → Cookies and confirm your app auth cookie exists
+
+If it works in one browser but not another / not in incognito → it’s session/cookie/state binding.
+
+But honestly, state-based binding is the correct fix anyway, even if cookies are working.

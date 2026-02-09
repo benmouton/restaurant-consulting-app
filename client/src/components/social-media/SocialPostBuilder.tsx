@@ -173,10 +173,12 @@ export default function SocialPostBuilder() {
           if (d.business_error) diagInfo += ` | Biz Error: ${d.business_error}`;
         } catch {}
       }
+      const msgParam = params.get("msg");
+      const msgInfo = msgParam ? ` Details: ${decodeURIComponent(msgParam)}` : "";
       const errorMessages: Record<string, string> = {
         no_pages: `No Facebook Pages found.${diagInfo}`,
         invalid_state: "Connection session expired. Please try again.",
-        oauth_failed: "Connection failed. Please try again.",
+        oauth_failed: `Connection failed.${msgInfo || " Please try again."}`,
         missing_params: "Connection was incomplete. Please try again.",
       };
       toast({

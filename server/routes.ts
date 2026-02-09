@@ -1984,26 +1984,45 @@ Generate JSON with:
       const userId = stateData.userId;
       console.log("Meta OAuth state valid for user:", userId);
 
-      const shortToken = await socialMediaService.exchangeMetaCode(code as string);
-      console.log("Meta OAuth short token obtained");
-      
-      // Exchange to long-lived token once (can only be done once per short token)
+      // Step 1: Exchange code for short-lived token
+      let shortToken;
+      try {
+        shortToken = await socialMediaService.exchangeMetaCode(code as string);
+        console.log("[META_CB] Step 1 OK: short token obtained");
+      } catch (e: any) {
+        console.error("[META_CB] Step 1 FAIL: token exchange:", e?.message);
+        const msg = encodeURIComponent(`Token exchange failed: ${e?.message || "unknown"}`);
+        res.redirect(`/domain/social-media?error=oauth_failed&msg=${msg}`);
+        return;
+      }
+
+      // Step 2: Exchange to long-lived token (only attempt once)
       let longLivedAccessToken = shortToken.accessToken;
       try {
         const longToken = await socialMediaService.getMetaLongLivedToken(shortToken.accessToken);
         longLivedAccessToken = longToken.accessToken;
-        console.log("Meta OAuth long-lived token obtained");
-      } catch (e) {
-        console.warn("Could not get long-lived token, using short token:", e);
+        console.log("[META_CB] Step 2 OK: long-lived token obtained");
+      } catch (e: any) {
+        console.warn("[META_CB] Step 2 WARN: long-lived exchange failed, using short token:", e?.message);
       }
 
-      // Get pages using the long-lived token
-      let { pages, diagnostics } = await socialMediaService.getFacebookPages(longLivedAccessToken);
-      console.log("Meta OAuth pages found:", pages.length, pages.map(p => p.name));
-      console.log("Meta OAuth diagnostics:", JSON.stringify(diagnostics));
+      // Step 3: Fetch pages
+      let pages: any[];
+      let diagnostics: any;
+      try {
+        const result = await socialMediaService.getFacebookPages(longLivedAccessToken);
+        pages = result.pages;
+        diagnostics = result.diagnostics;
+        console.log("[META_CB] Step 3 OK: pages found:", pages.length, pages.map((p: any) => p.name));
+      } catch (e: any) {
+        console.error("[META_CB] Step 3 FAIL: page fetch:", e?.message);
+        const msg = encodeURIComponent(`Page fetch failed: ${e?.message || "unknown"}`);
+        res.redirect(`/domain/social-media?error=oauth_failed&msg=${msg}`);
+        return;
+      }
 
       if (pages.length === 0) {
-        console.warn("Meta OAuth: No pages returned. Diagnostics:", JSON.stringify(diagnostics));
+        console.warn("[META_CB] No pages returned. Diagnostics:", JSON.stringify(diagnostics));
         const diagParam = encodeURIComponent(JSON.stringify({
           scopes: diagnostics.scopes,
           type: diagnostics.type,
@@ -2014,48 +2033,57 @@ Generate JSON with:
           businesses_count: diagnostics.businesses_count,
           businesses_status: diagnostics.businesses_status,
           business_error: diagnostics.business_error,
-          token_used: diagnostics.token_used,
         }));
         res.redirect(`/domain/social-media?error=no_pages&diag=${diagParam}`);
         return;
       }
 
-      for (const page of pages) {
-        console.log("Saving Facebook page:", page.name, page.id);
-        await socialMediaService.saveConnectedAccount(
-          userId,
-          'facebook',
-          page.id,
-          page.name,
-          page.access_token,
-          undefined,
-          60 * 60 * 24 * 60,
-          { pageId: page.id },
-          page.picture?.data?.url
-        );
-
-        const igAccounts = await socialMediaService.getInstagramAccounts(page.id, page.access_token);
-        console.log("Instagram accounts for page", page.name, ":", igAccounts.length);
-        for (const ig of igAccounts) {
+      // Step 4: Save accounts
+      try {
+        for (const page of pages) {
+          console.log("[META_CB] Step 4: Saving page:", page.name, page.id);
           await socialMediaService.saveConnectedAccount(
             userId,
-            'instagram',
-            ig.id,
-            ig.username,
+            'facebook',
+            page.id,
+            page.name,
             page.access_token,
             undefined,
             60 * 60 * 24 * 60,
-            { igUserId: ig.id, pageId: page.id },
-            ig.profile_picture_url
+            { pageId: page.id },
+            page.picture?.data?.url
           );
+
+          const igAccounts = await socialMediaService.getInstagramAccounts(page.id, page.access_token);
+          console.log("[META_CB] Instagram accounts for", page.name, ":", igAccounts.length);
+          for (const ig of igAccounts) {
+            await socialMediaService.saveConnectedAccount(
+              userId,
+              'instagram',
+              ig.id,
+              ig.username,
+              page.access_token,
+              undefined,
+              60 * 60 * 24 * 60,
+              { igUserId: ig.id, pageId: page.id },
+              ig.profile_picture_url
+            );
+          }
         }
+        console.log("[META_CB] Step 4 OK: All accounts saved");
+      } catch (e: any) {
+        console.error("[META_CB] Step 4 FAIL: save error:", e?.message);
+        const msg = encodeURIComponent(`Save failed: ${e?.message || "unknown"}`);
+        res.redirect(`/domain/social-media?error=oauth_failed&msg=${msg}`);
+        return;
       }
 
-      console.log("Meta OAuth completed successfully");
+      console.log("[META_CB] SUCCESS - redirecting");
       res.redirect("/domain/social-media?connected=meta");
-    } catch (error) {
-      console.error("Meta OAuth callback error:", error);
-      res.redirect("/domain/social-media?error=oauth_failed");
+    } catch (error: any) {
+      console.error("[META_CB] UNEXPECTED ERROR:", error?.message, error?.stack);
+      const msg = encodeURIComponent(error?.message || "unknown error");
+      res.redirect(`/domain/social-media?error=oauth_failed&msg=${msg}`);
     }
   });
 
