@@ -129,6 +129,7 @@ export default function SocialPostBuilder() {
     cta: "reserve_now",
     selectedHoliday: "",
     postTypeData: {} as any,
+    mediaUrl: "",
   });
 
   const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
@@ -300,7 +301,22 @@ export default function SocialPostBuilder() {
   }, []);
 
   const generateMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: { 
+      postType: string; 
+      platforms: string[]; 
+      outputStyle: string; 
+      eventName: string; 
+      eventDate: string; 
+      startTime: string; 
+      endTime: string; 
+      promotionDetails: string; 
+      targetAudience: string; 
+      tone: string; 
+      cta: string; 
+      selectedHoliday: string;
+      postTypeData?: any;
+      mediaUrl?: string;
+    }) => {
       const response = await apiRequest("POST", "/api/social-media/generate-post", data);
       return response.json();
     },
@@ -328,11 +344,12 @@ export default function SocialPostBuilder() {
   });
 
   const publishMutation = useMutation({
-    mutationFn: async (data: { caption: string; platformTargets: number[]; postNow: boolean; generatedContent?: object }) => {
+    mutationFn: async (data: { caption: string; platformTargets: number[]; postNow: boolean; generatedContent?: object; mediaUrls?: string[] }) => {
       const response = await apiRequest("POST", "/api/social-media/posts", data);
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/social-media/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/social-media/posts"] });
       toast({ title: "Published!", description: "Your post has been sent to the selected platforms." });
       setStep(1);
@@ -380,6 +397,7 @@ export default function SocialPostBuilder() {
       platformTargets: selectedAccountIds,
       postNow: true,
       generatedContent: generatedPost,
+      mediaUrls: formData.mediaUrl ? [formData.mediaUrl] : [],
     });
   };
 
@@ -430,10 +448,11 @@ export default function SocialPostBuilder() {
       return;
     }
     
-    // Ensure postTypeData is always passed, even if empty
+    // Ensure postTypeData and mediaUrl are always passed, even if empty
     const submissionData = {
       ...formData,
-      postTypeData: formData.postTypeData || {}
+      postTypeData: formData.postTypeData || {},
+      mediaUrl: formData.mediaUrl || ""
     };
     
     generateMutation.mutate(submissionData);
@@ -607,6 +626,23 @@ export default function SocialPostBuilder() {
             {step === 2 && (
               <div className="space-y-4">
                 {renderPostTypeFields()}
+
+                <div className="space-y-2">
+                  <Label>Image URL (Optional)</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="https://example.com/image.jpg"
+                      value={formData.mediaUrl}
+                      onChange={(e) => setFormData({ ...formData, mediaUrl: e.target.value })}
+                    />
+                    {formData.mediaUrl && (
+                      <div className="h-10 w-10 rounded border overflow-hidden">
+                        <img src={formData.mediaUrl} className="h-full w-full object-cover" alt="Preview" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Attach a photo link to include it in your post.</p>
+                </div>
 
                 <div className="space-y-2">
                   <Label>Additional Context</Label>
