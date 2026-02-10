@@ -2157,6 +2157,7 @@ Generate JSON with:
         scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
         status: postNow ? 'posting' : (scheduledFor ? 'scheduled' : 'draft'),
         postType,
+        postTypeData: req.body.postTypeData,
         generatedContent,
       });
 

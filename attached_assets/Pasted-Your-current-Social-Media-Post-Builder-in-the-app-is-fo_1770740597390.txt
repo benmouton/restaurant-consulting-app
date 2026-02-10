@@ -1,0 +1,47 @@
+Your current Social Media Post Builder in the app is focused on events/promotions (with fields like Event Name, Date, Start/End Time, and a description of what you're promoting). This makes sense for time-bound things like specials, happy hours, live music nights, or holiday dinners — and events are one of the most effective post types for restaurants on Facebook.
+However, Facebook Pages support a much wider variety of post formats and purposes. Your users (restaurant owners/managers) likely want to create quick everyday content too, not just scheduled events. Right now the tool feels limited to "promotional events only," which is why it doesn't cover the full range.
+Common Facebook Post Types Restaurants Use (Beyond Just Events)
+Here are the main categories restaurants post regularly on Facebook:
+
+Photo / Image Posts — Single mouth-watering dish photo, flat-lay of multiple items, interior shots, staff candids, or customer-submitted pics. These usually get the highest engagement.
+Carousel Posts — Multiple photos in one post (great for showcasing 3–5 menu items, a tasting menu, or "chef's favorites this week").
+Video Posts — Short clips (e.g., plating a dish, barista making latte art, 15-second teaser of tonight's special), Reels (short, vertical, trendy videos), or longer behind-the-scenes.
+Text / Status Updates — Quick announcements, polls ("Steak or seafood tonight?"), questions ("What's your go-to comfort food?"), fun facts, or dad-joke-style captions with minimal visuals.
+Stories — Temporary 24-hour content: quick boomerangs, polls/stickers, behind-the-scenes snippets, or "swipe up" to order/reserve.
+Offers / Deals — Facebook's built-in "Offer" format (time-limited discount, BOGO, etc., that people can claim/save).
+Events — What your tool already handles well (Jazz Night, Burger Special, etc.).
+Live Videos — Cooking demo, bartender flair, Q&A with the chef, or live coverage of a busy night.
+Album Posts — Grouped photos (e.g., "New Summer Menu" album with 8–10 dishes).
+Link Posts — Driving traffic to your website, online ordering page, or reservation system (though these tend to get lower organic reach).
+
+How to Expand Your Post Builder to Support More Types
+To give users the "full Facebook" experience, consider adding a post type selector as the very first step (or right after "Create").
+Suggested updated flow:
+
+Choose Post Type (dropdown or big buttons/cards)
+Event / Promotion (your current form — keep it!)
+Daily Special / Menu Feature
+Photo / Food Shot
+Carousel (multiple images)
+Short Video / Reel
+Poll or Question
+Quick Text Update / Announcement
+Offer / Discount
+Behind-the-Scenes / Story-style
+Other (with free-form fields)
+
+Conditional Fields based on the type chosen
+For Daily Special / Menu Feature → fields like: Dish Name, Price, Description, Ingredients/Allergens, Photo upload, "Available Today Only?" checkbox
+For Photo / Carousel → Multi-image uploader + caption + optional call-to-action buttons ("Reserve Now", "Order Online")
+For Poll → Question + 2–4 answer options + duration
+For Offer → Discount details, expiration date, claim limit, terms
+Keep shared fields like: Tone/Style, Accounts to post to, Scheduling/Holidays integration
+
+Quick Wins You Could Add Soon
+A simple "Quick Post" mode with just: Photo/Video upload + Caption + CTA buttons
+Pre-filled templates for restaurants (e.g., "Dish of the Day", "Throwback Thursday", "Customer Spotlight", "Poll: What's your favorite?")
+Toggle to turn an Event into a regular post if no date/time is needed
+
+
+This way the tool feels more flexible — users can still create proper events when they want, but also fire off a quick photo of today's special, run a poll about dessert choices, or post a Reel of the kitchen rush without forcing it into an "event" structure.
+Would you like help sketching out specific field layouts for 3–4 of these new post types, or ideas for how the UI could look when switching between them? Or maybe some example post copy/prompts for non-event content? Let me know which direction you'd like to go next!

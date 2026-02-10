@@ -274,7 +274,8 @@ export const scheduledPosts = pgTable("scheduled_posts", {
   mediaUrls: text("media_urls").array(),
   scheduledFor: timestamp("scheduled_for"),
   status: text("status").notNull().default("draft"), // 'draft' | 'scheduled' | 'posting' | 'posted' | 'failed' | 'partial'
-  postType: text("post_type"), // 'event' | 'promotion' | 'menu_feature' | etc.
+  postType: text("post_type"), // 'event' | 'promotion' | 'menu_feature' | 'quick_post' | 'poll' | 'offer' | etc.
+  postTypeData: jsonb("post_type_data"), // Type-specific fields (poll options, offer details, etc.)
   generatedContent: jsonb("generated_content"), // AI-generated content (hashtags, story overlays, etc.)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

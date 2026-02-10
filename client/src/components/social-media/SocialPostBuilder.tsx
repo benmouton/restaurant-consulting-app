@@ -128,6 +128,7 @@ export default function SocialPostBuilder() {
     tone: "classy",
     cta: "reserve_now",
     selectedHoliday: "",
+    postTypeData: {} as any,
   });
 
   const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
@@ -149,6 +150,114 @@ export default function SocialPostBuilder() {
   });
 
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
+
+  const getPostTypeLabel = () => {
+    switch (formData.postType) {
+      case "event_promo": return "Event Details";
+      case "special": return "Special Details";
+      case "menu_feature": return "Dish Details";
+      case "poll": return "Poll Details";
+      case "offer": return "Offer Details";
+      default: return "Post Details";
+    }
+  };
+
+  const renderPostTypeFields = () => {
+    switch (formData.postType) {
+      case "poll":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Question</Label>
+              <Input 
+                placeholder="e.g., Which dessert should we add?"
+                value={formData.postTypeData.question || ""}
+                onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, question: e.target.value } })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input 
+                placeholder="Option 1" 
+                value={formData.postTypeData.option1 || ""}
+                onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, option1: e.target.value } })}
+              />
+              <Input 
+                placeholder="Option 2" 
+                value={formData.postTypeData.option2 || ""}
+                onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, option2: e.target.value } })}
+              />
+            </div>
+          </div>
+        );
+      case "offer":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Discount (e.g. 20% off)</Label>
+                <Input 
+                  value={formData.postTypeData.discount || ""}
+                  onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, discount: e.target.value } })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Expires</Label>
+                <Input type="date" 
+                  value={formData.postTypeData.expiry || ""}
+                  onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, expiry: e.target.value } })}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{formData.postType === 'menu_feature' ? 'Dish Name' : 'Event/Promotion Name'}</Label>
+                <Input
+                  placeholder={formData.postType === 'menu_feature' ? "e.g., Wagyu Ribeye" : "e.g., Jazz Night, Burger Special"}
+                  value={formData.eventName}
+                  onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
+                  data-testid="input-event-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={formData.eventDate}
+                  onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
+                  data-testid="input-event-date"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={formData.startTime}
+                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                  data-testid="input-start-time"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Time</Label>
+                <Input
+                  type="time"
+                  value={formData.endTime}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                  data-testid="input-end-time"
+                />
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -320,7 +429,14 @@ export default function SocialPostBuilder() {
       toast({ title: "Missing info", description: "Please select at least one platform.", variant: "destructive" });
       return;
     }
-    generateMutation.mutate(formData);
+    
+    // Ensure postTypeData is always passed, even if empty
+    const submissionData = {
+      ...formData,
+      postTypeData: formData.postTypeData || {}
+    };
+    
+    generateMutation.mutate(submissionData);
   };
 
   const getUpcomingHolidays = () => {
@@ -482,7 +598,7 @@ export default function SocialPostBuilder() {
                   className="w-full"
                   data-testid="button-next-step"
                 >
-                  Next: Event Details
+                  Next: {getPostTypeLabel()}
                   <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
@@ -490,52 +606,12 @@ export default function SocialPostBuilder() {
 
             {step === 2 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Event/Promotion Name</Label>
-                    <Input
-                      placeholder="e.g., Jazz Night, Burger Special"
-                      value={formData.eventName}
-                      onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
-                      data-testid="input-event-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Date</Label>
-                    <Input
-                      type="date"
-                      value={formData.eventDate}
-                      onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
-                      data-testid="input-event-date"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
-                    <Input
-                      type="time"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      data-testid="input-start-time"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Time</Label>
-                    <Input
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      data-testid="input-end-time"
-                    />
-                  </div>
-                </div>
+                {renderPostTypeFields()}
 
                 <div className="space-y-2">
-                  <Label>What are you promoting?</Label>
+                  <Label>Additional Context</Label>
                   <Textarea
-                    placeholder="Describe the special, event, or feature you're promoting..."
+                    placeholder="Tell the AI more about this post..."
                     value={formData.promotionDetails}
                     onChange={(e) => setFormData({ ...formData, promotionDetails: e.target.value })}
                     rows={3}

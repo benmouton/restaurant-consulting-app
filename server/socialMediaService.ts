@@ -482,6 +482,47 @@ export const socialMediaService = {
     return response.json();
   },
 
+  async generatePostContent(data: any, brandSettings?: any) {
+    const { postType, platforms, outputStyle, tone, targetAudience, eventName, promotionDetails } = data;
+    
+    let prompt = `Act as an expert restaurant social media manager. Generate a high-performing social media post for a restaurant.
+    
+    RESTAURANT INFO:
+    Name: ${brandSettings?.restaurantName || "Our Restaurant"}
+    Location: ${brandSettings?.location || "Local area"}
+    Voice: ${(brandSettings?.voiceAdjectives || []).join(", ")}
+    
+    POST TYPE: ${postType}
+    PLATFORMS: ${platforms.join(", ")}
+    STYLE: ${outputStyle}
+    TONE: ${tone}
+    AUDIENCE: ${targetAudience}
+    
+    DETAILS:
+    ${eventName ? `Subject: ${eventName}` : ""}
+    ${promotionDetails ? `Details: ${promotionDetails}` : ""}
+    ${data.postTypeData ? `Specific Info: ${JSON.stringify(data.postTypeData)}` : ""}
+    
+    Provide the response in JSON format with:
+    - primaryCaption (engaging caption with emojis based on emoji_level: ${brandSettings?.emojiLevel || "light"})
+    - shortCaption (for quick reading or stories)
+    - storyOverlays (3-5 short text snippets for story slides)
+    - hashtags (relevant trending and local hashtags)
+    - suggestedPostTime (best time today to post)
+    - replyPack (3 potential responses to common comments)`;
+
+    // AI generation logic would go here, currently using Replit AI integration
+    // For now, returning a mock structure or calling the actual AI service
+    return {
+      primaryCaption: "Drafting your perfect post...",
+      shortCaption: "Coming soon!",
+      storyOverlays: ["Slide 1", "Slide 2"],
+      hashtags: ["#restaurant", "#foodie"],
+      suggestedPostTime: "6:00 PM",
+      replyPack: ["Yum!", "See you there!"]
+    };
+  },
+
   // Helper: Get decrypted token for an account
   getDecryptedToken(account: ConnectedAccount): string {
     return decrypt(account.accessTokenEncrypted);
