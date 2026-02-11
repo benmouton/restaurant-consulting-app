@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,21 +14,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Sparkles,
-  Calendar,
-  Image,
+  Image as ImageIcon,
   Settings,
-  FileText,
   Clock,
   Copy,
   Check,
-  ChevronRight,
   Instagram,
   Facebook,
   Loader2,
@@ -42,6 +38,9 @@ import {
   AlertCircle,
   CheckCircle2,
   History,
+  X,
+  Upload,
+  Eye,
 } from "lucide-react";
 import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
 
@@ -112,12 +111,16 @@ interface GeneratedPost {
 export default function SocialPostBuilder() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("create");
-  const [step, setStep] = useState(1);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [caption, setCaption] = useState("");
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
+  const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
 
-  const [formData, setFormData] = useState({
+  const [aiFormData, setAiFormData] = useState({
     postType: "",
-    platforms: [] as string[],
     outputStyle: "warm_hospitality",
     eventName: "",
     eventDate: "",
@@ -129,10 +132,7 @@ export default function SocialPostBuilder() {
     cta: "reserve_now",
     selectedHoliday: "",
     postTypeData: {} as any,
-    mediaUrl: "",
   });
-
-  const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
 
   const { data: holidays, isLoading: holidaysLoading } = useQuery<RestaurantHoliday[]>({
     queryKey: ["/api/social-media/holidays/upcoming"],
@@ -150,115 +150,7 @@ export default function SocialPostBuilder() {
     queryKey: ["/api/social-media/posts"],
   });
 
-  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
-
-  const getPostTypeLabel = () => {
-    switch (formData.postType) {
-      case "event_promo": return "Event Details";
-      case "special": return "Special Details";
-      case "menu_feature": return "Dish Details";
-      case "poll": return "Poll Details";
-      case "offer": return "Offer Details";
-      default: return "Post Details";
-    }
-  };
-
-  const renderPostTypeFields = () => {
-    switch (formData.postType) {
-      case "poll":
-        return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Question</Label>
-              <Input 
-                placeholder="e.g., Which dessert should we add?"
-                value={formData.postTypeData.question || ""}
-                onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, question: e.target.value } })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Input 
-                placeholder="Option 1" 
-                value={formData.postTypeData.option1 || ""}
-                onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, option1: e.target.value } })}
-              />
-              <Input 
-                placeholder="Option 2" 
-                value={formData.postTypeData.option2 || ""}
-                onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, option2: e.target.value } })}
-              />
-            </div>
-          </div>
-        );
-      case "offer":
-        return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Discount (e.g. 20% off)</Label>
-                <Input 
-                  value={formData.postTypeData.discount || ""}
-                  onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, discount: e.target.value } })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Expires</Label>
-                <Input type="date" 
-                  value={formData.postTypeData.expiry || ""}
-                  onChange={(e) => setFormData({ ...formData, postTypeData: { ...formData.postTypeData, expiry: e.target.value } })}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{formData.postType === 'menu_feature' ? 'Dish Name' : 'Event/Promotion Name'}</Label>
-                <Input
-                  placeholder={formData.postType === 'menu_feature' ? "e.g., Wagyu Ribeye" : "e.g., Jazz Night, Burger Special"}
-                  value={formData.eventName}
-                  onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
-                  data-testid="input-event-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={formData.eventDate}
-                  onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
-                  data-testid="input-event-date"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Time</Label>
-                <Input
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  data-testid="input-start-time"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>End Time</Label>
-                <Input
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  data-testid="input-end-time"
-                />
-              </div>
-            </div>
-          </div>
-        );
-    }
-  };
+  const activeAccounts = connectedAccounts?.filter(a => a.status === 'active') || [];
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -301,29 +193,15 @@ export default function SocialPostBuilder() {
   }, []);
 
   const generateMutation = useMutation({
-    mutationFn: async (data: { 
-      postType: string; 
-      platforms: string[]; 
-      outputStyle: string; 
-      eventName: string; 
-      eventDate: string; 
-      startTime: string; 
-      endTime: string; 
-      promotionDetails: string; 
-      targetAudience: string; 
-      tone: string; 
-      cta: string; 
-      selectedHoliday: string;
-      postTypeData?: any;
-      mediaUrl?: string;
-    }) => {
+    mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/social-media/generate-post", data);
       return response.json();
     },
     onSuccess: (data) => {
       setGeneratedPost(data);
-      setStep(4);
-      toast({ title: "Post generated!", description: "Your content is ready to copy." });
+      setCaption(data.primaryCaption);
+      setShowAiPanel(false);
+      toast({ title: "Post generated!", description: "Your content is ready. Edit it below or publish." });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to generate post. Please try again.", variant: "destructive" });
@@ -348,11 +226,32 @@ export default function SocialPostBuilder() {
       const response = await apiRequest("POST", "/api/social-media/posts", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/social-media/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/social-media/posts"] });
-      toast({ title: "Published!", description: "Your post has been sent to the selected platforms." });
-      setStep(1);
+
+      const results = data.results || [];
+      const failed = results.filter((r: any) => r.status === 'failed');
+      const succeeded = results.filter((r: any) => r.status === 'success');
+
+      if (failed.length > 0 && succeeded.length === 0) {
+        toast({
+          title: "Publishing Failed",
+          description: failed.map((r: any) => `${r.provider}: ${r.errorMessage}`).join('; '),
+          variant: "destructive",
+        });
+      } else if (failed.length > 0) {
+        toast({
+          title: "Partially Published",
+          description: `${succeeded.length} succeeded, ${failed.length} failed: ${failed.map((r: any) => r.errorMessage).join('; ')}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Published!", description: `Your post has been sent to ${succeeded.length} platform${succeeded.length !== 1 ? 's' : ''}.` });
+      }
+
+      setCaption("");
+      setMediaUrl("");
       setGeneratedPost(null);
       setSelectedAccountIds([]);
     },
@@ -365,10 +264,8 @@ export default function SocialPostBuilder() {
     try {
       const response = await fetch("/api/oauth/meta/start");
       const data = await response.json();
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
-      }
-    } catch (error) {
+      if (data.authUrl) window.location.href = data.authUrl;
+    } catch {
       toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
     }
   };
@@ -377,27 +274,28 @@ export default function SocialPostBuilder() {
     try {
       const response = await fetch("/api/oauth/google/start");
       const data = await response.json();
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
-      }
-    } catch (error) {
+      if (data.authUrl) window.location.href = data.authUrl;
+    } catch {
       toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
     }
   };
 
   const handlePublish = () => {
     if (selectedAccountIds.length === 0) {
-      toast({ title: "Select accounts", description: "Please select at least one account to publish to.", variant: "destructive" });
+      toast({ title: "Select channels", description: "Please select at least one channel to publish to.", variant: "destructive" });
       return;
     }
-    if (!generatedPost) return;
+    if (!caption.trim()) {
+      toast({ title: "Write something", description: "Please write a caption for your post.", variant: "destructive" });
+      return;
+    }
 
     publishMutation.mutate({
-      caption: generatedPost.primaryCaption,
+      caption: caption.trim(),
       platformTargets: selectedAccountIds,
       postNow: true,
-      generatedContent: generatedPost,
-      mediaUrls: formData.mediaUrl ? [formData.mediaUrl] : [],
+      generatedContent: generatedPost || undefined,
+      mediaUrls: mediaUrl ? [mediaUrl] : [],
     });
   };
 
@@ -409,26 +307,30 @@ export default function SocialPostBuilder() {
     );
   };
 
-  const getProviderIcon = (provider: string) => {
-    switch (provider) {
-      case 'facebook':
-        return <Facebook className="h-4 w-4 text-blue-600" />;
-      case 'instagram':
-        return <Instagram className="h-4 w-4 text-pink-600" />;
-      case 'google_business':
-        return <MapPin className="h-4 w-4 text-red-500" />;
-      default:
-        return <Link2 className="h-4 w-4" />;
+  const selectAllAccounts = () => {
+    if (selectedAccountIds.length === activeAccounts.length) {
+      setSelectedAccountIds([]);
+    } else {
+      setSelectedAccountIds(activeAccounts.map(a => a.id));
     }
   };
 
-  const handlePlatformToggle = (platform: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      platforms: prev.platforms.includes(platform)
-        ? prev.platforms.filter((p) => p !== platform)
-        : [...prev.platforms, platform],
-    }));
+  const getProviderIcon = (provider: string) => {
+    switch (provider) {
+      case 'facebook': return <Facebook className="h-3.5 w-3.5 text-blue-600" />;
+      case 'instagram': return <Instagram className="h-3.5 w-3.5 text-pink-600" />;
+      case 'google_business': return <MapPin className="h-3.5 w-3.5 text-red-500" />;
+      default: return <Link2 className="h-3.5 w-3.5" />;
+    }
+  };
+
+  const getProviderBadgeColor = (provider: string) => {
+    switch (provider) {
+      case 'facebook': return 'bg-blue-600';
+      case 'instagram': return 'bg-gradient-to-tr from-purple-600 via-pink-500 to-orange-400';
+      case 'google_business': return 'bg-blue-500';
+      default: return 'bg-muted-foreground';
+    }
   };
 
   const copyToClipboard = (text: string, field: string) => {
@@ -438,31 +340,28 @@ export default function SocialPostBuilder() {
     toast({ title: "Copied!", description: "Text copied to clipboard." });
   };
 
-  const handleGenerate = () => {
-    if (!formData.postType) {
+  const handleAiGenerate = () => {
+    if (!aiFormData.postType) {
       toast({ title: "Missing info", description: "Please select a post type.", variant: "destructive" });
       return;
     }
-    if (formData.platforms.length === 0) {
-      toast({ title: "Missing info", description: "Please select at least one platform.", variant: "destructive" });
-      return;
-    }
-    
-    // Ensure postTypeData and mediaUrl are always passed, even if empty
-    const submissionData = {
-      ...formData,
-      postTypeData: formData.postTypeData || {},
-      mediaUrl: formData.mediaUrl || ""
-    };
-    
-    generateMutation.mutate(submissionData);
+
+    const platforms = selectedAccountIds.map(id => {
+      const acct = activeAccounts.find(a => a.id === id);
+      return acct?.provider || '';
+    }).filter(Boolean);
+
+    generateMutation.mutate({
+      ...aiFormData,
+      platforms: platforms.length > 0 ? platforms : ['facebook', 'instagram'],
+      postTypeData: aiFormData.postTypeData || {},
+      mediaUrl: mediaUrl || "",
+    });
   };
 
   const getUpcomingHolidays = () => {
     if (!holidays) return [];
     const today = new Date();
-    const todayStr = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    
     return holidays
       .filter((h) => {
         const [month, day] = h.date.split('-').map(Number);
@@ -474,785 +373,584 @@ export default function SocialPostBuilder() {
   };
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Social Media Post Builder
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 mb-4">
-            <TabsTrigger value="create" className="text-xs sm:text-sm" data-testid="tab-create-post">
-              <Wand2 className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Create</span>
+    <div className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <TabsList>
+            <TabsTrigger value="create" data-testid="tab-create-post">
+              <Wand2 className="h-4 w-4 mr-2" />
+              Create
             </TabsTrigger>
-            <TabsTrigger value="accounts" className="text-xs sm:text-sm" data-testid="tab-accounts">
-              <Link2 className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Accounts</span>
+            <TabsTrigger value="accounts" data-testid="tab-accounts">
+              <Link2 className="h-4 w-4 mr-2" />
+              Channels
             </TabsTrigger>
-            <TabsTrigger value="holidays" className="text-xs sm:text-sm" data-testid="tab-holidays">
-              <PartyPopper className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Holidays</span>
+            <TabsTrigger value="holidays" data-testid="tab-holidays">
+              <PartyPopper className="h-4 w-4 mr-2" />
+              Holidays
             </TabsTrigger>
-            <TabsTrigger value="history" className="text-xs sm:text-sm" data-testid="tab-history">
-              <History className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">History</span>
+            <TabsTrigger value="history" data-testid="tab-history">
+              <History className="h-4 w-4 mr-2" />
+              Sent
             </TabsTrigger>
-            <TabsTrigger value="settings" className="text-xs sm:text-sm" data-testid="tab-settings">
-              <Settings className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Voice</span>
+            <TabsTrigger value="settings" data-testid="tab-settings">
+              <Settings className="h-4 w-4 mr-2" />
+              Voice
             </TabsTrigger>
           </TabsList>
+        </div>
 
-          <TabsContent value="create" className="space-y-4">
-            {step === 1 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Post Type</Label>
-                  <Select
-                    value={formData.postType}
-                    onValueChange={(v) => setFormData({ ...formData, postType: v })}
-                  >
-                    <SelectTrigger data-testid="select-post-type">
-                      <SelectValue placeholder="What are you posting about?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {POST_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Platforms</Label>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant={formData.platforms.includes("instagram_feed") ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePlatformToggle("instagram_feed")}
-                      data-testid="button-platform-instagram"
-                    >
-                      <Instagram className="h-4 w-4 mr-2" />
-                      Instagram Feed
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formData.platforms.includes("instagram_story") ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePlatformToggle("instagram_story")}
-                      data-testid="button-platform-ig-story"
-                    >
-                      <Instagram className="h-4 w-4 mr-2" />
-                      IG Story
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formData.platforms.includes("facebook") ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePlatformToggle("facebook")}
-                      data-testid="button-platform-facebook"
-                    >
-                      <Facebook className="h-4 w-4 mr-2" />
-                      Facebook
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formData.platforms.includes("google_business") ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePlatformToggle("google_business")}
-                      data-testid="button-platform-google"
-                    >
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Google Business
-                    </Button>
-                  </div>
-                  {connectedAccounts && connectedAccounts.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      <span>{connectedAccounts.filter(a => a.status === 'active').length} account(s) connected</span>
-                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-manage-accounts">
-                        Manage
-                      </Button>
-                    </div>
-                  )}
-                  {(!connectedAccounts || connectedAccounts.length === 0) && (
-                    <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-amber-600">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>No accounts connected.</span>
-                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setActiveTab("accounts")} data-testid="button-connect-accounts">
-                        Connect now
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Output Style</Label>
-                  <Select
-                    value={formData.outputStyle}
-                    onValueChange={(v) => setFormData({ ...formData, outputStyle: v })}
-                  >
-                    <SelectTrigger data-testid="select-output-style">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {OUTPUT_STYLES.map((style) => (
-                        <SelectItem key={style.value} value={style.value}>
-                          {style.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button
-                  onClick={() => setStep(2)}
-                  disabled={!formData.postType || formData.platforms.length === 0}
-                  className="w-full"
-                  data-testid="button-next-step"
-                >
-                  Next: {getPostTypeLabel()}
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="space-y-4">
-                {renderPostTypeFields()}
-
-                <div className="space-y-2">
-                  <Label>Image URL (Optional)</Label>
-                  <div className="flex gap-2">
-                    <Input 
-                      placeholder="https://example.com/image.jpg"
-                      value={formData.mediaUrl}
-                      onChange={(e) => setFormData({ ...formData, mediaUrl: e.target.value })}
-                    />
-                    {formData.mediaUrl && (
-                      <div className="h-10 w-10 rounded border overflow-hidden">
-                        <img src={formData.mediaUrl} className="h-full w-full object-cover" alt="Preview" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Attach a photo link to include it in your post.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Additional Context</Label>
-                  <Textarea
-                    placeholder="Tell the AI more about this post..."
-                    value={formData.promotionDetails}
-                    onChange={(e) => setFormData({ ...formData, promotionDetails: e.target.value })}
-                    rows={3}
-                    data-testid="textarea-promotion-details"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1" data-testid="button-back-step-2">
-                    Back
-                  </Button>
-                  <Button onClick={() => setStep(3)} className="flex-1" data-testid="button-next-step-2">
-                    Next: Tone & Style
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <TabsContent value="create">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Left: Compose Panel */}
+            <div className="lg:col-span-3 space-y-4">
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  {/* Channel selector row */}
                   <div className="space-y-2">
-                    <Label>Target Audience</Label>
-                    <Select
-                      value={formData.targetAudience}
-                      onValueChange={(v) => setFormData({ ...formData, targetAudience: v })}
-                    >
-                      <SelectTrigger data-testid="select-target-audience">
-                        <SelectValue placeholder="Who is this for?" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TARGET_AUDIENCES.map((aud) => (
-                          <SelectItem key={aud.value} value={aud.value}>
-                            {aud.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tone</Label>
-                    <Select
-                      value={formData.tone}
-                      onValueChange={(v) => setFormData({ ...formData, tone: v })}
-                    >
-                      <SelectTrigger data-testid="select-tone">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TONES.map((tone) => (
-                          <SelectItem key={tone.value} value={tone.value}>
-                            {tone.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Call to Action</Label>
-                  <Select
-                    value={formData.cta}
-                    onValueChange={(v) => setFormData({ ...formData, cta: v })}
-                  >
-                    <SelectTrigger data-testid="select-cta">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CTAS.map((cta) => (
-                        <SelectItem key={cta.value} value={cta.value}>
-                          {cta.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {getUpcomingHolidays().length > 0 && (
-                  <div className="space-y-2 p-3 bg-muted rounded-lg">
-                    <Label className="flex flex-wrap items-center gap-2">
-                      <PartyPopper className="h-4 w-4" />
-                      Upcoming Holidays
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {getUpcomingHolidays().map((holiday) => (
-                        <Badge
-                          key={holiday.id}
-                          variant={formData.selectedHoliday === holiday.name ? "default" : "outline"}
-                          className="cursor-pointer"
-                          onClick={() =>
-                            setFormData({
-                              ...formData,
-                              selectedHoliday:
-                                formData.selectedHoliday === holiday.name ? "" : holiday.name,
-                            })
-                          }
-                          data-testid={`badge-holiday-${holiday.id}`}
-                        >
-                          {holiday.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => setStep(2)} className="flex-1" data-testid="button-back-step-3">
-                    Back
-                  </Button>
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={generateMutation.isPending}
-                    className="flex-1"
-                    data-testid="button-generate-post"
-                  >
-                    {generateMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generate Post
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {step === 4 && generatedPost && (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-semibold flex flex-wrap items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Your Generated Content
-                  </h3>
-                  <Badge variant="outline" className="text-xs" data-testid="badge-platform-count">
-                    {formData.platforms.length} platform{formData.platforms.length !== 1 ? 's' : ''}
-                  </Badge>
-                </div>
-
-                <Tabs defaultValue="all" className="w-full">
-                  <TabsList className="w-full grid grid-cols-4">
-                    <TabsTrigger value="all" className="text-xs" data-testid="tab-preview-all">All</TabsTrigger>
-                    {formData.platforms.includes("instagram_feed") && (
-                      <TabsTrigger value="instagram" className="text-xs" data-testid="tab-preview-instagram">
-                        <Instagram className="h-3 w-3 mr-1" />
-                        IG
-                      </TabsTrigger>
-                    )}
-                    {formData.platforms.includes("facebook") && (
-                      <TabsTrigger value="facebook" className="text-xs" data-testid="tab-preview-facebook">
-                        <Facebook className="h-3 w-3 mr-1" />
-                        FB
-                      </TabsTrigger>
-                    )}
-                    {formData.platforms.includes("google_business") && (
-                      <TabsTrigger value="google" className="text-xs" data-testid="tab-preview-google">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        GBP
-                      </TabsTrigger>
-                    )}
-                  </TabsList>
-
-                  <TabsContent value="all" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Label>Primary Caption</Label>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => copyToClipboard(generatedPost.primaryCaption, "primary")}
-                          data-testid="button-copy-primary"
-                        >
-                          {copiedField === "primary" ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {selectedAccountIds.length > 0
+                          ? `${selectedAccountIds.length} channel${selectedAccountIds.length !== 1 ? 's' : ''} selected`
+                          : 'Select channels'}
+                      </span>
+                      {activeAccounts.length > 1 && (
+                        <Button variant="ghost" size="sm" onClick={selectAllAccounts} data-testid="button-select-all-accounts">
+                          {selectedAccountIds.length === activeAccounts.length ? 'Deselect All' : 'Select All'}
                         </Button>
-                      </div>
-                      <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap" data-testid="text-primary-caption">
-                        {generatedPost.primaryCaption}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Label>Short Caption</Label>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => copyToClipboard(generatedPost.shortCaption, "short")}
-                          data-testid="button-copy-short"
-                        >
-                          {copiedField === "short" ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      <div className="p-3 bg-muted rounded-lg text-sm" data-testid="text-short-caption">
-                        {generatedPost.shortCaption}
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {formData.platforms.includes("instagram_feed") && (
-                    <TabsContent value="instagram" className="mt-4">
-                      <div className="border rounded-lg overflow-hidden">
-                        <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 p-2 flex flex-wrap items-center gap-2">
-                          <Instagram className="h-4 w-4 text-white" />
-                          <span className="text-white text-sm font-medium">Instagram Preview</span>
-                        </div>
-                        <div className="p-4 space-y-3">
-                          <div className="aspect-square bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
-                            [Your image here]
-                          </div>
-                          <p className="text-sm whitespace-pre-wrap">{generatedPost.primaryCaption}</p>
-                          <div className="flex flex-wrap gap-1">
-                            {generatedPost.hashtags.map((tag, i) => (
-                              <span key={i} className="text-xs text-primary">{tag}</span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full mt-2"
-                        onClick={() => copyToClipboard(generatedPost.primaryCaption + "\n\n" + generatedPost.hashtags.join(" "), "ig-full")}
-                        data-testid="button-copy-instagram"
-                      >
-                        {copiedField === "ig-full" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                        Copy Instagram Caption
-                      </Button>
-                    </TabsContent>
-                  )}
-
-                  {formData.platforms.includes("facebook") && (
-                    <TabsContent value="facebook" className="mt-4">
-                      <div className="border rounded-lg overflow-hidden">
-                        <div className="bg-blue-600 p-2 flex flex-wrap items-center gap-2">
-                          <Facebook className="h-4 w-4 text-white" />
-                          <span className="text-white text-sm font-medium">Facebook Preview</span>
-                        </div>
-                        <div className="p-4 space-y-3">
-                          <p className="text-sm whitespace-pre-wrap" data-testid="text-facebook-preview">{generatedPost.primaryCaption}</p>
-                          <div className="aspect-video bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">
-                            [Your image here]
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full mt-2"
-                        onClick={() => copyToClipboard(generatedPost.primaryCaption, "fb-full")}
-                        data-testid="button-copy-facebook"
-                      >
-                        {copiedField === "fb-full" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                        Copy Facebook Post
-                      </Button>
-                    </TabsContent>
-                  )}
-
-                  {formData.platforms.includes("google_business") && (
-                    <TabsContent value="google" className="mt-4">
-                      <div className="border rounded-lg overflow-hidden">
-                        <div className="bg-green-600 p-2 flex flex-wrap items-center gap-2">
-                          <MapPin className="h-4 w-4 text-white" />
-                          <span className="text-white text-sm font-medium">Google Business Preview</span>
-                        </div>
-                        <div className="p-4 space-y-3">
-                          <p className="text-sm whitespace-pre-wrap" data-testid="text-google-preview">{generatedPost.shortCaption}</p>
-                          <div className="text-xs text-muted-foreground">
-                            Tip: Google Business posts are best kept short (under 300 characters).
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full mt-2"
-                        onClick={() => copyToClipboard(generatedPost.shortCaption, "gbp-full")}
-                        data-testid="button-copy-google"
-                      >
-                        {copiedField === "gbp-full" ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                        Copy Google Business Post
-                      </Button>
-                    </TabsContent>
-                  )}
-                </Tabs>
-
-                {generatedPost.storyOverlays.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Story Text Overlays</Label>
-                    <div className="space-y-2">
-                      {generatedPost.storyOverlays.map((overlay, i) => (
-                        <div key={i} className="flex flex-wrap items-center gap-2">
-                          <div className="flex-1 p-2 bg-muted rounded text-sm" data-testid={`text-overlay-${i}`}>{overlay}</div>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => copyToClipboard(overlay, `overlay-${i}`)}
-                            data-testid={`button-copy-overlay-${i}`}
-                          >
-                            {copiedField === `overlay-${i}` ? (
-                              <Check className="h-4 w-4" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Label>Hashtags</Label>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => copyToClipboard(generatedPost.hashtags.join(" "), "hashtags")}
-                      data-testid="button-copy-hashtags"
-                    >
-                      {copiedField === "hashtags" ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
                       )}
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {generatedPost.hashtags.map((tag, i) => (
-                      <Badge key={i} variant="secondary" data-testid={`badge-hashtag-${i}`}>
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-2 p-3 bg-primary/5 rounded-lg" data-testid="text-suggested-time">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <span className="text-sm">
-                    Best time to post: <strong>{generatedPost.suggestedPostTime}</strong>
-                  </span>
-                </div>
-
-                <div className="border-t pt-4 mt-4">
-                  <h3 className="font-medium mb-2 flex flex-wrap items-center gap-2">
-                    <Send className="h-4 w-4" />
-                    Publish to Connected Accounts
-                  </h3>
-                  {connectedAccounts && connectedAccounts.length > 0 ? (
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm text-muted-foreground">
-                          Select which accounts to publish this post to:
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const activeAccounts = connectedAccounts.filter(a => a.status === 'active');
-                            if (selectedAccountIds.length === activeAccounts.length) {
-                              setSelectedAccountIds([]);
-                            } else {
-                              setSelectedAccountIds(activeAccounts.map(a => a.id));
-                            }
-                          }}
-                          data-testid="button-select-all-accounts"
+                    {activeAccounts.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {activeAccounts.map((account) => {
+                          const isSelected = selectedAccountIds.includes(account.id);
+                          return (
+                            <button
+                              key={account.id}
+                              onClick={() => toggleAccountSelection(account.id)}
+                              className={`relative rounded-full transition-all ${isSelected ? 'ring-2 ring-primary ring-offset-2' : 'opacity-50 hover:opacity-80'}`}
+                              title={`${account.displayName} (${account.provider.replace('_', ' ')})`}
+                              data-testid={`channel-avatar-${account.id}`}
+                            >
+                              <Avatar className="h-10 w-10">
+                                {account.profilePictureUrl ? (
+                                  <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
+                                ) : null}
+                                <AvatarFallback className="text-xs font-medium">
+                                  {account.displayName.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center text-white ${getProviderBadgeColor(account.provider)}`}>
+                                {account.provider === 'facebook' && <Facebook className="h-2.5 w-2.5" />}
+                                {account.provider === 'instagram' && <Instagram className="h-2.5 w-2.5" />}
+                                {account.provider === 'google_business' && <MapPin className="h-2.5 w-2.5" />}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        <button
+                          onClick={() => setActiveTab("accounts")}
+                          className="h-10 w-10 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                          title="Add channel"
+                          data-testid="button-add-channel"
                         >
-                          {selectedAccountIds.length === connectedAccounts.filter(a => a.status === 'active').length
-                            ? 'Deselect All'
-                            : 'Select All'}
+                          <span className="text-lg leading-none">+</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>No channels connected.</span>
+                        <Button variant="ghost" size="sm" onClick={() => setActiveTab("accounts")} data-testid="button-connect-accounts">
+                          Connect now
                         </Button>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {connectedAccounts.filter(a => a.status === 'active').map((account) => (
-                          <div
-                            key={account.id}
-                            className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                              selectedAccountIds.includes(account.id)
-                                ? 'border-primary bg-primary/5'
-                                : 'hover:bg-muted/50'
-                            }`}
-                            onClick={() => toggleAccountSelection(account.id)}
-                            data-testid={`account-select-${account.id}`}
-                          >
-                            <Checkbox
-                              checked={selectedAccountIds.includes(account.id)}
-                              onCheckedChange={() => toggleAccountSelection(account.id)}
-                              data-testid={`checkbox-account-${account.id}`}
-                            />
-                            <Avatar className="h-8 w-8">
-                              {account.profilePictureUrl ? (
-                                <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
-                              ) : null}
-                              <AvatarFallback className="text-xs">
-                                {getProviderIcon(account.provider)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{account.displayName}</div>
-                              <div className="text-xs text-muted-foreground capitalize">{account.provider.replace('_', ' ')}</div>
-                            </div>
-                          </div>
-                        ))}
+                    )}
+                  </div>
+
+                  {/* Large textarea */}
+                  <Textarea
+                    placeholder="What would you like to share?"
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    rows={8}
+                    className="text-base resize-none border-0 focus-visible:ring-0 shadow-none"
+                    data-testid="textarea-caption"
+                  />
+
+                  {/* Image area */}
+                  {mediaUrl ? (
+                    <div className="relative rounded-md border overflow-hidden">
+                      <img src={mediaUrl} alt="Post media" className="w-full max-h-64 object-cover" />
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute top-2 right-2"
+                        onClick={() => setMediaUrl("")}
+                        data-testid="button-remove-image"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-muted-foreground/20 rounded-md p-4">
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <Upload className="h-6 w-6 text-muted-foreground/50" />
+                        <div className="text-sm text-muted-foreground">
+                          Drag & drop or{" "}
+                          <label className="text-primary cursor-pointer hover:underline">
+                            paste an image URL
+                          </label>
+                        </div>
+                        <Input
+                          placeholder="https://example.com/image.jpg"
+                          value={mediaUrl}
+                          onChange={(e) => setMediaUrl(e.target.value)}
+                          className="max-w-sm"
+                          data-testid="input-media-url"
+                        />
                       </div>
+                    </div>
+                  )}
+
+                  {/* Bottom toolbar */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Button
+                        variant={showAiPanel ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setShowAiPanel(!showAiPanel)}
+                        data-testid="button-ai-assistant"
+                      >
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        AI Assistant
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPreview(!showPreview)}
+                        className="lg:hidden"
+                        data-testid="button-toggle-preview"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Preview
+                      </Button>
                       <Button
                         onClick={handlePublish}
-                        disabled={selectedAccountIds.length === 0 || publishMutation.isPending}
-                        className="w-full"
+                        disabled={!caption.trim() || selectedAccountIds.length === 0 || publishMutation.isPending}
                         data-testid="button-publish-now"
                       >
                         {publishMutation.isPending ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Publishing to {selectedAccountIds.length} platform{selectedAccountIds.length !== 1 ? 's' : ''}...
+                            Publishing...
                           </>
                         ) : (
                           <>
                             <Send className="h-4 w-4 mr-2" />
-                            Publish Now to {selectedAccountIds.length} Platform{selectedAccountIds.length !== 1 ? 's' : ''}
+                            Publish Now
                           </>
                         )}
                       </Button>
                     </div>
-                  ) : (
-                    <div className="text-center py-6 border rounded-lg bg-muted/30">
-                      <Link2 className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                      <p className="font-medium">No accounts connected</p>
-                      <p className="text-sm text-muted-foreground mb-3">Connect your social accounts to post directly</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setActiveTab("accounts")}
-                      >
-                        <Link2 className="h-4 w-4 mr-2" />
-                        Connect Accounts
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* AI Assistant panel (collapsible below compose) */}
+              {showAiPanel && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex flex-wrap items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        AI Post Generator
+                      </span>
+                      <Button size="icon" variant="ghost" onClick={() => setShowAiPanel(false)}>
+                        <X className="h-4 w-4" />
                       </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Post Type</Label>
+                        <Select value={aiFormData.postType} onValueChange={(v) => setAiFormData({ ...aiFormData, postType: v })}>
+                          <SelectTrigger data-testid="select-post-type">
+                            <SelectValue placeholder="What are you posting about?" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {POST_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Style</Label>
+                        <Select value={aiFormData.outputStyle} onValueChange={(v) => setAiFormData({ ...aiFormData, outputStyle: v })}>
+                          <SelectTrigger data-testid="select-output-style">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {OUTPUT_STYLES.map((style) => (
+                              <SelectItem key={style.value} value={style.value}>{style.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Event / Item Name</Label>
+                        <Input
+                          placeholder="e.g., Jazz Night, Wagyu Ribeye"
+                          value={aiFormData.eventName}
+                          onChange={(e) => setAiFormData({ ...aiFormData, eventName: e.target.value })}
+                          data-testid="input-event-name"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Date</Label>
+                        <Input
+                          type="date"
+                          value={aiFormData.eventDate}
+                          onChange={(e) => setAiFormData({ ...aiFormData, eventDate: e.target.value })}
+                          data-testid="input-event-date"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Target Audience</Label>
+                        <Select value={aiFormData.targetAudience} onValueChange={(v) => setAiFormData({ ...aiFormData, targetAudience: v })}>
+                          <SelectTrigger data-testid="select-target-audience">
+                            <SelectValue placeholder="Who is this for?" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TARGET_AUDIENCES.map((aud) => (
+                              <SelectItem key={aud.value} value={aud.value}>{aud.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tone</Label>
+                        <Select value={aiFormData.tone} onValueChange={(v) => setAiFormData({ ...aiFormData, tone: v })}>
+                          <SelectTrigger data-testid="select-tone">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TONES.map((tone) => (
+                              <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Additional Details</Label>
+                      <Textarea
+                        placeholder="Tell the AI more about this post..."
+                        value={aiFormData.promotionDetails}
+                        onChange={(e) => setAiFormData({ ...aiFormData, promotionDetails: e.target.value })}
+                        rows={2}
+                        data-testid="textarea-promotion-details"
+                      />
+                    </div>
+
+                    {getUpcomingHolidays().length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        <span className="text-xs text-muted-foreground mr-1">Upcoming:</span>
+                        {getUpcomingHolidays().map((holiday) => (
+                          <Badge
+                            key={holiday.id}
+                            variant={aiFormData.selectedHoliday === holiday.name ? "default" : "outline"}
+                            className="cursor-pointer text-xs"
+                            onClick={() =>
+                              setAiFormData({
+                                ...aiFormData,
+                                selectedHoliday: aiFormData.selectedHoliday === holiday.name ? "" : holiday.name,
+                              })
+                            }
+                            data-testid={`badge-holiday-${holiday.id}`}
+                          >
+                            {holiday.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleAiGenerate}
+                      disabled={generateMutation.isPending || !aiFormData.postType}
+                      className="w-full"
+                      data-testid="button-generate-post"
+                    >
+                      {generateMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Generate Post
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Right: Preview Panel */}
+            <div className={`lg:col-span-2 ${showPreview ? '' : 'hidden lg:block'}`}>
+              <Card className="sticky top-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex flex-wrap items-center gap-2">
+                    <Eye className="h-4 w-4" />
+                    Post Preview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {caption ? (
+                    <>
+                      {/* Preview mock */}
+                      <div className="border rounded-md overflow-hidden">
+                        <div className="p-3 flex items-center gap-2 border-b bg-muted/30">
+                          <div className="h-8 w-8 rounded-full bg-muted" />
+                          <div>
+                            <div className="text-xs font-medium">{brandSettings?.restaurantName || 'Your Restaurant'}</div>
+                            <div className="text-[10px] text-muted-foreground">Just now</div>
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <p className="text-sm whitespace-pre-wrap" data-testid="text-preview-caption">{caption}</p>
+                        </div>
+                        {mediaUrl && (
+                          <img src={mediaUrl} alt="Preview" className="w-full max-h-48 object-cover border-t" />
+                        )}
+                        {generatedPost?.hashtags && generatedPost.hashtags.length > 0 && (
+                          <div className="px-3 pb-3 flex flex-wrap gap-1">
+                            {generatedPost.hashtags.map((tag, i) => (
+                              <span key={i} className="text-xs text-primary">{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Copy actions */}
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copyToClipboard(caption, "caption")}
+                          data-testid="button-copy-caption"
+                        >
+                          {copiedField === "caption" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                          Copy Caption
+                        </Button>
+                        {generatedPost?.hashtags && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyToClipboard(generatedPost.hashtags.join(" "), "hashtags")}
+                            data-testid="button-copy-hashtags"
+                          >
+                            {copiedField === "hashtags" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                            Hashtags
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Short caption and story overlays */}
+                      {generatedPost?.shortCaption && (
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center justify-between gap-1">
+                            <Label className="text-xs">Short Caption</Label>
+                            <Button size="icon" variant="ghost" onClick={() => copyToClipboard(generatedPost.shortCaption, "short")} data-testid="button-copy-short">
+                              {copiedField === "short" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </div>
+                          <p className="text-xs bg-muted rounded p-2" data-testid="text-short-caption">{generatedPost.shortCaption}</p>
+                        </div>
+                      )}
+
+                      {generatedPost?.suggestedPostTime && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2" data-testid="text-suggested-time">
+                          <Clock className="h-3 w-3" />
+                          Best time: <strong>{generatedPost.suggestedPostTime}</strong>
+                        </div>
+                      )}
+
+                      {/* Selected channels summary */}
+                      {selectedAccountIds.length > 0 && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Publishing to</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedAccountIds.map(id => {
+                              const acct = activeAccounts.find(a => a.id === id);
+                              if (!acct) return null;
+                              return (
+                                <Badge key={id} variant="secondary" className="text-xs" data-testid={`badge-publish-target-${id}`}>
+                                  {getProviderIcon(acct.provider)}
+                                  <span className="ml-1">{acct.displayName}</span>
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                      <div className="h-16 w-12 border-2 border-dashed border-muted-foreground/20 rounded mb-4 flex items-center justify-center">
+                        <div className="space-y-1">
+                          <div className="h-1.5 w-6 bg-muted-foreground/20 rounded" />
+                          <div className="h-1.5 w-8 bg-muted-foreground/20 rounded" />
+                          <div className="h-4 w-8 bg-muted-foreground/10 rounded mt-1" />
+                        </div>
+                      </div>
+                      <p className="text-sm">See your post's preview here</p>
                     </div>
                   )}
-                </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
 
-                <Button
-                  onClick={() => {
-                    setStep(1);
-                    setGeneratedPost(null);
-                    setSelectedAccountIds([]);
-                    setFormData({
-                      postType: "",
-                      platforms: [],
-                      outputStyle: "warm_hospitality",
-                      eventName: "",
-                      eventDate: "",
-                      startTime: "",
-                      endTime: "",
-                      promotionDetails: "",
-                      targetAudience: "",
-                      tone: "classy",
-                      cta: "reserve_now",
-                      selectedHoliday: "",
-                    });
-                  }}
-                  variant="outline"
-                  className="w-full"
-                  data-testid="button-create-another"
-                >
-                  Create Another Post
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="accounts" className="space-y-4">
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium mb-2">Connect Your Accounts</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Connect your social media accounts to post directly from this tool.
-                </p>
+        {/* Channels / Accounts Tab */}
+        <TabsContent value="accounts">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base">Channels</CardTitle>
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleConnectMeta} variant="outline" data-testid="button-connect-meta">
+                  <Button onClick={handleConnectMeta} variant="outline" size="sm" data-testid="button-connect-meta">
                     <Facebook className="h-4 w-4 mr-2 text-blue-600" />
                     Connect Facebook / Instagram
                   </Button>
-                  <Button onClick={handleConnectGoogle} variant="outline" data-testid="button-connect-google">
+                  <Button onClick={handleConnectGoogle} variant="outline" size="sm" data-testid="button-connect-google">
                     <MapPin className="h-4 w-4 mr-2 text-red-500" />
                     Connect Google Business
                   </Button>
                 </div>
               </div>
-
-              <div>
-                <h3 className="font-medium mb-2">Connected Accounts</h3>
-                {accountsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2].map((i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
+            </CardHeader>
+            <CardContent>
+              {accountsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : connectedAccounts && connectedAccounts.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground mb-3">
+                    {connectedAccounts.filter(a => a.status === 'active').length}/{connectedAccounts.length} Channels connected
                   </div>
-                ) : connectedAccounts && connectedAccounts.length > 0 ? (
-                  <div className="space-y-2">
-                    {connectedAccounts.map((account) => (
-                      <div
-                        key={account.id}
-                        className="flex flex-wrap items-center justify-between gap-2 p-3 border rounded-lg"
-                        data-testid={`card-account-${account.id}`}
-                      >
-                        <div className="flex flex-wrap items-center gap-3">
+                  {connectedAccounts.map((account) => (
+                    <div
+                      key={account.id}
+                      className="flex flex-wrap items-center justify-between gap-3 p-3 border rounded-md"
+                      data-testid={`card-account-${account.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
                           <Avatar className="h-10 w-10">
                             {account.profilePictureUrl ? (
                               <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
                             ) : null}
-                            <AvatarFallback>
-                              {getProviderIcon(account.provider)}
-                            </AvatarFallback>
+                            <AvatarFallback>{account.displayName.charAt(0)}</AvatarFallback>
                           </Avatar>
-                          <div>
-                            <div className="font-medium">{account.displayName}</div>
-                            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1">
-                              {getProviderIcon(account.provider)}
-                              <span className="capitalize">{account.provider.replace('_', ' ')}</span>
-                            </div>
+                          <span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center text-white ${getProviderBadgeColor(account.provider)}`}>
+                            {account.provider === 'facebook' && <Facebook className="h-2.5 w-2.5" />}
+                            {account.provider === 'instagram' && <Instagram className="h-2.5 w-2.5" />}
+                            {account.provider === 'google_business' && <MapPin className="h-2.5 w-2.5" />}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">{account.displayName}</div>
+                          <div className="text-xs text-muted-foreground capitalize">
+                            {account.provider === 'facebook' ? 'Facebook Page' :
+                             account.provider === 'instagram' ? 'Instagram Professional Account' :
+                             account.provider === 'google_business' ? 'Google Business Profile' :
+                             account.provider.replace('_', ' ')}
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={account.status === 'active' ? 'default' : 'destructive'} data-testid={`badge-account-status-${account.id}`}>
-                            {account.status}
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => disconnectMutation.mutate(account.id)}
-                            disabled={disconnectMutation.isPending}
-                            data-testid={`button-disconnect-${account.id}`}
-                          >
-                            <Unlink className="h-4 w-4" />
-                          </Button>
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Link2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No accounts connected yet</p>
-                    <p className="text-sm">Connect your social media accounts above to start posting</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={account.status === 'active' ? 'default' : 'destructive'} data-testid={`badge-account-status-${account.id}`}>
+                          {account.status}
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => disconnectMutation.mutate(account.id)}
+                          disabled={disconnectMutation.isPending}
+                          data-testid={`button-disconnect-${account.id}`}
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Link2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No channels connected yet</p>
+                  <p className="text-sm mt-1">Connect your social media accounts above to start posting</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="holidays">
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Upcoming national days and holidays relevant to restaurants. Click to use as inspiration for a post.
+        {/* Holidays Tab */}
+        <TabsContent value="holidays">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Upcoming Holidays</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                National days and holidays relevant to restaurants. Click one to generate a post about it.
               </p>
               {holidaysLoading ? (
                 <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
                 </div>
               ) : holidays && holidays.length > 0 ? (
                 <div className="space-y-2">
                   {holidays.slice(0, 10).map((holiday) => (
                     <div
                       key={holiday.id}
-                      className="p-3 border rounded-lg hover-elevate cursor-pointer"
+                      className="p-3 border rounded-md hover-elevate cursor-pointer"
                       onClick={() => {
-                        setFormData({
-                          ...formData,
-                          postType: "holiday",
-                          selectedHoliday: holiday.name,
-                        });
+                        setAiFormData({ ...aiFormData, postType: "holiday", selectedHoliday: holiday.name });
+                        setShowAiPanel(true);
                         setActiveTab("create");
                       }}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="font-medium">{holiday.name}</div>
+                          <div className="font-medium text-sm">{holiday.name}</div>
                           <div className="text-xs text-muted-foreground">{holiday.date}</div>
-                          {holiday.suggestedAngle && (
-                            <div className="text-sm mt-1">{holiday.suggestedAngle}</div>
-                          )}
+                          {holiday.suggestedAngle && <div className="text-sm mt-1">{holiday.suggestedAngle}</div>}
                         </div>
                         <Badge variant="outline">{holiday.category}</Badge>
                       </div>
                       {holiday.suggestedTags && holiday.suggestedTags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {holiday.suggestedTags.map((tag, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
+                            <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
                           ))}
                         </div>
                       )}
@@ -1260,24 +958,25 @@ export default function SocialPostBuilder() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No upcoming holidays found.
-                </div>
+                <div className="text-center py-8 text-muted-foreground">No upcoming holidays found.</div>
               )}
-            </div>
-          </TabsContent>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="history" className="space-y-4">
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                View your recent posts and their status across platforms.
-              </p>
+        {/* History / Sent Tab */}
+        <TabsContent value="history">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Sent Posts</CardTitle>
+            </CardHeader>
+            <CardContent>
               {postHistory && postHistory.length > 0 ? (
-                <div className="space-y-3">
-                  {postHistory.slice(0, 10).map((post) => (
-                    <div key={post.id} className="p-3 border rounded-lg">
+                <div className="space-y-2">
+                  {postHistory.slice(0, 20).map((post) => (
+                    <div key={post.id} className="p-3 border rounded-md">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="text-sm line-clamp-2">{post.caption}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
                             <Clock className="h-3 w-3" />
@@ -1301,21 +1000,29 @@ export default function SocialPostBuilder() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <History className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No posts yet</p>
-                  <p className="text-sm">Your published posts will appear here</p>
+                <div className="text-center py-12 text-muted-foreground">
+                  <History className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No posts yet</p>
+                  <p className="text-sm mt-1">Your published posts will appear here</p>
                 </div>
               )}
-            </div>
-          </TabsContent>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="settings">
-            <BrandVoiceSettingsPanel settings={brandSettings} />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+        {/* Brand Voice Settings Tab */}
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Brand Voice Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <BrandVoiceSettingsPanel settings={brandSettings} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
 
@@ -1335,10 +1042,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
     mutationFn: async (data: typeof formData) => {
       const payload = {
         ...data,
-        neverSayList: data.neverSayList
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        neverSayList: data.neverSayList.split(",").map((s) => s.trim()).filter(Boolean),
       };
       const response = await apiRequest("POST", "/api/social-media/brand-settings", payload);
       return response.json();
@@ -1410,10 +1114,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Default CTA</Label>
-          <Select
-            value={formData.defaultCta}
-            onValueChange={(v) => setFormData({ ...formData, defaultCta: v })}
-          >
+          <Select value={formData.defaultCta} onValueChange={(v) => setFormData({ ...formData, defaultCta: v })}>
             <SelectTrigger data-testid="select-default-cta">
               <SelectValue />
             </SelectTrigger>
@@ -1426,10 +1127,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
         </div>
         <div className="space-y-2">
           <Label>Emoji Level</Label>
-          <Select
-            value={formData.emojiLevel}
-            onValueChange={(v) => setFormData({ ...formData, emojiLevel: v })}
-          >
+          <Select value={formData.emojiLevel} onValueChange={(v) => setFormData({ ...formData, emojiLevel: v })}>
             <SelectTrigger data-testid="select-emoji-level">
               <SelectValue />
             </SelectTrigger>
@@ -1444,10 +1142,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
 
       <div className="space-y-2">
         <Label>Hashtag Style</Label>
-        <Select
-          value={formData.hashtagStyle}
-          onValueChange={(v) => setFormData({ ...formData, hashtagStyle: v })}
-        >
+        <Select value={formData.hashtagStyle} onValueChange={(v) => setFormData({ ...formData, hashtagStyle: v })}>
           <SelectTrigger data-testid="select-hashtag-style">
             <SelectValue />
           </SelectTrigger>
@@ -1467,9 +1162,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
           placeholder="e.g., cheap, best ever, guaranteed"
           data-testid="input-never-say"
         />
-        <p className="text-xs text-muted-foreground">
-          Words to avoid in generated content
-        </p>
+        <p className="text-xs text-muted-foreground">Words to avoid in generated content</p>
       </div>
 
       <Button

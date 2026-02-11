@@ -369,31 +369,36 @@ export const socialMediaService = {
     message: string,
     imageUrl?: string
   ): Promise<{ id: string }> {
-    let url = `https://graph.facebook.com/v21.0/${pageId}/feed`;
-    const params: any = {
-      message,
-      access_token: pageToken,
-    };
-    
+    let endpoint = imageUrl
+      ? `https://graph.facebook.com/v21.0/${pageId}/photos`
+      : `https://graph.facebook.com/v21.0/${pageId}/feed`;
+
+    const body = new URLSearchParams();
+    body.append('access_token', pageToken);
     if (imageUrl) {
-      url = `https://graph.facebook.com/v21.0/${pageId}/photos`;
-      params.url = imageUrl;
-      params.caption = message;
-      delete params.message;
+      body.append('url', imageUrl);
+      body.append('caption', message);
+    } else {
+      body.append('message', message);
     }
-    
-    const response = await fetch(url, {
+
+    console.log(`[POST_FB] Posting to ${endpoint} for page ${pageId}`);
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
     });
-    
+
+    const rawText = await response.text();
+    console.log(`[POST_FB] Response status: ${response.status}, body: ${rawText}`);
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Failed to post to Facebook');
+      let errMsg = 'Failed to post to Facebook';
+      try { errMsg = JSON.parse(rawText)?.error?.message || errMsg; } catch {}
+      throw new Error(errMsg);
     }
-    
-    return response.json();
+
+    return JSON.parse(rawText);
   },
 
   // Posting to Instagram (2-step: create container, then publish)
@@ -403,46 +408,58 @@ export const socialMediaService = {
     caption: string,
     imageUrl: string
   ): Promise<{ id: string }> {
+    const createBody = new URLSearchParams();
+    createBody.append('image_url', imageUrl);
+    createBody.append('caption', caption);
+    createBody.append('access_token', pageToken);
+
+    console.log(`[POST_IG] Creating media container for IG user ${igUserId}`);
     const createResponse = await fetch(
       `https://graph.facebook.com/v21.0/${igUserId}/media`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_url: imageUrl,
-          caption,
-          access_token: pageToken,
-        }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: createBody.toString(),
       }
     );
-    
+
+    const createText = await createResponse.text();
+    console.log(`[POST_IG] Create response: ${createResponse.status}, body: ${createText}`);
+
     if (!createResponse.ok) {
-      const error = await createResponse.json();
-      throw new Error(error.error?.message || 'Failed to create Instagram media');
+      let errMsg = 'Failed to create Instagram media';
+      try { errMsg = JSON.parse(createText)?.error?.message || errMsg; } catch {}
+      throw new Error(errMsg);
     }
-    
-    const { id: containerId } = await createResponse.json();
-    
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
+    const { id: containerId } = JSON.parse(createText);
+
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const publishBody = new URLSearchParams();
+    publishBody.append('creation_id', containerId);
+    publishBody.append('access_token', pageToken);
+
+    console.log(`[POST_IG] Publishing container ${containerId}`);
     const publishResponse = await fetch(
       `https://graph.facebook.com/v21.0/${igUserId}/media_publish`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          creation_id: containerId,
-          access_token: pageToken,
-        }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: publishBody.toString(),
       }
     );
-    
+
+    const publishText = await publishResponse.text();
+    console.log(`[POST_IG] Publish response: ${publishResponse.status}, body: ${publishText}`);
+
     if (!publishResponse.ok) {
-      const error = await publishResponse.json();
-      throw new Error(error.error?.message || 'Failed to publish Instagram media');
+      let errMsg = 'Failed to publish Instagram media';
+      try { errMsg = JSON.parse(publishText)?.error?.message || errMsg; } catch {}
+      throw new Error(errMsg);
     }
-    
-    return publishResponse.json();
+
+    return JSON.parse(publishText);
   },
 
   // Posting to Google Business Profile

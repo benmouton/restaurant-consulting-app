@@ -2163,6 +2163,10 @@ Generate JSON with:
 
       if (postNow) {
         await executePost(post.id);
+        const updatedPost = await storage.getScheduledPostById(post.id);
+        const results = await storage.getPostResults(post.id);
+        res.json({ ...updatedPost, results });
+        return;
       }
 
       res.json(post);
@@ -2199,16 +2203,28 @@ Generate JSON with:
   // Execute post immediately
   async function executePost(postId: number) {
     const post = await storage.getScheduledPostById(postId);
-    if (!post || !post.platformTargets) return;
+    if (!post || !post.platformTargets) {
+      console.error(`[EXEC_POST] Post ${postId} not found or has no targets`);
+      return;
+    }
 
+    console.log(`[EXEC_POST] Starting post ${postId} to ${post.platformTargets.length} targets:`, post.platformTargets);
     await storage.updateScheduledPost(postId, { status: 'posting' });
 
     let allSuccess = true;
     let anySuccess = false;
+    const errors: string[] = [];
 
     for (const accountId of post.platformTargets) {
       const account = await storage.getConnectedAccountById(accountId);
-      if (!account) continue;
+      if (!account) {
+        console.error(`[EXEC_POST] Account ${accountId} not found, skipping`);
+        errors.push(`Account ${accountId} not found`);
+        allSuccess = false;
+        continue;
+      }
+
+      console.log(`[EXEC_POST] Posting to ${account.provider} account: ${account.displayName} (${accountId})`);
 
       try {
         const token = socialMediaService.getDecryptedToken(account);
@@ -2216,6 +2232,7 @@ Generate JSON with:
 
         if (account.provider === 'facebook') {
           const meta = account.meta as any;
+          if (!meta?.pageId) throw new Error('Facebook account missing pageId in metadata');
           result = await socialMediaService.postToFacebook(
             meta.pageId,
             token,
@@ -2224,9 +2241,10 @@ Generate JSON with:
           );
         } else if (account.provider === 'instagram') {
           if (!post.mediaUrls?.[0]) {
-            throw new Error('Instagram requires an image');
+            throw new Error('Instagram requires an image URL. Please include an image.');
           }
           const meta = account.meta as any;
+          if (!meta?.igUserId) throw new Error('Instagram account missing igUserId in metadata');
           result = await socialMediaService.postToInstagram(
             meta.igUserId,
             token,
@@ -2235,6 +2253,7 @@ Generate JSON with:
           );
         } else if (account.provider === 'google_business') {
           const meta = account.meta as any;
+          if (!meta?.locationName) throw new Error('Google Business account missing locationName in metadata');
           result = await socialMediaService.postToGoogleBusiness(
             meta.locationName,
             token,
@@ -2242,6 +2261,7 @@ Generate JSON with:
           );
         }
 
+        console.log(`[EXEC_POST] SUCCESS for ${account.provider}:`, JSON.stringify(result));
         await storage.createPostResult({
           scheduledPostId: postId,
           connectedAccountId: accountId,
@@ -2253,7 +2273,9 @@ Generate JSON with:
         });
         anySuccess = true;
       } catch (error: any) {
+        console.error(`[EXEC_POST] FAILED for ${account.provider} (${account.displayName}):`, error.message);
         allSuccess = false;
+        errors.push(`${account.provider}: ${error.message}`);
         await storage.createPostResult({
           scheduledPostId: postId,
           connectedAccountId: accountId,
@@ -2265,6 +2287,7 @@ Generate JSON with:
     }
 
     const finalStatus = allSuccess ? 'posted' : (anySuccess ? 'partial' : 'failed');
+    console.log(`[EXEC_POST] Post ${postId} final status: ${finalStatus}`, errors.length ? `Errors: ${errors.join('; ')}` : '');
     await storage.updateScheduledPost(postId, { status: finalStatus });
   }
 
