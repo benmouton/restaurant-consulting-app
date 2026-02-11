@@ -325,9 +325,10 @@ export default function SocialPostBuilder() {
 
   const handleConnectMeta = async () => {
     try {
-      const response = await fetch("/api/oauth/meta/start");
+      const response = await fetch("/api/oauth/meta/start", { credentials: "include" });
       const data = await response.json();
       if (data.authUrl) window.location.href = data.authUrl;
+      else toast({ title: "Error", description: data.message || "Failed to start connection.", variant: "destructive" });
     } catch {
       toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
     }
@@ -335,9 +336,10 @@ export default function SocialPostBuilder() {
 
   const handleConnectGoogle = async () => {
     try {
-      const response = await fetch("/api/oauth/google/start");
+      const response = await fetch("/api/oauth/google/start", { credentials: "include" });
       const data = await response.json();
       if (data.authUrl) window.location.href = data.authUrl;
+      else toast({ title: "Error", description: data.message || "Failed to start connection.", variant: "destructive" });
     } catch {
       toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
     }
