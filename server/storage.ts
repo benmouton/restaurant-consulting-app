@@ -650,6 +650,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteConnectedAccount(id: number): Promise<void> {
+    await db.delete(postResults).where(eq(postResults.connectedAccountId, id));
     await db.delete(connectedAccounts).where(eq(connectedAccounts.id, id));
   }
 
