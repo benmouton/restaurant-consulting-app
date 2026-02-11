@@ -581,7 +581,21 @@ export class DatabaseStorage implements IStorage {
 
   // Social Media - Holidays
   async getUpcomingHolidays(): Promise<RestaurantHoliday[]> {
-    return await db.select().from(restaurantHolidays).orderBy(restaurantHolidays.date);
+    const allHolidays = await db.select().from(restaurantHolidays).orderBy(restaurantHolidays.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const twoWeeksOut = new Date(today);
+    twoWeeksOut.setDate(twoWeeksOut.getDate() + 14);
+
+    return allHolidays.filter((h) => {
+      const [month, day] = h.date.split('-').map(Number);
+      const holidayThisYear = new Date(today.getFullYear(), month - 1, day);
+      holidayThisYear.setHours(0, 0, 0, 0);
+      if (holidayThisYear < today) {
+        holidayThisYear.setFullYear(holidayThisYear.getFullYear() + 1);
+      }
+      return holidayThisYear >= today && holidayThisYear <= twoWeeksOut;
+    });
   }
 
   // Social Media - Brand Voice Settings

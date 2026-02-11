@@ -422,17 +422,29 @@ export default function SocialPostBuilder() {
     });
   };
 
-  const getUpcomingHolidays = () => {
-    if (!holidays) return [];
+  const formatHolidayDate = (mmdd: string) => {
+    const [month, day] = mmdd.split('-').map(Number);
     const today = new Date();
-    return holidays
-      .filter((h) => {
-        const [month, day] = h.date.split('-').map(Number);
-        const holidayDate = new Date(today.getFullYear(), month - 1, day);
-        const diffDays = Math.ceil((holidayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return diffDays >= 0 && diffDays <= 14;
-      })
-      .slice(0, 5);
+    const holidayDate = new Date(today.getFullYear(), month - 1, day);
+    if (holidayDate < today) {
+      holidayDate.setFullYear(holidayDate.getFullYear() + 1);
+    }
+    return holidayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const getDaysUntilHoliday = (mmdd: string) => {
+    const [month, day] = mmdd.split('-').map(Number);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const holidayDate = new Date(today.getFullYear(), month - 1, day);
+    holidayDate.setHours(0, 0, 0, 0);
+    if (holidayDate < today) {
+      holidayDate.setFullYear(holidayDate.getFullYear() + 1);
+    }
+    const diffDays = Math.round((holidayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    return `In ${diffDays} days`;
   };
 
   return (
@@ -752,10 +764,10 @@ export default function SocialPostBuilder() {
                       />
                     </div>
 
-                    {getUpcomingHolidays().length > 0 && (
+                    {holidays && holidays.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         <span className="text-xs text-muted-foreground mr-1">Upcoming:</span>
-                        {getUpcomingHolidays().map((holiday) => (
+                        {holidays.slice(0, 5).map((holiday) => (
                           <Badge
                             key={holiday.id}
                             variant={aiFormData.selectedHoliday === holiday.name ? "default" : "outline"}
@@ -1029,7 +1041,10 @@ export default function SocialPostBuilder() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="font-medium text-sm">{holiday.name}</div>
-                          <div className="text-xs text-muted-foreground">{holiday.date}</div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>{formatHolidayDate(holiday.date)}</span>
+                            <Badge variant="secondary" className="text-xs">{getDaysUntilHoliday(holiday.date)}</Badge>
+                          </div>
                           {holiday.suggestedAngle && <div className="text-sm mt-1">{holiday.suggestedAngle}</div>}
                         </div>
                         <Badge variant="outline">{holiday.category}</Badge>
