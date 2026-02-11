@@ -118,6 +118,10 @@ export default function SocialPostBuilder() {
   const [mediaUrl, setMediaUrl] = useState("");
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const [aiFormData, setAiFormData] = useState({
     postType: "",
@@ -259,6 +263,65 @@ export default function SocialPostBuilder() {
       toast({ title: "Error", description: "Failed to publish post. Please try again.", variant: "destructive" });
     },
   });
+
+  const uploadFile = async (file: File) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file", description: "Please upload a JPEG, PNG, GIF, or WebP image.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Images must be under 10MB.", variant: "destructive" });
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await fetch("/api/social-media/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json();
+      const fullUrl = window.location.origin + data.url;
+      setMediaUrl(fullUrl);
+      toast({ title: "Image uploaded", description: "Your image is ready." });
+    } catch {
+      toast({ title: "Upload failed", description: "Could not upload the image. Try again.", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      uploadFile(files[0]);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      uploadFile(files[0]);
+    }
+  };
 
   const handleConnectMeta = async () => {
     try {
@@ -480,6 +543,14 @@ export default function SocialPostBuilder() {
                   />
 
                   {/* Image area */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    data-testid="input-file-upload"
+                  />
                   {mediaUrl ? (
                     <div className="relative rounded-md border overflow-hidden">
                       <img src={mediaUrl} alt="Post media" className="w-full max-h-64 object-cover" />
@@ -494,22 +565,38 @@ export default function SocialPostBuilder() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="border-2 border-dashed border-muted-foreground/20 rounded-md p-4">
+                    <div
+                      ref={dropZoneRef}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-md p-6 cursor-pointer transition-colors ${
+                        isDragging
+                          ? 'border-primary bg-primary/5'
+                          : 'border-muted-foreground/20 hover:border-muted-foreground/40'
+                      }`}
+                      data-testid="dropzone-image"
+                    >
                       <div className="flex flex-col items-center gap-2 text-center">
-                        <Upload className="h-6 w-6 text-muted-foreground/50" />
-                        <div className="text-sm text-muted-foreground">
-                          Drag & drop or{" "}
-                          <label className="text-primary cursor-pointer hover:underline">
-                            paste an image URL
-                          </label>
-                        </div>
-                        <Input
-                          placeholder="https://example.com/image.jpg"
-                          value={mediaUrl}
-                          onChange={(e) => setMediaUrl(e.target.value)}
-                          className="max-w-sm"
-                          data-testid="input-media-url"
-                        />
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                            <div className="text-sm text-muted-foreground">Uploading...</div>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-6 w-6 text-muted-foreground/50" />
+                            <div className="text-sm text-muted-foreground">
+                              {isDragging ? (
+                                <span className="text-primary font-medium">Drop your image here</span>
+                              ) : (
+                                <>Drag & drop an image, or <span className="text-primary">click to browse</span></>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground/60">JPEG, PNG, GIF, WebP up to 10MB</div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}

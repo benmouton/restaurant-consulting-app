@@ -1,3 +1,4 @@
+import express from "express";
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -2173,6 +2174,45 @@ Generate JSON with:
     } catch (error) {
       console.error("Error creating post:", error);
       res.status(500).json({ message: "Failed to create post" });
+    }
+  });
+
+  // Social media image upload
+  const socialUploadsDir = path.join(process.cwd(), "uploads", "social-media");
+  if (!fs.existsSync(socialUploadsDir)) {
+    fs.mkdirSync(socialUploadsDir, { recursive: true });
+  }
+  const socialImageUpload = multer({
+    storage: multer.diskStorage({
+      destination: socialUploadsDir,
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+      },
+    }),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"));
+      }
+    },
+  });
+
+  app.use("/uploads/social-media", express.static(socialUploadsDir));
+
+  app.post("/api/social-media/upload-image", isAuthenticated, socialImageUpload.single("image"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image uploaded" });
+      }
+      const imageUrl = `/uploads/social-media/${req.file.filename}`;
+      res.json({ url: imageUrl });
+    } catch (error) {
+      console.error("Error uploading social media image:", error);
+      res.status(500).json({ message: "Failed to upload image" });
     }
   });
 
