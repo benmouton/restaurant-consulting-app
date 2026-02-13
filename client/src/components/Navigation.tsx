@@ -33,10 +33,9 @@ export function Navigation() {
     <nav className="fixed left-0 top-0 z-50 flex h-16 w-full items-center justify-between border-b bg-white/80 px-4 backdrop-blur-md transition-all lg:h-full lg:w-72 lg:flex-col lg:border-r lg:border-b-0 lg:px-6 lg:py-8">
       {/* Brand */}
       <div className="flex items-center gap-3 lg:w-full lg:mb-10">
-        <img src={logoImage} alt="The AI Restaurant Consultant" className="h-12 w-12 rounded-lg object-contain" />
+        <img src={logoImage} alt="Restaurant AI Consulting" className="h-12 w-12 rounded-lg object-contain" />
         <div>
-          <h1 className="font-display text-lg font-bold tracking-tight text-primary">AI Restaurant</h1>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Consultant</p>
+          <h1 className="font-display text-sm font-bold tracking-tight text-primary leading-tight">Restaurant AI<br/>Consulting</h1>
         </div>
       </div>
 

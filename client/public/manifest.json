@@ -1,6 +1,6 @@
 {
-  "name": "The AI Restaurant Consultant",
-  "short_name": "AI Consultant",
+  "name": "Restaurant AI Consulting",
+  "short_name": "Restaurant AI",
   "description": "AI-powered restaurant operations consulting platform",
   "start_url": "/",
   "display": "standalone",

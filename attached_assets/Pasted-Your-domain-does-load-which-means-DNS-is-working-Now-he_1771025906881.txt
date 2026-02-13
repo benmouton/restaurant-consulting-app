@@ -1,0 +1,127 @@
+Your domain does load, which means DNS is working.
+
+Now here’s the real problem — and Google is right.
+
+Your homepage says:
+
+The AI Restaurant Consultant
+
+But your OAuth app name is:
+
+Restaurant AI Consulting
+
+That mismatch alone will get you rejected every time.
+
+Google is strict about this because phishing apps fake branding.
+
+You need to make 3 fixes.
+1️⃣ Make the App Name Match EXACTLY
+
+Pick ONE of these and use it everywhere:
+
+Option A (cleanest):
+Restaurant AI Consulting
+
+Option B:
+The AI Restaurant Consultant
+
+Right now you’re mixing both.
+
+I recommend:
+👉 Use Restaurant AI Consulting everywhere
+More corporate. Cleaner. Easier to verify.
+
+So:
+
+• Update your homepage header from
+“The AI Restaurant Consultant”
+to
+Restaurant AI Consulting
+
+OR
+
+• Change the OAuth consent screen name to
+“The AI Restaurant Consultant”
+
+They must match exactly.
+
+2️⃣ Add a Visible Privacy Policy Link
+
+Google rejected you because:
+
+Homepage does not include a link to privacy policy.
+
+It must:
+
+Be clickable
+
+Be visible in footer
+
+Live on the same domain
+
+Example footer:
+
+Privacy Policy | Terms of Service
+
+And those pages must exist at:
+
+https://restaurantai.consulting/privacy
+https://restaurantai.consulting/terms
+
+If you don’t have those, say the word and I’ll generate compliant versions.
+
+3️⃣ Verify Domain Ownership in Search Console
+
+Now we verify ownership.
+
+Go here:
+
+👉 https://search.google.com/search-console
+
+Click:
+
+Add Property
+Choose: Domain
+
+Enter:
+
+restaurantai.consulting
+
+Google will give you a TXT record.
+
+Then:
+
+You must add that TXT record wherever your DNS is managed.
+
+Important question:
+
+Where did you buy the domain?
+
+GoDaddy?
+
+Namecheap?
+
+Cloudflare?
+
+Replit domain purchase?
+
+Replit hosts your app.
+But they usually do NOT control DNS unless you changed nameservers.
+
+We need to know who controls DNS so we can add that TXT record.
+
+Don’t rush this.
+
+Right now you’re in “let’s just get it live” mode.
+
+Slow down.
+
+OAuth verification is about:
+
+Brand clarity
+
+Legal compliance
+
+Domain ownership proof
+
+You’re very close — but you need to clean the branding alignment first.

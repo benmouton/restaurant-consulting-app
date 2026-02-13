@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -41,8 +42,8 @@ export default function Landing() {
       <header className="border-b border-border" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src={logoImage} alt="The AI Restaurant Consultant" className="h-10 w-10 rounded-lg object-contain" />
-            <span className="text-xl font-bold">The AI Restaurant Consultant</span>
+            <img src={logoImage} alt="Restaurant AI Consulting" className="h-10 w-10 rounded-lg object-contain" />
+            <span className="text-xl font-bold">Restaurant AI Consulting</span>
           </div>
           <Button asChild data-testid="button-login-header">
             <a href="/api/login">Sign In</a>
@@ -230,7 +231,12 @@ export default function Landing() {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
         <div className="container mx-auto text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 The Restaurant Consultant. Built by operators, for operators.</p>
+          <div className="flex flex-wrap items-center justify-center gap-4 mb-2">
+            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+            <span>|</span>
+            <Link href="/terms" className="hover:underline">Terms of Service</Link>
+          </div>
+          <p>&copy; 2026 Restaurant AI Consulting. Built by operators, for operators.</p>
         </div>
       </footer>
     </div>
