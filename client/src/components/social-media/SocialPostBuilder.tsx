@@ -122,6 +122,7 @@ export default function SocialPostBuilder() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const dragCounterRef = useRef(0);
 
   const [aiFormData, setAiFormData] = useState({
     postType: "",
@@ -281,6 +282,7 @@ export default function SocialPostBuilder() {
       const response = await fetch("/api/social-media/upload-image", {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
       if (!response.ok) throw new Error("Upload failed");
       const data = await response.json();
@@ -297,18 +299,30 @@ export default function SocialPostBuilder() {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(true);
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounterRef.current = 0;
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files.length > 0) {
@@ -481,8 +495,23 @@ export default function SocialPostBuilder() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Left: Compose Panel */}
             <div className="lg:col-span-3 space-y-4">
-              <Card>
+              <Card
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`transition-colors ${isDragging ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+              >
                 <CardContent className="p-4 space-y-4">
+                  {/* Full-card drag overlay */}
+                  {isDragging && (
+                    <div className="flex items-center justify-center p-6 border-2 border-dashed border-primary rounded-md bg-primary/5">
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <Upload className="h-8 w-8 text-primary" />
+                        <span className="text-sm font-medium text-primary">Drop your image here</span>
+                      </div>
+                    </div>
+                  )}
                   {/* Channel selector row */}
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -582,6 +611,7 @@ export default function SocialPostBuilder() {
                     <div
                       ref={dropZoneRef}
                       onDragOver={handleDragOver}
+                      onDragEnter={handleDragEnter}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
                       onClick={() => fileInputRef.current?.click()}
