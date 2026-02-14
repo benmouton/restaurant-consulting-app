@@ -767,6 +767,7 @@ export const oauthStates = pgTable("oauth_states", {
   state: text("state").primaryKey(),
   userId: text("user_id").notNull(),
   provider: text("provider").notNull(),
+  codeVerifier: text("code_verifier"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

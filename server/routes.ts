@@ -18,6 +18,7 @@ import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { restaurantHolidays, insertHandbookSettingsSchema, insertRestaurantStandardsSchema, insertCertificationAttemptSchema } from "@shared/schema";
 import { sendOrganizationInviteEmail } from "./emailService";
+import { encrypt } from "./encryption";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -2139,6 +2140,112 @@ Generate JSON with:
     }
   });
 
+  // LinkedIn OAuth start
+  app.get("/api/oauth/linkedin/start", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { authUrl } = await socialMediaService.startLinkedInOAuth(userId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting LinkedIn OAuth:", error);
+      res.status(500).json({ message: "Failed to start LinkedIn OAuth" });
+    }
+  });
+
+  // LinkedIn OAuth callback
+  app.get("/api/oauth/linkedin/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        res.redirect("/domain/social-media?error=missing_params");
+        return;
+      }
+
+      const stateData = await socialMediaService.validateAndConsumeState(state as string);
+      if (!stateData || stateData.provider !== 'linkedin') {
+        res.redirect("/domain/social-media?error=invalid_state");
+        return;
+      }
+      const userId = stateData.userId;
+
+      const tokens = await socialMediaService.exchangeLinkedInCode(code as string);
+      const profile = await socialMediaService.getLinkedInProfile(tokens.accessToken);
+
+      await socialMediaService.saveConnectedAccount(
+        userId,
+        'linkedin',
+        profile.sub,
+        profile.name || 'LinkedIn Profile',
+        tokens.accessToken,
+        tokens.refreshToken,
+        tokens.expiresIn,
+        { personUrn: profile.sub },
+        profile.picture
+      );
+
+      res.redirect("/domain/social-media?connected=linkedin");
+    } catch (error) {
+      console.error("LinkedIn OAuth callback error:", error);
+      res.redirect("/domain/social-media?error=oauth_failed");
+    }
+  });
+
+  // X (Twitter) OAuth start
+  app.get("/api/oauth/x/start", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { authUrl } = await socialMediaService.startXOAuth(userId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting X OAuth:", error);
+      res.status(500).json({ message: "Failed to start X OAuth" });
+    }
+  });
+
+  // X (Twitter) OAuth callback
+  app.get("/api/oauth/x/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        res.redirect("/domain/social-media?error=missing_params");
+        return;
+      }
+
+      const stateData = await socialMediaService.validateAndConsumeState(state as string);
+      if (!stateData || stateData.provider !== 'x') {
+        res.redirect("/domain/social-media?error=invalid_state");
+        return;
+      }
+      const userId = stateData.userId;
+      const codeVerifier = stateData.codeVerifier;
+
+      if (!codeVerifier) {
+        res.redirect("/domain/social-media?error=missing_pkce");
+        return;
+      }
+
+      const tokens = await socialMediaService.exchangeXCode(code as string, codeVerifier);
+      const profile = await socialMediaService.getXProfile(tokens.accessToken);
+
+      await socialMediaService.saveConnectedAccount(
+        userId,
+        'x',
+        profile.id,
+        `@${profile.username}`,
+        tokens.accessToken,
+        tokens.refreshToken,
+        tokens.expiresIn,
+        { xUserId: profile.id, username: profile.username },
+        profile.profileImageUrl
+      );
+
+      res.redirect("/domain/social-media?connected=x");
+    } catch (error) {
+      console.error("X OAuth callback error:", error);
+      res.redirect("/domain/social-media?error=oauth_failed");
+    }
+  });
+
   // Create and schedule a post
   app.post("/api/social-media/posts", isAuthenticated, async (req: any, res) => {
     try {
@@ -2299,6 +2406,35 @@ Generate JSON with:
             token,
             post.caption
           );
+        } else if (account.provider === 'linkedin') {
+          const meta = account.meta as any;
+          if (!meta?.personUrn) throw new Error('LinkedIn account missing personUrn in metadata');
+          result = await socialMediaService.postToLinkedIn(
+            meta.personUrn,
+            token,
+            post.caption,
+            post.mediaUrls?.[0]
+          );
+        } else if (account.provider === 'x') {
+          let currentToken = token;
+          if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) < new Date()) {
+            const refreshToken = socialMediaService.getDecryptedRefreshToken(account);
+            if (refreshToken) {
+              try {
+                const refreshed = await socialMediaService.refreshXToken(refreshToken);
+                currentToken = refreshed.accessToken;
+                await storage.updateConnectedAccount(account.id, {
+                  accessTokenEncrypted: encrypt(refreshed.accessToken),
+                  refreshTokenEncrypted: refreshed.refreshToken ? encrypt(refreshed.refreshToken) : account.refreshTokenEncrypted,
+                  tokenExpiresAt: refreshed.expiresIn ? new Date(Date.now() + refreshed.expiresIn * 1000) : account.tokenExpiresAt,
+                });
+              } catch (refreshErr: any) {
+                console.error(`[EXEC_POST] X token refresh failed:`, refreshErr.message);
+                throw new Error('X token expired and refresh failed. Please reconnect your X account.');
+              }
+            }
+          }
+          result = await socialMediaService.postToX(currentToken, post.caption);
         }
 
         console.log(`[EXEC_POST] SUCCESS for ${account.provider}:`, JSON.stringify(result));

@@ -42,6 +42,7 @@ import {
   Upload,
   Eye,
 } from "lucide-react";
+import { SiLinkedin, SiX, SiNextdoor } from "react-icons/si";
 import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
 
 interface SafeConnectedAccount {
@@ -359,6 +360,28 @@ export default function SocialPostBuilder() {
     }
   };
 
+  const handleConnectLinkedIn = async () => {
+    try {
+      const response = await fetch("/api/oauth/linkedin/start", { credentials: "include" });
+      const data = await response.json();
+      if (data.authUrl) window.location.href = data.authUrl;
+      else toast({ title: "Error", description: data.message || "Failed to start connection.", variant: "destructive" });
+    } catch {
+      toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
+    }
+  };
+
+  const handleConnectX = async () => {
+    try {
+      const response = await fetch("/api/oauth/x/start", { credentials: "include" });
+      const data = await response.json();
+      if (data.authUrl) window.location.href = data.authUrl;
+      else toast({ title: "Error", description: data.message || "Failed to start connection.", variant: "destructive" });
+    } catch {
+      toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
+    }
+  };
+
   const handlePublish = () => {
     if (selectedAccountIds.length === 0) {
       toast({ title: "Select channels", description: "Please select at least one channel to publish to.", variant: "destructive" });
@@ -399,6 +422,8 @@ export default function SocialPostBuilder() {
       case 'facebook': return <Facebook className="h-3.5 w-3.5 text-blue-600" />;
       case 'instagram': return <Instagram className="h-3.5 w-3.5 text-pink-600" />;
       case 'google_business': return <MapPin className="h-3.5 w-3.5 text-red-500" />;
+      case 'linkedin': return <SiLinkedin className="h-3.5 w-3.5 text-blue-700" />;
+      case 'x': return <SiX className="h-3.5 w-3.5" />;
       default: return <Link2 className="h-3.5 w-3.5" />;
     }
   };
@@ -408,6 +433,8 @@ export default function SocialPostBuilder() {
       case 'facebook': return 'bg-blue-600';
       case 'instagram': return 'bg-gradient-to-tr from-purple-600 via-pink-500 to-orange-400';
       case 'google_business': return 'bg-blue-500';
+      case 'linkedin': return 'bg-blue-700';
+      case 'x': return 'bg-black dark:bg-white';
       default: return 'bg-muted-foreground';
     }
   };
@@ -973,6 +1000,18 @@ export default function SocialPostBuilder() {
                     <MapPin className="h-4 w-4 mr-2 text-red-500" />
                     Connect Google Business
                   </Button>
+                  <Button onClick={handleConnectLinkedIn} variant="outline" size="sm" data-testid="button-connect-linkedin">
+                    <SiLinkedin className="h-4 w-4 mr-2 text-blue-700" />
+                    Connect LinkedIn
+                  </Button>
+                  <Button onClick={handleConnectX} variant="outline" size="sm" data-testid="button-connect-x">
+                    <SiX className="h-4 w-4 mr-2" />
+                    Connect X
+                  </Button>
+                  <Button variant="outline" size="sm" disabled data-testid="button-connect-nextdoor">
+                    <SiNextdoor className="h-4 w-4 mr-2 text-green-600" />
+                    Nextdoor (Coming Soon)
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -1004,6 +1043,8 @@ export default function SocialPostBuilder() {
                             {account.provider === 'facebook' && <Facebook className="h-2.5 w-2.5" />}
                             {account.provider === 'instagram' && <Instagram className="h-2.5 w-2.5" />}
                             {account.provider === 'google_business' && <MapPin className="h-2.5 w-2.5" />}
+                            {account.provider === 'linkedin' && <SiLinkedin className="h-2.5 w-2.5" />}
+                            {account.provider === 'x' && <SiX className="h-2.5 w-2.5" />}
                           </span>
                         </div>
                         <div>
@@ -1012,6 +1053,8 @@ export default function SocialPostBuilder() {
                             {account.provider === 'facebook' ? 'Facebook Page' :
                              account.provider === 'instagram' ? 'Instagram Professional Account' :
                              account.provider === 'google_business' ? 'Google Business Profile' :
+                             account.provider === 'linkedin' ? 'LinkedIn Profile' :
+                             account.provider === 'x' ? 'X (Twitter) Account' :
                              account.provider.replace('_', ' ')}
                           </div>
                         </div>

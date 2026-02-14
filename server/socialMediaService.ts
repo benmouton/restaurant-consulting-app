@@ -10,6 +10,10 @@ const META_APP_ID = process.env.META_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID;
+const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
+const X_CLIENT_ID = process.env.X_CLIENT_ID;
+const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET;
 
 const STATE_EXPIRY_MS = 10 * 60 * 1000;
 
@@ -58,14 +62,14 @@ export interface GoogleLocation {
 }
 
 export const socialMediaService = {
-  async validateAndConsumeState(state: string): Promise<{ userId: string; provider: string } | null> {
+  async validateAndConsumeState(state: string): Promise<{ userId: string; provider: string; codeVerifier?: string | null } | null> {
     await cleanupExpiredStates();
     const [data] = await db.select().from(oauthStates).where(eq(oauthStates.state, state));
     if (!data) {
       return null;
     }
     await db.delete(oauthStates).where(eq(oauthStates.state, state));
-    return { userId: data.userId, provider: data.provider };
+    return { userId: data.userId, provider: data.provider, codeVerifier: data.codeVerifier };
   },
 
   async startMetaOAuth(userId: string): Promise<OAuthStartResult> {
@@ -538,6 +542,230 @@ export const socialMediaService = {
       suggestedPostTime: "6:00 PM",
       replyPack: ["Yum!", "See you there!"]
     };
+  },
+
+  // LinkedIn OAuth
+  async startLinkedInOAuth(userId: string): Promise<OAuthStartResult> {
+    await cleanupExpiredStates();
+    const state = crypto.randomBytes(32).toString('hex');
+    await db.insert(oauthStates).values({ state, userId, provider: 'linkedin' });
+    const redirectUri = `${getBaseUrl()}/api/oauth/linkedin/callback`;
+    const scopes = 'openid profile w_member_social';
+    const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` +
+      `response_type=code` +
+      `&client_id=${LINKEDIN_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&state=${state}` +
+      `&scope=${encodeURIComponent(scopes)}`;
+    return { authUrl, state };
+  },
+
+  async exchangeLinkedInCode(code: string): Promise<TokenExchangeResult> {
+    const redirectUri = `${getBaseUrl()}/api/oauth/linkedin/callback`;
+    const response = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: LINKEDIN_CLIENT_ID!,
+        client_secret: LINKEDIN_CLIENT_SECRET!,
+        redirect_uri: redirectUri,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`LinkedIn token exchange failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    };
+  },
+
+  async getLinkedInProfile(accessToken: string): Promise<{ sub: string; name: string; picture?: string }> {
+    const response = await fetch('https://api.linkedin.com/v2/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`LinkedIn profile fetch failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      sub: data.sub,
+      name: data.name || `${data.given_name || ''} ${data.family_name || ''}`.trim(),
+      picture: data.picture,
+    };
+  },
+
+  async postToLinkedIn(
+    personUrn: string,
+    accessToken: string,
+    message: string,
+    imageUrl?: string
+  ): Promise<{ id: string }> {
+    const body: any = {
+      author: `urn:li:person:${personUrn}`,
+      lifecycleState: 'PUBLISHED',
+      specificContent: {
+        'com.linkedin.ugc.ShareContent': {
+          shareCommentary: { text: message },
+          shareMediaCategory: 'NONE',
+        },
+      },
+      visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+    };
+
+    if (imageUrl) {
+      body.specificContent['com.linkedin.ugc.ShareContent'].shareMediaCategory = 'ARTICLE';
+      body.specificContent['com.linkedin.ugc.ShareContent'].media = [{
+        status: 'READY',
+        originalUrl: imageUrl,
+      }];
+    }
+
+    console.log(`[POST_LI] Posting to LinkedIn for person ${personUrn}`);
+    const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const rawText = await response.text();
+    console.log(`[POST_LI] Response status: ${response.status}, body: ${rawText}`);
+
+    if (!response.ok) {
+      let errMsg = 'Failed to post to LinkedIn';
+      try { errMsg = JSON.parse(rawText)?.message || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+
+    return { id: response.headers.get('x-restli-id') || JSON.parse(rawText)?.id || 'posted' };
+  },
+
+  // X (Twitter) OAuth 2.0 with PKCE
+  async startXOAuth(userId: string): Promise<OAuthStartResult> {
+    await cleanupExpiredStates();
+    const state = crypto.randomBytes(32).toString('hex');
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+
+    await db.insert(oauthStates).values({ state, userId, provider: 'x', codeVerifier });
+    const redirectUri = `${getBaseUrl()}/api/oauth/x/callback`;
+    const scopes = 'tweet.read tweet.write users.read offline.access';
+    const authUrl = `https://twitter.com/i/oauth2/authorize?` +
+      `response_type=code` +
+      `&client_id=${X_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=${encodeURIComponent(scopes)}` +
+      `&state=${state}` +
+      `&code_challenge=${codeChallenge}` +
+      `&code_challenge_method=S256`;
+    return { authUrl, state };
+  },
+
+  async exchangeXCode(code: string, codeVerifier: string): Promise<TokenExchangeResult> {
+    const redirectUri = `${getBaseUrl()}/api/oauth/x/callback`;
+    const basicAuth = Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString('base64');
+    const response = await fetch('https://api.x.com/2/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code_verifier: codeVerifier,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`X token exchange failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    };
+  },
+
+  async refreshXToken(refreshToken: string): Promise<TokenExchangeResult> {
+    const basicAuth = Buffer.from(`${X_CLIENT_ID}:${X_CLIENT_SECRET}`).toString('base64');
+    const response = await fetch('https://api.x.com/2/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`X token refresh failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    };
+  },
+
+  async getXProfile(accessToken: string): Promise<{ id: string; username: string; name: string; profileImageUrl?: string }> {
+    const response = await fetch('https://api.x.com/2/users/me?user.fields=profile_image_url', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`X profile fetch failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      id: data.data.id,
+      username: data.data.username,
+      name: data.data.name,
+      profileImageUrl: data.data.profile_image_url,
+    };
+  },
+
+  async postToX(
+    accessToken: string,
+    message: string
+  ): Promise<{ id: string }> {
+    console.log(`[POST_X] Posting tweet`);
+    const response = await fetch('https://api.x.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: message }),
+    });
+
+    const rawText = await response.text();
+    console.log(`[POST_X] Response status: ${response.status}, body: ${rawText}`);
+
+    if (!response.ok) {
+      let errMsg = 'Failed to post to X';
+      try { errMsg = JSON.parse(rawText)?.detail || JSON.parse(rawText)?.title || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+
+    const result = JSON.parse(rawText);
+    return { id: result.data?.id || 'posted' };
   },
 
   // Helper: Get decrypted token for an account
