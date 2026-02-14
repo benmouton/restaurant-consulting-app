@@ -1,0 +1,43 @@
+Overview
+Verify your ownership of a site by adding a <meta> tag to the HTML of a specified page. We'll verify that the meta tag exists on that page. If we can't find the tag, we'll give you information about the error we encountered. This tag is tied to a specific user. Search Console will periodically check for the presence of this tag.
+
+⚠️ Requirements
+Your homepage cannot require authentication. The site homepage must be available to non-logged-in users.
+You must be able to edit the HTML source code of the site's homepage directly. Specifically, you must be able to insert a tag into the <head> tag on your homepage. If you do not have permissions to do this, try another verification method. If you are using a website hosting platform, you might need to search your service's help pages to see if this is possible.
+The tag must be included less than 2MB into the file. External resources such as scripts are not counted as part of the size. (This restriction should affect very few websites.)
+Can be used for URL-prefix properties, but not Domain properties.
+Steps
+To verify ownership using an HTML tag:
+
+If you are using a website hosting platform, search your service's help pages for custom instructions to verify your site on Search Console. If you don't find any information, then continue on to the next steps.
+Read the requirements for this verification technique.
+Choose the HTML tag method on the Ownership verification page for your property.
+Copy the tag from the Search Console verification wizard into the <head> section in the HTML of your site's non-logged-in home page (see note). Example:
+<head>
+<title>Example.com homepage</title>
+<meta name="google-site-verification" content="......." />
+</head>
+This tag is unique to you; it cannot be used to identify anyone else, and is associated with your Gmail account.
+Save your page. Confirm that the tag is present in your live page by visiting the page and looking for the tag in the page source code. (Press Control + F then search for "google-site-verification" in the page source to find the tag.)
+Complete verification by clicking Verify in the verification details page.
+If verification fails, see Potential errors below to troubleshoot the issue.
+Troubleshooting
+The following verification errors can occur with HTML tag verification:
+
+Meta tag not found/in the wrong location. The verification meta tag must be within the <head> section of the page. If you see these errors, check the following:
+Is the meta tag on the correct page? We look for it in the rendered source of your site's home page. This is the page where your browser goes when you visit the URL that defines your Search Console property.
+
+Is the meta tag in the correct place on the page? We look for it in the page's <head> section. An example of correct placement is shown here:
+<html>
+  <head>
+    <title>Your Page Title</title>
+    <meta name="google-site-verification" content="your verification string">
+  </head>
+<body>
+...
+If you're using a web editor or a WYSIWYG editor to edit your page, make sure you're editing the HTML of the live page, not just the local copy on your computer.
+Your meta tag is incorrect
+We found the verification meta tag, but the contents were incorrect. To avoid errors, copy and paste the meta tag provided on the Verification page of Search Console. If another user's verification tag was already present in the page, you might get this error; confirm that the exact tag given to you in the Search Console verification wizard is present in the page HTML.
+Your meta tag is not formatted correctly
+We found the meta tag on your page, but there seems to be a syntax error for it. Copy and paste the tag exactly as provided by Search Console in the source HTML of your page. (Note that you shouldn't see the tag in your browser when you're visiting this page; you will only see it when looking at the HTML that generates the page.)
+Additional common verification problems are listed below.
