@@ -332,7 +332,21 @@ export const socialMediaService = {
   },
 
   async getGoogleBusinessLocations(accessToken: string): Promise<GoogleLocation[]> {
-    const accountsResponse = await fetch(
+    const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        const response = await fetch(url, options);
+        if (response.status === 429) {
+          const waitSec = Math.pow(2, attempt + 1);
+          console.log(`[GOOGLE_API] Rate limited (429), waiting ${waitSec}s before retry ${attempt + 1}/${retries}...`);
+          await new Promise(resolve => setTimeout(resolve, waitSec * 1000));
+          continue;
+        }
+        return response;
+      }
+      return fetch(url, options);
+    };
+
+    const accountsResponse = await fetchWithRetry(
       'https://mybusinessaccountmanagement.googleapis.com/v1/accounts',
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
@@ -347,7 +361,7 @@ export const socialMediaService = {
     
     const locations: GoogleLocation[] = [];
     for (const account of accounts) {
-      const locResponse = await fetch(
+      const locResponse = await fetchWithRetry(
         `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
