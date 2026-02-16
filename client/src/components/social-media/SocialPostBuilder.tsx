@@ -182,12 +182,18 @@ export default function SocialPostBuilder() {
         } catch {}
       }
       const msgParam = params.get("msg");
+      const detail = params.get("detail");
       const msgInfo = msgParam ? ` Details: ${decodeURIComponent(msgParam)}` : "";
+      const detailInfo = detail ? ` Details: ${decodeURIComponent(detail)}` : "";
       const errorMessages: Record<string, string> = {
         no_pages: `No Facebook Pages found.${diagInfo}`,
         invalid_state: "Connection session expired. Please try again.",
-        oauth_failed: `Connection failed.${msgInfo || " Please try again."}`,
+        oauth_failed: `Connection failed.${detailInfo || msgInfo || " Please try again."}`,
         missing_params: "Connection was incomplete. Please try again.",
+        google_denied: "Google connection was denied or cancelled.",
+        google_api_not_enabled: "The Google Business Profile API is not enabled in your Google Cloud project. Please enable the 'My Business Account Management API' and 'My Business Business Information API' in Google Cloud Console, then try again.",
+        no_google_locations: "No Google Business Profile locations were found for this Google account. Make sure the Google account you're connecting has a verified Business Profile.",
+        google_locations_failed: `Could not retrieve your Business Profile locations.${detailInfo || " The API may not be enabled in your Google Cloud project."}`,
       };
       toast({
         title: "Connection Failed",

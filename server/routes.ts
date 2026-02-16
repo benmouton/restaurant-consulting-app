@@ -2104,21 +2104,52 @@ Generate JSON with:
   // Google OAuth callback
   app.get("/api/oauth/google/callback", async (req: any, res) => {
     try {
-      const { code, state } = req.query;
+      const { code, state, error: oauthError } = req.query;
+      
+      if (oauthError) {
+        console.error("[GOOGLE_OAUTH] User denied or error from Google:", oauthError);
+        res.redirect(`/domain/social-media?error=google_denied&detail=${encodeURIComponent(String(oauthError))}`);
+        return;
+      }
+      
       if (!code || !state) {
+        console.error("[GOOGLE_OAUTH] Missing code or state params");
         res.redirect("/domain/social-media?error=missing_params");
         return;
       }
 
       const stateData = await socialMediaService.validateAndConsumeState(state as string);
       if (!stateData || stateData.provider !== 'google') {
+        console.error("[GOOGLE_OAUTH] Invalid or expired state");
         res.redirect("/domain/social-media?error=invalid_state");
         return;
       }
       const userId = stateData.userId;
 
+      console.log("[GOOGLE_OAUTH] Exchanging code for tokens...");
       const tokens = await socialMediaService.exchangeGoogleCode(code as string);
-      const locations = await socialMediaService.getGoogleBusinessLocations(tokens.accessToken);
+      console.log("[GOOGLE_OAUTH] Token exchange successful, fetching locations...");
+      
+      let locations: any[] = [];
+      try {
+        locations = await socialMediaService.getGoogleBusinessLocations(tokens.accessToken);
+        console.log(`[GOOGLE_OAUTH] Found ${locations.length} locations`);
+      } catch (locError: any) {
+        console.error("[GOOGLE_OAUTH] Failed to fetch locations:", locError.message);
+        const errorMsg = locError.message || '';
+        if (errorMsg.includes('403') || errorMsg.includes('forbidden') || errorMsg.includes('disabled')) {
+          res.redirect("/domain/social-media?error=google_api_not_enabled");
+        } else {
+          res.redirect(`/domain/social-media?error=google_locations_failed&detail=${encodeURIComponent(errorMsg.slice(0, 200))}`);
+        }
+        return;
+      }
+
+      if (locations.length === 0) {
+        console.warn("[GOOGLE_OAUTH] No Business Profile locations found for this Google account");
+        res.redirect("/domain/social-media?error=no_google_locations");
+        return;
+      }
 
       for (const location of locations) {
         await socialMediaService.saveConnectedAccount(
@@ -2134,9 +2165,9 @@ Generate JSON with:
       }
 
       res.redirect("/domain/social-media?connected=google");
-    } catch (error) {
-      console.error("Google OAuth callback error:", error);
-      res.redirect("/domain/social-media?error=oauth_failed");
+    } catch (error: any) {
+      console.error("Google OAuth callback error:", error.message || error);
+      res.redirect(`/domain/social-media?error=oauth_failed&detail=${encodeURIComponent((error.message || '').slice(0, 200))}`);
     }
   });
 
