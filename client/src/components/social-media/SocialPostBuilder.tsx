@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format, parse } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -41,6 +44,7 @@ import {
   X,
   Upload,
   Eye,
+  CalendarIcon,
 } from "lucide-react";
 import { SiLinkedin, SiX, SiNextdoor } from "react-icons/si";
 import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
@@ -129,7 +133,7 @@ export default function SocialPostBuilder() {
     postType: "",
     outputStyle: "warm_hospitality",
     eventName: "",
-    eventDate: "",
+    eventDate: format(new Date(), "yyyy-MM-dd"),
     startTime: "",
     endTime: "",
     promotionDetails: "",
@@ -780,12 +784,29 @@ export default function SocialPostBuilder() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Date</Label>
-                        <Input
-                          type="date"
-                          value={aiFormData.eventDate}
-                          onChange={(e) => setAiFormData({ ...aiFormData, eventDate: e.target.value })}
-                          data-testid="input-event-date"
-                        />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal"
+                              data-testid="input-event-date"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {aiFormData.eventDate
+                                ? format(parse(aiFormData.eventDate, "yyyy-MM-dd", new Date()), "MMM d, yyyy")
+                                : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={aiFormData.eventDate ? parse(aiFormData.eventDate, "yyyy-MM-dd", new Date()) : undefined}
+                              onSelect={(date) => setAiFormData({ ...aiFormData, eventDate: date ? format(date, "yyyy-MM-dd") : "" })}
+                              initialFocus
+                              data-testid="calendar-event-date"
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
 
