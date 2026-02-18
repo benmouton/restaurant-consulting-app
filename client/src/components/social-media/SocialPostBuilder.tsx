@@ -588,6 +588,8 @@ export default function SocialPostBuilder() {
                                 {account.provider === 'facebook' && <Facebook className="h-2.5 w-2.5" />}
                                 {account.provider === 'instagram' && <Instagram className="h-2.5 w-2.5" />}
                                 {account.provider === 'google_business' && <MapPin className="h-2.5 w-2.5" />}
+                                {account.provider === 'linkedin' && <SiLinkedin className="h-2.5 w-2.5" />}
+                                {account.provider === 'x' && <SiX className="h-2.5 w-2.5" />}
                               </span>
                             </button>
                           );
