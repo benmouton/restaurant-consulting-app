@@ -349,10 +349,17 @@ export const organizationInvites = pgTable("organization_invites", {
   organizationId: integer("organization_id").notNull().references(() => organizations.id),
   email: text("email").notNull(),
   inviteToken: text("invite_token").notNull().unique(),
-  invitedBy: text("invited_by").notNull(), // userId of inviter
-  status: text("status").notNull().default("pending"), // 'pending', 'accepted', 'expired'
+  invitedBy: text("invited_by").notNull(),
+  status: text("status").notNull().default("pending"),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  recipientName: text("recipient_name"),
+  relationship: text("relationship"),
+  personalMessage: text("personal_message"),
+  subjectLine: text("subject_line"),
+  reminderSent: boolean("reminder_sent").default(false),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  reminderEnabled: boolean("reminder_enabled").default(true),
 });
 
 // Internal Messages (org member-to-member messaging)

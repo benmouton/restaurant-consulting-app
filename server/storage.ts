@@ -131,6 +131,8 @@ export interface IStorage {
   getInviteById(id: number): Promise<OrganizationInvite | undefined>;
   updateInviteStatus(id: number, status: string): Promise<void>;
   deleteInvite(id: number): Promise<void>;
+  getInvitesDueForReminder(): Promise<OrganizationInvite[]>;
+  markInviteReminderSent(id: number): Promise<void>;
   
   // HR Documents (organization-aware)
   getHRDocumentsForOrganization(organizationId: number): Promise<HRDocument[]>;
@@ -972,6 +974,25 @@ export class DatabaseStorage implements IStorage {
 
   async deleteInvite(id: number): Promise<void> {
     await db.delete(organizationInvites)
+      .where(eq(organizationInvites.id, id));
+  }
+
+  async getInvitesDueForReminder(): Promise<OrganizationInvite[]> {
+    const now = new Date();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    return await db.select().from(organizationInvites)
+      .where(and(
+        eq(organizationInvites.status, "pending"),
+        eq(organizationInvites.reminderEnabled, true),
+        eq(organizationInvites.reminderSent, false),
+        lte(organizationInvites.createdAt, threeDaysAgo),
+        gte(organizationInvites.expiresAt, now),
+      ));
+  }
+
+  async markInviteReminderSent(id: number): Promise<void> {
+    await db.update(organizationInvites)
+      .set({ reminderSent: true, reminderSentAt: new Date() })
       .where(eq(organizationInvites.id, id));
   }
 

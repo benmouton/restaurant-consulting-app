@@ -17,7 +17,7 @@ import { getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { restaurantHolidays, insertHandbookSettingsSchema, insertRestaurantStandardsSchema, insertCertificationAttemptSchema } from "@shared/schema";
-import { sendOrganizationInviteEmail } from "./emailService";
+import { sendOrganizationInviteEmail, sendInviteReminderEmail } from "./emailService";
 import { encrypt } from "./encryption";
 
 const openai = new OpenAI({
@@ -3687,7 +3687,7 @@ Generate JSON with:
     try {
       console.log("[Invite] Received invite request");
       const userId = req.user.claims.sub;
-      const { email } = req.body;
+      const { email, recipientName, relationship, personalMessage, subjectLine, reminderEnabled } = req.body;
       console.log(`[Invite] User ${userId} inviting ${email}`);
 
       if (!email) {
@@ -3703,8 +3703,8 @@ Generate JSON with:
 
       const user = await storage.getUserById(userId);
       const inviterName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "A team member";
+      const inviterEmail = user?.email || undefined;
 
-      // Check for existing pending invites for this email and cancel them
       const existingInvites = await storage.getOrganizationInvites(org.id);
       const pendingForEmail = existingInvites.filter(i => i.email === email && i.status === "pending");
       if (pendingForEmail.length > 0) {
@@ -3726,10 +3726,14 @@ Generate JSON with:
         invitedBy: userId,
         status: "pending",
         expiresAt,
+        recipientName: recipientName || null,
+        relationship: relationship || null,
+        personalMessage: personalMessage || null,
+        subjectLine: subjectLine || null,
+        reminderEnabled: reminderEnabled !== false,
       });
       console.log(`[Invite] Invite created with id: ${invite.id}`);
 
-      // Use production domain if available, otherwise dev domain
       const productionDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
       const baseUrl = productionDomain 
         ? `https://${productionDomain}`
@@ -3739,7 +3743,17 @@ Generate JSON with:
       const inviteLink = `${baseUrl}/accept-invite/${inviteToken}`;
 
       console.log(`[Invite] Sending email to ${email}...`);
-      const emailSent = await sendOrganizationInviteEmail(email, inviterName, org.name, inviteLink);
+      const emailSent = await sendOrganizationInviteEmail({
+        toEmail: email,
+        recipientName: recipientName || undefined,
+        inviterName,
+        inviterEmail,
+        organizationName: org.name,
+        inviteLink,
+        personalMessage: personalMessage || undefined,
+        subjectLine: subjectLine || undefined,
+        relationship: relationship || undefined,
+      });
       
       if (!emailSent) {
         console.warn("[Invite] Failed to send invite email, but invite was created");
@@ -3817,7 +3831,16 @@ Generate JSON with:
     }
 
     const org = await storage.getOrganization(invite.organizationId);
-    res.json({ organizationName: org?.name, email: invite.email });
+    const inviter = await storage.getUserById(invite.invitedBy);
+    const inviterName = inviter?.firstName ? `${inviter.firstName} ${inviter.lastName || ''}`.trim() : "A team member";
+    res.json({ 
+      organizationName: org?.name, 
+      email: invite.email,
+      recipientName: invite.recipientName,
+      personalMessage: invite.personalMessage,
+      inviterName,
+      relationship: invite.relationship,
+    });
   });
 
   // Cancel/delete pending invite (owners only)
@@ -3893,6 +3916,7 @@ Generate JSON with:
 
       const user = await storage.getUserById(userId);
       const inviterName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "A team member";
+      const inviterEmail = user?.email || undefined;
 
       const inviteToken = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date();
@@ -3905,6 +3929,11 @@ Generate JSON with:
         invitedBy: userId,
         status: "pending",
         expiresAt,
+        recipientName: invite.recipientName,
+        relationship: invite.relationship,
+        personalMessage: invite.personalMessage,
+        subjectLine: invite.subjectLine,
+        reminderEnabled: invite.reminderEnabled,
       });
 
       const productionDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
@@ -3915,7 +3944,17 @@ Generate JSON with:
           : "http://localhost:5000";
       const inviteLink = `${baseUrl}/accept-invite/${inviteToken}`;
 
-      await sendOrganizationInviteEmail(invite.email, inviterName, org.name, inviteLink);
+      await sendOrganizationInviteEmail({
+        toEmail: invite.email,
+        recipientName: invite.recipientName || undefined,
+        inviterName,
+        inviterEmail,
+        organizationName: org.name,
+        inviteLink,
+        personalMessage: invite.personalMessage || undefined,
+        subjectLine: invite.subjectLine || undefined,
+        relationship: invite.relationship || undefined,
+      });
 
       res.status(201).json(newInvite);
     } catch (err) {
@@ -4447,7 +4486,60 @@ Be fair but rigorous. A real restaurant's reputation depends on this evaluation 
   await seedTrainingTemplates();
   await seedRestaurantHolidays();
 
+  // Auto-reminder: check every hour for invites that need 3-day reminders
+  setInterval(async () => {
+    try {
+      await processInviteReminders();
+    } catch (err) {
+      console.error("[Reminders] Error processing invite reminders:", err);
+    }
+  }, 60 * 60 * 1000); // every hour
+
   return httpServer;
+}
+
+async function processInviteReminders() {
+  const dueInvites = await storage.getInvitesDueForReminder();
+  if (dueInvites.length === 0) return;
+
+  console.log(`[Reminders] Found ${dueInvites.length} invites due for reminder`);
+
+  for (const invite of dueInvites) {
+    try {
+      const inviter = await storage.getUserById(invite.invitedBy);
+      if (!inviter) {
+        console.warn(`[Reminders] Skipping invite ${invite.id}: inviter not found`);
+        continue;
+      }
+
+      const daysRemaining = Math.max(1, Math.ceil(
+        (new Date(invite.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+      ));
+
+      const inviterName = [inviter.firstName, inviter.lastName].filter(Boolean).join(' ') || 'Your colleague';
+      const protocol = process.env.REPL_SLUG ? 'https' : 'http';
+      const host = process.env.REPL_SLUG 
+        ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : 'localhost:5000';
+      const inviteLink = `${protocol}://${host}/accept-invite/${invite.inviteToken}`;
+
+      const sent = await sendInviteReminderEmail({
+        toEmail: invite.email,
+        recipientName: invite.recipientName || undefined,
+        inviterName,
+        inviterEmail: inviter.email || undefined,
+        inviteLink,
+        daysRemaining,
+      });
+
+      if (sent) {
+        await storage.markInviteReminderSent(invite.id);
+        console.log(`[Reminders] Reminder sent for invite ${invite.id} to ${invite.email}`);
+      }
+    } catch (err) {
+      console.error(`[Reminders] Failed to process invite ${invite.id}:`, err);
+    }
+  }
 }
 
 // Helper function to process uploaded documents asynchronously

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Users, 
@@ -19,7 +23,8 @@ import {
   Building,
   RefreshCw,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle
 } from "lucide-react";
 import {
   AlertDialog,
@@ -59,6 +64,11 @@ interface OrganizationInvite {
   status: string;
   expiresAt: string;
   createdAt: string;
+  recipientName: string | null;
+  relationship: string | null;
+  personalMessage: string | null;
+  reminderSent: boolean | null;
+  reminderEnabled: boolean | null;
 }
 
 const orgRoleOptions = [
@@ -96,11 +106,32 @@ function isInviteExpired(expiresAt: string): boolean {
 
 export default function OrganizationManagement() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [orgName, setOrgName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
   const [isCreating, setIsCreating] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRelationship, setInviteRelationship] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [inviteSubject, setInviteSubject] = useState("default");
+  const [inviteReminderEnabled, setInviteReminderEnabled] = useState(true);
+  const [showInviteSuccess, setShowInviteSuccess] = useState(false);
+  const [lastSentInvite, setLastSentInvite] = useState<any>(null);
+  const messageEdited = useRef(false);
+
+  const getDefaultMessage = (name: string) => {
+    const greeting = name || "there";
+    const signOff = (user as any)?.firstName || "Ben";
+    return `Hey ${greeting},\n\nI've been building something I'm really excited about — a restaurant operations platform called The Restaurant Consultant. It's built from everything I've learned running my own restaurants, and I'd love your honest feedback on it.\n\nYou know this business better than most, and your perspective would mean a lot to me as I shape this into something that actually helps operators like us.\n\nTake a look when you get a chance — no pressure, no sales pitch. Just want to know if this is something you'd actually use on a Tuesday night when everything's going sideways.\n\n— ${signOff}`;
+  };
+
+  useEffect(() => {
+    if (!messageEdited.current) {
+      setInviteMessage(getDefaultMessage(inviteName));
+    }
+  }, [inviteName, user]);
 
   const { data: organization, isLoading: orgLoading } = useQuery<Organization | null>({
     queryKey: ["/api/organization"],
@@ -140,19 +171,26 @@ export default function OrganizationManagement() {
   });
 
   const sendInviteMutation = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: string }) => {
-      const response = await apiRequest("POST", "/api/organization/invite", { email, role });
+    mutationFn: async (data: { email: string; role: string; recipientName?: string; relationship?: string; personalMessage?: string; subjectLine?: string; reminderEnabled?: boolean }) => {
+      const response = await apiRequest("POST", "/api/organization/invite", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/organization/invites"] });
+      const sentName = inviteName || "Your invite";
+      const sentEmail = inviteEmail;
+      setShowInviteSuccess(true);
+      setLastSentInvite(data);
+      toast({
+        title: "Invitation sent!",
+        description: `${sentName} was sent to ${sentEmail}. They have 7 days to accept.`,
+      });
+      setInviteName("");
       setInviteEmail("");
       setInviteRole("viewer");
-      setIsInviting(false);
-      toast({
-        title: "Invite sent",
-        description: "Invitation sent! It expires in 7 days.",
-      });
+      setInviteMessage("");
+      setInviteSubject("default");
+      messageEdited.current = false;
     },
     onError: (error: any) => {
       toast({
@@ -254,7 +292,15 @@ export default function OrganizationManagement() {
   const handleSendInvite = (e: React.FormEvent) => {
     e.preventDefault();
     if (inviteEmail.trim()) {
-      sendInviteMutation.mutate({ email: inviteEmail.trim(), role: inviteRole });
+      sendInviteMutation.mutate({ 
+        email: inviteEmail.trim(), 
+        role: inviteRole,
+        recipientName: inviteName.trim() || undefined,
+        relationship: inviteRelationship || undefined,
+        personalMessage: inviteMessage.trim() || undefined,
+        subjectLine: inviteSubject || undefined,
+        reminderEnabled: inviteReminderEnabled,
+      });
     }
   };
 
@@ -470,25 +516,136 @@ export default function OrganizationManagement() {
 
             <div>
               <h4 className="text-sm font-medium mb-3">Invite Team Members</h4>
-              {isInviting ? (
+              {showInviteSuccess ? (
+                <div className="text-center space-y-4 py-4">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+                  <div>
+                    <p className="font-medium" data-testid="text-invite-success">
+                      Invitation sent to {lastSentInvite?.recipientName || "your contact"} at {lastSentInvite?.email || "their email"}!
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">They have 7 days to accept.</p>
+                  </div>
+                  <div className="flex gap-2 justify-center flex-wrap">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowInviteSuccess(false);
+                        setLastSentInvite(null);
+                        setInviteName("");
+                        setInviteEmail("");
+                        setInviteRole("viewer");
+                        setInviteRelationship("");
+                        setInviteMessage("");
+                        setInviteSubject("default");
+                        setInviteReminderEnabled(true);
+                        messageEdited.current = false;
+                      }}
+                      data-testid="btn-send-another"
+                    >
+                      Send Another Invitation
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowInviteSuccess(false);
+                        setLastSentInvite(null);
+                        setIsInviting(false);
+                      }}
+                      data-testid="btn-done-inviting"
+                    >
+                      Done
+                    </Button>
+                  </div>
+                </div>
+              ) : isInviting ? (
                 <form onSubmit={handleSendInvite} className="space-y-3">
-                  <Input
-                    type="email"
-                    placeholder="Enter email address"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    data-testid="input-invite-email"
-                  />
-                  <Select value={inviteRole} onValueChange={setInviteRole}>
-                    <SelectTrigger data-testid="select-invite-role">
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="shift_lead">Shift Lead</SelectItem>
-                      <SelectItem value="viewer">Viewer (Read-only)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="invite-name">Their First Name</Label>
+                      <Input
+                        id="invite-name"
+                        placeholder="Their first name"
+                        value={inviteName}
+                        onChange={(e) => setInviteName(e.target.value)}
+                        data-testid="input-invite-name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="invite-email">Email Address</Label>
+                      <Input
+                        id="invite-email"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        required
+                        data-testid="input-invite-email"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Relationship</Label>
+                      <Select value={inviteRelationship} onValueChange={setInviteRelationship}>
+                        <SelectTrigger data-testid="select-invite-relationship">
+                          <SelectValue placeholder="Select relationship" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="fellow_operator">Fellow Operator</SelectItem>
+                          <SelectItem value="manager">Manager</SelectItem>
+                          <SelectItem value="industry_friend">Industry Friend</SelectItem>
+                          <SelectItem value="mentor_advisor">Mentor / Advisor</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Role</Label>
+                      <Select value={inviteRole} onValueChange={setInviteRole}>
+                        <SelectTrigger data-testid="select-invite-role">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manager">Manager</SelectItem>
+                          <SelectItem value="shift_lead">Shift Lead</SelectItem>
+                          <SelectItem value="viewer">Viewer (Read-only)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Subject Line</Label>
+                    <Select value={inviteSubject} onValueChange={setInviteSubject}>
+                      <SelectTrigger data-testid="select-invite-subject">
+                        <SelectValue placeholder="Select subject line" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Hey {inviteName || "[name]"} — I'd love your feedback on something I'm building</SelectItem>
+                        <SelectItem value="alternative1">{(user as any)?.firstName || "[Your name]"} invited you to try The Restaurant Consultant</SelectItem>
+                        <SelectItem value="alternative2">Got 10 minutes? I built something for operators like us</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="invite-message">Personal Message</Label>
+                    <Textarea
+                      id="invite-message"
+                      rows={8}
+                      value={inviteMessage}
+                      onChange={(e) => {
+                        messageEdited.current = true;
+                        setInviteMessage(e.target.value);
+                      }}
+                      data-testid="textarea-invite-message"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={inviteReminderEnabled}
+                      onCheckedChange={setInviteReminderEnabled}
+                      data-testid="switch-invite-reminder"
+                    />
+                    <Label>Send a gentle reminder after 3 days if not accepted</Label>
+                  </div>
                   <div className="flex gap-2 flex-wrap">
                     <Button 
                       type="submit" 
@@ -548,29 +705,60 @@ export default function OrganizationManagement() {
                     <div className="space-y-2">
                       {pendingInvites.map((invite) => {
                         const expired = isInviteExpired(invite.expiresAt);
+                        const relationshipLabels: Record<string, string> = {
+                          fellow_operator: "Fellow Operator",
+                          manager: "Manager",
+                          industry_friend: "Industry Friend",
+                          mentor_advisor: "Mentor / Advisor",
+                          other: "Other",
+                        };
                         return (
                           <div 
                             key={invite.id} 
-                            className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-md"
+                            className="flex items-center justify-between gap-2 p-3 bg-muted/50 rounded-md"
                             data-testid={`invite-${invite.id}`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                               <div className="min-w-0">
-                                <p className="text-sm truncate">{invite.email}</p>
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  {expired ? (
-                                    <>
-                                      <AlertTriangle className="h-3 w-3 text-destructive" />
-                                      <span className="text-destructive">Expired {new Date(invite.expiresAt).toLocaleDateString()}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Clock className="h-3 w-3" />
-                                      Expires: {new Date(invite.expiresAt).toLocaleDateString()}
-                                    </>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-medium truncate" data-testid={`text-invite-name-${invite.id}`}>
+                                    {invite.recipientName || invite.email}
+                                  </p>
+                                  {invite.relationship && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {relationshipLabels[invite.relationship] || invite.relationship}
+                                    </Badge>
                                   )}
-                                </p>
+                                </div>
+                                {invite.recipientName && (
+                                  <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
+                                )}
+                                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                    {expired ? (
+                                      <>
+                                        <AlertTriangle className="h-3 w-3 text-destructive" />
+                                        <span className="text-destructive">Expired {new Date(invite.expiresAt).toLocaleDateString()}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Clock className="h-3 w-3" />
+                                        Expires: {new Date(invite.expiresAt).toLocaleDateString()}
+                                      </>
+                                    )}
+                                  </p>
+                                  {!expired && invite.reminderEnabled && !invite.reminderSent && (
+                                    <span className="text-xs text-muted-foreground">
+                                      &middot; Reminder scheduled
+                                    </span>
+                                  )}
+                                  {invite.reminderSent && (
+                                    <span className="text-xs text-muted-foreground">
+                                      &middot; Reminder sent
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">

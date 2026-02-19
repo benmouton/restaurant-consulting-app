@@ -1,6 +1,3 @@
-// Resend Email Service Integration
-// Uses Replit Connectors for secure API key management
-
 import { Resend } from 'resend';
 
 let connectionSettings: any;
@@ -41,40 +38,86 @@ async function getResendClient() {
   };
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function nl2br(str: string): string {
+  return escapeHtml(str).replace(/\n/g, '<br>');
+}
+
+interface PersonalizedInviteOptions {
+  toEmail: string;
+  recipientName?: string;
+  inviterName: string;
+  inviterEmail?: string;
+  organizationName: string;
+  inviteLink: string;
+  personalMessage?: string;
+  subjectLine?: string;
+  relationship?: string;
+}
+
 export async function sendOrganizationInviteEmail(
-  toEmail: string,
-  inviterName: string,
-  organizationName: string,
-  inviteLink: string
+  toEmailOrOptions: string | PersonalizedInviteOptions,
+  inviterNameArg?: string,
+  organizationNameArg?: string,
+  inviteLinkArg?: string
 ): Promise<boolean> {
+  let opts: PersonalizedInviteOptions;
+
+  if (typeof toEmailOrOptions === 'string') {
+    opts = {
+      toEmail: toEmailOrOptions,
+      inviterName: inviterNameArg || 'A team member',
+      organizationName: organizationNameArg || '',
+      inviteLink: inviteLinkArg || '',
+    };
+  } else {
+    opts = toEmailOrOptions;
+  }
+
   try {
-    console.log(`[Email] Attempting to send invite email to ${toEmail}`);
+    console.log(`[Email] Attempting to send invite email to ${opts.toEmail}`);
     const { client, fromEmail } = await getResendClient();
     console.log(`[Email] Got Resend client, fromEmail: ${fromEmail || 'using default'}`);
+
+    const recipientFirst = opts.recipientName || '';
+    const subject = opts.subjectLine || `Hey ${recipientFirst} — I'd love your feedback on something I'm building`;
+
+    const fromDisplay = `${opts.inviterName} via The Restaurant Consultant`;
+    const senderFrom = fromEmail 
+      ? fromEmail.replace(/<.*>/, '').trim() 
+        ? fromEmail.replace(/^[^<]*/, `${fromDisplay} `) 
+        : `${fromDisplay} <${fromEmail}>`
+      : `${fromDisplay} <noreply@restaurantai.consulting>`;
+
+    const fromEmailAddr = fromEmail?.match(/<(.+)>/)?.[1] || fromEmail || 'noreply@restaurantai.consulting';
+
+    const messageHtml = opts.personalMessage 
+      ? nl2br(opts.personalMessage)
+      : `I've been building something I'm really excited about &mdash; a restaurant operations platform called The Restaurant Consultant. It's built from everything I've learned running my own restaurants, and I'd love your honest feedback on it.<br><br>You know this business better than most, and your perspective would mean a lot to me as I shape this into something that actually helps operators like us.<br><br>Take a look when you get a chance &mdash; no pressure, no sales pitch. Just want to know if this is something you'd actually use on a Tuesday night when everything's going sideways.<br><br>&mdash; ${escapeHtml(opts.inviterName)}`;
+
+    const html = buildInviteEmailHtml({
+      recipientName: recipientFirst,
+      messageHtml,
+      inviteLink: opts.inviteLink,
+      inviterName: opts.inviterName,
+      inviterEmail: opts.inviterEmail,
+      senderEmailAddr: fromEmailAddr,
+    });
     
     const result = await client.emails.send({
-      from: fromEmail || 'The Restaurant Consultant <noreply@restaurantai.consulting>',
-      to: toEmail,
-      subject: `${inviterName} invited you to join ${organizationName}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1a1a1a;">You've been invited to join ${organizationName}</h2>
-          <p style="color: #444; font-size: 16px;">
-            ${inviterName} has invited you to join their organization on The Restaurant Consultant.
-          </p>
-          <p style="color: #444; font-size: 16px;">
-            As a member, you'll be able to view shared documents, training materials, and collaborate with your team.
-          </p>
-          <div style="margin: 30px 0;">
-            <a href="${inviteLink}" style="background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-size: 16px; display: inline-block;">
-              Accept Invitation
-            </a>
-          </div>
-          <p style="color: #888; font-size: 14px;">
-            This invitation link will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
-          </p>
-        </div>
-      `,
+      from: senderFrom,
+      to: opts.toEmail,
+      replyTo: opts.inviterEmail || undefined,
+      subject,
+      html,
     });
     
     console.log(`[Email] Resend API response:`, JSON.stringify(result));
@@ -84,11 +127,188 @@ export async function sendOrganizationInviteEmail(
       return false;
     }
     
-    console.log(`[Email] Successfully sent invite email to ${toEmail}, id: ${result.data?.id}`);
+    console.log(`[Email] Successfully sent invite email to ${opts.toEmail}, id: ${result.data?.id}`);
     return true;
   } catch (error: any) {
     console.error('[Email] Failed to send invite email:', error?.message || error);
     console.error('[Email] Full error:', JSON.stringify(error, null, 2));
     return false;
   }
+}
+
+export async function sendInviteReminderEmail(opts: {
+  toEmail: string;
+  recipientName?: string;
+  inviterName: string;
+  inviterEmail?: string;
+  inviteLink: string;
+  daysRemaining: number;
+}): Promise<boolean> {
+  try {
+    console.log(`[Email] Sending reminder email to ${opts.toEmail}`);
+    const { client, fromEmail } = await getResendClient();
+
+    const recipientFirst = opts.recipientName || '';
+    const fromDisplay = `${opts.inviterName} via The Restaurant Consultant`;
+    const senderFrom = fromEmail 
+      ? fromEmail.replace(/^[^<]*/, `${fromDisplay} `) 
+      : `${fromDisplay} <noreply@restaurantai.consulting>`;
+    const fromEmailAddr = fromEmail?.match(/<(.+)>/)?.[1] || fromEmail || 'noreply@restaurantai.consulting';
+
+    const messageHtml = `Just bumping this &mdash; I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.`;
+
+    const html = buildInviteEmailHtml({
+      recipientName: recipientFirst,
+      messageHtml,
+      inviteLink: opts.inviteLink,
+      inviterName: opts.inviterName,
+      inviterEmail: opts.inviterEmail,
+      senderEmailAddr: fromEmailAddr,
+      isReminder: true,
+      daysRemaining: opts.daysRemaining,
+    });
+
+    const result = await client.emails.send({
+      from: senderFrom,
+      to: opts.toEmail,
+      replyTo: opts.inviterEmail || undefined,
+      subject: `Quick follow-up — still want your take on this`,
+      html,
+    });
+
+    if (result.error) {
+      console.error('[Email] Resend returned error:', result.error);
+      return false;
+    }
+
+    console.log(`[Email] Reminder sent to ${opts.toEmail}, id: ${result.data?.id}`);
+    return true;
+  } catch (error: any) {
+    console.error('[Email] Failed to send reminder email:', error?.message || error);
+    return false;
+  }
+}
+
+function buildInviteEmailHtml(params: {
+  recipientName: string;
+  messageHtml: string;
+  inviteLink: string;
+  inviterName: string;
+  inviterEmail?: string;
+  senderEmailAddr: string;
+  isReminder?: boolean;
+  daysRemaining?: number;
+}): string {
+  const greeting = params.recipientName ? `Hey ${escapeHtml(params.recipientName)},` : `Hey there,`;
+  const expiryNote = params.isReminder && params.daysRemaining 
+    ? `Expires in ${params.daysRemaining} day${params.daysRemaining === 1 ? '' : 's'}.`
+    : `This invitation expires in 7 days.`;
+  const replyNote = params.inviterEmail 
+    ? `Questions? Just reply to this email &mdash; it goes directly to ${escapeHtml(params.inviterName)}.`
+    : `Questions? Reach out to ${escapeHtml(params.inviterName)} directly.`;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <span style="color: #ffffff; font-family: 'Georgia', serif; font-size: 18px; font-weight: bold;">The Restaurant</span>
+                    <span style="color: #14b8a6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-left: 6px;">Consultant</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Body -->
+          <tr>
+            <td style="background-color: #ffffff; padding: 40px 30px;">
+              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                ${greeting}
+              </p>
+              
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
+                ${params.messageHtml}
+              </p>
+              
+              <!-- Divider -->
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <p style="color: #1a1a1a; font-size: 15px; font-weight: 600; margin: 0 0 16px 0;">
+                Here's what you'll get access to:
+              </p>
+              
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 30px 0;">
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F52A;</span> 12 operational domains &mdash; from kitchen readiness to HR compliance
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F4CB;</span> Training templates and employee handbooks
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F4B0;</span> Food cost tools and financial analysis
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F6A8;</span> Crisis management playbooks
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F4AC;</span> An operations consultant for any question
+                </td></tr>
+              </table>
+              
+              <!-- Divider -->
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <!-- CTA Button -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding: 10px 0 20px 0;">
+                    <a href="${params.inviteLink}" style="background-color: #14b8a6; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; display: inline-block; letter-spacing: 0.3px;">
+                      Accept Invitation &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
+                ${expiryNote}
+              </p>
+              
+              <!-- Divider -->
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <p style="color: #888888; font-size: 14px; margin: 0;">
+                ${replyNote}
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="color: #888888; font-size: 13px; margin: 0 0 4px 0;">The Restaurant Consultant</p>
+              <p style="color: #666666; font-size: 12px; font-style: italic; margin: 0;">Systems that work on your worst night.</p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }

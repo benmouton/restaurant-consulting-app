@@ -1,16 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users, CheckCircle, XCircle, Building } from "lucide-react";
+import { BrandLogoFull } from "@/components/BrandLogo";
+import { Loader2, Users, CheckCircle, XCircle, MessageSquare, ArrowRight } from "lucide-react";
 
 interface InviteDetails {
   organizationName: string;
   email: string;
+  recipientName?: string;
+  personalMessage?: string;
+  inviterName?: string;
+  relationship?: string;
 }
 
 export default function AcceptInvitePage() {
@@ -60,6 +66,9 @@ export default function AcceptInvitePage() {
     acceptInviteMutation.mutate();
   };
 
+  const inviterDisplay = inviteDetails?.inviterName || "A team member";
+  const recipientDisplay = inviteDetails?.recipientName || "";
+
   if (authLoading || inviteLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -70,30 +79,41 @@ export default function AcceptInvitePage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 gap-6">
+        <BrandLogoFull />
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Users className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <CardTitle>You're Invited!</CardTitle>
+            <CardTitle data-testid="text-invite-title">
+              {recipientDisplay 
+                ? `Hey ${recipientDisplay}, ${inviterDisplay} invited you!` 
+                : "You're Invited!"}
+            </CardTitle>
             <CardDescription>
-              Sign in to accept your invitation to join {inviteDetails?.organizationName || "the team"}
+              Sign in to accept your invitation to join {inviteDetails?.organizationName || "the team"} on The Restaurant Consultant.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {inviteDetails?.personalMessage && (
+              <div className="bg-muted/50 p-4 rounded-md space-y-2">
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground font-medium">{inviterDisplay}'s message:</p>
+                </div>
+                <p className="text-sm whitespace-pre-line" data-testid="text-personal-message">
+                  {inviteDetails.personalMessage}
+                </p>
+              </div>
+            )}
             <Button 
               className="w-full" 
               onClick={() => {
-                // Pass return URL as query param so we redirect back here after login
                 const returnTo = encodeURIComponent(window.location.pathname);
                 window.location.href = `/api/login?returnTo=${returnTo}`;
               }}
               data-testid="btn-login-to-accept"
             >
               Sign in to Continue
+              <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </CardContent>
         </Card>
@@ -103,7 +123,8 @@ export default function AcceptInvitePage() {
 
   if (inviteError) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 gap-6">
+        <BrandLogoFull />
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -133,15 +154,16 @@ export default function AcceptInvitePage() {
 
   if (acceptedOrg) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 gap-6">
+        <BrandLogoFull />
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center">
-                <CheckCircle className="h-8 w-8 text-green-500" />
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <CardTitle>Welcome to {acceptedOrg}!</CardTitle>
+            <CardTitle data-testid="text-welcome-title">Welcome to {acceptedOrg}!</CardTitle>
             <CardDescription>
               You now have access to shared HR documents and can collaborate with your team.
             </CardDescription>
@@ -153,6 +175,7 @@ export default function AcceptInvitePage() {
               data-testid="btn-view-documents"
             >
               View HR Documents
+              <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
             <Button 
               variant="outline" 
@@ -169,21 +192,36 @@ export default function AcceptInvitePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 gap-6">
+      <BrandLogoFull />
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Building className="h-8 w-8 text-primary" />
-            </div>
-          </div>
-          <CardTitle>Join {inviteDetails?.organizationName}</CardTitle>
+          <CardTitle data-testid="text-join-title">
+            {recipientDisplay 
+              ? `Hey ${recipientDisplay}, join ${inviteDetails?.organizationName}` 
+              : `Join ${inviteDetails?.organizationName}`}
+          </CardTitle>
           <CardDescription>
-            You've been invited to join this team. Accept to get access to shared HR documents and collaborate with other team members.
+            {inviterDisplay} invited you to collaborate on The Restaurant Consultant.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted/50 p-4 rounded-lg text-center">
+          {inviteDetails?.personalMessage && (
+            <>
+              <div className="bg-muted/50 p-4 rounded-md space-y-2">
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground font-medium">{inviterDisplay}'s message:</p>
+                </div>
+                <p className="text-sm whitespace-pre-line" data-testid="text-personal-message">
+                  {inviteDetails.personalMessage}
+                </p>
+              </div>
+              <Separator />
+            </>
+          )}
+
+          <div className="bg-muted/50 p-4 rounded-md text-center">
             <p className="text-sm text-muted-foreground">Invitation for:</p>
             <p className="font-medium" data-testid="text-invite-email">{inviteDetails?.email}</p>
           </div>
