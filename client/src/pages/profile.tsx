@@ -62,7 +62,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 const roleOptions = [
   { value: "owner", label: "Owner", description: "Full access to all features including financials" },
-  { value: "gm", label: "General Manager", description: "Operations, training, AI, and staff management" },
+  { value: "gm", label: "General Manager", description: "Operations, training, consulting, and staff management" },
   { value: "manager", label: "Manager", description: "Shift operations, checklists, and training" },
 ];
 

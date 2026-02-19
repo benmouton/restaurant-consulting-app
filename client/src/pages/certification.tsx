@@ -671,7 +671,7 @@ function CertificationTest() {
               <div>
                 <p className="font-medium text-sm">No standards configured</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Go to the Standards tab to set up your restaurant's standards. Without them, the AI will use generic industry defaults.
+                  Go to the Standards tab to set up your restaurant's standards. Without them, generic industry defaults will be used.
                 </p>
               </div>
             </div>

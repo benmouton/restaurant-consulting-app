@@ -708,7 +708,7 @@ export default function SocialPostBuilder() {
                         data-testid="button-ai-assistant"
                       >
                         <Sparkles className="h-4 w-4 mr-1" />
-                        AI Assistant
+                        Post Assistant
                       </Button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -744,14 +744,14 @@ export default function SocialPostBuilder() {
                 </CardContent>
               </Card>
 
-              {/* AI Assistant panel (collapsible below compose) */}
+              {/* Post Assistant panel (collapsible below compose) */}
               {showAiPanel && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex flex-wrap items-center justify-between gap-2">
                       <span className="flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-primary" />
-                        AI Post Generator
+                        Post Generator
                       </span>
                       <Button size="icon" variant="ghost" onClick={() => setShowAiPanel(false)}>
                         <X className="h-4 w-4" />
@@ -858,7 +858,7 @@ export default function SocialPostBuilder() {
                     <div className="space-y-1">
                       <Label className="text-xs">Additional Details</Label>
                       <Textarea
-                        placeholder="Tell the AI more about this post..."
+                        placeholder="Add more details about this post..."
                         value={aiFormData.promotionDetails}
                         onChange={(e) => setAiFormData({ ...aiFormData, promotionDetails: e.target.value })}
                         rows={2}

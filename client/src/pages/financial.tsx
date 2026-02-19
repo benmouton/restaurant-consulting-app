@@ -181,7 +181,7 @@ export default function FinancialPage() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-4">
         <h1 className="text-2xl font-bold">Financial Insights</h1>
         <p className="text-muted-foreground text-center">
-          Sign in to upload your financial reports and get AI-powered analysis
+          Sign in to upload your financial reports and get expert analysis
         </p>
         <Button asChild>
           <Link href="/">Go to Home</Link>

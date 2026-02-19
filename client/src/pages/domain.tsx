@@ -2582,7 +2582,7 @@ Ensure all language is:
           <Label htmlFor="description">What Happened (Plain Language)</Label>
           <Textarea
             id="description"
-            placeholder="Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. The AI will convert this into objective, compliant documentation."
+            placeholder="Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. This will be converted into objective, compliant documentation."
             className="mt-1 min-h-[120px]"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -4309,7 +4309,7 @@ Generate ONLY the staff message, nothing else.`,
             {/* Priorities Tab */}
             <TabsContent value="priorities" className="space-y-4 mt-4">
               <p className="text-sm text-muted-foreground">
-                Get AI-powered task recommendations personalized for your restaurant on {dayOfWeek}s.
+                Get task recommendations personalized for your restaurant on {dayOfWeek}s.
               </p>
 
               <Button 
@@ -6221,10 +6221,10 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          AI-Powered SOP Capture
+          Smart SOP Capture
         </CardTitle>
         <CardDescription>
-          Describe how a task is actually performed. The AI converts it into standardized, transferable documentation.
+          Describe how a task is actually performed. It gets converted into standardized, transferable documentation.
           No theory. No guessing. Capture reality.
         </CardDescription>
       </CardHeader>
@@ -6238,7 +6238,7 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
 
           <TabsContent value="capture" className="space-y-4 mt-4">
             <p className="text-sm text-muted-foreground">
-              Describe how your best performer does this task. The AI will convert it into a structured SOP.
+              Describe how your best performer does this task. It will be converted into a structured SOP.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -6311,7 +6311,7 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
               ? "e.g., First thing in the morning, the shift lead goes to the office and gets the cash drawer from the safe. They count it twice to verify the starting amount matches the log. Then they take it to the register, open the drawer, and do a test transaction to make sure the system is working..."
               : mode === "checklist"
               ? "e.g., Count starting cash, verify safe log, transport to register, test POS system, verify receipt printer, stock register tape..."
-              : "Paste your existing SOP or describe how the process currently works. The AI will audit it for scalability..."
+              : "Paste your existing SOP or describe how the process currently works. It will be audited for scalability..."
             }
             className="mt-1 min-h-[150px]"
             value={workflowDescription}

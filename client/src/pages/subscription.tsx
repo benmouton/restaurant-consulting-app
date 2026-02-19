@@ -72,11 +72,11 @@ export default function SubscriptionPage() {
   }
 
   const features = [
-    { icon: Sparkles, text: "AI-powered restaurant consultant" },
-    { icon: FileText, text: "10 operational framework domains" },
+    { icon: Sparkles, text: "Expert operations consultant" },
+    { icon: FileText, text: "12 operational framework domains" },
     { icon: Users, text: "FOH & BOH training templates" },
     { icon: Calculator, text: "Financial document analysis" },
-    { icon: Shield, text: "Domain-specific AI tools" },
+    { icon: Shield, text: "Domain-specific operations tools" },
   ];
 
   return (
@@ -156,7 +156,7 @@ export default function SubscriptionPage() {
                 </p>
                 <p>
                   This platform gives you battle-tested frameworks from real restaurant operations: 
-                  service standards, training protocols, accountability systems, and AI tools 
+                  service standards, training protocols, accountability systems, and operations tools 
                   that understand the reality of a slammed dinner rush.
                 </p>
                 <p>
@@ -173,7 +173,7 @@ export default function SubscriptionPage() {
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                    <span>AI consultant trained on "systems over heroics" philosophy</span>
+                    <span>Operations consultant built on "systems over heroics" philosophy</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -189,7 +189,7 @@ export default function SubscriptionPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                    <span>Domain-specific AI tools for daily operations</span>
+                    <span>Domain-specific tools for daily operations</span>
                   </li>
                 </ul>
               </CardContent>

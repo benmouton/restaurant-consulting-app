@@ -1,7 +1,7 @@
 # The Restaurant Consultant
 
 ## Overview
-A full-stack web application for restaurant owners and operators, designed to build durable operational systems. It offers an AI-powered consultant, operational framework content, training templates, and staff management tools. The project's vision is to provide independent restaurants with repeatable systems to overcome operational challenges and foster discipline. Key capabilities include comprehensive staff scheduling, employee portal access, labor demand analysis, food costing, and an AI-driven leadership command center.
+A full-stack web application for restaurant owners and operators, designed to build durable operational systems. It offers an expert operations consultant, operational framework content, training templates, and staff management tools. The project's vision is to provide independent restaurants with repeatable systems to overcome operational challenges and foster discipline. Key capabilities include comprehensive staff scheduling, employee portal access, labor demand analysis, food costing, and an expert-driven leadership command center.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -36,9 +36,9 @@ Preferred communication style: Simple, everyday language.
 - **Labor Demand & Cut-Decision Engine**: Cover-driven staffing tool with real-time labor calculations, metrics dashboard, color-coded labor percentage, gap indicators, and quick recommendations. Supports pre-shift planning and mid-shift decisions.
 - **Food Costing System**: Tools for plate costing, ingredient memory, waste buffer presets, target defaults, and weekly food cost tracking with historical data.
 - **Role-Based Access Control (RBAC)**: Three roles (Owner, General Manager, Manager) with distinct feature access, implemented via `useRole` hook and `RoleGate` component.
-- **AI Integration**: Utilizes OpenAI API via Replit AI Integrations for restaurant consulting chat, image generation, and social media post generation, driven by a domain-specific system prompt.
-- **Leadership Command Center**: Daily task management tool with AI-generated priorities, crisis guidance, follow-up mode, progress tracking dashboard (completion rates, trends, heatmap), and browser notification reminders. Features a restaurant profile setup wizard.
-- **Social Media Post Builder**: AI-powered content creation for various post types and platforms (Instagram, Facebook, Google Business Profile, LinkedIn, X/Twitter, Nextdoor) with brand voice settings. Includes direct posting integration via OAuth and token encryption, and a holiday calendar.
+- **Consulting Engine**: Utilizes OpenAI API via Replit Integrations for restaurant consulting chat, image generation, and social media post generation, driven by a domain-specific system prompt.
+- **Leadership Command Center**: Daily task management tool with personalized priorities, crisis guidance, follow-up mode, progress tracking dashboard (completion rates, trends, heatmap), and browser notification reminders. Features a restaurant profile setup wizard.
+- **Social Media Post Builder**: Expert content creation for various post types and platforms (Instagram, Facebook, Google Business Profile, LinkedIn, X/Twitter, Nextdoor) with brand voice settings. Includes direct posting integration via OAuth and token encryption, and a holiday calendar.
 - **Smart Dashboard**: Time-based priority domain highlights (morning/afternoon/evening/weekend-aware), contextual greetings, consolidated navigation (Resources dropdown, Tools dropdown, standalone Ask Consultant), and onboarding redirect for new users.
 - **Onboarding Flow**: Full-screen 3-step wizard at `/onboarding` (personal info, restaurant name, role selection) with skip option and dashboard banner for incomplete setup. Replaced modal-based onboarding.
 - **Facility Command Center**: Crisis management hub with 5 tabs:

@@ -19,13 +19,13 @@ export default function TermsOfService() {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl" data-testid="text-terms-title">Terms of Service</CardTitle>
-            <p className="text-muted-foreground">Restaurant AI Consulting</p>
+            <p className="text-muted-foreground">Restaurant Operations Consulting</p>
             <p className="text-sm text-muted-foreground">Effective Date: January 23, 2026</p>
           </CardHeader>
           <CardContent className="prose prose-neutral dark:prose-invert max-w-none space-y-6">
             <p className="text-muted-foreground">
-              These Terms of Service ("Terms") govern your access to and use of Restaurant AI Consulting 
-              (the "App," "Service," "Platform"), operated by Restaurant AI Consulting ("we," "us," or "our").
+              These Terms of Service ("Terms") govern your access to and use of Restaurant Operations Consulting 
+              (the "App," "Service," "Platform"), operated by Restaurant Operations Consulting ("we," "us," or "our").
             </p>
             <p className="text-muted-foreground">
               By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, 
@@ -35,13 +35,13 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold mb-3">1. Description of the Service</h2>
               <p className="text-muted-foreground mb-3">
-                Restaurant AI Consulting provides restaurant operators with tools, guidance, automation, 
-                and AI-assisted features related to operations, training, marketing, scheduling, social media, 
+                Restaurant Operations Consulting provides restaurant operators with tools, guidance, automation, 
+                and expert-driven features related to operations, training, marketing, scheduling, social media, 
                 and business management.
               </p>
               <p className="text-muted-foreground mb-2">The Service may include:</p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-                <li>AI-generated recommendations and content</li>
+                <li>Tailored recommendations and content</li>
                 <li>Templates, checklists, and frameworks</li>
                 <li>Social media planning and posting tools</li>
                 <li>Account integrations with third-party platforms (e.g., Facebook, Instagram)</li>
@@ -104,7 +104,7 @@ export default function TermsOfService() {
                 <li>Infringe on the rights of others</li>
                 <li>Post or distribute unlawful, misleading, defamatory, or harmful content</li>
                 <li>Abuse, interfere with, or disrupt the Service or its infrastructure</li>
-                <li>Attempt to reverse-engineer or misuse the platform or AI features</li>
+                <li>Attempt to reverse-engineer or misuse the platform or its features</li>
               </ul>
               <p className="text-muted-foreground mt-3">
                 We reserve the right to suspend or terminate access for violations of these Terms.
@@ -112,17 +112,17 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold mb-3">6. AI-Generated Content Disclaimer</h2>
+              <h2 className="text-xl font-semibold mb-3">6. Generated Content Disclaimer</h2>
               <p className="text-muted-foreground mb-2">
-                The Service may generate content using artificial intelligence. You acknowledge and agree that:
+                The Service may generate content and recommendations. You acknowledge and agree that:
               </p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-                <li>AI outputs may be inaccurate, incomplete, or inappropriate for your specific situation</li>
+                <li>Generated outputs may be inaccurate, incomplete, or inappropriate for your specific situation</li>
                 <li>You are responsible for reviewing, verifying, and approving all outputs before use</li>
                 <li>Final decisions and actions remain your responsibility</li>
               </ul>
               <p className="text-muted-foreground mt-3">
-                <strong>Restaurant AI Consulting is not liable for decisions made based on AI-generated content.</strong>
+                <strong>Restaurant Operations Consulting is not liable for decisions made based on generated content.</strong>
               </p>
             </section>
 
@@ -145,7 +145,7 @@ export default function TermsOfService() {
               <h2 className="text-xl font-semibold mb-3">8. Intellectual Property</h2>
               <p className="text-muted-foreground mb-3">
                 All content, software, designs, text, graphics, and features of the Service are owned by or 
-                licensed to Restaurant AI Consulting and are protected by intellectual property laws.
+                licensed to Restaurant Operations Consulting and are protected by intellectual property laws.
               </p>
               <p className="text-muted-foreground mb-2">
                 You are granted a limited, non-exclusive, non-transferable license to use the Service for 
@@ -189,7 +189,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold mb-3">12. Limitation of Liability</h2>
               <p className="text-muted-foreground mb-2">
-                To the maximum extent permitted by law, Restaurant AI Consulting shall not be liable for:
+                To the maximum extent permitted by law, Restaurant Operations Consulting shall not be liable for:
               </p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-1">
                 <li>Indirect, incidental, or consequential damages</li>
@@ -205,7 +205,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold mb-3">13. Indemnification</h2>
               <p className="text-muted-foreground mb-2">
-                You agree to indemnify and hold harmless Restaurant AI Consulting from any claims, damages, 
+                You agree to indemnify and hold harmless Restaurant Operations Consulting from any claims, damages, 
                 losses, or expenses arising from:
               </p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-1">

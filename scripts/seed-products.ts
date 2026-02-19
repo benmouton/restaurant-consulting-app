@@ -64,7 +64,7 @@ async function seedProducts() {
   
   const product = await stripe.products.create({
     name: 'Restaurant Consultant Pro',
-    description: 'Full access to the Restaurant Consultant platform: AI-powered operational frameworks, training templates, financial document analysis, and domain-specific AI tools.',
+    description: 'Full access to the Restaurant Consultant platform: expert operational frameworks, training templates, financial document analysis, and domain-specific operations tools.',
     metadata: {
       type: 'subscription',
       tier: 'pro',

@@ -33,7 +33,7 @@
 **Sidebar (280px fixed)**:
 - Logo area at top (h-16)
 - Primary nav sections with icon + label
-- Sections: Dashboard, Frameworks, Training, AI Consulting, Financial Tools, Resources
+- Sections: Dashboard, Frameworks, Training, Consulting, Financial Tools, Resources
 - User profile/settings at bottom
 - Collapsible sub-navigation for nested items
 
@@ -65,10 +65,10 @@
 - Multi-step forms with progress indicator
 - Action buttons: primary (right), secondary (left)
 
-**AI Consulting Interface**:
+**Consulting Interface**:
 - Chat-style conversation panel (right side, 400px)
 - Input area with send button at bottom
-- Conversation bubbles: AI responses (left-aligned), user queries (right-aligned)
+- Conversation bubbles: Consultant responses (left-aligned), user queries (right-aligned)
 - Suggested prompts as clickable chips
 
 **Framework/Template Cards**:

@@ -42,8 +42,8 @@ export default function Landing() {
       <header className="border-b border-border" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src={logoImage} alt="Restaurant AI Consulting" className="h-10 w-10 rounded-lg object-contain" />
-            <span className="text-xl font-bold">Restaurant AI Consulting</span>
+            <img src={logoImage} alt="Restaurant Operations Consulting" className="h-10 w-10 rounded-lg object-contain" />
+            <span className="text-xl font-bold">Restaurant Operations Consulting</span>
           </div>
           <Button asChild data-testid="button-login-header">
             <a href="/api/login">Sign In</a>
@@ -76,7 +76,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* AI Consultant Feature */}
+      {/* Consultant Feature */}
       <section className="py-20 px-4 bg-card border-y border-border">
         <div className="container mx-auto max-w-4xl">
           <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -86,8 +86,8 @@ export default function Landing() {
                 Ask Anything. Get Real Answers.
               </h2>
               <p className="text-muted-foreground mb-6">
-                An AI consultant trained on decades of real restaurant operations. 
-                Ask it anything—from handling a walkout to structuring your comp policy.
+                An operations consultant built on decades of real restaurant experience. 
+                Ask anything—from handling a walkout to structuring your comp policy.
                 No fluff. Direct, actionable guidance.
               </p>
               <ul className="space-y-3">
@@ -216,7 +216,7 @@ export default function Landing() {
             Start Building Real Systems Today
           </h2>
           <p className="text-primary-foreground/80 mb-8">
-            $10/month. 10 operational frameworks. AI consultant included. 
+            $10/month. 12 operational domains. Expert consultant included. 
             If it wouldn't hold up during a slammed dinner rush, it's not in here.
           </p>
           <Button size="lg" variant="secondary" asChild data-testid="button-cta-bottom">
@@ -236,7 +236,7 @@ export default function Landing() {
             <span>|</span>
             <Link href="/terms" className="hover:underline">Terms of Service</Link>
           </div>
-          <p>&copy; 2026 Restaurant AI Consulting. Built by operators, for operators.</p>
+          <p>&copy; 2026 Restaurant Operations Consulting. Built by operators, for operators.</p>
         </div>
       </footer>
     </div>

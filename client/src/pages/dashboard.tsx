@@ -156,8 +156,8 @@ export default function Dashboard() {
       <header className="border-b border-border sticky top-0 glass-header z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <img src={logoImage} alt="Restaurant AI Consulting" className="h-9 w-9 rounded-xl object-contain flex-shrink-0 ring-1 ring-primary/20" />
-            <span className="font-bold text-sm sm:text-base tracking-tight truncate">Restaurant AI Consulting</span>
+            <img src={logoImage} alt="Restaurant Operations Consulting" className="h-9 w-9 rounded-xl object-contain flex-shrink-0 ring-1 ring-primary/20" />
+            <span className="font-bold text-sm sm:text-base tracking-tight truncate">Restaurant Operations Consulting</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="hidden md:flex items-center gap-2">
@@ -206,7 +206,7 @@ export default function Dashboard() {
               <Link href="/consultant">
                 <Button variant="outline" size="sm" data-testid="button-consultant-nav">
                   <MessageSquare className="h-4 w-4 mr-2" />
-                  Ask Consultant
+                  Consultant
                 </Button>
               </Link>
             </div>
@@ -242,7 +242,7 @@ export default function Dashboard() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/consultant")} className="cursor-pointer">
                   <MessageSquare className="mr-2 h-4 w-4" />
-                  Ask Consultant
+                  Consultant
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/scheduling")} className="cursor-pointer">
                   <Calendar className="mr-2 h-4 w-4" />
@@ -446,7 +446,7 @@ export default function Dashboard() {
                 <div className="p-2 rounded-md bg-primary/10">
                   <MessageSquare className="h-5 w-5 text-primary" />
                 </div>
-                AI Consultant
+                Consultant
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-2">

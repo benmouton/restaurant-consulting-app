@@ -132,7 +132,7 @@ export default function ConsultantPage() {
             </Link>
             <div className="flex items-center gap-2">
               <ChefHat className="h-6 w-6 text-primary" />
-              <span className="font-bold">AI Consultant</span>
+              <span className="font-bold">Operations Consultant</span>
             </div>
           </div>
           <Button 
