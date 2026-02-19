@@ -1,0 +1,159 @@
+# Build a Standalone Media Kit Page — NOT Connected to the Main App
+
+Create a completely separate, standalone page at `/media-kit` that is NOT linked from the main app navigation, dashboard, or any other page. It should not appear in the nav bar, footer, or any menu. It is only accessible by directly visiting the URL. This page is a professional media kit / about page designed to be shared as a link on Facebook and social media.
+
+**This is a public page — no authentication required.**
+
+---
+
+## Page Design
+
+### Style
+- Use the same dark theme as the rest of the app (#0d1117 background, white text, cyan #22d3ee accents)
+- But this page should feel more editorial and personal — like a magazine profile, not a SaaS dashboard
+- Use Playfair Display for headings, DM Sans for body text
+- Full-width layout, generous whitespace, large typography
+- Mobile-responsive — this will primarily be viewed from Facebook on phones
+
+### Page Structure
+
+---
+
+#### SECTION 1: Hero / Introduction
+
+Large headline:
+**Ben Mouton**
+
+Subtitle:
+**Restaurant Owner. Operator. Consultant.**
+
+Brief intro paragraph:
+"I've spent over 20 years in the restaurant industry — not advising from the outside, but working the line, managing the floor, counting the drawers, and doing the hiring and firing. I opened Mouton's Bistro & Bar in 2012 serving Cajun-Creole cuisine with a Texas soul. I've expanded to multiple locations, survived a pandemic closure, navigated rising food and labor costs, and learned every lesson the hard way. Now I'm building the tools I wish I'd had from day one."
+
+Below the intro, add a subtle horizontal rule and three stat cards in a row:
+
+```
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  14+ Years       │  │  2 Locations     │  │  Cajun-Creole    │
+│  Restaurant Owner│  │  Leander &       │  │  Texas-Louisiana │
+│                  │  │  Cedar Park, TX  │  │  Cuisine         │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+```
+
+---
+
+#### SECTION 2: The Story
+
+Heading: **From New Orleans Roots to Texas Tables**
+
+Content (write this as a compelling narrative, not bullet points):
+
+Ben Mouton grew up in Texas but spent his holidays in New Orleans, surrounded by the flavors that would shape his career. He studied culinary arts in New Orleans before returning to Texas in 2000, where he spent the next decade waiting tables, bartending, and managing restaurants across the Austin area.
+
+In January 2012, he opened Mouton's Southern Bistro in Leander, Texas — a small Cajun-Creole restaurant inspired by the roadside diners between Austin and New Orleans. The concept was simple: traditional Cajun and Creole meets familiar Texas ingredients, served with genuine Southern hospitality.
+
+The restaurant grew. A second location opened in Cedar Park. The menu evolved. Family recipes became customer favorites — Paw Paw's Pork Chop (named after Ben's grandfather), Rachel's Greyhound (named after his wife and co-owner), and the Bourbon Street Breakfast became staples.
+
+But growth also meant harder lessons: rising food costs, labor shortages, the pandemic shutdown, the painful decision to close the original Leander location in 2024 after 12 years. Every challenge taught Ben something that no business book or consultant could — because he lived it on the floor, every shift.
+
+---
+
+#### SECTION 3: The Restaurant Consultant
+
+Heading: **Why I Built The Restaurant Consultant**
+
+Content:
+
+"After 14 years of building and running restaurants, I realized something: the systems that actually keep a restaurant alive — staffing models, cost controls, training programs, HR compliance, crisis playbooks — don't exist in any accessible form for independent operators. The advice is either too expensive (hire a consultant at $200/hour) or too generic (read a book written by someone who's never worked a Friday night rush).
+
+So I built what I needed. The Restaurant Consultant is a platform with 12 operational domains covering every area where restaurants succeed or fail — from kitchen readiness scoring to progressive discipline documentation to food cost analysis. It's not AI gimmicks. It's decades of operational knowledge, structured into systems that work when the kitchen is slammed and the new server just called out.
+
+Every framework, every checklist, every script in this platform has been tested at Mouton's Bistro & Bar. If it wouldn't hold up during a slammed dinner rush, it doesn't belong."
+
+Below this, show 4-6 feature highlights as clean cards:
+
+- **12 Operational Domains** — Leadership, Service, Training, Staffing, HR, Kitchen, Costs, Reviews, SOPs, Crisis, Facilities, Social Media
+- **Operations Consultant** — Ask anything about restaurant operations. Get direct, practical answers.
+- **Kitchen Command Center** — Pre-shift readiness scoring with real-time station tracking
+- **Skills Certification Engine** — Behavior-based certification with transparent rubric scoring
+- **Training Templates** — 7-day structured training programs personalized for your restaurant
+- **HR Documentation Engine** — Generate Workforce Commission-compliant documentation from plain language descriptions
+
+---
+
+#### SECTION 4: Philosophy
+
+Heading: **How I Think About Restaurants**
+
+Show these as three large quote-style blocks:
+
+**"Structure Over Motivation"**
+"I don't sell inspiration. I sell systems that work when you're not there."
+
+**"Systems Over Heroics"**
+"If one person has to save every shift, you don't have a business — you have a dependency."
+
+**"Clarity Over Chaos"**
+"Every recommendation is tested against a slammed dinner rush. If it doesn't hold up, it doesn't belong."
+
+---
+
+#### SECTION 5: Press & Recognition (optional — include if there's content)
+
+Heading: **In the Press**
+
+- Community Impact: "Mouton's Southern Bistro undergoes expansions, renovations after 10 years" (2022)
+- Community Impact: "Ben Mouton opened Mouton's Southern Bistro in Leander in early 2012"
+- Yelp: 4+ stars, 426 reviews at Cedar Park location
+- TripAdvisor: 4.2 stars, 169 reviews
+
+Show these as simple linked cards with publication name and headline.
+
+---
+
+#### SECTION 6: Contact / CTA
+
+Heading: **Get in Touch**
+
+Two columns:
+
+Left column:
+- Email: benmouton@gmail.com
+- Location: Cedar Park, Texas
+- Restaurant: Mouton's Bistro & Bar — 1821 S Lakeline Blvd #104
+
+Right column:
+- Link to The Restaurant Consultant: restaurantai.consulting (update to new domain if changed)
+- Social links: Instagram (@moutonsbistro), LinkedIn, Facebook
+
+Below, a large CTA button:
+**"Try The Restaurant Consultant — $10/month →"**
+Subtitle: "Built by an operator, for operators. No contracts. Cancel anytime."
+
+---
+
+#### FOOTER
+
+Simple footer:
+"© 2026 Ben Mouton. All rights reserved."
+Links: Privacy Policy | Terms of Service
+
+---
+
+## Technical Requirements
+
+1. Create this as a new route in the app: `/media-kit`
+2. **Do NOT add it to the navigation bar, footer links, or any other navigation in the app**
+3. It should be a public page — no authentication required (similar to `/privacy` and `/terms`)
+4. Add the route to `App.tsx`:
+```tsx
+<Route path="/media-kit" component={MediaKitPage} />
+```
+5. Create the page component at `src/pages/media-kit.tsx`
+6. The page should have its own layout — no sidebar, no app nav bar. It's a standalone landing page.
+7. Include Open Graph meta tags so it previews well when shared on Facebook:
+   - og:title = "Ben Mouton — Restaurant Owner, Operator, Consultant"
+   - og:description = "14+ years in the restaurant industry. Builder of The Restaurant Consultant."
+   - og:image = (use the app's favicon or logo for now)
+   - og:url = the media kit URL
+8. Make it print-friendly — operators may want to print or PDF this page
