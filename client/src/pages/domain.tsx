@@ -2055,7 +2055,7 @@ Provide actionable summary and follow-up plan.`;
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   {mode === "readiness" ? "Calculating readiness..." :
                    mode === "alerts" ? "Analyzing service flow..." :
-                   mode === "debrief" || mode === "quick-debrief" ? "Building debrief..." :
+                   mode === "debrief" ? "Building debrief..." :
                    "Creating coaching plan..."}
                 </>
               ) : (

@@ -1,0 +1,203 @@
+# Page-Specific Improvements — SOPs, Crisis, Facilities, Social Media, Scheduling
+
+Targeted improvements for 6 more pages/views. Also includes AI branding catches from these screenshots.
+
+---
+
+## AI Branding Fixes Found in These Screenshots
+
+Fix these first — they're quick text changes:
+
+1. **SOPs & Scalability page** — The tool is called "AI-Powered SOP Capture" → Rename to **"SOP Capture Engine"** or just **"SOP Capture"**
+2. **SOPs & Scalability page** — Subtitle says "The AI converts it into standardized, transferable documentation" → Change to **"This converts your description into standardized, transferable documentation"**
+3. **SOPs & Scalability page** — The Capture SOP tab description says "Describe how your best performer does this task. The AI will convert it into a structured SOP." → Change to **"Describe how your best performer does this task. We'll convert it into a structured SOP."**
+4. **Social Media page** — There's a button labeled "AI Assistant" at the bottom → Rename to **"Writing Assistant"** or **"Draft Assistant"** or just **"Assist"**
+5. **Dashboard (screenshot 6)** — Shows "AI Consultant" label at the bottom of the dashboard → Change to **"Operations Consultant"** or just **"Consultant"**
+
+---
+
+## 1. SOPs & Scalability Page
+
+### SOP Capture — show what the output looks like
+- Operators won't fill in a blank form unless they know what they're getting. Below the "Generate SOP" button, add a collapsed preview: **"See example output →"**
+- When expanded, show a brief sample SOP with sections like: Purpose, Role Owner, Trigger, Steps (numbered), Verification/Sign-off
+- This shows the operator exactly what they'll get and builds confidence in the tool
+
+### Add a "My SOPs" library
+- After generating SOPs, where do they go? Add a tab or section that shows all previously generated SOPs
+- Each saved SOP should show: Task name, Role owner, Date created, Last updated
+- Add actions: View, Edit, Print/Export, Archive
+- Operators need to be able to find and reference their SOPs later — this is the whole point of documentation
+
+### Quick Checklist tab improvements
+- If the Quick Checklist tab lets operators create checklists from descriptions, add the ability to:
+  - Reorder checklist items via drag-and-drop
+  - Assign each checklist to a position (e.g., "Opening Server Checklist," "Closing Manager Checklist")
+  - Set a frequency: Daily, Weekly, Monthly, As Needed
+  - Export as a printable PDF (operators still tape checklists to walls)
+
+### Audit tab suggestion
+- The Audit tab should let operators audit their existing SOPs:
+  - List all SOPs with a "Last reviewed" date
+  - Flag SOPs that haven't been reviewed in 90+ days
+  - Add a "Mark as reviewed" button that updates the date
+  - This prevents the exact problem the page subtitle describes — SOPs becoming "shelf décor"
+
+### Content library items
+- "Would This Survive a Second Location Test" is an excellent checklist name — great copywriting
+- "Manager Daily Audit Questions" is highly practical
+- Consider auto-expanding one of these by default so new users see the value immediately
+
+---
+
+## 2. Crisis Management Page
+
+This page has some of the best UX in the app. The scenario selector cards are perfect for a high-stress moment.
+
+### Make it feel more urgent
+- The Crisis Command Center card has a subtle red border — good. But consider making the entire header section more visually distinct:
+  - Darker red background on the header area
+  - Larger, bolder "What's happening?" text
+  - The goal is that when someone opens this page in a panic, the first thing they see is the action they need to take
+
+### Add a brief "First 60 seconds" note per scenario
+- When a user selects a crisis type (e.g., "Kitchen backed up / ticket times blown"), before going to the full response, show a quick **3-step immediate action** card:
+  - Example for kitchen backup: "1. Call an all-hands to the line 2. 86 any items over 15 min ticket time 3. Communicate wait times to FOH"
+- This gives the operator something to DO right now while the full guidance loads or while they read the rest
+
+### After selecting a scenario
+- If clicking a scenario takes them to a detailed response page, make sure there's a prominent "Back to Crisis Selection" button — in a crisis they might pick the wrong one and need to go back fast
+- Add a "Log this incident" button at the bottom of each crisis response so it gets saved to a crisis history log
+
+### Crisis history
+- Add a history/log of past crisis events. Fields: Date, type, what happened, what was done, outcome
+- This is valuable for insurance claims, pattern recognition, and training
+- Show a count: "3 incidents this month" or "Last incident: Feb 12 — Staff walkout"
+
+### Content library
+- "Service Meltdown Playbook," "Staff Walkout Protocol," and "Owner Burnout Recovery" are all great
+- "Owner Burnout Recovery" is a standout — that's the kind of thing that makes an operator feel like this platform was built by someone who gets it. Consider featuring it more prominently, maybe as a banner or callout rather than buried in an accordion
+
+---
+
+## 3. Facilities & Asset Protection Page
+
+### Facility Command Center — the 5 tabs are ambitious
+- Breakdown, PM Schedule, Equipment, Vendors, Dashboard — this is essentially a lightweight CMMS (Computerized Maintenance Management System). That's a strong feature set.
+
+### Breakdown tab improvements
+- After logging an issue, show a **priority classification** based on the inputs:
+  - Active service + Safety risk = **CRITICAL — Act now**
+  - Active service + No safety risk = **HIGH — Workaround needed**
+  - Not in service + Safety risk = **HIGH — Fix before opening**
+  - Not in service + No safety risk = **STANDARD — Schedule repair**
+- This helps operators triage without guessing
+
+### Add a "Troubleshooting Tips" quick response
+- After the user selects an equipment type and describes the issue, before they even submit, show common quick fixes:
+  - Example: Equipment type = "Walk-in cooler", Symptoms = "temp high" → Show: "Check: Is the door sealing properly? Is the condenser coil dirty? Is the evaporator fan running? Has the defrost timer stuck?"
+- This could save operators an expensive emergency service call
+
+### PM Schedule tab suggestions
+- Build a preventative maintenance calendar that shows:
+  - Equipment name, PM task, frequency (weekly/monthly/quarterly), last completed, next due
+  - Color coding: Green = on schedule, Yellow = due this week, Red = overdue
+  - One-click "Mark as done" to update the completion date
+
+### Equipment tab suggestions
+- Equipment registry: Name, type, brand/model, serial number, install date, warranty expiration, vendor/service company
+- This is gold during an emergency — "What's the model number of our walk-in?" shouldn't require going to the basement to look
+
+### Vendors tab suggestions
+- Vendor directory: Company name, contact name, phone, email, what they service, average response time, contract details
+- Add a "Call now" button that opens the phone dialer on mobile — during a breakdown, speed matters
+
+---
+
+## 4. Social Media Page
+
+This is a surprisingly full-featured social media tool. The multi-channel posting with platform previews, image upload, holidays calendar, sent history, and voice settings is a lot of value.
+
+### "AI Assistant" button rename
+- As noted above, rename from "AI Assistant" to "Writing Assistant" or "Draft Assistant"
+
+### Post Preview improvements
+- The "See your post's preview here" placeholder is good, but make it more useful:
+  - Show platform-specific previews (Instagram card looks different from Twitter/X card)
+  - When a channel is selected, update the preview to match that platform's visual format
+  - Show character count with platform limits (Twitter 280, Instagram 2200, Facebook ~63,000)
+
+### Content calendar view
+- The Holidays tab is smart — operators forget to plan for Valentine's Day, Mother's Day, etc. until it's too late
+- Enhance it by suggesting post ideas for upcoming holidays:
+  - "Valentine's Day is in 5 days — Draft a post?" with a one-click button to pre-fill the composer
+  - "National Margarita Day is Feb 22 — Plan something?"
+
+### Sent tab improvements
+- Show basic engagement metrics if possible (or at least a link back to the post on each platform)
+- Show a "Post again" or "Reuse" button for popular past posts
+- Monthly summary: "You posted 12 times this month — 8 to Instagram, 3 to Facebook, 1 to X"
+
+### Voice tab
+- If Voice lets operators define their brand voice/tone for generated content, this is a great feature
+- Make sure the voice settings are clearly explained: "Posts generated with the Writing Assistant will match this voice"
+- Consider offering 2-3 preset voices: "Casual & fun," "Professional & polished," "Community-focused"
+
+---
+
+## 5. Staff Scheduling Page
+
+This page feels empty and early-stage compared to the rest of the app.
+
+### The calendar needs content even when empty
+- An empty 7-day grid with no shifts looks like the feature doesn't work. Add:
+  - A clear empty state message: "No shifts scheduled this week. Add your first shift to get started."
+  - A quick-start wizard: "Set up your week — How many shifts do you typically run per day?" with options for Lunch only, Dinner only, Lunch + Dinner, All day
+  - Show sample/template shifts in a lighter color as a guide that operators can click to adopt
+
+### Add Shift improvements
+- The "+ Add Shift" button should open a form with: Day, Daypart (AM/PM/Split), Position, Employee (from staff list), Start time, End time
+- After adding a few shifts, the calendar should visually show them as colored blocks in each day column
+- Color code by position: Servers = blue, Cooks = red, Host = green, Bar = purple, etc.
+
+### Staff tab
+- Should show the full employee roster with: Name, position(s), hire date, phone, email, availability notes
+- Add a "Max hours" field per employee to help prevent overtime
+- Show weekly hours scheduled vs max for each employee
+
+### Coverage gaps
+- After shifts are added, automatically flag days/dayparts with no coverage for critical positions
+- Example: "Friday dinner has no host scheduled" or "Saturday lunch has 2 servers — you usually schedule 4"
+- This is the killer feature for scheduling — most operators don't realize gaps until the day of
+
+### "Check Labor Impact" button
+- This is a great concept — connects scheduling to the Labor Demand Engine from the Staffing & Labor domain
+- Make sure it shows: Projected labor cost for the week, labor cost % based on projected revenue, comparison to target labor %
+
+### Announcements tab
+- Let operators post shift-wide announcements: "New menu launches Friday," "Health inspection Tuesday — deep clean Monday night"
+- Show which employees have viewed the announcement
+- This reduces the "I didn't know" excuse
+
+---
+
+## 6. Dashboard Bottom Section (Screenshot 6)
+
+### "AI Consultant" label
+- Change to "Operations Consultant" or "The Consultant" to match the rebrand
+- The description below should focus on expertise, not technology
+
+### Layout of dashboard bottom
+- Staff Scheduling and AI Consultant sections look like they're below the domain grid — consider whether these should be:
+  - Integrated into the domain grid as cards (for consistency)
+  - Or kept separate but given more visual weight — right now they feel like afterthoughts compared to the domain cards above
+
+---
+
+## Priority Order for This Batch
+1. **AI branding fixes** (5 quick text changes listed at the top)
+2. **Scheduling page** (needs the most work — feels unfinished)
+3. **Crisis Management** (high-impact improvements, already strong base)
+4. **Facilities & Asset Protection** (the PM schedule and equipment registry add real value)
+5. **SOPs & Scalability** (SOP library is the key missing piece)
+6. **Social Media** (already surprisingly complete, improvements are polish)
