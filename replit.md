@@ -63,6 +63,17 @@ Preferred communication style: Simple, everyday language.
   - **Acknowledgment Tracking**: Daily "I have read & understand" per role/shift.
   - **Duplicate & Copy**: Clone existing playbooks for quick variations.
   - **Version Tracking**: Track changes over time with audit pass rates.
+- **Landing Page**: Conversion-optimized public marketing page with:
+  - **Hero**: "Replace Chaos with Systems" headline, 7-day free trial CTA, social proof
+  - **Interactive Consultant Preview**: 4 clickable example questions that swap chat preview with typing animation
+  - **Product Screenshots**: "See It In Action" section with 4 generated images (Kitchen, Consultant, Food Cost, HR)
+  - **Credibility Section**: "Built by an Operator" with stats cards and founder quote
+  - **Expandable Domain Cards**: 12 clickable cards revealing taglines and tools inside each domain
+  - **Pricing Breakdown**: Full feature checklist showing $10/month value proposition
+  - **Audience Targeting**: Stronger pain-point copy for Independent Owners, Small Groups, Rising Managers + exclusion disclaimer
+  - **Testimonials Placeholder**: Founding member CTA
+  - **Mobile-responsive**: Sticky header, responsive grids, full-width CTAs on mobile
+  - Generated product screenshot images stored in `client/src/assets/images/`
 - **Employee Handbook Builder**: Comprehensive handbook generation tool integrated into Templates page:
   - **Customizable Restaurant Info**: Restaurant name, phone, address, owner/operator names, mission statement.
   - **Policy Configuration**: Uniform policies (dining room and kitchen), employee meal policy, parking policy, closed holidays, scheduling app used.
