@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/use-auth";
-import { useRole } from "@/hooks/use-role";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Form,
   FormControl,
@@ -34,7 +39,12 @@ import {
   AlertTriangle,
   Loader2,
   Save,
-  ExternalLink
+  ExternalLink,
+  Camera,
+  ChevronDown,
+  Trash2,
+  Download,
+  Info
 } from "lucide-react";
 import OrganizationManagement from "@/components/OrganizationManagement";
 import {
@@ -48,6 +58,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+function formatPhoneNumber(phone: string | null | undefined): string {
+  if (!phone) return "Not set";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits[0] === "1") {
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return phone;
+}
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -95,13 +117,17 @@ interface ProfileData {
 export default function ProfilePage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { roleLabel } = useRole();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
 
   const { data: profile, isLoading } = useQuery<ProfileData>({
     queryKey: ["/api/user/profile"],
     enabled: !!user,
+  });
+
+  const { data: members = [] } = useQuery<any[]>({
+    queryKey: ["/api/organization/members"],
   });
 
   const form = useForm<ProfileFormValues>({
@@ -158,6 +184,34 @@ export default function ProfilePage() {
     },
   });
 
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const response = await fetch("/api/user/profile/photo", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
+      toast({
+        title: "Photo updated",
+        description: "Your profile photo has been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to upload photo. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/subscription/cancel");
@@ -172,6 +226,22 @@ export default function ProfilePage() {
       toast({
         title: "Error",
         description: "Failed to process cancellation. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/user/account");
+    },
+    onSuccess: () => {
+      window.location.href = "/";
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
         variant: "destructive",
       });
     },
@@ -196,6 +266,51 @@ export default function ProfilePage() {
 
   const onSubmit = (data: ProfileFormValues) => {
     updateProfileMutation.mutate(data);
+  };
+
+  const handlePhotoUpload = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/jpeg,image/png,image/webp";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+          toast({
+            title: "File too large",
+            description: "Please choose an image smaller than 5MB.",
+            variant: "destructive",
+          });
+          return;
+        }
+        uploadPhotoMutation.mutate(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleExportData = async () => {
+    try {
+      const response = await fetch("/api/user/export", { credentials: "include" });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "my-data-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Data exported",
+        description: "Your data has been downloaded.",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to export data. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatDate = (timestamp: number | null | undefined) => {
@@ -226,7 +341,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-4xl mx-auto py-8 px-4">
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-8 flex-wrap">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -257,7 +372,7 @@ export default function ProfilePage() {
                     Edit
                   </Button>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" onClick={handleCancel} data-testid="btn-cancel-edit">
                       Cancel
                     </Button>
@@ -282,128 +397,160 @@ export default function ProfilePage() {
             <CardContent className="space-y-4">
               {isEditing ? (
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Enter first name" 
-                              data-testid="input-first-name"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Enter last name" 
-                              data-testid="input-last-name"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="tel"
-                              placeholder="Enter phone number" 
-                              data-testid="input-phone"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="restaurantName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Restaurant Name</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Enter restaurant name" 
-                              data-testid="input-restaurant"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem className="sm:col-span-2">
-                          <FormLabel>Address</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Enter address" 
-                              data-testid="input-address"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="role"
-                      render={({ field }) => (
-                        <FormItem className="sm:col-span-2">
-                          <FormLabel>Role</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="relative">
+                        <Avatar className="h-16 w-16">
+                          {profile?.profileImageUrl ? (
+                            <AvatarImage src={profile.profileImageUrl} alt="Profile" />
+                          ) : null}
+                          <AvatarFallback className="text-lg">
+                            {profile?.firstName?.[0]}{profile?.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <button
+                          type="button"
+                          onClick={handlePhotoUpload}
+                          className="absolute bottom-0 right-0 rounded-full bg-primary text-primary-foreground p-1"
+                          data-testid="btn-upload-photo"
+                        >
+                          {uploadPhotoMutation.isPending ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Camera className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Click the camera icon to upload a photo (JPEG, PNG, or WebP, max 5MB)</p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
                             <FormControl>
-                              <SelectTrigger data-testid="select-role">
-                                <SelectValue placeholder="Select your role" />
-                              </SelectTrigger>
+                              <Input 
+                                placeholder="Enter first name" 
+                                data-testid="input-first-name"
+                                {...field} 
+                              />
                             </FormControl>
-                            <SelectContent>
-                              {roleOptions.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  <div className="flex flex-col">
-                                    <span>{option.label}</span>
-                                    <span className="text-xs text-muted-foreground">{option.description}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter last name" 
+                                data-testid="input-last-name"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="tel"
+                                placeholder="(512) 656-1026" 
+                                data-testid="input-phone"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="restaurantName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Restaurant Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter restaurant name" 
+                                data-testid="input-restaurant"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem className="sm:col-span-2">
+                            <FormLabel>Address</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter address" 
+                                data-testid="input-address"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem className="sm:col-span-2">
+                            <FormLabel>Role</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-role">
+                                  <SelectValue placeholder="Select your role" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {roleOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    <div className="flex flex-col">
+                                      <span>{option.label}</span>
+                                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </form>
                 </Form>
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
-                      {profile?.firstName?.[0]}{profile?.lastName?.[0]}
-                    </div>
+                    <Avatar className="h-12 w-12">
+                      {profile?.profileImageUrl ? (
+                        <AvatarImage src={profile.profileImageUrl} alt="Profile" />
+                      ) : null}
+                      <AvatarFallback className="font-bold">
+                        {profile?.firstName?.[0]}{profile?.lastName?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="font-semibold" data-testid="text-user-name">
                         {profile?.firstName} {profile?.lastName}
@@ -418,22 +565,22 @@ export default function ProfilePage() {
                   
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="flex items-center gap-2 text-sm">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="text-muted-foreground">Phone:</span>
-                      <span data-testid="text-phone">{profile?.phone || "Not set"}</span>
+                      <span data-testid="text-phone">{formatPhoneNumber(profile?.phone)}</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm">
+                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground shrink-0">Restaurant:</span>
+                      <span className="break-words" data-testid="text-restaurant">{profile?.restaurantName || "Not set"}</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground shrink-0">Address:</span>
+                      <span className="break-words" data-testid="text-address">{profile?.address || "Not set"}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Restaurant:</span>
-                      <span data-testid="text-restaurant">{profile?.restaurantName || "Not set"}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Address:</span>
-                      <span data-testid="text-address">{profile?.address || "Not set"}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="text-muted-foreground">Role:</span>
                       <span data-testid="text-role">{getRoleLabelFromValue(profile?.role)}</span>
                     </div>
@@ -452,12 +599,12 @@ export default function ProfilePage() {
               <CardDescription>Your permissions and access level in the system</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-muted-foreground">Restaurant Role:</span>
                 <Badge variant="secondary" data-testid="badge-role">{getRoleLabelFromValue(profile?.role)}</Badge>
               </div>
               {profile?.isAdmin && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-muted-foreground">Admin Status:</span>
                   <Badge variant="default" data-testid="badge-admin">Admin</Badge>
                 </div>
@@ -477,7 +624,7 @@ export default function ProfilePage() {
               <CardDescription>Your subscription status and billing information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-muted-foreground">Status:</span>
                 <Badge 
                   variant={hasActiveSubscription ? "default" : "secondary"}
@@ -489,17 +636,33 @@ export default function ProfilePage() {
 
               {profile?.subscriptionDetails && (
                 <>
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Next billing date:</span>
-                    <span data-testid="text-next-billing">
-                      {formatDate(profile.subscriptionDetails.currentPeriodEnd)}
-                    </span>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Plan:</span>
+                      <span data-testid="text-plan-name">Restaurant Operations Pro</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Price:</span>
+                      <span data-testid="text-plan-price">$10/month</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Billing cycle:</span>
+                      <span>Monthly</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Next billing:</span>
+                      <span data-testid="text-next-billing">
+                        {formatDate(profile.subscriptionDetails.currentPeriodEnd)}
+                      </span>
+                    </div>
                   </div>
                   
                   {profile.subscriptionDetails.cancelAtPeriodEnd && (
-                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 dark:bg-amber-950 p-3 rounded-lg" data-testid="alert-cancel-pending">
-                      <AlertTriangle className="h-4 w-4" />
+                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 dark:bg-amber-950 p-3 rounded-md" data-testid="alert-cancel-pending">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
                       <span className="text-sm">
                         Your subscription will cancel on {formatDate(profile.subscriptionDetails.currentPeriodEnd)}
                       </span>
@@ -509,68 +672,70 @@ export default function ProfilePage() {
               )}
 
               {!profile?.isAdmin && profile?.subscriptionStatus === "active" && (
-                <Separator />
-              )}
-
-              {!profile?.isAdmin && profile?.subscriptionStatus === "active" && (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Manage your subscription</p>
-                    <p className="text-xs text-muted-foreground">
-                      Update payment method, view invoices, or cancel
-                    </p>
-                  </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        data-testid="btn-manage-subscription"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Manage Subscription
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Manage Subscription</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          You'll be redirected to the billing portal where you can update your payment method, 
-                          view invoices, or cancel your subscription. Are you sure you want to proceed?
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel data-testid="btn-cancel-dialog">Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={() => cancelSubscriptionMutation.mutate()}
-                          disabled={cancelSubscriptionMutation.isPending}
-                          data-testid="btn-confirm-manage"
+                <>
+                  <Separator />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Manage your subscription</p>
+                      <p className="text-xs text-muted-foreground">
+                        Update payment method, view invoices, or cancel
+                      </p>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          data-testid="btn-manage-subscription"
                         >
-                          {cancelSubscriptionMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            "Open Billing Portal"
-                          )}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Manage Subscription
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Manage Subscription</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            You'll be redirected to the billing portal where you can update your payment method, 
+                            view invoices, or cancel your subscription. Are you sure you want to proceed?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel data-testid="btn-cancel-dialog">Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => cancelSubscriptionMutation.mutate()}
+                            disabled={cancelSubscriptionMutation.isPending}
+                            data-testid="btn-confirm-manage"
+                          >
+                            {cancelSubscriptionMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Open Billing Portal"
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </>
               )}
 
-              {!profile?.isAdmin && !profile?.subscriptionStatus && (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-medium">No active subscription</p>
-                    <p className="text-xs text-muted-foreground">
-                      Subscribe to access all features
-                    </p>
+              {!profile?.isAdmin && !hasActiveSubscription && (
+                <div className="space-y-3">
+                  <Separator />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Upgrade to unlock all features</p>
+                      <p className="text-xs text-muted-foreground">
+                        Get access to the AI consultant, financial analysis, training templates, and more for $10/month
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => navigate("/subscribe")}
+                      data-testid="btn-subscribe"
+                    >
+                      Subscribe Now
+                    </Button>
                   </div>
-                  <Button 
-                    onClick={() => navigate("/subscribe")}
-                    data-testid="btn-subscribe"
-                  >
-                    Subscribe Now
-                  </Button>
                 </div>
               )}
             </CardContent>
@@ -580,18 +745,112 @@ export default function ProfilePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Account Information</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Info className="h-5 w-5" />
+                Account Information
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground" data-testid="text-member-since">
-                Member since: {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                }) : "Unknown"}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="text-sm" data-testid="text-member-since">
+                  <span className="text-muted-foreground">Member since: </span>
+                  {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }) : "Unknown"}
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Team members: </span>
+                  <span data-testid="text-team-count">{members.length || 0}</span>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          <Collapsible open={dangerZoneOpen} onOpenChange={setDangerZoneOpen}>
+            <Card className={dangerZoneOpen ? "border-destructive/50" : ""}>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-5 w-5" />
+                      Danger Zone
+                    </CardTitle>
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${dangerZoneOpen ? "rotate-180" : ""}`} />
+                  </div>
+                  <CardDescription>Irreversible actions for your account</CardDescription>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Export My Data</p>
+                      <p className="text-xs text-muted-foreground">
+                        Download all your data including profile, conversations, and settings
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleExportData}
+                      data-testid="btn-export-data"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Data
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-destructive">Delete Account</p>
+                      <p className="text-xs text-muted-foreground">
+                        Permanently delete your account and all associated data. This cannot be undone.
+                      </p>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          data-testid="btn-delete-account"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Account
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete your account, 
+                            all your data, conversations, and remove you from any organizations.
+                            {hasActiveSubscription && " Your active subscription will also be cancelled."}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteAccountMutation.mutate()}
+                            disabled={deleteAccountMutation.isPending}
+                            className="bg-destructive text-destructive-foreground"
+                            data-testid="btn-confirm-delete-account"
+                          >
+                            {deleteAccountMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Yes, Delete My Account"
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
       </div>
     </div>

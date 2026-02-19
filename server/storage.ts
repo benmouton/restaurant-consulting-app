@@ -48,6 +48,7 @@ export interface IStorage {
     address?: string;
     restaurantName?: string;
     role?: string;
+    profileImageUrl?: string;
   }): Promise<User | undefined>;
   updateUserStripeInfo(userId: string, stripeInfo: {
     stripeCustomerId?: string;
@@ -118,6 +119,7 @@ export interface IStorage {
   getOrganizationMembers(organizationId: number): Promise<OrganizationMember[]>;
   addOrganizationMember(data: InsertOrganizationMember): Promise<OrganizationMember>;
   removeOrganizationMember(organizationId: number, userId: string): Promise<void>;
+  updateOrganizationMemberRole(organizationId: number, userId: string, role: string): Promise<void>;
   isOrganizationOwner(organizationId: number, userId: string): Promise<boolean>;
   isOrganizationMember(organizationId: number, userId: string): Promise<boolean>;
   
@@ -370,6 +372,7 @@ export class DatabaseStorage implements IStorage {
     address?: string;
     restaurantName?: string;
     role?: string;
+    profileImageUrl?: string;
   }): Promise<User | undefined> {
     const [user] = await db.update(users).set({
       ...profile,
@@ -895,6 +898,15 @@ export class DatabaseStorage implements IStorage {
 
   async removeOrganizationMember(organizationId: number, userId: string): Promise<void> {
     await db.delete(organizationMembers)
+      .where(and(
+        eq(organizationMembers.organizationId, organizationId),
+        eq(organizationMembers.userId, userId)
+      ));
+  }
+
+  async updateOrganizationMemberRole(organizationId: number, userId: string, role: string): Promise<void> {
+    await db.update(organizationMembers)
+      .set({ role })
       .where(and(
         eq(organizationMembers.organizationId, organizationId),
         eq(organizationMembers.userId, userId)

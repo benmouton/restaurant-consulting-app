@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Users, 
   UserPlus, 
@@ -14,7 +16,10 @@ import {
   Loader2, 
   Trash2, 
   Crown,
-  Building
+  Building,
+  RefreshCw,
+  Clock,
+  AlertTriangle
 } from "lucide-react";
 import {
   AlertDialog,
@@ -41,9 +46,10 @@ interface OrganizationMember {
   organizationId: number;
   userId: string;
   role: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   email: string;
+  profileImageUrl: string | null;
   joinedAt: string;
 }
 
@@ -55,10 +61,44 @@ interface OrganizationInvite {
   createdAt: string;
 }
 
+const orgRoleOptions = [
+  { value: "owner", label: "Owner" },
+  { value: "manager", label: "Manager" },
+  { value: "shift_lead", label: "Shift Lead" },
+  { value: "viewer", label: "Viewer" },
+];
+
+function getOrgRoleLabel(role: string): string {
+  return orgRoleOptions.find(r => r.value === role)?.label || role;
+}
+
+function getMemberDisplayName(member: OrganizationMember): string {
+  if (member.firstName && member.lastName) return `${member.firstName} ${member.lastName}`;
+  if (member.firstName) return member.firstName;
+  if (member.email) return member.email.split("@")[0];
+  return member.email || "Team Member";
+}
+
+function isMemberProfileIncomplete(member: OrganizationMember): boolean {
+  return !(member.firstName && member.lastName);
+}
+
+function getMemberInitials(member: OrganizationMember): string {
+  if (member.firstName && member.lastName) return `${member.firstName[0]}${member.lastName[0]}`;
+  if (member.firstName) return member.firstName[0];
+  if (member.email) return member.email[0].toUpperCase();
+  return "?";
+}
+
+function isInviteExpired(expiresAt: string): boolean {
+  return new Date() > new Date(expiresAt);
+}
+
 export default function OrganizationManagement() {
   const { toast } = useToast();
   const [orgName, setOrgName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("viewer");
   const [isCreating, setIsCreating] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
 
@@ -100,17 +140,18 @@ export default function OrganizationManagement() {
   });
 
   const sendInviteMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await apiRequest("POST", "/api/organization/invite", { email });
+    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+      const response = await apiRequest("POST", "/api/organization/invite", { email, role });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/organization/invites"] });
       setInviteEmail("");
+      setInviteRole("viewer");
       setIsInviting(false);
       toast({
         title: "Invite sent",
-        description: "An invitation email has been sent.",
+        description: "Invitation sent! It expires in 7 days.",
       });
     },
     onError: (error: any) => {
@@ -142,6 +183,26 @@ export default function OrganizationManagement() {
     },
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      await apiRequest("PATCH", `/api/organization/members/${userId}/role`, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organization/members"] });
+      toast({
+        title: "Role updated",
+        description: "Team member role has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update role.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const cancelInviteMutation = useMutation({
     mutationFn: async (inviteId: number) => {
       await apiRequest("DELETE", `/api/organization/invites/${inviteId}`);
@@ -162,6 +223,27 @@ export default function OrganizationManagement() {
     },
   });
 
+  const resendInviteMutation = useMutation({
+    mutationFn: async (inviteId: number) => {
+      const response = await apiRequest("POST", `/api/organization/invites/${inviteId}/resend`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organization/invites"] });
+      toast({
+        title: "Invite resent",
+        description: "A fresh invitation has been sent. It expires in 7 days.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend invitation.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateOrg = (e: React.FormEvent) => {
     e.preventDefault();
     if (orgName.trim()) {
@@ -172,8 +254,15 @@ export default function OrganizationManagement() {
   const handleSendInvite = (e: React.FormEvent) => {
     e.preventDefault();
     if (inviteEmail.trim()) {
-      sendInviteMutation.mutate(inviteEmail.trim());
+      sendInviteMutation.mutate({ email: inviteEmail.trim(), role: inviteRole });
     }
+  };
+
+  const handleResendAllExpired = () => {
+    const expiredInvites = invites.filter(i => i.status === "pending" && isInviteExpired(i.expiresAt));
+    expiredInvites.forEach(invite => {
+      resendInviteMutation.mutate(invite.id);
+    });
   };
 
   if (orgLoading) {
@@ -209,7 +298,7 @@ export default function OrganizationManagement() {
                   data-testid="input-org-name"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button 
                   type="submit" 
                   disabled={createOrgMutation.isPending || !orgName.trim()}
@@ -241,6 +330,9 @@ export default function OrganizationManagement() {
     );
   }
 
+  const pendingInvites = invites.filter(i => i.status === "pending");
+  const expiredCount = pendingInvites.filter(i => isInviteExpired(i.expiresAt)).length;
+
   return (
     <Card>
       <CardHeader>
@@ -256,9 +348,9 @@ export default function OrganizationManagement() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Building className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium" data-testid="text-org-name">{organization.name}</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Building className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="font-medium break-words" data-testid="text-org-name">{organization.name}</span>
           {organization.isOwner && (
             <Badge variant="secondary" data-testid="badge-owner">
               <Crown className="h-3 w-3 mr-1" />
@@ -275,61 +367,99 @@ export default function OrganizationManagement() {
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <div className="space-y-2">
-              {members.map((member) => (
-                <div 
-                  key={member.id} 
-                  className="flex items-center justify-between p-2 bg-muted/50 rounded-md"
-                  data-testid={`member-${member.userId}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-medium">
-                      {member.firstName?.[0] || member.email?.[0]?.toUpperCase()}{member.lastName?.[0] || ''}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {member.firstName && member.lastName 
-                          ? `${member.firstName} ${member.lastName}`
-                          : member.email?.split('@')[0] || 'Team Member'}
-                        {member.role === "owner" && (
-                          <Crown className="h-3 w-3 inline ml-1 text-amber-500" />
+              {members.map((member) => {
+                const displayName = getMemberDisplayName(member);
+                const profileIncomplete = isMemberProfileIncomplete(member);
+                return (
+                  <div 
+                    key={member.id} 
+                    className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-md"
+                    data-testid={`member-${member.userId}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        {member.profileImageUrl ? (
+                          <AvatarImage src={member.profileImageUrl} alt={displayName} />
+                        ) : null}
+                        <AvatarFallback className="text-xs">
+                          {getMemberInitials(member)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium truncate" data-testid={`text-member-name-${member.userId}`}>
+                            {displayName}
+                            {member.role === "owner" && (
+                              <Crown className="h-3 w-3 inline ml-1 text-amber-500" />
+                            )}
+                          </p>
+                          {profileIncomplete && (
+                            <Badge variant="secondary" className="text-xs">
+                              Profile incomplete
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-role-${member.userId}`}>
+                            {getOrgRoleLabel(member.role)}
+                          </Badge>
+                        </div>
+                        {member.email && !profileIncomplete && (
+                          <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                         )}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{member.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {organization.isOwner && member.role !== "owner" && (
+                        <>
+                          <Select
+                            value={member.role}
+                            onValueChange={(newRole) => updateRoleMutation.mutate({ userId: member.userId, role: newRole })}
+                          >
+                            <SelectTrigger className="w-[120px]" data-testid={`select-role-${member.userId}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {orgRoleOptions.filter(r => r.value !== "owner").map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                data-testid={`btn-remove-member-${member.userId}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to remove {displayName} from your organization? 
+                                  They will lose access to shared documents.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => removeMemberMutation.mutate(member.userId)}
+                                  className="bg-destructive text-destructive-foreground"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
                     </div>
                   </div>
-                  {organization.isOwner && member.role !== "owner" && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          size="icon" 
-                          variant="ghost"
-                          data-testid={`btn-remove-member-${member.userId}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to remove {member.firstName} {member.lastName} from your organization? 
-                            They will lose access to shared documents.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => removeMemberMutation.mutate(member.userId)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Remove
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -349,7 +479,17 @@ export default function OrganizationManagement() {
                     onChange={(e) => setInviteEmail(e.target.value)}
                     data-testid="input-invite-email"
                   />
-                  <div className="flex gap-2">
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger data-testid="select-invite-role">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="shift_lead">Shift Lead</SelectItem>
+                      <SelectItem value="viewer">Viewer (Read-only)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2 flex-wrap">
                     <Button 
                       type="submit" 
                       disabled={sendInviteMutation.isPending || !inviteEmail.trim()}
@@ -380,44 +520,95 @@ export default function OrganizationManagement() {
               )}
             </div>
 
-            {invites.length > 0 && (
+            {pendingInvites.length > 0 && (
               <>
                 <Separator />
                 <div>
-                  <h4 className="text-sm font-medium mb-3">Pending Invitations</h4>
+                  <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                    <h4 className="text-sm font-medium">Pending Invitations ({pendingInvites.length})</h4>
+                    {expiredCount > 1 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResendAllExpired}
+                        disabled={resendInviteMutation.isPending}
+                        data-testid="btn-resend-all-expired"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Resend All Expired ({expiredCount})
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Invitations expire after 7 days. Resend to generate a new link.
+                  </p>
                   {invitesLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <div className="space-y-2">
-                      {invites.filter(i => i.status === "pending").map((invite) => (
-                        <div 
-                          key={invite.id} 
-                          className="flex items-center justify-between p-2 bg-muted/50 rounded-md"
-                          data-testid={`invite-${invite.id}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-sm">{invite.email}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Expires: {new Date(invite.expiresAt).toLocaleDateString()}
-                              </p>
+                      {pendingInvites.map((invite) => {
+                        const expired = isInviteExpired(invite.expiresAt);
+                        return (
+                          <div 
+                            key={invite.id} 
+                            className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-md"
+                            data-testid={`invite-${invite.id}`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm truncate">{invite.email}</p>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  {expired ? (
+                                    <>
+                                      <AlertTriangle className="h-3 w-3 text-destructive" />
+                                      <span className="text-destructive">Expired {new Date(invite.expiresAt).toLocaleDateString()}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Clock className="h-3 w-3" />
+                                      Expires: {new Date(invite.expiresAt).toLocaleDateString()}
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge
+                                variant={expired ? "destructive" : "secondary"}
+                                data-testid={`badge-invite-status-${invite.id}`}
+                              >
+                                {expired ? "Expired" : "Pending"}
+                              </Badge>
+                              {expired && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => resendInviteMutation.mutate(invite.id)}
+                                  disabled={resendInviteMutation.isPending}
+                                  data-testid={`btn-resend-invite-${invite.id}`}
+                                >
+                                  {resendInviteMutation.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  ) : (
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                  )}
+                                  Resend
+                                </Button>
+                              )}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => cancelInviteMutation.mutate(invite.id)}
+                                disabled={cancelInviteMutation.isPending}
+                                data-testid={`btn-cancel-invite-${invite.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary">Pending</Badge>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => cancelInviteMutation.mutate(invite.id)}
-                              disabled={cancelInviteMutation.isPending}
-                              data-testid={`btn-cancel-invite-${invite.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

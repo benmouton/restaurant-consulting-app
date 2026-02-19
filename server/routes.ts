@@ -408,6 +408,103 @@ export async function registerRoutes(
     }
   });
 
+  const profileUploadsDir = path.join(process.cwd(), "uploads", "profiles");
+  if (!fs.existsSync(profileUploadsDir)) {
+    fs.mkdirSync(profileUploadsDir, { recursive: true });
+  }
+  app.use("/uploads/profiles", express.static(profileUploadsDir));
+
+  const profilePhotoUpload = multer({
+    storage: multer.diskStorage({
+      destination: "uploads/profiles",
+      filename: (req: any, file, cb) => {
+        const ext = file.originalname.split('.').pop();
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
+      },
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const allowed = ["image/jpeg", "image/png", "image/webp"];
+      cb(null, allowed.includes(file.mimetype));
+    },
+  });
+
+  app.post("/api/user/profile/photo", isAuthenticated, profilePhotoUpload.single("photo"), async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const imageUrl = `/uploads/profiles/${req.file.filename}`;
+      await storage.updateUserProfile(userId, { profileImageUrl: imageUrl });
+      res.json({ url: imageUrl });
+    } catch (error) {
+      console.error("Photo upload error:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
+  app.get("/api/user/export", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const conversations = await storage.getConversations(userId);
+      const restaurantProfile = await storage.getRestaurantProfile(userId);
+
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        profile: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          address: user.address,
+          restaurantName: user.restaurantName,
+          role: user.role,
+          createdAt: user.createdAt,
+        },
+        restaurantProfile: restaurantProfile || null,
+        conversationCount: conversations.length,
+      };
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", "attachment; filename=my-data-export.json");
+      res.json(exportData);
+    } catch (error) {
+      console.error("Data export error:", error);
+      res.status(500).json({ error: "Failed to export data" });
+    }
+  });
+
+  app.delete("/api/user/account", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (user.stripeCustomerId) {
+        try {
+          const stripe = await stripeService.getStripe();
+          if (stripe && user.stripeSubscriptionId) {
+            await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+          }
+        } catch (subErr) {
+          console.error("Failed to cancel subscription during account deletion:", subErr);
+        }
+      }
+
+      await storage.deleteUser(userId);
+      req.logout(() => {
+        res.json({ success: true });
+      });
+    } catch (error) {
+      console.error("Account deletion error:", error);
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
   app.post("/api/subscription/cancel", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -3277,9 +3374,10 @@ Generate JSON with:
       const user = users.find(u => u.id === m.userId);
       return {
         ...m,
-        firstName: user?.firstName || "Unknown",
-        lastName: user?.lastName || "User",
+        firstName: user?.firstName || null,
+        lastName: user?.lastName || null,
         email: user?.email || "",
+        profileImageUrl: user?.profileImageUrl || null,
       };
     });
 
@@ -3457,6 +3555,86 @@ Generate JSON with:
     } catch (err) {
       console.error("Cancel invite error:", err);
       res.status(500).json({ message: "Failed to cancel invite" });
+    }
+  });
+
+  // Update organization member role (owners only)
+  app.patch("/api/organization/members/:userId/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const ownerId = req.user.claims.sub;
+      const memberUserId = req.params.userId;
+      const { role } = req.body;
+
+      const validRoles = ["owner", "manager", "shift_lead", "viewer"];
+      if (!role || !validRoles.includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      const org = await storage.getOrganizationByOwner(ownerId);
+      if (!org) {
+        return res.status(403).json({ message: "Only organization owners can update roles" });
+      }
+
+      if (memberUserId === ownerId) {
+        return res.status(400).json({ message: "Cannot change your own role" });
+      }
+
+      await storage.updateOrganizationMemberRole(org.id, memberUserId, role);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Update member role error:", err);
+      res.status(500).json({ message: "Failed to update role" });
+    }
+  });
+
+  // Resend expired invite (owners only)
+  app.post("/api/organization/invites/:inviteId/resend", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const inviteId = parseInt(req.params.inviteId);
+
+      const org = await storage.getOrganizationByOwner(userId);
+      if (!org) {
+        return res.status(403).json({ message: "Only organization owners can resend invites" });
+      }
+
+      const invite = await storage.getInviteById(inviteId);
+      if (!invite || invite.organizationId !== org.id) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+
+      await storage.deleteInvite(inviteId);
+
+      const user = await storage.getUserById(userId);
+      const inviterName = user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "A team member";
+
+      const inviteToken = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const newInvite = await storage.createOrganizationInvite({
+        organizationId: org.id,
+        email: invite.email,
+        inviteToken,
+        invitedBy: userId,
+        status: "pending",
+        expiresAt,
+      });
+
+      const productionDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
+      const baseUrl = productionDomain 
+        ? `https://${productionDomain}`
+        : process.env.REPLIT_DEV_DOMAIN
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+          : "http://localhost:5000";
+      const inviteLink = `${baseUrl}/accept-invite/${inviteToken}`;
+
+      await sendOrganizationInviteEmail(invite.email, inviterName, org.name, inviteLink);
+
+      res.status(201).json(newInvite);
+    } catch (err) {
+      console.error("Resend invite error:", err);
+      res.status(500).json({ message: "Failed to resend invite" });
     }
   });
 
