@@ -1,0 +1,157 @@
+# Page-Specific Improvements — Skills Certification Engine
+
+This is one of the most differentiated features in your app. Most restaurant tech handles scheduling and POS — almost nobody offers behavior-based certification with customizable rubrics. The Standards tab is particularly impressive. Here's how to make it even stronger.
+
+---
+
+## AI Branding Fix
+
+**Screenshot 1:** The warning banner says "Go to the Standards tab to set up your restaurant's standards. Without them, the AI will use generic industry defaults."
+- Change to: **"Go to the Standards tab to set up your restaurant's standards. Without them, generic industry defaults will be used."**
+
+---
+
+## 1. Certify Tab Improvements
+
+### Add context about what the certification scenario will look like
+- Right now the form is: Trainee Name, Role, Phase, then "Generate Certification Scenario." An operator doesn't know what they're about to get.
+- Add a brief description below each Certification Phase option:
+  - **Shadow Phase:** "Knowledge + judgment scenarios. Lower difficulty, more guidance." ✅ (already there — good)
+  - **Perform Phase:** "Real-world scenarios the trainee must handle independently. Moderate difficulty."
+  - **Certify Phase:** "Full service simulation. High difficulty, no hints. Pass/fail."
+- Below the Generate button, add: "You'll receive a scenario your trainee responds to verbally or in writing, scored against your restaurant's standards."
+
+### Show a sample scenario
+- Add a collapsed "See example scenario →" section below the button
+- Show a brief example of what a generated certification scenario looks like so the trainer knows what to expect before generating one
+- This is especially important for first-time users who've never seen the output
+
+### Connect to employee records
+- The "Trainee Name" field should be a **searchable dropdown of employees from the Staff tab** in Scheduling, not a free text field
+- This ensures certification results are tied to a specific employee record and avoids typos or duplicate names
+- If the staff list isn't populated yet, fall back to free text with a note: "Add employees in Staff Scheduling to auto-populate this list"
+
+---
+
+## 2. Dashboard Tab Improvements
+
+### The empty state needs more than "No certification tests yet"
+- Replace with a more informative empty state:
+  - Show a brief visual of what the dashboard will look like once populated (a mockup or wireframe)
+  - Add text: "Once you run certification tests, you'll see: pass/fail rates by role, individual employee scores, and certification expiration tracking."
+  - Add a CTA button: "Run Your First Certification →" that takes them to the Certify tab
+
+### When populated, the dashboard should show:
+- **Team certification overview:**
+  - Total employees certified vs uncertified
+  - Breakdown by role: "Servers: 4/6 certified, Kitchen: 3/5 certified"
+  - Progress bar per role showing certification coverage
+- **Recent attempts table:**
+  - Employee name, role, phase, score, pass/fail, date
+  - Click to view full scenario and scoring breakdown
+- **Expiration tracking:**
+  - If certifications expire (e.g., every 6 months), show who's due for recertification
+  - "3 certifications expiring this month" with a list
+- **Trends:**
+  - Average scores over time (are new hires getting better?)
+  - Most common failure areas (helps identify training gaps)
+
+---
+
+## 3. Standards Tab Improvements
+
+### The Standards tab is the strongest part — protect and enhance it
+
+The content you've filled in is excellent:
+- Service Philosophy: "Warm, fast, professional service. Never argue with guests."
+- Steps of Service with specific timing targets
+- Speed Targets (Drinks 3 min, Apps 8 min, Entrees 15 min)
+- ROAR recovery framework
+- Alcohol policy with ID rules, max drinks, cut-off rules
+- Safety & Sanitation rules
+- Critical Errors (Auto-Fail) list
+- Scoring Rubric Weights with configurable pass threshold
+
+This is genuinely comprehensive. A few enhancements:
+
+### Add a "Standards Completion" indicator
+- Show a progress bar or checklist at the top of the Standards tab:
+  - ✅ Service Philosophy
+  - ✅ Steps of Service
+  - ✅ Speed Targets
+  - ✅ Recovery Framework
+  - ✅ Alcohol Policy
+  - ✅ Safety & Sanitation
+  - ✅ Critical Errors
+  - ✅ Scoring Rubric
+- This helps operators see at a glance if they've missed any sections
+- Show "Standards complete ✓" or "7 of 8 sections configured" at the top
+
+### Make the "Load Default Template" button more prominent on first visit
+- When no standards are configured (screenshot 1 shows the warning), the Standards tab should lead with the default template button front and center, not as a small button in the corner
+- Frame it as: "Start with industry-standard defaults and customize to your restaurant" with a large CTA
+- After loading, show what was loaded so the operator can review and edit
+
+### Add section-level validation
+- For Steps of Service: if Greeting Timing is left blank, show a subtle warning
+- For Speed Targets: if any are blank, flag it
+- For Scoring Rubric: validate that weights total 100 (you already show "100/100" — good) and show an error state in red if they don't
+- For Critical Errors: suggest a minimum of 3 items — if fewer, show: "Consider adding more critical errors. Most restaurants have 5-8."
+
+### Add a "Preview as Rubric" button
+- Let the operator see their standards formatted as the actual scoring rubric that will be used during certification
+- Show it as a clean table:
+  - Category | Weight | What's Being Evaluated
+  - Prioritization & Triage (25%) | How well did the trainee identify and prioritize the issue?
+  - Guest Communication (25%) | Did the trainee communicate effectively with the guest?
+  - etc.
+- This helps operators understand exactly how their standards translate to scoring
+
+### Connect standards to other parts of the app
+- The Speed Targets (Drinks 3 min, Apps 8 min, Entrees 15 min) should also feed into the Kitchen Operations page's ticket time tracking
+- The Recovery Framework (ROAR) should be referenced in the Service Standards domain's Guest Recovery Decision Advisor
+- The Alcohol Policy should appear in the Training Manual's relevant day
+- This creates a **single source of truth** — operators define standards once and they flow everywhere
+
+---
+
+## 4. Certification Report / Scorecard
+
+### After a certification is scored, generate a printable report
+- The report should include:
+  - Employee name, role, date, phase tested
+  - Scenario description
+  - Employee's response (or trainer's notes on the response)
+  - Score by category with rubric weights applied
+  - Overall score and pass/fail
+  - Areas of strength
+  - Areas for improvement with specific retraining recommendations
+  - If failed: "Recommended retest date" and "Focus areas before retest"
+  - Trainer signature line and employee signature line
+- Add "Print," "Export PDF," and "Save to Employee Record" buttons
+- This scorecard becomes part of the employee's file — critical for both development and legal protection
+
+---
+
+## 5. Multi-Role Standards
+
+### Allow different standards per role
+- A server's standards are different from a cook's standards
+- Consider allowing operators to create multiple standards sets:
+  - "Server Standards" (front-of-house focused)
+  - "Kitchen Standards" (food safety, speed, station management focused)
+  - "Bartender Standards" (alcohol policy heavy, drink knowledge)
+  - "Manager Standards" (leadership, crisis response, P&L awareness)
+- When running a certification, auto-load the relevant standards based on the role selected
+- This is a bigger feature but would make the certification system truly comprehensive
+
+---
+
+## Priority Order
+1. **AI branding fix** (quick text change)
+2. **Dashboard empty state and populated view** (makes the feature feel complete)
+3. **Connect trainee name to employee records** (data integrity)
+4. **Standards completion indicator** (guides setup)
+5. **Certification scorecard/report** (tangible output operators can file)
+6. **Preview as Rubric button** (helps operators understand the scoring)
+7. **Multi-role standards** (bigger feature, high long-term value)
