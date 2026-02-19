@@ -1,0 +1,165 @@
+# Add "Install App" / Add to Homescreen Prompt
+
+Your app already has PWA meta tags in index.html (manifest.json, apple-touch-icon, mobile-web-app-capable). But users don't know they can install it. We need to actively prompt them.
+
+---
+
+## 1. Create an "Add to Homescreen" Smart Banner
+
+Build a component that appears at the top or bottom of the screen on mobile devices:
+
+### When to show it:
+- Only on mobile browsers (not desktop, not if already installed as PWA)
+- After the user's 2nd or 3rd visit (don't show it on first visit — let them explore first)
+- Don't show it if the user has dismissed it before (store dismissal in localStorage)
+- Don't show it if the app is already running in standalone mode (installed)
+
+### Detection logic:
+```javascript
+// Check if already installed as PWA
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+  || window.navigator.standalone === true;
+
+// Check if mobile
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+// Only show if mobile AND not already installed
+const shouldShowBanner = isMobile && !isStandalone && !localStorage.getItem('pwa-dismissed');
+```
+
+### Banner design:
+- Slim banner at the bottom of the screen (above any bottom nav if present)
+- Dark background matching the app theme
+- Chef hat icon (your logo) on the left
+- Text: **"Add The Restaurant Consultant to your homescreen for instant access"**
+- Two buttons: **"Install"** (cyan, primary) and **"✕"** (dismiss)
+- Smooth slide-up animation when appearing
+
+### For Android (Chrome):
+- Intercept the `beforeinstallprompt` event:
+```javascript
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show your custom install banner
+});
+
+// When user clicks "Install":
+deferredPrompt.prompt();
+const { outcome } = await deferredPrompt.userChoice;
+```
+
+### For iOS (Safari):
+- iOS doesn't support the beforeinstallprompt API
+- Instead, show instructions: "Tap the Share button ↑ then 'Add to Home Screen'"
+- Include a small animated graphic showing the steps (share icon → scroll → Add to Home Screen)
+- Detect iOS specifically:
+```javascript
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+```
+
+---
+
+## 2. Update manifest.json
+
+Make sure your manifest.json is complete for the best install experience:
+
+```json
+{
+  "name": "The Restaurant Consultant",
+  "short_name": "TRC",
+  "description": "Restaurant operations systems. Replace chaos with structure.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#1e40af",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+```
+
+Make sure the icon files actually exist at those paths. You'll need at minimum:
+- 192x192 PNG (required for Android install)
+- 512x512 PNG (required for splash screen)
+- apple-touch-icon.png at 180x180 (for iOS)
+
+Use your chef hat logo in a circle on the dark background for all of these.
+
+---
+
+## 3. Add an "Install App" Option in Settings/Profile
+
+In addition to the smart banner, add a persistent option:
+- In the Account Settings page or in the user dropdown menu, add: "Install App" or "Add to Homescreen"
+- This gives users who dismissed the banner a way to install later
+- Hide this option if the app is already running in standalone mode
+
+---
+
+## 4. Post-Install Experience
+
+After the user installs the app:
+- The app should open in standalone mode (no browser chrome — fullscreen feel)
+- The splash screen should show your logo on the dark background
+- Make sure all navigation works without a browser back button — add a back button/arrow in your app's UI where needed (you already have these in most pages)
+- Make sure the status bar color matches your theme (you already have the meta tag: `<meta name="theme-color" content="#1e40af">` — consider changing this to match your dark background: `#0d1117`)
+
+---
+
+## 5. Service Worker (Optional but Recommended)
+
+If you don't already have a service worker, adding a basic one enables:
+- Offline caching of the app shell (so the app loads even without internet)
+- Faster subsequent loads
+- Better install experience on Android
+
+Basic service worker:
+```javascript
+// public/sw.js
+const CACHE_NAME = 'trc-v1';
+const urlsToCache = ['/', '/index.html'];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => response || fetch(event.request))
+  );
+});
+```
+
+Register it in your main.tsx or index.html:
+```javascript
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+```
+
+---
+
+## Priority Order
+1. **Update manifest.json** (quick fix, enables everything else)
+2. **Generate proper icon files** at 192, 512, and 180px sizes
+3. **Build the smart banner component** (biggest UX impact)
+4. **Add iOS-specific instructions** (half your users are probably on iPhones)
+5. **Add "Install App" to settings** (secondary access point)
+6. **Service worker** (optional, improves performance)
+7. **Update theme-color meta tag** to #0d1117

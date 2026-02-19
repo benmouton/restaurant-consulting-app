@@ -32,6 +32,7 @@ import DataDeletion from "@/pages/data-deletion";
 import TermsOfService from "@/pages/terms";
 import CertificationPage from "@/pages/certification";
 import NotFound from "@/pages/not-found";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
   return (
@@ -123,6 +124,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <PwaInstallBanner />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

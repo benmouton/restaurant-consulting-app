@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useRole } from "@/hooks/use-role";
 import { useAdmin } from "@/hooks/use-admin";
 import { useSubscription } from "@/hooks/use-subscription";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, BookOpen, LogOut, Building2, Shield, CreditCard, Settings, ChevronDown, UserCog, MessageSquare } from "lucide-react";
+import { LayoutDashboard, BookOpen, LogOut, Building2, Shield, CreditCard, Settings, ChevronDown, UserCog, MessageSquare, Download, Share, Plus, ArrowUp, X } from "lucide-react";
 import { BrandLogoNav } from "@/components/BrandLogo";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +18,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function Navigation() {
   const [location] = useLocation();
@@ -22,6 +31,8 @@ export function Navigation() {
   const { roleLabel } = useRole();
   const { isAdmin } = useAdmin();
   const { subscriptionStatus } = useSubscription();
+  const { canShowInstallOption, canPromptNative, isIOS, promptInstall } = usePwaInstall();
+  const [showIOSDialog, setShowIOSDialog] = useState(false);
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -30,6 +41,7 @@ export function Navigation() {
   ];
 
   return (
+    <>
     <nav className="fixed left-0 top-0 z-50 flex h-16 w-full items-center justify-between border-b bg-white/80 px-4 backdrop-blur-md transition-all lg:h-full lg:w-72 lg:flex-col lg:border-r lg:border-b-0 lg:px-6 lg:py-8">
       {/* Brand */}
       <div className="lg:w-full lg:mb-10">
@@ -133,6 +145,22 @@ export function Navigation() {
                 Account Settings
               </DropdownMenuItem>
             </Link>
+            {canShowInstallOption && (
+              <DropdownMenuItem
+                onClick={async () => {
+                  if (canPromptNative) {
+                    await promptInstall();
+                  } else if (isIOS) {
+                    setShowIOSDialog(true);
+                  }
+                }}
+                className="cursor-pointer"
+                data-testid="button-install-app"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Install App
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem 
               onClick={() => logout()}
               className="text-destructive focus:text-destructive cursor-pointer"
@@ -145,5 +173,48 @@ export function Navigation() {
         </DropdownMenu>
       </div>
     </nav>
+
+    <Dialog open={showIOSDialog} onOpenChange={setShowIOSDialog}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Add to Home Screen</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary/10 text-primary shrink-0">
+              <Share className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">1. Tap the Share button</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                Look for <ArrowUp className="h-3 w-3 inline" /> at the bottom of Safari
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary/10 text-primary shrink-0">
+              <Plus className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">2. Tap "Add to Home Screen"</p>
+              <p className="text-xs text-muted-foreground">Scroll down in the share menu to find it</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary/10 text-primary shrink-0">
+              <Download className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">3. Tap "Add"</p>
+              <p className="text-xs text-muted-foreground">Confirm to add the app to your homescreen</p>
+            </div>
+          </div>
+        </div>
+        <Button onClick={() => setShowIOSDialog(false)} className="w-full mt-2" data-testid="button-ios-install-close">
+          Got it
+        </Button>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
