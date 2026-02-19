@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Users, DollarSign, TrendingUp, Shield, ArrowLeft, Trash2, Eye, X, Building, Link2, Copy, Ban, RefreshCw, Plus, Clock } from "lucide-react";
+import { Loader2, Users, DollarSign, TrendingUp, Shield, ArrowLeft, Trash2, Eye, X, Building, Link2, Copy, Ban, RefreshCw, Plus, Clock, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -153,17 +153,20 @@ export default function AdminDashboard() {
       const res = await apiRequest("POST", "/api/admin/test-access", data);
       return await res.json();
     },
-    onSuccess: (token: TestAccessToken) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/test-access"] });
-      const link = `${window.location.origin}/test-access/${token.token}`;
+      const link = `${window.location.origin}/test-access/${data.token}`;
       setGeneratedLink(link);
       setShowLinkField(true);
+      const savedEmail = testEmail;
       setTestName("");
       setTestEmail("");
       setTestDuration("7");
       toast({
-        title: "Test link created",
-        description: "The test access link has been generated successfully.",
+        title: data.emailSent ? "Link created & email sent" : "Test link created",
+        description: data.emailSent 
+          ? `An invitation email has been sent to ${savedEmail}.`
+          : "The test access link has been generated. Copy and share it manually.",
       });
     },
     onError: (error: any) => {
@@ -631,6 +634,26 @@ export default function AdminDashboard() {
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
+                            {token.email && token.status === "active" && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  testAccessActionMutation.mutate(
+                                    { id: token.id, action: "send_email" },
+                                    {
+                                      onSuccess: () => {
+                                        toast({ title: "Email sent", description: `Invitation email sent to ${token.email}.` });
+                                      },
+                                    }
+                                  );
+                                }}
+                                disabled={testAccessActionMutation.isPending}
+                                data-testid={`button-send-email-${token.id}`}
+                              >
+                                <Send className="h-4 w-4" />
+                              </Button>
+                            )}
                             {(token.status === "active" || token.status === "used") && (
                               <Button
                                 size="icon"

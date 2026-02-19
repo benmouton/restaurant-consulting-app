@@ -189,6 +189,150 @@ export async function sendInviteReminderEmail(opts: {
   }
 }
 
+export async function sendTestAccessEmail(opts: {
+  toEmail: string;
+  recipientName: string;
+  accessLink: string;
+  durationDays: number;
+  senderName?: string;
+}): Promise<boolean> {
+  try {
+    console.log(`[Email] Sending test access email to ${opts.toEmail}`);
+    const { client, fromEmail } = await getResendClient();
+
+    const fromDisplay = opts.senderName 
+      ? `${opts.senderName} via The Restaurant Consultant`
+      : 'The Restaurant Consultant';
+    const senderFrom = fromEmail 
+      ? fromEmail.replace(/^[^<]*/, `${fromDisplay} `) 
+      : `${fromDisplay} <noreply@restaurantai.consulting>`;
+
+    const recipientFirst = opts.recipientName.split(' ')[0];
+    const greeting = `Hey ${escapeHtml(recipientFirst)},`;
+    const durationText = opts.durationDays === 1 ? '1 day' : `${opts.durationDays} days`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <span style="color: #ffffff; font-family: 'Georgia', serif; font-size: 18px; font-weight: bold;">The Restaurant</span>
+                    <span style="color: #14b8a6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-left: 6px;">Consultant</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Body -->
+          <tr>
+            <td style="background-color: #ffffff; padding: 40px 30px;">
+              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                ${greeting}
+              </p>
+              
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 10px 0;">
+                You've been given exclusive access to <strong>The Restaurant Consultant</strong> &mdash; a complete operations platform built for independent restaurant operators.
+              </p>
+
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
+                Take it for a spin and let us know what you think. Your access lasts <strong>${durationText}</strong>.
+              </p>
+              
+              <!-- Divider -->
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <p style="color: #1a1a1a; font-size: 15px; font-weight: 600; margin: 0 0 16px 0;">
+                Here's what you'll have access to:
+              </p>
+              
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 30px 0;">
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F52A;</span> 12 operational domains &mdash; from kitchen readiness to HR compliance
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F4CB;</span> Training templates and employee handbooks
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F4B0;</span> Food cost tools and financial analysis
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F6A8;</span> Crisis management playbooks
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  <span style="margin-right: 8px;">&#x1F4AC;</span> An operations consultant for any question
+                </td></tr>
+              </table>
+              
+              <!-- Divider -->
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <!-- CTA Button -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding: 10px 0 20px 0;">
+                    <a href="${opts.accessLink}" style="background-color: #14b8a6; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; display: inline-block; letter-spacing: 0.3px;">
+                      Get Started &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
+                Your access expires in ${durationText}. No credit card required.
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="color: #888888; font-size: 13px; margin: 0 0 4px 0;">The Restaurant Consultant</p>
+              <p style="color: #666666; font-size: 12px; font-style: italic; margin: 0;">Systems that work on your worst night.</p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const result = await client.emails.send({
+      from: senderFrom,
+      to: opts.toEmail,
+      subject: `${escapeHtml(recipientFirst)}, you've been invited to try The Restaurant Consultant`,
+      html,
+    });
+
+    if (result.error) {
+      console.error('[Email] Resend returned error:', result.error);
+      return false;
+    }
+
+    console.log(`[Email] Test access email sent to ${opts.toEmail}, id: ${result.data?.id}`);
+    return true;
+  } catch (error: any) {
+    console.error('[Email] Failed to send test access email:', error?.message || error);
+    return false;
+  }
+}
+
 function buildInviteEmailHtml(params: {
   recipientName: string;
   messageHtml: string;

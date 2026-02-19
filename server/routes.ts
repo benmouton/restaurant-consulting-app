@@ -17,7 +17,7 @@ import { getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { restaurantHolidays, insertHandbookSettingsSchema, insertRestaurantStandardsSchema, insertCertificationAttemptSchema } from "@shared/schema";
-import { sendOrganizationInviteEmail, sendInviteReminderEmail } from "./emailService";
+import { sendOrganizationInviteEmail, sendInviteReminderEmail, sendTestAccessEmail } from "./emailService";
 import { encrypt } from "./encryption";
 
 const openai = new OpenAI({
@@ -626,21 +626,51 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Name and duration are required" });
       }
       const token = crypto.randomBytes(32).toString("hex");
+      const parsedDuration = parseInt(durationDays);
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + parseInt(durationDays));
+      expiresAt.setDate(expiresAt.getDate() + parsedDuration);
       
       const result = await storage.createTestAccessToken({
         token,
         name,
         email: email || null,
         accessLevel: accessLevel || "full",
-        durationDays: parseInt(durationDays),
+        durationDays: parsedDuration,
         expiresAt,
         status: "active",
         userId: null,
         createdBy: req.user.claims.sub,
       });
-      res.json({ ...result, token });
+
+      let emailSent = false;
+      if (email) {
+        const protocol = process.env.REPL_SLUG ? 'https' : 'http';
+        const host = process.env.REPL_SLUG 
+          ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+          : 'localhost:5000';
+        const accessLink = `${protocol}://${host}/test-access/${token}`;
+
+        const adminUser = await storage.getUserById(req.user.claims.sub);
+        const senderName = adminUser?.firstName 
+          ? `${adminUser.firstName} ${adminUser.lastName || ''}`.trim() 
+          : undefined;
+
+        emailSent = await sendTestAccessEmail({
+          toEmail: email,
+          recipientName: name,
+          accessLink,
+          durationDays: parsedDuration,
+          senderName,
+        });
+
+        if (emailSent) {
+          console.log(`[TestAccess] Email sent to ${email} for token ${result.id}`);
+        } else {
+          console.warn(`[TestAccess] Failed to send email to ${email}, link still generated`);
+        }
+      }
+
+      res.json({ ...result, token, emailSent });
     } catch (error) {
       console.error("Create test access error:", error);
       res.status(500).json({ error: "Failed to create test access token" });
@@ -698,6 +728,32 @@ export async function registerRoutes(
           revokedAt: null,
         });
         return res.json({ ...result, token: newToken });
+      }
+
+      if (action === "send_email") {
+        if (!token.email) {
+          return res.status(400).json({ error: "No email address on this token" });
+        }
+        const protocol = process.env.REPL_SLUG ? 'https' : 'http';
+        const host = process.env.REPL_SLUG 
+          ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+          : 'localhost:5000';
+        const accessLink = `${protocol}://${host}/test-access/${token.token}`;
+
+        const adminUser = await storage.getUserById(req.user.claims.sub);
+        const senderName = adminUser?.firstName 
+          ? `${adminUser.firstName} ${adminUser.lastName || ''}`.trim() 
+          : undefined;
+
+        const sent = await sendTestAccessEmail({
+          toEmail: token.email,
+          recipientName: token.name,
+          accessLink,
+          durationDays: token.durationDays,
+          senderName,
+        });
+
+        return res.json({ success: sent, emailSent: sent });
       }
 
       res.status(400).json({ error: "Invalid action" });
