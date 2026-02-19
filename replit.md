@@ -38,7 +38,9 @@ Preferred communication style: Simple, everyday language.
 - **Role-Based Access Control (RBAC)**: Three roles (Owner, General Manager, Manager) with distinct feature access, implemented via `useRole` hook and `RoleGate` component.
 - **AI Integration**: Utilizes OpenAI API via Replit AI Integrations for restaurant consulting chat, image generation, and social media post generation, driven by a domain-specific system prompt.
 - **Leadership Command Center**: Daily task management tool with AI-generated priorities, crisis guidance, follow-up mode, progress tracking dashboard (completion rates, trends, heatmap), and browser notification reminders. Features a restaurant profile setup wizard.
-- **Social Media Post Builder**: AI-powered content creation for various post types and platforms (Instagram, Facebook, Google Business Profile) with brand voice settings. Includes direct posting integration via OAuth and token encryption, and a holiday calendar.
+- **Social Media Post Builder**: AI-powered content creation for various post types and platforms (Instagram, Facebook, Google Business Profile, LinkedIn, X/Twitter, Nextdoor) with brand voice settings. Includes direct posting integration via OAuth and token encryption, and a holiday calendar.
+- **Smart Dashboard**: Time-based priority domain highlights (morning/afternoon/evening/weekend-aware), contextual greetings, consolidated navigation (Resources dropdown, Tools dropdown, standalone Ask Consultant), and onboarding redirect for new users.
+- **Onboarding Flow**: Full-screen 3-step wizard at `/onboarding` (personal info, restaurant name, role selection) with skip option and dashboard banner for incomplete setup. Replaced modal-based onboarding.
 - **Facility Command Center**: Crisis management hub with 5 tabs:
   - **Breakdown**: Equipment issue triage with AI-generated response scripts, vendor suggestions based on equipment type.
   - **PM Schedule**: Preventative maintenance planning with fail-silent monitoring.

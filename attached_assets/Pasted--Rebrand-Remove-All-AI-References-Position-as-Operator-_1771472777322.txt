@@ -1,0 +1,175 @@
+# Rebrand: Remove All AI References — Position as Operator-Built Systems Platform
+
+The app currently brands itself around AI ("Restaurant AI Consulting," "AI-powered," etc.). We need to remove ALL references to AI throughout the entire codebase and rebrand around operator expertise and systems. The value is the frameworks and methodology — not the technology delivering it.
+
+**Core positioning shift:**
+- OLD: "AI-powered restaurant operations consulting platform"
+- NEW: "Restaurant operations systems built by operators, for operators"
+
+Work through each section below carefully. Search the entire codebase for each term to make sure nothing is missed.
+
+---
+
+## 1. App Name & Branding
+
+**Find and replace across the entire project:**
+
+### index.html
+- Page title: Change `<title>Restaurant AI Consulting</title>` → `<title>Restaurant Operations Consulting</title>` (or whatever the new brand name is — see options below)
+- Meta description: Change `"AI-powered restaurant operations consulting platform. Replace chaos with systems."` → `"Restaurant operations consulting platform. Replace chaos with systems."`
+- `apple-mobile-web-app-title`: Update to match new name
+- Remove any other meta tags referencing AI
+
+### Brand name options (pick one and apply everywhere):
+- **Restaurant Operations Consulting** (straightforward)
+- **Operator Systems** (short, punchy)
+- **The Operator's Playbook** (positions around the content)
+- **[Your Name] Restaurant Consulting** (personal authority brand)
+
+Whatever name is chosen, update it in:
+- `index.html` title and meta tags
+- The top-left nav logo/text ("Restaurant AI Consulting" → new name)
+- `manifest.json` — update `name` and `short_name`
+- Any footer text
+- Any email templates or notification text
+- The landing page headline and copy
+
+---
+
+## 2. Navigation & UI Labels
+
+Search the entire codebase for these terms and replace:
+
+| Find | Replace With |
+|------|-------------|
+| `Ask Consultant` (nav item) | `Consultant` or `Ask an Expert` |
+| `AI Consultant` | `Consultant` or `Operations Consultant` |
+| `AI-powered` | Remove entirely, or replace with `personalized` or `data-driven` |
+| `AI-generated` | `custom` or `tailored` |
+| `artificial intelligence` | Remove or replace with `expert systems` |
+| `machine learning` | Remove unless in a technical context |
+| `powered by AI` | `built by operators` |
+
+---
+
+## 3. Landing Page Copy
+
+**File:** `src/pages/landing.tsx` (and any related components)
+
+Search for and rewrite any copy that leads with AI as the selling point. The landing page should sell:
+- Operational expertise and proven frameworks
+- Systems that replace chaos
+- Built by someone who's actually run restaurants
+
+**Replace patterns like:**
+- "AI analyzes your restaurant..." → "Get expert recommendations based on your restaurant's specifics..."
+- "Our AI consultant..." → "Our consulting engine..." or "Get expert guidance..."
+- "AI-powered recommendations" → "Tailored recommendations" or "Personalized action plans"
+- "Let AI handle..." → "Get instant guidance on..." or "Stop guessing about..."
+
+**The landing page headline should NOT mention AI.** Focus on the pain point and outcome:
+- "Stop firefighting. Start operating." 
+- "Restaurant systems that actually work on a Tuesday night."
+- "Replace chaos with systems. Built by operators, for operators."
+
+---
+
+## 4. Domain Pages & AI Tool Forms
+
+### Guest Recovery Decision Advisor (Service Standards domain)
+- Keep the name "Guest Recovery Decision Advisor" — it's great, no AI reference
+- Change button text from anything like "Get AI Advice" → `Get Recovery Advice` (may already be correct)
+- If there's any subtitle or description mentioning AI, change it to reference the methodology instead:
+  - "Get real-time guidance on how to recover from a service failure—within your comp limits" ✅ (this is already good)
+
+### Labor Demand & Cut-Decision Engine (Staffing & Labor domain)
+- Keep the name — it's excellent, no AI reference
+- Change button from anything mentioning AI → `Generate Staffing Plan` (may already be correct)
+- Subtitle: "Cover-driven staffing decisions. No guessing, no hoping—just data-driven labor actions." ✅ (already good)
+
+### Leadership Command Center (Ownership & Leadership domain)
+- If it says "AI-powered task recommendations" → change to `Personalized task recommendations` or `Expert task recommendations`
+- "Get AI-powered task recommendations personalized for your restaurant on Wednesdays" → `Get task recommendations personalized for your restaurant on Wednesdays`
+
+### ALL AI tool forms across every domain:
+- Search for any loading states that say "AI is thinking..." or "AI is generating..." → change to `Analyzing...`, `Building your plan...`, `Generating recommendations...`
+- Search for any tooltips or helper text mentioning AI
+- Search for any empty states mentioning AI
+
+---
+
+## 5. Consultant Page
+
+**File:** `src/pages/consultant.tsx`
+
+This is likely the most AI-branded page. Reframe it:
+- If it's called "AI Consultant" anywhere → `Operations Consultant` or just `Consultant`
+- If there's a chat interface, don't frame it as "chatting with AI" — frame it as "consulting on operations"
+- Placeholder text in the chat input should say something like `Ask about any operational challenge...` not `Ask the AI...`
+- Any intro copy like "Our AI has been trained on..." → `Built on decades of real restaurant operating experience...` or `Powered by proven operational frameworks...`
+
+---
+
+## 6. Onboarding & Profile
+
+**File:** `src/components/onboarding-modal.tsx` and `src/pages/profile.tsx`
+
+- "Tell us about your restaurant to get tailored recommendations" ✅ (already good — no AI mention)
+- Search for any AI references in onboarding steps
+- Profile page: if there's any copy about "how AI uses your data" → reframe as "how your profile personalizes your experience"
+
+---
+
+## 7. Subscription & Pricing
+
+**File:** `src/pages/subscription.tsx`
+
+- Remove AI from any plan names or feature descriptions
+- Don't sell "AI-powered features" — sell "expert consulting tools" or "operational systems"
+- Feature descriptions should focus on outcomes:
+  - ❌ "AI-generated staffing plans"
+  - ✅ "Custom staffing plans based on your covers and labor targets"
+  - ❌ "AI consultant access"  
+  - ✅ "Unlimited access to the operations consultant"
+
+---
+
+## 8. Global Search — Catch Everything
+
+After making the changes above, do a global search across the ENTIRE codebase for these terms and fix any remaining instances:
+
+```
+Search for: "AI" (case-sensitive, whole word)
+Search for: "ai" (in variable names, CSS classes, file names)  
+Search for: "artificial"
+Search for: "machine learning"
+Search for: "GPT"
+Search for: "LLM"
+Search for: "language model"
+Search for: "neural"
+Search for: "powered by"
+```
+
+**Important exceptions — DO NOT remove:**
+- Internal code comments explaining the AI integration (backend stuff is fine)
+- API route names or internal variable names that reference AI services (these are invisible to users)
+- Any legal/privacy policy disclosures that are required about AI usage — these should stay for compliance
+
+---
+
+## 9. Favicon & Assets
+
+- If the favicon or logo contains "AI" text, it needs to be updated
+- Check `public/` folder for any images with AI branding
+- Update Open Graph / social share images if they mention AI
+
+---
+
+## Summary of the Philosophy
+
+The AI is the engine under the hood. Users should never think about it. They should feel like they're accessing a **consulting platform built by someone who's lived the restaurant life** — not a chatbot. Every piece of copy should answer: "Why should I trust this?" with "Because it was built by operators who've been through it" — NOT "Because AI."
+
+Think of it like this:
+- Grammarly doesn't say "AI fixes your grammar" — it says "Write with confidence"
+- Uber doesn't say "AI matches you with drivers" — it says "Tap a button, get a ride"
+- This app should say "Get the right staffing plan for tonight" — not "AI generates your staffing plan"

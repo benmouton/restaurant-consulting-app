@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { useAuth } from "@/hooks/use-auth";
-import { OnboardingModal } from "@/components/onboarding-modal";
+import OnboardingPage from "@/pages/onboarding";
 import { SubscriptionGate } from "@/components/subscription-gate";
 import { RoleGate } from "@/components/role-gate";
 import { USER_ROLES } from "@shared/models/auth";
@@ -54,9 +54,13 @@ function Router() {
 
   return (
     <>
-      {user && <OnboardingModal user={user} />}
       <Switch>
-        <Route path="/" component={user ? Dashboard : Landing} />
+        <Route path="/">
+          {user ? <Dashboard /> : <Landing />}
+        </Route>
+        <Route path="/onboarding">
+          {user ? <OnboardingPage user={user} /> : <Landing />}
+        </Route>
         <Route path="/subscribe" component={SubscriptionPage} />
         <Route path="/subscription/success" component={SubscriptionSuccessPage} />
         <Route path="/subscription/cancel" component={SubscriptionCancelPage} />

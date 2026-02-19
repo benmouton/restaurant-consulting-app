@@ -1,3 +1,4 @@
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -39,7 +40,10 @@ import {
   Menu,
   Share2,
   BookOpen,
-  Sparkles
+  Sparkles,
+  Library,
+  Briefcase,
+  Zap
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 import logoImage from "@/assets/logo.png";
@@ -59,6 +63,55 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Share2,
 };
 
+function getTimeContext(): { greeting: string; subtitle: string; prioritySlugs: string[]; priorityLabel: string } {
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay();
+  const isFriSat = day === 5 || day === 6;
+  const isMonday = day === 1;
+
+  let greeting: string;
+  let subtitle: string;
+  let prioritySlugs: string[] = [];
+  let priorityLabel: string;
+
+  if (hour < 12) {
+    greeting = "Good morning";
+    subtitle = "Here's what to focus on before service";
+  } else if (hour < 17) {
+    greeting = "Good afternoon";
+    subtitle = "Mid-shift priorities";
+  } else {
+    greeting = "Good evening";
+    subtitle = "Closing out the day";
+  }
+
+  if (hour < 11) {
+    prioritySlugs = ["staffing", "kitchen"];
+    priorityLabel = "Focus for this morning";
+  } else if (hour < 15) {
+    prioritySlugs = ["service", "costs"];
+    priorityLabel = "Priority right now";
+  } else if (hour < 17) {
+    prioritySlugs = ["staffing", "training"];
+    priorityLabel = "Pre-dinner priorities";
+  } else {
+    prioritySlugs = ["service", "kitchen"];
+    priorityLabel = "Priority for tonight";
+  }
+
+  if (isFriSat && !prioritySlugs.includes("crisis")) {
+    prioritySlugs = [...prioritySlugs.slice(0, 2), "crisis"];
+  }
+
+  if (isMonday) {
+    const mondayExtras = ["costs", "hr"].filter(s => !prioritySlugs.includes(s));
+    prioritySlugs = [...prioritySlugs.slice(0, 1), ...mondayExtras.slice(0, 2)];
+  }
+
+  return { greeting, subtitle, prioritySlugs: prioritySlugs.slice(0, 3), priorityLabel };
+}
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -68,6 +121,27 @@ export default function Dashboard() {
   const { data: domains, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
   });
+
+  const timeContext = useMemo(() => getTimeContext(), []);
+
+  const priorityDomains = useMemo(() => {
+    if (!domains || domains.length === 0) return [];
+    const matched = timeContext.prioritySlugs
+      .map(slug => domains.find(d => d.slug === slug))
+      .filter(Boolean) as Domain[];
+    if (matched.length >= 2) return matched;
+    const fallback = domains.filter(d => !matched.some(m => m.id === d.id)).slice(0, 3 - matched.length);
+    return [...matched, ...fallback];
+  }, [domains, timeContext.prioritySlugs]);
+
+  const needsOnboarding = user && !user.restaurantName;
+  const [skippedOnboarding, setSkippedOnboarding] = useState(() => !!localStorage.getItem("onboarding-skipped"));
+
+  useEffect(() => {
+    if (needsOnboarding && !skippedOnboarding) {
+      navigate("/onboarding");
+    }
+  }, [needsOnboarding, skippedOnboarding, navigate]);
 
   if (authLoading) {
     return (
@@ -79,7 +153,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header with glassmorphism */}
       <header className="border-b border-border sticky top-0 glass-header z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
@@ -87,51 +160,57 @@ export default function Dashboard() {
             <span className="font-bold text-sm sm:text-base tracking-tight truncate">Restaurant AI Consulting</span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-2">
-              <Link href="/templates">
-                <Button variant="outline" size="sm" data-testid="button-templates-nav">
-                  <GraduationCap className="h-4 w-4 mr-2" />
-                  Templates
-                </Button>
-              </Link>
-              <Link href="/playbooks">
-                <Button variant="outline" size="sm" data-testid="button-playbooks-nav">
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Playbooks
-                </Button>
-              </Link>
-              {permissions.canAccessFinancials && (
-                <Link href="/financial">
-                  <Button variant="outline" size="sm" data-testid="button-financial-nav">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Financial
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-resources-nav">
+                    <Library className="h-4 w-4 mr-2" />
+                    Resources
+                    <ChevronDown className="h-3 w-3 ml-1" />
                   </Button>
-                </Link>
-              )}
-              <Link href="/certification">
-                <Button variant="outline" size="sm" data-testid="button-certification-nav">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Certification
-                </Button>
-              </Link>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate("/templates")} className="cursor-pointer" data-testid="button-templates-nav">
+                    <GraduationCap className="mr-2 h-4 w-4" />
+                    Templates
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/playbooks")} className="cursor-pointer" data-testid="button-playbooks-nav">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Playbooks
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-tools-nav">
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    Tools
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  {permissions.canAccessFinancials && (
+                    <DropdownMenuItem onClick={() => navigate("/financial")} className="cursor-pointer" data-testid="button-financial-nav">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Financial
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => navigate("/certification")} className="cursor-pointer" data-testid="button-certification-nav">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Certification
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Link href="/consultant">
                 <Button variant="outline" size="sm" data-testid="button-consultant-nav">
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Ask Consultant
                 </Button>
               </Link>
-              {isAdmin && (
-                <Link href="/admin">
-                  <Button variant="outline" size="sm" data-testid="button-admin-nav">
-                    <Shield className="h-4 w-4 mr-2" />
-                    Admin
-                  </Button>
-                </Link>
-              )}
             </div>
             
-            {/* Mobile Navigation Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild className="md:hidden">
                 <Button variant="outline" size="icon" data-testid="button-mobile-menu">
@@ -139,8 +218,7 @@ export default function Dashboard() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Navigation</DropdownMenuLabel>
-                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Resources</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => navigate("/templates")} className="cursor-pointer">
                   <GraduationCap className="mr-2 h-4 w-4" />
                   Templates
@@ -149,6 +227,8 @@ export default function Dashboard() {
                   <BookOpen className="mr-2 h-4 w-4" />
                   Playbooks
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Tools</DropdownMenuLabel>
                 {permissions.canAccessFinancials && (
                   <DropdownMenuItem onClick={() => navigate("/financial")} className="cursor-pointer">
                     <BarChart3 className="mr-2 h-4 w-4" />
@@ -159,6 +239,7 @@ export default function Dashboard() {
                   <Sparkles className="mr-2 h-4 w-4" />
                   Certification
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/consultant")} className="cursor-pointer">
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Ask Consultant
@@ -168,17 +249,19 @@ export default function Dashboard() {
                   Scheduling
                 </DropdownMenuItem>
                 {isAdmin && (
-                  <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
-                    <Shield className="mr-2 h-4 w-4" />
-                    Admin
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
+                      <Shield className="mr-2 h-4 w-4" />
+                      Admin
+                    </DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* User Menu */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-muted cursor-pointer" data-testid="button-user-menu">
+              <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1 rounded-lg hover-elevate cursor-pointer" data-testid="button-user-menu">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
                   <AvatarFallback>
@@ -211,6 +294,17 @@ export default function Dashboard() {
                   <UserCog className="mr-2 h-4 w-4" />
                   Account Settings
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem 
+                    onClick={() => navigate("/admin")}
+                    className="cursor-pointer"
+                    data-testid="button-admin-user-menu"
+                  >
+                    <Shield className="mr-2 h-4 w-4" />
+                    Admin Dashboard
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={() => logout()}
                   className="text-destructive focus:text-destructive cursor-pointer"
@@ -225,21 +319,65 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-10 sm:py-16">
-        {/* Welcome - Premium typography */}
-        <div className="mb-10 sm:mb-14">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 tracking-tight">
-            Welcome{user?.firstName ? `, ${user.firstName}` : ""}
+      <main className="container mx-auto px-4 py-6 sm:py-10">
+        {needsOnboarding && skippedOnboarding && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between gap-4 flex-wrap" data-testid="banner-complete-setup">
+            <p className="text-sm text-muted-foreground">
+              Complete your restaurant setup to personalize templates and tools.
+            </p>
+            <Button size="sm" variant="outline" onClick={() => navigate("/onboarding")} data-testid="btn-complete-setup-banner">
+              Complete Setup
+            </Button>
+          </div>
+        )}
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-1 tracking-tight" data-testid="text-welcome">
+            {timeContext.greeting}{user?.firstName ? `, ${user.firstName}` : ""}
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-            Select a domain to explore frameworks, checklists, and scripts.
+          <p className="text-sm sm:text-base text-muted-foreground" data-testid="text-subtitle">
+            {timeContext.subtitle}
           </p>
         </div>
 
-        {/* Domains Grid - Premium Cards */}
-        <div className="mb-12 sm:mb-16">
-          <h2 className="text-xl sm:text-2xl font-semibold mb-6 tracking-tight">Operational Domains</h2>
+        {priorityDomains.length > 0 && !domainsLoading && (
+          <div className="mb-8 sm:mb-10" data-testid="section-priority">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground" data-testid="text-priority-label">
+                {timeContext.priorityLabel}
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {priorityDomains.map((domain) => {
+                const IconComponent = iconMap[domain.icon] || ClipboardList;
+                return (
+                  <Link key={domain.id} href={`/domain/${domain.slug}`}>
+                    <Card 
+                      className="premium-card hover-elevate cursor-pointer h-full border-l-2 border-l-primary"
+                      data-testid={`card-priority-${domain.slug}`}
+                    >
+                      <CardContent className="p-4 sm:p-5 flex items-center gap-4">
+                        <div className="p-2 rounded-md bg-primary/10 flex-shrink-0">
+                          <IconComponent className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-sm sm:text-base tracking-tight">{domain.name}</h3>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {domain.description}
+                          </p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-auto" />
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-8 sm:mb-10">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 tracking-tight">All Domains</h2>
           {domainsLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
               {[...Array(10)].map((_, i) => (
@@ -279,53 +417,51 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Scheduling Section - Premium Card */}
-        <Card className="mb-6 premium-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-3 text-lg sm:text-xl">
-              <div className="p-2 rounded-md bg-primary/10">
-                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              </div>
-              Staff Scheduling
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <p className="text-muted-foreground mb-5 text-sm sm:text-base">
-              Manage your team schedule, staff roster, positions, and announcements. 
-              Build shifts, track open coverage, and keep your team informed.
-            </p>
-            <Link href="/scheduling">
-              <Button data-testid="button-open-scheduling">
-                Open Scheduling
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <Card className="premium-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <div className="p-2 rounded-md bg-primary/10">
+                  <Calendar className="h-5 w-5 text-primary" />
+                </div>
+                Staff Scheduling
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <p className="text-muted-foreground mb-4 text-sm">
+                Manage your team schedule, staff roster, positions, and announcements.
+              </p>
+              <Link href="/scheduling">
+                <Button data-testid="button-open-scheduling">
+                  Open Scheduling
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
 
-        {/* Quick Access: AI Consultant - Premium Card */}
-        <Card className="premium-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-3 text-lg sm:text-xl">
-              <div className="p-2 rounded-md bg-primary/10">
-                <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              </div>
-              AI Consultant
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <p className="text-muted-foreground mb-5 text-sm sm:text-base">
-              Got a specific question? Ask the consultant anything about restaurant operations. 
-              No fluff, just practical answers.
-            </p>
-            <Link href="/consultant">
-              <Button data-testid="button-open-consultant">
-                Open Consultant
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+          <Card className="premium-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <div className="p-2 rounded-md bg-primary/10">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                </div>
+                AI Consultant
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <p className="text-muted-foreground mb-4 text-sm">
+                Ask the consultant anything about restaurant operations. No fluff, just practical answers.
+              </p>
+              <Link href="/consultant">
+                <Button data-testid="button-open-consultant">
+                  Open Consultant
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

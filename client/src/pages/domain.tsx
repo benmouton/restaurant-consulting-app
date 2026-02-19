@@ -2882,7 +2882,8 @@ function HRRecordsViewer() {
 
 function LaborDemandEngine() {
   const { toast } = useToast();
-  const [daypart, setDaypart] = useState<string>("dinner");
+  const [showSample, setShowSample] = useState(false);
+  const [daypart, setDaypart] = useState<string>(() => new Date().getHours() < 15 ? "lunch" : "dinner");
   const [dayOfWeek, setDayOfWeek] = useState<string>(new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase());
   const [projectedCovers, setProjectedCovers] = useState<string>("");
   const [actualCovers, setActualCovers] = useState<string>("");
@@ -3514,7 +3515,7 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating {mode === "preshift" ? "staffing plan" : "cut decision"}...
+              Building your plan...
             </>
           ) : (
             <>
@@ -3523,6 +3524,25 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
             </>
           )}
         </Button>
+
+        {!recommendation && !isGenerating && (
+          <button
+            onClick={() => setShowSample(!showSample)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 flex items-center gap-1"
+            data-testid="btn-toggle-sample-labor"
+          >
+            {showSample ? "Hide example output" : "See example output \u2192"}
+          </button>
+        )}
+        {showSample && !recommendation && (
+          <div className="mt-2 p-3 bg-muted/50 rounded-md border border-dashed text-xs text-muted-foreground space-y-1">
+            <p className="font-medium">PROJECTED SALES: $6,750</p>
+            <p>RECOMMENDED STAFFING:</p>
+            <p className="pl-3">Servers: 5 | Bartenders: 2 | Hosts: 1 | Cooks: 4</p>
+            <p>LABOR BUDGET: $1,890 (28% target)</p>
+            <p>DECISION: Hold current levels. Consider cutting 1 server after 8:30pm if pace drops.</p>
+          </div>
+        )}
 
         {recommendation && (
           <div className="mt-4 space-y-4">
@@ -3568,6 +3588,7 @@ function SkillsCertificationEngine() {
 
 function GuestRecoveryAdvisor() {
   const { toast } = useToast();
+  const [showSample, setShowSample] = useState(false);
   const [issueType, setIssueType] = useState<string>("");
   const [timeDelay, setTimeDelay] = useState<string>("");
   const [checkValue, setCheckValue] = useState<string>("");
@@ -3772,7 +3793,7 @@ Keep the response practical and immediately actionable. This is real-time guidan
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating recovery advice...
+              Analyzing situation...
             </>
           ) : (
             <>
@@ -3781,6 +3802,24 @@ Keep the response practical and immediately actionable. This is real-time guidan
             </>
           )}
         </Button>
+
+        {!response && !isGenerating && (
+          <button
+            onClick={() => setShowSample(!showSample)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 flex items-center gap-1"
+            data-testid="btn-toggle-sample-recovery"
+          >
+            {showSample ? "Hide example output" : "See example output \u2192"}
+          </button>
+        )}
+        {showSample && !response && (
+          <div className="mt-2 p-3 bg-muted/50 rounded-md border border-dashed text-xs text-muted-foreground space-y-1">
+            <p className="font-medium">RECOVERY SCRIPT:</p>
+            <p className="pl-3 italic">"I sincerely apologize for the wait. Let me get that corrected right away and I'd like to offer a complimentary dessert for the trouble."</p>
+            <p className="font-medium mt-1">APPROVED COMP: Free dessert + comped appetizer (~$18)</p>
+            <p className="font-medium">FOLLOW-UP: Check back within 5 minutes, alert manager on duty</p>
+          </div>
+        )}
 
         {response && (
           <div className="mt-4 space-y-4">
@@ -7495,43 +7534,67 @@ export default function DomainPage() {
         {/* Social Media Post Builder - only show for social-media domain */}
         {slug === "social-media" && <SocialPostBuilder />}
 
-        {/* Content Accordion */}
-        <Accordion type="multiple" className="space-y-4">
-          {content.map((item) => {
-            const typeConfig = contentTypeConfig[item.contentType] || contentTypeConfig.output;
-            const IconComponent = typeConfig.icon;
-            
-            return (
-              <AccordionItem 
-                key={item.id} 
-                value={`item-${item.id}`}
-                className="border rounded-lg px-4"
-                data-testid={`accordion-item-${item.id}`}
-              >
-                <AccordionTrigger className="hover:no-underline py-4">
-                  <div className="flex items-center gap-3 text-left">
-                    <Badge variant="secondary" className={typeConfig.color}>
-                      <IconComponent className="h-3 w-3 mr-1" />
-                      {typeConfig.label}
-                    </Badge>
-                    <span className="font-medium">{item.title}</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pb-4">
-                  <div className={`whitespace-pre-wrap text-sm leading-relaxed ${
-                    item.contentType === 'script' || item.contentType === 'checklist' 
-                      ? 'font-mono bg-muted p-4 rounded-md' 
-                      : item.contentType === 'principle'
-                      ? 'border-l-4 border-primary pl-4 italic text-muted-foreground'
-                      : ''
-                  }`}>
-                    {item.content}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+        {/* Content Accordion - Grouped by type */}
+        {(() => {
+          const typeOrder = ["principle", "output", "checklist", "script"] as const;
+          const grouped = typeOrder
+            .map(type => ({
+              type,
+              config: contentTypeConfig[type],
+              items: content.filter(c => c.contentType === type),
+            }))
+            .filter(g => g.items.length > 0);
+
+          return (
+            <Accordion type="multiple" className="space-y-4">
+              {grouped.map(({ type, config, items }) => {
+                const IconComponent = config.icon;
+                const preview = items[0]?.content?.slice(0, 100).replace(/\n/g, " ").trim();
+
+                return (
+                  <AccordionItem
+                    key={type}
+                    value={`group-${type}`}
+                    className="border rounded-lg px-4"
+                    data-testid={`accordion-group-${type}`}
+                  >
+                    <AccordionTrigger className="hover:no-underline py-4">
+                      <div className="flex flex-col gap-1 text-left w-full mr-2">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <Badge variant="secondary" className={config.color}>
+                            <IconComponent className="h-3 w-3 mr-1" />
+                            {config.label} ({items.length})
+                          </Badge>
+                        </div>
+                        {preview && (
+                          <p className="text-xs text-muted-foreground line-clamp-1 pl-0.5">
+                            {preview}{items[0]?.content && items[0].content.length > 100 ? "..." : ""}
+                          </p>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-4 space-y-4">
+                      {items.map((item) => (
+                        <div key={item.id} data-testid={`accordion-item-${item.id}`}>
+                          <h4 className="font-medium text-sm mb-2">{item.title}</h4>
+                          <div className={`whitespace-pre-wrap text-sm leading-relaxed ${
+                            item.contentType === 'script' || item.contentType === 'checklist'
+                              ? 'font-mono bg-muted p-4 rounded-md'
+                              : item.contentType === 'principle'
+                              ? 'border-l-4 border-primary pl-4 italic text-muted-foreground'
+                              : ''
+                          }`}>
+                            {item.content}
+                          </div>
+                        </div>
+                      ))}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          );
+        })()}
 
         {/* Back Link */}
         <div className="mt-8 pt-8 border-t border-border">
