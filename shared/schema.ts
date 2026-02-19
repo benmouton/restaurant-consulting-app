@@ -763,6 +763,34 @@ export type CertificationAttempt = typeof certificationAttempts.$inferSelect;
 export type InsertRestaurantStandards = z.infer<typeof insertRestaurantStandardsSchema>;
 export type InsertCertificationAttempt = z.infer<typeof insertCertificationAttemptSchema>;
 
+export const trainingAssignments = pgTable("training_assignments", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  employeeName: text("employee_name").notNull(),
+  templateCategory: text("template_category").notNull(),
+  totalDays: integer("total_days").notNull().default(7),
+  status: text("status").notNull().default("in_progress"),
+  startDate: text("start_date").notNull(),
+  completedDate: text("completed_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const trainingDayCompletions = pgTable("training_day_completions", {
+  id: serial("id").primaryKey(),
+  assignmentId: integer("assignment_id").notNull(),
+  dayNumber: integer("day_number").notNull(),
+  completedAt: text("completed_at").notNull(),
+  signedOffBy: text("signed_off_by").notNull(),
+  notes: text("notes"),
+});
+
+export const insertTrainingAssignmentSchema = createInsertSchema(trainingAssignments).omit({ id: true, createdAt: true });
+export const insertTrainingDayCompletionSchema = createInsertSchema(trainingDayCompletions).omit({ id: true });
+export type TrainingAssignment = typeof trainingAssignments.$inferSelect;
+export type TrainingDayCompletion = typeof trainingDayCompletions.$inferSelect;
+export type InsertTrainingAssignment = z.infer<typeof insertTrainingAssignmentSchema>;
+export type InsertTrainingDayCompletion = z.infer<typeof insertTrainingDayCompletionSchema>;
+
 export const oauthStates = pgTable("oauth_states", {
   state: text("state").primaryKey(),
   userId: text("user_id").notNull(),

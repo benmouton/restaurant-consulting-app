@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, restaurantStandards, certificationAttempts, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings, type RestaurantStandards, type CertificationAttempt, type InsertRestaurantStandards, type InsertCertificationAttempt } from "@shared/schema";
+import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, restaurantStandards, certificationAttempts, trainingAssignments, trainingDayCompletions, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings, type RestaurantStandards, type CertificationAttempt, type InsertRestaurantStandards, type InsertCertificationAttempt, type TrainingAssignment, type TrainingDayCompletion, type InsertTrainingAssignment, type InsertTrainingDayCompletion } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -191,6 +191,15 @@ export interface IStorage {
   getCertificationAttemptsByTrainee(userId: string, traineeName: string): Promise<CertificationAttempt[]>;
   createCertificationAttempt(data: InsertCertificationAttempt): Promise<CertificationAttempt>;
   getCertificationStats(userId: string): Promise<{ totalAttempts: number; passed: number; failed: number; avgScore: number; byRole: Record<string, { attempts: number; passed: number; avgScore: number }>; byCategory: Record<string, number> }>;
+
+  // Training Assignments
+  getTrainingAssignments(userId: string): Promise<TrainingAssignment[]>;
+  createTrainingAssignment(data: InsertTrainingAssignment): Promise<TrainingAssignment>;
+  updateTrainingAssignment(id: number, userId: string, data: Partial<InsertTrainingAssignment>): Promise<TrainingAssignment | undefined>;
+  deleteTrainingAssignment(id: number, userId: string): Promise<void>;
+  getTrainingDayCompletions(assignmentId: number): Promise<TrainingDayCompletion[]>;
+  createTrainingDayCompletion(data: InsertTrainingDayCompletion): Promise<TrainingDayCompletion>;
+  deleteTrainingDayCompletion(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1641,6 +1650,38 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { totalAttempts, passed, failed, avgScore, byRole, byCategory };
+  }
+
+  async getTrainingAssignments(userId: string): Promise<TrainingAssignment[]> {
+    return await db.select().from(trainingAssignments).where(eq(trainingAssignments.userId, userId)).orderBy(desc(trainingAssignments.createdAt));
+  }
+
+  async createTrainingAssignment(data: InsertTrainingAssignment): Promise<TrainingAssignment> {
+    const [assignment] = await db.insert(trainingAssignments).values(data).returning();
+    return assignment;
+  }
+
+  async updateTrainingAssignment(id: number, userId: string, data: Partial<InsertTrainingAssignment>): Promise<TrainingAssignment | undefined> {
+    const [updated] = await db.update(trainingAssignments).set(data).where(and(eq(trainingAssignments.id, id), eq(trainingAssignments.userId, userId))).returning();
+    return updated;
+  }
+
+  async deleteTrainingAssignment(id: number, userId: string): Promise<void> {
+    await db.delete(trainingDayCompletions).where(eq(trainingDayCompletions.assignmentId, id));
+    await db.delete(trainingAssignments).where(and(eq(trainingAssignments.id, id), eq(trainingAssignments.userId, userId)));
+  }
+
+  async getTrainingDayCompletions(assignmentId: number): Promise<TrainingDayCompletion[]> {
+    return await db.select().from(trainingDayCompletions).where(eq(trainingDayCompletions.assignmentId, assignmentId)).orderBy(trainingDayCompletions.dayNumber);
+  }
+
+  async createTrainingDayCompletion(data: InsertTrainingDayCompletion): Promise<TrainingDayCompletion> {
+    const [completion] = await db.insert(trainingDayCompletions).values(data).returning();
+    return completion;
+  }
+
+  async deleteTrainingDayCompletion(id: number): Promise<void> {
+    await db.delete(trainingDayCompletions).where(eq(trainingDayCompletions.id, id));
   }
 }
 

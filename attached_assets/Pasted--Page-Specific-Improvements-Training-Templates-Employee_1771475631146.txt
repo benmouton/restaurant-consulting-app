@@ -1,0 +1,145 @@
+# Page-Specific Improvements — Training Templates & Employee Handbook
+
+---
+
+## Prompt Fix — Restaurant Name Repetition in Generated Training Manuals
+
+**Fix this first — it's visible in generated output and looks unprofessional.**
+
+When generating training manual content, the LLM is repeating the restaurant name multiple times in the output. For example:
+> "At Mouton's Bistro & Bar Bistro & Bar & Bar, we're not just serving meals..."
+> "Welcome to the kitchen team at Mouton's Bistro & Bar Bistro & Bar & Bar, where Southern culinary tradition..."
+
+The restaurant name should appear exactly once. This is a prompt/generation issue, not a data issue. Fix it with one or both of these approaches:
+
+**Option A — Fix the generation prompt:**
+In the system prompt or template that generates training manual content, add a clear instruction:
+"When referencing the restaurant name, use it exactly once in the opening sentence. Never repeat or duplicate the restaurant name."
+
+Also check if the restaurant name is being injected into the prompt in multiple places (e.g., once in the system prompt context AND once in the user message). If so, consolidate to one injection point.
+
+**Option B — Post-process the output:**
+After the LLM generates the content, run a cleanup step that detects and removes duplicate consecutive occurrences of the restaurant name. For example, replace any instance of "[name] [name]" or "[name] & [name] & [name]" with a single "[name]". This is a safety net even if you fix the prompt.
+
+---
+
+## 1. Training Templates — Server & Kitchen Manuals
+
+### The structure is excellent
+The 7-day training programs with structured daily objectives, the sidebar navigation, the key points tags, and the print button — this is all well thought out. The Shadow → Perform → Certify model is a strong training methodology.
+
+### Add progress tracking per employee
+- This is the biggest missing feature. Right now these are static manuals. Add the ability to:
+  - Assign a training manual to a specific employee
+  - Track which days/modules they've completed
+  - Have the trainer sign off on each day: "Day 1: Orientation — Completed by [trainer name] on [date]"
+  - Show a progress bar: "Sarah — Server Training: Day 4 of 7 (57%)"
+- This turns the manual from a document into an actual training system
+
+### Day 7: Final Evaluation
+- This is tagged as "assessment" which is great — it's different from the procedure days
+- Make sure the evaluation generates a printable/saveable scorecard
+- Include a pass/fail threshold with specific criteria
+- If the employee doesn't pass, suggest which days to repeat
+- Add a "Certify" button that marks the employee as trained and logs the date — this ties into the certification system you already have
+
+### Add a "Customize" option per day
+- Let operators edit the content of each training day to match their specific restaurant
+- For example, Day 2: Menu Knowledge should pull from THEIR menu, not a generic one
+- Even a simple "Add custom notes to this day" field would help operators personalize without rebuilding the whole thing
+
+### Export options
+- "Print" button is there — good
+- Add "Export as PDF" for the full manual — operators often print these and put them in a training binder
+- Add "Share with employee" — send a link or email to the trainee so they can reference it on their phone
+
+### Add more position training tracks
+- You currently have Server Training and Kitchen Training
+- Consider adding tracks for: Host/Hostess, Bartender, Manager/Shift Lead, Busser/Food Runner
+- Even if the content is simpler, having a dedicated track for each position signals completeness
+- At minimum, show these as "Coming soon" placeholders so operators know they're planned
+
+---
+
+## 2. Employee Handbook Builder
+
+This is a genuinely valuable tool. Most independent restaurant operators either have no handbook or are using a generic template from the internet that doesn't match their actual policies.
+
+### Pre-fill from onboarding data
+- If the user completed onboarding and provided their restaurant name, type, etc., pre-fill those fields in the handbook builder
+- Same for any data already in their profile — don't make them type "Mouton's Bistro & Bar" again
+
+### Setup tab improvements
+- The fields are good: Restaurant name, owner, address, phone, email, website, mission statement, scheduling app, orientation period, evaluation schedule, closed holidays
+- Add a few more that commonly appear in restaurant handbooks:
+  - **Dress code / uniform policy** (dropdown: Formal, Business casual, Uniform provided, Casual with guidelines)
+  - **Tip policy** (dropdown: Pooled, Individual, Tip-out percentage system)
+  - **Meal/shift meal policy** (Free meal, Discounted, No meal benefit)
+  - **Parking instructions**
+  - **Social media policy for employees** (Can they post about the restaurant? Tag it? Photograph food?)
+
+### Policies tab suggestions
+- If not already built, the Policies tab should cover the standard restaurant handbook sections:
+  - Attendance & punctuality (late policy, no-call/no-show consequences)
+  - Progressive discipline steps
+  - Harassment & discrimination policy
+  - Substance abuse policy
+  - Cell phone policy
+  - Cash handling procedures
+  - Food safety & hygiene expectations
+  - Scheduling & shift swap process
+  - Resignation & termination procedures
+- For each policy, offer a **default template** that the operator can customize — don't make them write from scratch
+- Add toggle switches: "Include this policy? Yes/No" so operators can skip sections that don't apply
+
+### Preview tab suggestions
+- Show the full handbook as it would look printed, with:
+  - Cover page with restaurant name and logo
+  - Table of contents
+  - All selected policies formatted consistently
+  - An acknowledgment/signature page at the end (critical for legal protection)
+- Make sure the preview updates in real-time as they change settings and policies
+
+### Signature page
+- The very last page of any employee handbook should be a tear-out acknowledgment form:
+  - "I, [employee name], acknowledge that I have received and read the [Restaurant Name] Employee Handbook. I understand the policies and agree to abide by them."
+  - Signature line, printed name, date
+  - This is legally important — it's what protects the operator in a wrongful termination claim
+- If possible, add a digital signature option where employees can sign on a tablet/phone
+
+### Version control
+- When the operator updates their handbook, save the previous version
+- Show a version history: "v1 — Created Jan 15, 2026 | v2 — Updated Feb 10, 2026 (added social media policy)"
+- This matters because employees should sign the most current version, and operators need to know which version each employee signed
+
+---
+
+## 3. Overall Training Templates Page
+
+### The "personalized for Mouton's Bistro & Bar" subtitle is great
+- This immediately shows value — it's not generic content, it's THEIR training program
+- Make sure this personalization runs deep: menu items, restaurant-specific policies, their actual hours, their actual positions should all be reflected in the training content
+
+### Add a "Training Dashboard" summary view
+- Before diving into individual manuals, show a high-level view:
+  - Number of employees currently in training
+  - Who's on which day of their program
+  - Overdue training (started but not completed in expected timeframe)
+  - Recently certified employees
+- This gives the operator a reason to check this page regularly, not just when onboarding someone new
+
+### Connect training completion to the HR domain
+- When an employee completes their 7-day training and passes the Day 7 evaluation, log it in their HR record
+- If an employee has a performance issue later, the operator can reference: "Employee completed server training on [date] and was certified — they were trained on this expectation"
+- This strengthens any future discipline documentation
+
+---
+
+## Priority Order
+1. **Bug fix — restaurant name duplication** (this is visible to users and looks broken)
+2. **Employee progress tracking** (transforms static manuals into an active training system)
+3. **Handbook signature page** (legal protection — highest practical value)
+4. **Pre-fill from onboarding data** (quick UX win)
+5. **Policies tab defaults** (saves operators hours of writing)
+6. **Additional training tracks** (even as placeholders, signals completeness)
+7. **Training dashboard** (engagement driver)

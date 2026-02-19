@@ -36,10 +36,27 @@ import {
   CheckCircle2,
   Loader2,
   X,
+  Shield,
+  Check,
 } from "lucide-react";
 import type { HandbookSettings } from "@shared/schema";
 
 const defaultHolidays = ["Thanksgiving Day", "Christmas Day", "Easter Sunday"];
+
+const STANDARD_POLICIES = [
+  { key: "attendance", label: "Attendance & Punctuality", desc: "Late policy, no-call/no-show consequences, call-in procedures" },
+  { key: "discipline", label: "Progressive Discipline", desc: "Verbal warning, written warning, suspension, termination steps" },
+  { key: "harassment", label: "Harassment & Discrimination", desc: "Zero-tolerance policy, reporting procedures, investigation process" },
+  { key: "substance", label: "Substance Abuse Policy", desc: "Drug-free workplace, testing policy, consequences" },
+  { key: "cellPhone", label: "Cell Phone Policy", desc: "Phone usage during shifts, emergency exceptions" },
+  { key: "cashHandling", label: "Cash Handling Procedures", desc: "Till management, cash drops, shortage accountability" },
+  { key: "foodSafety", label: "Food Safety & Hygiene", desc: "Handwashing, temperature control, cross-contamination prevention" },
+  { key: "scheduling", label: "Scheduling & Shift Swaps", desc: "Schedule posting, swap procedures, availability requirements" },
+  { key: "resignation", label: "Resignation & Termination", desc: "Notice period, final paycheck, return of property" },
+  { key: "socialMedia", label: "Social Media Policy", desc: "Online conduct, restaurant mentions, photo/video guidelines" },
+  { key: "alcohol", label: "Alcohol Service Policy", desc: "ID checking, intoxication signs, refusal procedures" },
+  { key: "tipPolicy", label: "Tip Policy", desc: "Pooled vs individual tips, tip-out percentage, reporting requirements" },
+];
 
 const schedulingApps = [
   { value: "homebase", label: "Homebase" },
@@ -52,10 +69,24 @@ const schedulingApps = [
   { value: "none", label: "None / Paper Schedule" },
 ];
 
-export function HandbookBuilder() {
+export function HandbookBuilder({ user }: { user?: any }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("setup");
   const [newHoliday, setNewHoliday] = useState("");
+  const [policyToggles, setPolicyToggles] = useState<Record<string, boolean>>({
+    attendance: true,
+    discipline: true,
+    harassment: true,
+    substance: true,
+    cellPhone: true,
+    cashHandling: true,
+    foodSafety: true,
+    scheduling: true,
+    resignation: true,
+    socialMedia: true,
+    alcohol: true,
+    tipPolicy: true,
+  });
 
   const { data: settings, isLoading } = useQuery<HandbookSettings | null>({
     queryKey: ["/api/handbook-settings"],
@@ -90,6 +121,19 @@ export function HandbookBuilder() {
       }));
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (!settings && user) {
+      setFormData((prev) => ({
+        ...prev,
+        restaurantName: prev.restaurantName || user.restaurantName || "",
+        restaurantEmail: prev.restaurantEmail || user.email || "",
+        restaurantAddress: prev.restaurantAddress || user.address || "",
+        restaurantPhone: prev.restaurantPhone || user.phone || "",
+        ownerNames: prev.ownerNames || (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : ""),
+      }));
+    }
+  }, [settings, user]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: Partial<HandbookSettings>) => {
@@ -900,75 +944,105 @@ Date: ________________________________
           </TabsContent>
 
           <TabsContent value="policies" className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="font-semibold">Additional Policies</h3>
-              <p className="text-sm text-muted-foreground">
-                Add any restaurant-specific policies or modifications to the standard policies.
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <h3 className="font-semibold flex flex-wrap items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Standard Policies
+              </h3>
+              <Badge variant="secondary" data-testid="badge-policy-count">
+                {Object.values(policyToggles).filter(Boolean).length} of {STANDARD_POLICIES.length} policies included
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Toggle policies on or off to include them in your handbook. Add custom notes where needed.
+            </p>
 
-              <div className="space-y-2">
-                <Label htmlFor="alcoholPolicy">Alcohol Service Policy (Additional Notes)</Label>
-                <Textarea
-                  id="alcoholPolicy"
-                  placeholder="Any additional alcohol service policies specific to your restaurant..."
-                  value={formData.alcoholPolicy || ""}
-                  onChange={(e) => setFormData({ ...formData, alcoholPolicy: e.target.value })}
-                  className="min-h-[100px]"
-                  data-testid="textarea-alcohol-policy"
-                />
-              </div>
+            <div className="space-y-3">
+              {STANDARD_POLICIES.map((policy) => {
+                const isOn = policyToggles[policy.key] ?? true;
+                return (
+                  <div
+                    key={policy.key}
+                    className="border rounded-md p-3 space-y-2"
+                    data-testid={`policy-section-${policy.key}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={`toggle-elevate ${isOn ? "toggle-elevated" : ""} shrink-0 mt-0.5`}
+                        onClick={() =>
+                          setPolicyToggles((prev) => ({
+                            ...prev,
+                            [policy.key]: !prev[policy.key],
+                          }))
+                        }
+                        data-testid={`toggle-policy-${policy.key}`}
+                      >
+                        {isOn ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{policy.label}</div>
+                        <div className="text-xs text-muted-foreground">{policy.desc}</div>
+                      </div>
+                    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="socialMediaPolicy">Social Media Policy (Additional Notes)</Label>
-                <Textarea
-                  id="socialMediaPolicy"
-                  placeholder="Any additional social media guidelines specific to your restaurant..."
-                  value={formData.socialMediaPolicy || ""}
-                  onChange={(e) => setFormData({ ...formData, socialMediaPolicy: e.target.value })}
-                  className="min-h-[100px]"
-                  data-testid="textarea-social-media-policy"
-                />
-              </div>
+                    {isOn && policy.key === "alcohol" && (
+                      <div className="pl-10 space-y-1">
+                        <Label htmlFor="alcoholPolicy" className="text-xs text-muted-foreground">
+                          Custom notes (optional)
+                        </Label>
+                        <Textarea
+                          id="alcoholPolicy"
+                          placeholder="Any additional alcohol service policies specific to your restaurant..."
+                          value={formData.alcoholPolicy || ""}
+                          onChange={(e) => setFormData({ ...formData, alcoholPolicy: e.target.value })}
+                          className="min-h-[80px] text-sm"
+                          data-testid="textarea-alcohol-policy"
+                        />
+                      </div>
+                    )}
 
-              <div className="space-y-2">
-                <Label htmlFor="additionalPolicies">Other Policies</Label>
-                <Textarea
-                  id="additionalPolicies"
-                  placeholder="Any other policies you want to include in your handbook..."
-                  value={formData.additionalPolicies || ""}
-                  onChange={(e) => setFormData({ ...formData, additionalPolicies: e.target.value })}
-                  className="min-h-[150px]"
-                  data-testid="textarea-additional-policies"
-                />
-              </div>
+                    {isOn && policy.key === "socialMedia" && (
+                      <div className="pl-10 space-y-1">
+                        <Label htmlFor="socialMediaPolicy" className="text-xs text-muted-foreground">
+                          Custom notes (optional)
+                        </Label>
+                        <Textarea
+                          id="socialMediaPolicy"
+                          placeholder="Any additional social media guidelines specific to your restaurant..."
+                          value={formData.socialMediaPolicy || ""}
+                          onChange={(e) => setFormData({ ...formData, socialMediaPolicy: e.target.value })}
+                          className="min-h-[80px] text-sm"
+                          data-testid="textarea-social-media-policy"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <h4 className="font-medium mb-2 flex flex-wrap items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                Included Standard Policies
-              </h4>
-              <p className="text-sm text-muted-foreground mb-3">
-                The following policies are automatically included in your handbook:
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="additionalPolicies">Other Policies</Label>
+              <p className="text-xs text-muted-foreground">
+                Any other policies you want to include in your handbook.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "Employment Policies",
-                  "Non-Discrimination",
-                  "Standards of Conduct",
-                  "Harassment Policy",
-                  "Attendance & Absences",
-                  "Time Clock & Payroll",
-                  "Safety & Sanitation",
-                  "Customer Service",
-                  "Teamwork",
-                  "Emergency Procedures",
-                ].map((policy) => (
-                  <Badge key={policy} variant="outline">
-                    {policy}
-                  </Badge>
-                ))}
-              </div>
+              <Textarea
+                id="additionalPolicies"
+                placeholder="Any other policies you want to include in your handbook..."
+                value={formData.additionalPolicies || ""}
+                onChange={(e) => setFormData({ ...formData, additionalPolicies: e.target.value })}
+                className="min-h-[120px]"
+                data-testid="textarea-additional-policies"
+              />
             </div>
           </TabsContent>
 

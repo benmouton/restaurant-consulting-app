@@ -1,0 +1,144 @@
+# Page-Specific Improvements — Financial Insights
+
+---
+
+## 1. Drag & Drop File Upload
+
+### Replace the native file input with a drag & drop zone
+- The current "Choose File" button uses the browser's default file input — it looks dated and doesn't match the polished feel of the rest of the app
+- Replace it with a drag & drop upload zone (similar to what you already have on the Reviews & Reputation page for screenshot uploads and the Social Media page for image uploads)
+- Design:
+  - Dashed border box with an upload icon
+  - Text: "Drag & drop your financial report here, or click to browse"
+  - Subtext: "Supports PDF, CSV, and Excel files"
+  - Show accepted file types with small icons (PDF icon, spreadsheet icon)
+  - On drag hover, highlight the zone with a cyan border glow
+  - After dropping, show the file name, size, and a progress bar during upload
+- Keep the Document Type dropdown — but move it below the drop zone and auto-detect it if possible:
+  - If filename contains "P&L" or "Profit" → auto-select "P&L Statement"
+  - If filename contains "Labor" or "Payroll" → auto-select "Labor Report"
+  - If filename contains "Sales" → auto-select "Sales Report"
+  - Let the user override the auto-detection
+
+---
+
+## 2. Document Summary Improvements
+
+### The auto-generated summary is a strong feature — enhance it
+- The summary for the P&L upload is good — it pulls out key numbers ($1.6M income, $528K COGS, $534K payroll, etc.)
+- Add **visual callouts** for the most important metrics. Below the text summary, show 4-6 metric cards in a row:
+
+```
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│  Revenue     │ │ Food Cost %  │ │ Labor Cost % │ │ Net Profit % │
+│  $1,600,274  │ │   33.0%      │ │   33.4%      │ │   TBD        │
+│              │ │  ⚠ High      │ │  ⚠ High      │ │              │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+- Color code each metric: Green = healthy, Yellow = watch, Red = problem
+- Use restaurant industry benchmarks for the thresholds:
+  - Food cost: Green < 30%, Yellow 30-34%, Red > 34%
+  - Labor cost: Green < 28%, Yellow 28-33%, Red > 33%
+  - Prime cost (food + labor): Green < 60%, Yellow 60-65%, Red > 65%
+  - Net profit: Green > 10%, Yellow 5-10%, Red < 5%
+
+### Add a "Key Concerns" section
+- Below the summary, automatically flag 2-3 specific concerns based on the data:
+  - "Your payroll ($534,526) is 33.4% of revenue — industry target is under 30%"
+  - "Third-party delivery fees ($52,405) represent 3.3% of revenue — consider renegotiating platform rates or pushing direct ordering"
+  - "Operating costs ($342,624) are 21.4% of revenue — break this down further to find savings"
+- Each concern should have an action suggestion, not just a flag
+
+---
+
+## 3. Analysis Tab — Smart Question Suggestions
+
+### Don't show an empty chat — show suggested questions
+- The Analysis tab currently shows an empty chat with placeholder text suggesting example questions. Most operators won't know what to ask.
+- Instead, after a document is uploaded and analyzed, auto-generate 6-8 **clickable suggested questions** based on the actual data in the uploaded document:
+
+**For a P&L statement, suggest questions like:**
+- "What's my prime cost percentage and is it within target?"
+- "Which expense category grew the most compared to industry benchmarks?"
+- "Where are my biggest opportunities to cut costs?"
+- "What would my profit look like if I reduced food cost by 2%?"
+- "Is my labor cost sustainable at this revenue level?"
+- "How do my delivery fees compare to what I'm making from delivery sales?"
+- "What should my break-even monthly revenue be based on these fixed costs?"
+- "If I raised menu prices 5%, how would that impact my margins?"
+
+**For a Sales Report, suggest different questions:**
+- "What's my average daily revenue?"
+- "Which day of the week generates the most sales?"
+- "What's my revenue per seat based on my seat count?"
+- "Am I trending up or down compared to previous periods?"
+
+### Display these as clickable chips/buttons
+- Show them in a grid or wrapped row above the chat input
+- When clicked, they auto-fill the chat input and submit
+- After the first answer, show 2-3 follow-up suggestions based on the response
+- This creates a guided analysis flow instead of a blank canvas
+
+### Add a "Full Analysis" one-click button
+- At the top of the Analysis tab, add a prominent button: "Run Full Financial Analysis"
+- When clicked, it automatically runs through a comprehensive analysis covering: revenue health, cost structure, prime cost, profit margins, biggest concerns, and 3 recommended actions
+- Output as a structured report rather than a chat message
+- Add "Export as PDF" and "Share with accountant" buttons on the report
+
+---
+
+## 4. Multi-Document Comparison
+
+### Enable period-over-period analysis
+- When multiple documents of the same type are uploaded (e.g., two P&L statements from different months), unlock a comparison view:
+  - Side-by-side metrics: January vs February
+  - Trend arrows: Revenue ↑ 4.2%, Food Cost ↓ 1.1%, Labor ↑ 2.3%
+  - Highlight what improved and what got worse
+- This is where the real ongoing value lives — an operator checking monthly trends will come back every month
+
+### Suggested questions for comparisons:
+- "What changed most between January and February?"
+- "Is my food cost trending in the right direction?"
+- "Am I spending more on labor this month and why?"
+
+---
+
+## 5. Empty State Improvements
+
+### The Documents tab empty state needs more guidance
+- Current: "No documents uploaded yet. Upload your first financial report above."
+- Better: Show a visual guide of what kind of documents to upload and what they'll get:
+
+```
+What to upload:                  What you'll get:
+📊 P&L Statement          →    Cost analysis, margin health, savings opportunities
+📋 Sales Report            →    Revenue trends, per-seat metrics, day-of-week patterns
+👥 Labor Report             →    Labor % analysis, overtime flags, scheduling efficiency
+📦 Inventory Report         →    Waste identification, par optimization, cost trends
+```
+
+- Add a note: "Most POS systems (Toast, Square, Clover) can export these as CSV or Excel"
+- If you know common POS export paths, link to a help article: "How to export from Toast →"
+
+---
+
+## 6. File Management
+
+### Your Documents section improvements
+- Add columns: Document name, Type, Date uploaded, Date range covered, Status (ready/processing)
+- Add the ability to tag documents by period: "January 2026," "February 2026," "Q1 2026"
+- Add a sort/filter: by type, by date
+- When multiple documents are uploaded, group them by type or by period
+- Show which documents have been analyzed and which haven't
+
+---
+
+## Priority Order
+1. **Drag & drop upload** (matches the rest of the app's polish, quick UX win)
+2. **Smart question suggestions on Analysis tab** (biggest impact — makes the feature usable without financial knowledge)
+3. **Visual metric cards on Document Summary** (turns a wall of text into scannable insights)
+4. **Key Concerns auto-flags** (proactive value — tells operators what to worry about)
+5. **Empty state improvements** (helps first-time users know what to do)
+6. **Full Analysis one-click button** (power feature for engaged users)
+7. **Multi-document comparison** (longer-term, high-retention feature)

@@ -2578,6 +2578,99 @@ Generate JSON with:
     res.json(templates);
   });
 
+  // Training Assignment Routes
+  app.get("/api/training-assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const assignments = await storage.getTrainingAssignments(userId);
+      const assignmentsWithCompletions = await Promise.all(
+        assignments.map(async (a) => {
+          const completions = await storage.getTrainingDayCompletions(a.id);
+          return { ...a, completions };
+        })
+      );
+      res.json(assignmentsWithCompletions);
+    } catch (error) {
+      console.error('Error fetching training assignments:', error);
+      res.status(500).json({ message: "Failed to fetch training assignments" });
+    }
+  });
+
+  app.post("/api/training-assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { employeeName, templateCategory, totalDays, startDate } = req.body;
+      const assignment = await storage.createTrainingAssignment({
+        userId,
+        employeeName,
+        templateCategory,
+        totalDays: totalDays || 7,
+        status: "in_progress",
+        startDate: startDate || new Date().toISOString().split('T')[0],
+      });
+      res.status(201).json({ ...assignment, completions: [] });
+    } catch (error) {
+      console.error('Error creating training assignment:', error);
+      res.status(500).json({ message: "Failed to create training assignment" });
+    }
+  });
+
+  app.patch("/api/training-assignments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateTrainingAssignment(id, userId, req.body);
+      if (!updated) return res.status(404).json({ message: "Assignment not found" });
+      const completions = await storage.getTrainingDayCompletions(id);
+      res.json({ ...updated, completions });
+    } catch (error) {
+      console.error('Error updating training assignment:', error);
+      res.status(500).json({ message: "Failed to update training assignment" });
+    }
+  });
+
+  app.delete("/api/training-assignments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      await storage.deleteTrainingAssignment(id, userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting training assignment:', error);
+      res.status(500).json({ message: "Failed to delete training assignment" });
+    }
+  });
+
+  app.post("/api/training-assignments/:id/days", isAuthenticated, async (req: any, res) => {
+    try {
+      const assignmentId = parseInt(req.params.id);
+      const { dayNumber, signedOffBy, notes } = req.body;
+      const completion = await storage.createTrainingDayCompletion({
+        assignmentId,
+        dayNumber,
+        completedAt: new Date().toISOString().split('T')[0],
+        signedOffBy,
+        notes: notes || null,
+      });
+      const allCompletions = await storage.getTrainingDayCompletions(assignmentId);
+      res.status(201).json({ completion, allCompletions });
+    } catch (error) {
+      console.error('Error creating day completion:', error);
+      res.status(500).json({ message: "Failed to mark day complete" });
+    }
+  });
+
+  app.delete("/api/training-day-completions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteTrainingDayCompletion(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting day completion:', error);
+      res.status(500).json({ message: "Failed to remove day completion" });
+    }
+  });
+
   // Financial Document Routes
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
