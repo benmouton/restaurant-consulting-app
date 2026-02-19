@@ -1,0 +1,134 @@
+# Page-Specific Improvements — HR, Kitchen Ops, Cost & Margin, Reviews
+
+These are targeted improvements for 4 domain pages. Implement each section independently.
+
+---
+
+## 1. HR & Documentation Page
+
+### Fix AI reference in placeholder text
+- In the "What Happened (Plain Language)" textarea, the placeholder currently says: "Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. The AI will convert this into objective, compliant documentation."
+- Change to: "Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. This will be formatted into objective, hearing-ready documentation."
+
+### Add document type preview
+- Before the user hits "Generate HR Documentation," show a brief note of what they'll get: "Generates: Written warning document with incident summary, policy reference, corrective action, and employee acknowledgment signature line"
+- This sets expectations and shows the value of the tool without them having to guess
+
+### HR Document Records improvements
+- The record card for "Adam - Cook - 3 Shift Suspension" looks good, but add a **filter/search bar** above the records list so operators can quickly find a specific employee's history
+- Add a sort option: by date, by employee name, by severity
+- Add a count showing total records: "Showing 1 of 1 records" or "12 records"
+- Consider adding a status indicator for records that are pending signature vs completed
+
+### Add a "Documentation Trail" view
+- Operators need to see an employee's full discipline history at a glance during progressive discipline
+- Add a button or link on each employee record: "View full history for [employee name]"
+- This would filter all records for that employee and show them chronologically — critical for building a termination case
+
+---
+
+## 2. Kitchen Operations Page
+
+This is the strongest page in the app. Focus on polish, not overhaul.
+
+### Score Breakdown improvements
+- The score bars (Prep 0/30, Pars 20/20, Staffing 5/20, etc.) are great but they should update in real-time as the user fills in fields above
+- Right now it looks like the scores are static until you hit "Generate Readiness Score" — make the score bars react immediately as fields change:
+  - Prep Sign-Off toggles Yes → Prep score fills to 30/30
+  - All stations green → Line Set stays 10/10
+  - BOH Headcount filled in → Staffing score adjusts
+- This makes the form feel alive and gives instant feedback
+
+### Add a "Ready / Not Ready" summary badge
+- At the top of the Kitchen Command Center card (next to the title), show a large badge:
+  - **Green: "Ready"** when total score is above threshold (e.g., 80/100)
+  - **Yellow: "Caution"** when score is 60-79
+  - **Red: "Not Ready"** when below 60
+- This gives the KM one glance to know if they're good to go
+
+### Station Status enhancement
+- When a station is toggled OFF (not ready), show an optional text field: "What's the issue?" (e.g., "Sauté pilot light out" or "No sauté cook until 5pm")
+- These notes feed into the readiness report and help the GM/chef know exactly what to address
+
+### Debrief tab suggestion
+- In the Debrief tab, add fields for: Total covers actual vs projected, ticket time average, any comps/voids, biggest operational issue of the shift
+- Auto-compare tonight's actual covers to the projected covers from the Readiness tab
+- This creates a feedback loop: plan → execute → review
+
+---
+
+## 3. Cost & Margin Control Page
+
+### Food Cost Tools — New Plate tab improvements
+- The ingredient builder is functional but could be more powerful:
+  - After adding ingredients, show a **running plate cost total** and **food cost percentage** at the bottom in real-time (based on a target menu price field)
+  - Add a field for "Target Menu Price" so the tool can instantly show: "Plate cost: $4.82 | Menu price: $18.00 | Food cost: 26.8% ✅" with a green/yellow/red indicator based on whether it's within target
+  - Add a "Suggested menu price" calculation: plate cost ÷ target food cost % = suggested price
+
+### Add portion cost warnings
+- If an ingredient's cost/unit seems unusually high (like $50/oz for chicken), show a subtle warning: "Double-check this cost — seems high for this ingredient"
+- This catches data entry errors before they skew the whole plate cost
+
+### Weekly Check tab suggestion
+- If not already built, the Weekly Check tab should let operators input:
+  - Beginning inventory, purchases, ending inventory, and sales for the week
+  - Auto-calculate actual food cost %
+  - Compare to target and show variance
+  - Flag if variance exceeds threshold (e.g., >2% over target)
+
+### Saved tab suggestion
+- Saved plates should show the key metrics at a glance in the list view: plate name, plate cost, menu price, food cost %
+- Add a "Last updated" date so operators know if costs need refreshing
+- Add a bulk action: "Recalculate all saved plates" (useful when vendor prices change)
+
+---
+
+## 4. Reviews & Reputation Page
+
+### Review Response Generator improvements
+- After generating a response, add two buttons:
+  - **"Copy to clipboard"** — one-click copy for pasting into Google/Yelp
+  - **"Save to history"** — store the review and response for tracking
+- Add a **response tone selector** with options like:
+  - "Professional & empathetic" (default)
+  - "Brief & direct" (for simple complaints)
+  - "Recovery-focused" (when you want to invite them back)
+  - "Factual correction" (when the review contains inaccuracies)
+
+### Add a Review Tracker dashboard
+- Above the Response Generator, add a summary section:
+  - Total reviews responded to this month
+  - Average response time
+  - Breakdown by platform (Google, Yelp, etc.) if applicable
+  - Trend: "You've responded to 12 reviews this month vs 8 last month"
+- This helps operators see that they're staying on top of reputation management
+
+### Screenshot upload enhancement
+- When a screenshot is uploaded, show a preview thumbnail before generating
+- Add a note: "Works best with Google, Yelp, and TripAdvisor review screenshots"
+- Consider adding OCR extraction so the review text auto-populates the text field from the screenshot — then the user can edit before generating (if not already doing this)
+
+### Add a "Response Templates" section
+- Below the generator, offer 3-4 saved response templates that operators can customize:
+  - "Thank you for positive review"
+  - "Apologize and invite back"
+  - "Address specific complaint"
+  - "Correct misinformation professionally"
+- These give operators a starting point even without using the generator
+
+---
+
+## General Notes for All Pages
+
+### Consistency check
+- Make sure all "Generate" buttons use the same style, size, and icon treatment
+- All domain pages should have the same spacing between the tool section and the accordion/content library section below
+- The sparkle icon (✨) on generate buttons is fine — it signals "smart output" without saying "AI"
+
+### Loading states for all generate buttons
+- When any generate button is clicked, change the button text:
+  - "Generate HR Documentation" → "Building documentation..."
+  - "Generate Readiness Score" → "Calculating readiness..."
+  - "Generate Response" → "Crafting response..."
+- Add a subtle shimmer animation on the button during generation
+- Disable the button while generating to prevent double-clicks

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -81,6 +81,7 @@ import {
   XCircle,
   CheckCircle2,
   ArrowRight,
+  Search,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -217,6 +218,17 @@ function FoodCostCalculator() {
       return { color: "text-yellow-600", bg: "bg-yellow-50 dark:bg-yellow-950", message: "Acceptable margins. Watch portion sizes." };
     }
     return { color: "text-red-600", bg: "bg-red-50 dark:bg-red-950", message: `High food cost! Raise price to $${suggestedPrice.toFixed(2)} or reduce portions.` };
+  };
+
+  const getPortionCostWarning = (ing: PlateIngredient): string | null => {
+    const cost = parseFloat(ing.costPerUnit);
+    if (isNaN(cost) || cost <= 0) return null;
+    const thresholds: Record<string, number> = {
+      oz: 8, lb: 30, each: 25, cup: 15, tbsp: 5,
+    };
+    const threshold = thresholds[ing.unit] || 20;
+    if (cost > threshold) return `Double-check this cost — $${cost.toFixed(2)}/${ing.unit} seems high for ${ing.name}`;
+    return null;
   };
 
   const marginStatus = getMarginStatus();
@@ -419,6 +431,15 @@ function FoodCostCalculator() {
                         {ing.quantity} {ing.unit} @ ${ing.costPerUnit}/{ing.unit}
                         {parseFloat(ing.wasteBuffer) > 0 && <span className="ml-1">(+{ing.wasteBuffer}% waste)</span>}
                       </div>
+                      {(() => {
+                        const warning = getPortionCostWarning(ing);
+                        return warning ? (
+                          <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1 mt-0.5">
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            {warning}
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">${ing.calculatedCost.toFixed(2)}</span>
@@ -636,16 +657,24 @@ function FoodCostCalculator() {
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-auto">
                     {savedPlates.map((plate: any) => (
-                      <div key={plate.id} className="p-3 border rounded">
-                        <div className="flex justify-between items-start">
-                          <div className="font-medium">{plate.name}</div>
-                          <span className="font-semibold text-primary">${plate.totalCost}</span>
+                      <div key={plate.id} className="p-3 border rounded space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium truncate">{plate.name}</span>
+                          <Badge variant={
+                            plate.foodCostPercent && parseFloat(plate.foodCostPercent) <= (parseFloat(plate.targetFoodCost) || 28) 
+                              ? "default" : plate.foodCostPercent ? "destructive" : "secondary"
+                          }>
+                            {plate.foodCostPercent ? `${plate.foodCostPercent}%` : "No price set"}
+                          </Badge>
                         </div>
-                        {plate.menuPrice && (
-                          <div className="text-sm text-muted-foreground mt-1">
-                            Menu: ${plate.menuPrice} ({plate.foodCostPercent}% FC)
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span>Cost: ${plate.totalCost}</span>
+                          {plate.menuPrice && <span>Price: ${plate.menuPrice}</span>}
+                          {plate.foodCostPercent && <span>FC: {plate.foodCostPercent}%</span>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Saved {plate.createdAt ? new Date(plate.createdAt).toLocaleDateString() : "recently"}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -672,6 +701,8 @@ function KitchenComplianceEngine() {
   const [selectedPreset, setSelectedPreset] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingField, setRecordingField] = useState<string | null>(null);
+
+  const [stationIssues, setStationIssues] = useState<Record<string, string>>({});
 
   const [readinessInputs, setReadinessInputs] = useState({
     prepSignedOff: false,
@@ -1022,6 +1053,10 @@ function KitchenComplianceEngine() {
       if (mode === "readiness") {
         applyScore(scoreData.total);
         const stationStatus = stationList.map(s => `${s.label}: ${readinessInputs.stations[s.key] ? "Ready" : "NOT READY"}`).join(", ");
+        const stationIssuesList = Object.entries(stationIssues)
+          .filter(([_, v]) => v.trim())
+          .map(([k, v]) => `${stationList.find(s => s.key === k)?.label || k}: ${v}`)
+          .join(", ");
         prompt = `Generate a Kitchen Readiness Assessment.
 
 DETERMINISTIC SCORE: ${scoreData.total}/100
@@ -1030,6 +1065,7 @@ Breakdown: Prep ${scoreData.breakdown.prep}/30, Pars ${scoreData.breakdown.pars}
 STRUCTURED DATA:
 - Prep signed off: ${readinessInputs.prepSignedOff ? `Yes at ${readinessInputs.prepSignOffTime || "on time"}` : "No"}
 - Station Status: ${stationStatus}
+${stationIssuesList ? `- Station Issues: ${stationIssuesList}` : ""}
 - Par shortages: ${readinessInputs.parShortages.length > 0 ? readinessInputs.parShortages.join(", ") : "None"}
 - 86'd items: ${readinessInputs.eightyShortages || "None"}
 - BOH headcount: ${readinessInputs.headcount || "Not set"}
@@ -1261,9 +1297,21 @@ Provide actionable summary and follow-up plan.`;
   return (
     <Card className="mb-8">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           Kitchen Command Center
+          {mode === "readiness" && (
+            <Badge 
+              className={`text-xs ${
+                scoreData.total >= 80 ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30" :
+                scoreData.total >= 60 ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30" :
+                "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30"
+              }`}
+              data-testid="badge-readiness-status"
+            >
+              {scoreData.total >= 80 ? "Ready" : scoreData.total >= 60 ? "Caution" : "Not Ready"}
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>
           Real-time kitchen readiness, service alerts, and post-shift debriefs. Data-driven decisions, not gut feelings.
@@ -1417,27 +1465,50 @@ Provide actionable summary and follow-up plan.`;
 
             <div>
               <Label className="mb-1 block">Station Status</Label>
-              <div className="flex flex-wrap gap-2">
-                {stationList.map(station => {
-                  const isReady = readinessInputs.stations[station.key];
-                  const Icon = station.icon;
-                  return (
-                    <Button
-                      key={station.key}
-                      variant={isReady ? "default" : "outline"}
-                      size="sm"
-                      className={isReady ? "bg-green-600 hover:bg-green-700 text-white" : ""}
-                      onClick={() => setReadinessInputs(prev => ({
-                        ...prev,
-                        stations: { ...prev.stations, [station.key]: !prev.stations[station.key] },
-                      }))}
-                      data-testid={`btn-station-${station.key}`}
-                    >
-                      <Icon className="h-4 w-4 mr-1" />
-                      {station.label}
-                    </Button>
-                  );
-                })}
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {stationList.map(station => {
+                    const isReady = readinessInputs.stations[station.key];
+                    const Icon = station.icon;
+                    return (
+                      <Button
+                        key={station.key}
+                        variant={isReady ? "default" : "outline"}
+                        size="sm"
+                        className={isReady ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                        onClick={() => {
+                          setReadinessInputs(prev => ({
+                            ...prev,
+                            stations: { ...prev.stations, [station.key]: !prev.stations[station.key] },
+                          }));
+                          if (readinessInputs.stations[station.key]) {
+                          } else {
+                            setStationIssues(prev => { const n = {...prev}; delete n[station.key]; return n; });
+                          }
+                        }}
+                        data-testid={`btn-station-${station.key}`}
+                      >
+                        <Icon className="h-4 w-4 mr-1" />
+                        {station.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {stationList.some(s => !readinessInputs.stations[s.key]) && (
+                  <div className="space-y-2 pl-1">
+                    {stationList.filter(s => !readinessInputs.stations[s.key]).map(station => (
+                      <div key={station.key} className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs shrink-0">{station.label}</Badge>
+                        <Input
+                          placeholder={`What's the issue? (e.g., "${station.label === "Sauté" ? "Pilot light out" : "No cook until 5pm"}")`}
+                          value={stationIssues[station.key] || ""}
+                          onChange={(e) => setStationIssues(prev => ({ ...prev, [station.key]: e.target.value }))}
+                          data-testid={`input-station-issue-${station.key}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1982,7 +2053,10 @@ Provide actionable summary and follow-up plan.`;
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating {modeLabels[mode]}...
+                  {mode === "readiness" ? "Calculating readiness..." :
+                   mode === "alerts" ? "Analyzing service flow..." :
+                   mode === "debrief" || mode === "quick-debrief" ? "Building debrief..." :
+                   "Creating coaching plan..."}
                 </>
               ) : (
                 <>
@@ -2582,7 +2656,7 @@ Ensure all language is:
           <Label htmlFor="description">What Happened (Plain Language)</Label>
           <Textarea
             id="description"
-            placeholder="Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. This will be converted into objective, compliant documentation."
+            placeholder="Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. This will be formatted into objective, hearing-ready documentation."
             className="mt-1 min-h-[120px]"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -2593,6 +2667,10 @@ Ensure all language is:
           </p>
         </div>
 
+        <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+          <span className="font-medium">Generates:</span> Written warning document with incident summary, policy reference, corrective action, and employee acknowledgment signature line
+        </p>
+
         <Button 
           onClick={generateDocumentation} 
           disabled={isGenerating || !issueType || !description}
@@ -2602,7 +2680,7 @@ Ensure all language is:
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating compliant documentation...
+              Building documentation...
             </>
           ) : (
             <>
@@ -2723,6 +2801,9 @@ function HRRecordsViewer() {
   const { toast } = useToast();
   const [selectedDoc, setSelectedDoc] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "name" | "severity">("date");
+  const [filterEmployee, setFilterEmployee] = useState<string | null>(null);
   
   const { data: documents, isLoading } = useQuery<any[]>({
     queryKey: ["/api/hr-documents"],
@@ -2758,6 +2839,35 @@ function HRRecordsViewer() {
     "cash-handling": "Cash Handling",
   };
 
+  const filteredDocuments = useMemo(() => {
+    if (!documents) return [];
+    let filtered = [...documents];
+    
+    if (filterEmployee) {
+      filtered = filtered.filter((d: any) => d.employeeName === filterEmployee);
+    }
+    
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((d: any) => 
+        d.employeeName?.toLowerCase().includes(q) ||
+        d.employeePosition?.toLowerCase().includes(q) ||
+        (issueTypeLabels[d.issueType] || d.issueType)?.toLowerCase().includes(q)
+      );
+    }
+    
+    filtered.sort((a: any, b: any) => {
+      if (sortBy === "name") return (a.employeeName || "").localeCompare(b.employeeName || "");
+      if (sortBy === "severity") {
+        const order: Record<string, number> = { third: 3, second: 2, first: 1 };
+        return (order[b.disciplineLevel] || 0) - (order[a.disciplineLevel] || 0);
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    
+    return filtered;
+  }, [documents, searchQuery, sortBy, filterEmployee]);
+
   if (isLoading) {
     return (
       <Card className="mb-8">
@@ -2789,13 +2899,52 @@ function HRRecordsViewer() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {documents && documents.length > 0 && (
+            <div className="space-y-3 mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, position, or issue..."
+                    className="pl-9"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    data-testid="input-hr-search"
+                  />
+                </div>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                  <SelectTrigger className="w-40" data-testid="select-hr-sort">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Sort by Date</SelectItem>
+                    <SelectItem value="name">Sort by Name</SelectItem>
+                    <SelectItem value="severity">Sort by Severity</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {filterEmployee && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="gap-1">
+                    Showing history for: {filterEmployee}
+                    <button onClick={() => setFilterEmployee(null)} className="ml-1 hover:text-destructive">
+                      <XCircle className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground" data-testid="text-hr-record-count">
+                Showing {filteredDocuments.length} of {documents.length} record{documents.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
           {!documents || documents.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               No HR documents saved yet. Generate and save documentation above to start building records.
             </p>
           ) : (
             <div className="space-y-3">
-              {documents.map((doc: any) => (
+              {filteredDocuments.map((doc: any) => (
                 <div key={doc.id} className="p-4 border rounded-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -2806,6 +2955,17 @@ function HRRecordsViewer() {
                       <Badge variant={doc.disciplineLevel === "third" ? "destructive" : doc.disciplineLevel === "second" ? "default" : "outline"} className="text-xs">
                         {disciplineLevelLabels[doc.disciplineLevel] || doc.disciplineLevel}
                       </Badge>
+                      {doc.scanFilename || doc.signedAt ? (
+                        <Badge className="text-xs bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">
+                          <CheckSquare className="h-3 w-3 mr-1" />
+                          Signed
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Pending Signature
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {issueTypeLabels[doc.issueType] || doc.issueType}
@@ -2822,6 +2982,15 @@ function HRRecordsViewer() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFilterEmployee(doc.employeeName)}
+                      title={`View all records for ${doc.employeeName}`}
+                      data-testid={`btn-history-${doc.id}`}
+                    >
+                      <History className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -5247,6 +5416,7 @@ function ReviewResponseGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [screenshotBase64, setScreenshotBase64] = useState<string | null>(null);
+  const [responseTone, setResponseTone] = useState<string>("professional");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (file: File) => {
@@ -5332,6 +5502,12 @@ The response should:
 - ${reviewType === "negative" ? "Acknowledge their concern without being defensive or making excuses" : "Express genuine appreciation for their kind words"}
 - ${reviewType === "negative" ? "Offer to make it right and invite them to reach out directly" : "Invite them to visit again"}
 - Sign off with ${yourName || "[Your Name]"}, ${yourTitle || "Manager"}
+- Response tone: ${
+  responseTone === "professional" ? "Professional and empathetic — warm but polished" :
+  responseTone === "brief" ? "Brief and direct — short, sincere, no fluff" :
+  responseTone === "recovery" ? "Recovery-focused — invite them back, offer to make it right" :
+  "Factual correction — politely and professionally address inaccuracies while remaining respectful"
+}
 - Keep it concise (3-4 sentences max)
 - Never argue with the customer or blame staff
 
@@ -5381,6 +5557,7 @@ Generate ONLY the response text, nothing else.`,
   };
 
   return (
+    <>
     <Card className="mb-8">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -5426,6 +5603,21 @@ Generate ONLY the response text, nothing else.`,
               data-testid="input-restaurant-name"
             />
           </div>
+        </div>
+
+        <div>
+          <Label>Response Tone</Label>
+          <Select value={responseTone} onValueChange={setResponseTone}>
+            <SelectTrigger className="mt-1" data-testid="select-response-tone">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="professional">Professional & Empathetic</SelectItem>
+              <SelectItem value="brief">Brief & Direct</SelectItem>
+              <SelectItem value="recovery">Recovery-Focused</SelectItem>
+              <SelectItem value="factual">Factual Correction</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -5515,6 +5707,9 @@ Generate ONLY the response text, nothing else.`,
                 <p className="text-xs text-muted-foreground mt-1">
                   You can also paste (Ctrl+V) directly into the text area above
                 </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Works best with Google, Yelp, and TripAdvisor review screenshots
+                </p>
               </div>
             )}
           </div>
@@ -5529,7 +5724,7 @@ Generate ONLY the response text, nothing else.`,
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating...
+              Crafting response...
             </>
           ) : (
             <>
@@ -5545,7 +5740,7 @@ Generate ONLY the response text, nothing else.`,
               <Label>Generated Response</Label>
               <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-response">
                 <Copy className="h-4 w-4 mr-2" />
-                Copy
+                Copy to Clipboard
               </Button>
             </div>
             <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm">
@@ -5555,6 +5750,57 @@ Generate ONLY the response text, nothing else.`,
         )}
       </CardContent>
     </Card>
+
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <FileText className="h-5 w-5" />
+          Response Templates
+        </CardTitle>
+        <CardDescription>
+          Quick-start templates you can customize
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {[
+          {
+            title: "Thank You for Positive Review",
+            template: `Thank you so much for taking the time to share your experience! We're thrilled to hear you enjoyed your visit. Our team works hard to make every guest feel welcome, and feedback like yours makes it all worthwhile. We can't wait to see you again soon!\n\nWarm regards,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
+          },
+          {
+            title: "Apologize and Invite Back",
+            template: `Thank you for sharing your feedback — we sincerely apologize that your experience didn't meet the standard we hold ourselves to. This isn't reflective of what we strive to deliver, and we'd love the opportunity to make it right. Please reach out to us directly so we can ensure your next visit is the experience you deserve.\n\nSincerely,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
+          },
+          {
+            title: "Address Specific Complaint",
+            template: `Thank you for bringing this to our attention. We take all feedback seriously and have shared your concerns with our team. We're committed to improving and would appreciate the chance to speak with you directly about your experience. Please don't hesitate to contact us.\n\nBest regards,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
+          },
+          {
+            title: "Correct Misinformation Professionally",
+            template: `Thank you for your review. We appreciate all feedback and want to ensure accurate information is shared. We'd like to clarify a few points and would welcome the opportunity to discuss your experience directly. Please feel free to reach out to us — we value every guest and want to make sure things are right.\n\nRespectfully,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
+          },
+        ].map((tmpl, idx) => (
+          <div key={idx} className="p-3 border rounded-lg space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{tmpl.title}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setResponse(tmpl.template);
+                  toast({ title: "Template loaded — customize it before sending!" });
+                }}
+                data-testid={`btn-template-${idx}`}
+              >
+                Use Template
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground line-clamp-2">{tmpl.template}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+    </>
   );
 }
 
