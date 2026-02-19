@@ -12,7 +12,7 @@ import { USER_ROLES, type User, type UserRole } from "@shared/models/auth";
 import { BrandLogoNav, BrandLogoWithTagline } from "@/components/BrandLogo";
 
 interface OnboardingPageProps {
-  user: User;
+  user: User & { isTestUser?: boolean };
 }
 
 const roleDescriptions = {
@@ -45,9 +45,12 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
 
   const totalSteps = 3;
 
+  const isTestUser = !!(user as any).isTestUser;
+
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { firstName: string; phone: string; restaurantName: string; role: UserRole }) => {
-      const res = await fetch("/api/auth/user", {
+      const endpoint = isTestUser ? "/api/test-access/user" : "/api/auth/user";
+      const res = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

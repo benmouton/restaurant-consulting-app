@@ -922,6 +922,53 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/test-access/user", async (req: any, res) => {
+    try {
+      const testAccess = req.session?.testAccess;
+      if (!testAccess) {
+        return res.status(401).json({ message: "No test access session" });
+      }
+
+      const now = new Date();
+      const expiresAt = new Date(testAccess.expiresAt);
+      if (now > expiresAt) {
+        delete req.session.testAccess;
+        req.session.save();
+        return res.status(401).json({ message: "Test access expired" });
+      }
+
+      const { firstName, phone, restaurantName, role } = req.body;
+      if (!firstName || !restaurantName) {
+        return res.status(400).json({ message: "Name and restaurant name are required" });
+      }
+
+      const validRoles = ["owner", "general_manager", "manager"];
+      const currentUser = await storage.getUserById(testAccess.userId);
+      const allowedRole = currentUser && !currentUser.restaurantName && role && validRoles.includes(role) ? role : undefined;
+
+      const updateData: Record<string, unknown> = {
+        firstName,
+        phone: phone || null,
+        restaurantName,
+        updatedAt: new Date(),
+      };
+      if (allowedRole) {
+        updateData.role = allowedRole;
+      }
+
+      const [updatedUser] = await db
+        .update((await import("@shared/schema")).users)
+        .set(updateData)
+        .where(sql`id = ${testAccess.userId}`)
+        .returning();
+
+      res.json({ ...updatedUser, isTestUser: true });
+    } catch (error) {
+      console.error("Error updating test user profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   app.post("/api/test-access/logout", async (req: any, res) => {
     try {
       if (req.session?.testAccess) {
