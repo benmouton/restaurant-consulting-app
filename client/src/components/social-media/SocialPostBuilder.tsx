@@ -104,6 +104,15 @@ const CTAS = [
   { value: "come_early", label: "Come Early / Limited Seating" },
 ];
 
+const PLATFORM_LIMITS: Record<string, { chars: number; label: string }> = {
+  instagram: { chars: 2200, label: "Instagram" },
+  facebook: { chars: 63206, label: "Facebook" },
+  google_business: { chars: 1500, label: "Google Business" },
+  linkedin: { chars: 3000, label: "LinkedIn" },
+  x: { chars: 280, label: "X/Twitter" },
+  nextdoor: { chars: 10000, label: "Nextdoor" },
+};
+
 interface GeneratedPost {
   primaryCaption: string;
   shortCaption: string;
@@ -638,6 +647,34 @@ export default function SocialPostBuilder() {
                     data-testid="textarea-caption"
                   />
 
+                  {caption && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>{caption.length} characters</span>
+                      {(() => {
+                        const selectedProviders = selectedAccountIds.map(id => {
+                          const acct = activeAccounts.find(a => a.id === id);
+                          return acct?.provider || '';
+                        }).filter(Boolean);
+                        const uniqueProviders = Array.from(new Set(selectedProviders));
+                        return uniqueProviders.map(ch => {
+                          const limit = PLATFORM_LIMITS[ch];
+                          if (!limit) return null;
+                          const isOver = caption.length > limit.chars;
+                          return (
+                            <Badge
+                              key={ch}
+                              variant="outline"
+                              className={`text-xs ${isOver ? "text-red-600 border-red-500/30 bg-red-500/10" : ""}`}
+                              data-testid={`badge-char-limit-${ch}`}
+                            >
+                              {limit.label}: {caption.length}/{limit.chars} {isOver ? "-- over limit" : ""}
+                            </Badge>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
+
                   {/* Image area */}
                   <input
                     ref={fileInputRef}
@@ -1167,7 +1204,22 @@ export default function SocialPostBuilder() {
                           </div>
                           {holiday.suggestedAngle && <div className="text-sm mt-1">{holiday.suggestedAngle}</div>}
                         </div>
-                        <Badge variant="outline">{holiday.category}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCaption(`Happy ${holiday.name}! [Share what you're doing to celebrate at your restaurant]`);
+                              setActiveTab("create");
+                            }}
+                            data-testid={`btn-draft-holiday-${holiday.id}`}
+                          >
+                            Draft Post
+                          </Button>
+                          <Badge variant="outline">{holiday.category}</Badge>
+                        </div>
                       </div>
                       {holiday.suggestedTags && holiday.suggestedTags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
@@ -1195,6 +1247,34 @@ export default function SocialPostBuilder() {
             <CardContent>
               {postHistory && postHistory.length > 0 ? (
                 <div className="space-y-2">
+                  {(() => {
+                    const thisMonth = postHistory.filter(p => {
+                      if (!p.createdAt) return false;
+                      const d = new Date(p.createdAt);
+                      const now = new Date();
+                      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                    });
+                    const channelCounts: Record<string, number> = {};
+                    thisMonth.forEach(p => {
+                      (p.platformTargets || []).forEach(targetId => {
+                        const acct = connectedAccounts?.find(a => a.id === targetId);
+                        const provider = acct?.provider || `Account #${targetId}`;
+                        channelCounts[provider] = (channelCounts[provider] || 0) + 1;
+                      });
+                    });
+                    return (
+                      <div className="p-3 bg-muted/50 rounded-md mb-4" data-testid="monthly-post-summary">
+                        <p className="text-sm font-medium">This Month: {thisMonth.length} posts</p>
+                        {Object.keys(channelCounts).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {Object.entries(channelCounts).map(([ch, count]) => (
+                              <Badge key={ch} variant="secondary" className="text-xs">{ch}: {count}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {postHistory.slice(0, 20).map((post) => (
                     <div key={post.id} className="p-3 border rounded-md">
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1205,18 +1285,33 @@ export default function SocialPostBuilder() {
                             {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Unknown'}
                           </div>
                         </div>
-                        <Badge
-                          variant={
-                            post.status === 'posted' ? 'default' :
-                            post.status === 'failed' ? 'destructive' :
-                            post.status === 'partial' ? 'secondary' :
-                            'outline'
-                          }
-                        >
-                          {post.status === 'posted' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                          {post.status === 'failed' && <AlertCircle className="h-3 w-3 mr-1" />}
-                          {post.status}
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => {
+                              setCaption(post.caption);
+                              setActiveTab("create");
+                              toast({ title: "Post content loaded", description: "Edit and repost!" });
+                            }}
+                            data-testid={`btn-reuse-post-${post.id}`}
+                          >
+                            Reuse
+                          </Button>
+                          <Badge
+                            variant={
+                              post.status === 'posted' ? 'default' :
+                              post.status === 'failed' ? 'destructive' :
+                              post.status === 'partial' ? 'secondary' :
+                              'outline'
+                            }
+                          >
+                            {post.status === 'posted' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                            {post.status === 'failed' && <AlertCircle className="h-3 w-3 mr-1" />}
+                            {post.status}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                   ))}

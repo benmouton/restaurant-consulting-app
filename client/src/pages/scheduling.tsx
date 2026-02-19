@@ -526,6 +526,70 @@ export default function SchedulingPage() {
               </div>
             </div>
 
+            {shifts.length > 0 && (
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">{shifts.length} shifts</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">{new Set(shifts.filter(s => s.staffMemberId).map(s => s.staffMemberId)).size} staff scheduled</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">{shifts.reduce((sum, s) => sum + calculateShiftHours(s.startTime, s.endTime), 0).toFixed(1)} total hours</span>
+                </div>
+                {shifts.some(s => s.status === "open") && (
+                  <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/30">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    {shifts.filter(s => s.status === "open").length} open
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            {(() => {
+              const gaps: { day: string; issue: string }[] = [];
+              weekDates.forEach(date => {
+                const dateStr = formatDate(date);
+                const dayShifts = getShiftsForDate(dateStr);
+                if (dayShifts.length === 0) return;
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const positionsUsed = new Set(dayShifts.filter(s => s.positionId).map(s => s.positionId));
+                const allPositionIds = new Set(positions.map(p => p.id));
+                allPositionIds.forEach(pid => {
+                  if (!positionsUsed.has(pid)) {
+                    const pName = positions.find(p => p.id === pid)?.name;
+                    if (pName) gaps.push({ day: dayName, issue: `No ${pName} scheduled` });
+                  }
+                });
+                const openCount = dayShifts.filter(s => s.status === "open").length;
+                if (openCount > 0) {
+                  gaps.push({ day: dayName, issue: `${openCount} open shift${openCount > 1 ? "s" : ""}` });
+                }
+              });
+              if (gaps.length === 0) return null;
+              return (
+                <div className="p-3 border border-orange-500/30 bg-orange-500/5 rounded-lg" data-testid="coverage-gaps">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm font-medium text-orange-700 dark:text-orange-400">Coverage Gaps ({gaps.length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {gaps.slice(0, 8).map((gap, i) => (
+                      <Badge key={i} variant="outline" className="text-xs bg-orange-500/10 text-orange-600 border-orange-500/30">
+                        {gap.day}: {gap.issue}
+                      </Badge>
+                    ))}
+                    {gaps.length > 8 && (
+                      <Badge variant="outline" className="text-xs">+{gaps.length - 8} more</Badge>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="grid grid-cols-7 gap-2">
               {weekDates.map((date, i) => {
                 const dateStr = formatDate(date);
@@ -567,6 +631,11 @@ export default function SchedulingPage() {
                           </Button>
                         </div>
                       ))}
+                      {dayShifts.length === 0 && (
+                        <div className="flex-1 flex items-center justify-center">
+                          <span className="text-[10px] text-muted-foreground/50">No shifts</span>
+                        </div>
+                      )}
                     </div>
                     {dayShifts.length > 0 && hasRates && (
                       <div className="mt-2 pt-2 border-t border-dashed text-center" data-testid={`labor-cost-${dateStr}`}>
@@ -578,6 +647,25 @@ export default function SchedulingPage() {
                 );
               })}
             </div>
+
+            {shifts.length === 0 && (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <Calendar className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="font-medium mb-1">No shifts scheduled this week</p>
+                  <p className="text-sm text-muted-foreground mb-4">Add your first shift to get started, or set up positions first.</p>
+                  <div className="flex items-center justify-center gap-2">
+                    <Button variant="outline" onClick={() => setActiveTab("positions")} data-testid="btn-setup-positions">
+                      Set Up Positions
+                    </Button>
+                    <Button onClick={() => setShowAddShift(true)} data-testid="btn-first-shift">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Shift
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {openShifts.length > 0 && (
               <Card>
@@ -740,6 +828,17 @@ export default function SchedulingPage() {
                         </div>
                         {member.email && <p className="text-sm text-muted-foreground mt-2">{member.email}</p>}
                         {member.phone && <p className="text-sm text-muted-foreground">{member.phone}</p>}
+                        {(() => {
+                          const memberShifts = shifts.filter(s => s.staffMemberId === member.id);
+                          const totalHours = memberShifts.reduce((sum, s) => sum + calculateShiftHours(s.startTime, s.endTime), 0);
+                          if (totalHours === 0) return null;
+                          return (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              <Clock className="h-3 w-3 inline mr-1" />
+                              {totalHours.toFixed(1)} hrs this week
+                            </p>
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center gap-1">
                         {member.inviteStatus !== "accepted" && (
@@ -1007,6 +1106,11 @@ export default function SchedulingPage() {
                               month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
                             })}
                           </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {staff.length > 0 ? `Visible to ${staff.length} staff` : "No staff members yet"}
+                            </Badge>
+                          </div>
                         </div>
                         <Button
                           variant="ghost"

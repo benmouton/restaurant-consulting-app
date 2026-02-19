@@ -5815,6 +5815,49 @@ const CRISIS_TYPES = [
   { id: "food_safety", label: "Food safety / contamination issue", icon: AlertTriangle },
 ];
 
+const IMMEDIATE_ACTIONS: Record<string, { step1: string; step2: string; step3: string }> = {
+  kitchen_backed_up: {
+    step1: "Call all-hands to the line \u2014 every available person",
+    step2: "86 any items over 15-minute ticket time",
+    step3: "Communicate wait times to FOH immediately",
+  },
+  walkout: {
+    step1: "Lock down the floor \u2014 assess who's still here",
+    step2: "Consolidate sections and simplify the menu",
+    step3: "Call in any available off-duty staff",
+  },
+  health_inspector: {
+    step1: "Assign one person to accompany the inspector",
+    step2: "Quick-sweep visible violations: temps, dates, handwashing",
+    step3: "Pull recent cleaning logs and temp records",
+  },
+  system_failure: {
+    step1: "Assess safety risk \u2014 shut down if needed",
+    step2: "Identify workarounds for service continuation",
+    step3: "Call emergency repair service",
+  },
+  guests_angry: {
+    step1: "Manager to the table immediately",
+    step2: "Listen fully \u2014 don't interrupt or defend",
+    step3: "Offer a specific resolution, not just an apology",
+  },
+  food_safety: {
+    step1: "Stop serving the affected item immediately",
+    step2: "Isolate and label the product \u2014 do not discard yet",
+    step3: "Document everything: times, temps, batch numbers",
+  },
+  staff_conflict: {
+    step1: "Separate the individuals immediately",
+    step2: "Pull each aside privately \u2014 get both sides",
+    step3: "Reassign positions to keep service running",
+  },
+  owner_overwhelmed: {
+    step1: "Stop \u2014 take one deep breath, then prioritize",
+    step2: "Delegate the three biggest fires to your strongest people",
+    step3: "Focus only on the one thing that will collapse without you",
+  },
+};
+
 const SEVERITY_LEVELS = [
   { id: "mild", label: "Manageable", description: "We can handle this, need guidance", color: "bg-yellow-500" },
   { id: "moderate", label: "Serious", description: "Things are getting out of control", color: "bg-orange-500" },
@@ -6012,11 +6055,11 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
 
   return (
     <Card className="mb-8 border-destructive/30">
-      <CardHeader className="bg-destructive/5">
+      <CardHeader className="bg-red-500/10">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <Shield className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-destructive text-lg">
+              <Shield className="h-6 w-6" />
               Crisis Command Center
               {mode === "chat" && crisisStartTime && (
                 <Badge variant="outline" className="ml-2 text-destructive border-destructive/50">
@@ -6025,8 +6068,8 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>
-              {mode === "start" && "Real-time crisis support. I'll guide you through it."}
+            <CardDescription className="mt-1">
+              {mode === "start" && "Select what's happening. Get immediate action steps."}
               {mode === "severity" && "How serious is the situation right now?"}
               {mode === "chat" && "I'm here with you. Update me as things change."}
             </CardDescription>
@@ -6042,7 +6085,7 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
       <CardContent className="pt-6">
         {mode === "start" && (
           <div className="space-y-4">
-            <Label className="text-base font-semibold">What's happening?</Label>
+            <Label className="text-lg font-bold text-destructive">What's happening?</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {CRISIS_TYPES.map((crisis) => (
                 <Button
@@ -6106,6 +6149,28 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
 
         {mode === "chat" && (
           <div className="space-y-4">
+            {selectedCrisis && IMMEDIATE_ACTIONS[selectedCrisis] && (
+              <div className="p-4 border-2 border-red-500/30 bg-red-500/5 rounded-lg" data-testid="first-60-seconds">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  <span className="font-bold text-red-700 dark:text-red-400">First 60 Seconds</span>
+                </div>
+                <ol className="space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">1.</span>
+                    <span className="text-sm">{IMMEDIATE_ACTIONS[selectedCrisis].step1}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">2.</span>
+                    <span className="text-sm">{IMMEDIATE_ACTIONS[selectedCrisis].step2}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">3.</span>
+                    <span className="text-sm">{IMMEDIATE_ACTIONS[selectedCrisis].step3}</span>
+                  </li>
+                </ol>
+              </div>
+            )}
             <div className="h-[400px] overflow-y-auto border rounded-lg p-4 bg-accent/20">
               {messages.map((message) => (
                 <div
@@ -6229,6 +6294,7 @@ function SOPCaptureEngine() {
   const [trigger, setTrigger] = useState<string>("");
   const [result, setResult] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showExampleSOP, setShowExampleSOP] = useState(false);
 
   const generateSOP = async () => {
     if (!workflowDescription.trim()) {
@@ -6544,6 +6610,16 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
             <p className="text-sm text-muted-foreground">
               Test your workflow against the "Second Location Test." Would this survive turnover and expansion?
             </p>
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-medium">SOP Freshness Check</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                SOPs should be reviewed at least every 90 days. Run an audit on each SOP periodically to make sure
+                your documentation reflects how things are actually done — not how they were done 6 months ago.
+              </p>
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -6584,6 +6660,54 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
             </>
           )}
         </Button>
+
+        {mode === "capture" && (
+          <div className="border-t pt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowExampleSOP(!showExampleSOP)}
+              className="text-xs text-muted-foreground"
+              data-testid="btn-toggle-example-sop"
+            >
+              {showExampleSOP ? "Hide example output" : "See example output →"}
+            </Button>
+            {showExampleSOP && (
+              <div className="mt-3 p-4 bg-muted/50 rounded-lg text-sm space-y-3">
+                <div>
+                  <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Example: Opening Cash Drawer</p>
+                </div>
+                <div>
+                  <p className="font-medium">Purpose</p>
+                  <p className="text-muted-foreground text-xs">Standardize the opening cash count process to ensure accuracy and prevent discrepancies across shifts.</p>
+                </div>
+                <div>
+                  <p className="font-medium">Role Owner</p>
+                  <p className="text-muted-foreground text-xs">Opening Manager / Shift Lead</p>
+                </div>
+                <div>
+                  <p className="font-medium">Trigger</p>
+                  <p className="text-muted-foreground text-xs">Before the first transaction of each business day.</p>
+                </div>
+                <div>
+                  <p className="font-medium">Steps</p>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Retrieve the cash drawer from the safe using the opening key</li>
+                    <li>Count all denominations and record on the Opening Count Sheet</li>
+                    <li>Compare to the expected starting bank amount ($200.00)</li>
+                    <li>Note any discrepancies and report to GM immediately</li>
+                    <li>Sign the count sheet and place in the manager's box</li>
+                    <li>Load the drawer into the POS terminal</li>
+                  </ol>
+                </div>
+                <div>
+                  <p className="font-medium">Verification / Sign-off</p>
+                  <p className="text-muted-foreground text-xs">Opening count must match expected bank. Any variance over $1.00 requires GM notification before service begins.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {result && (
           <div className="mt-4 space-y-3">
@@ -6798,6 +6922,28 @@ function FacilityCommandCenter() {
     );
   };
 
+  const QUICK_TROUBLESHOOT: Record<string, string[]> = {
+    refrigeration: ["Check door seal for gaps", "Clean condenser coils", "Verify evaporator fan is running", "Check defrost timer", "Ensure proper airflow (not overpacked)"],
+    cooking: ["Check pilot light / igniter", "Verify gas supply valve is open", "Calibrate thermostat with oven thermometer", "Check thermocouple connection", "Clean burner tubes"],
+    dish: ["Check water supply valves", "Clean spray arms and filters", "Verify chemical levels", "Inspect fill valve and drain"],
+    hvac: ["Check thermostat batteries and settings", "Replace air filter", "Verify breaker hasn't tripped", "Check if vents are blocked"],
+    plumbing: ["Check shut-off valves", "Inspect for visible leaks", "Verify hot water heater is functioning", "Check grease trap levels"],
+    electrical: ["Check breaker panel for tripped breakers", "Verify outlets with a tester", "Look for burn marks or unusual smells", "Check GFCI reset buttons"],
+    pos: ["Power cycle the terminal", "Check network/ethernet cables", "Verify payment processor connection", "Restart the router"],
+    other: ["Document the issue clearly with photos", "Check if issue is isolated or affects multiple areas", "Note when problem first appeared"],
+  };
+
+  const quickTips = QUICK_TROUBLESHOOT[equipmentType] || [];
+
+  const getBreakdownPriority = () => {
+    const isDuringService = inActiveService === "yes";
+    const isSafetyRisk = safetyRisk === "yes";
+    if (isDuringService && isSafetyRisk) return { level: "CRITICAL", text: "Act now — safety risk during active service", color: "text-red-700 dark:text-red-400 bg-red-500/10 border-red-500/30" };
+    if (isDuringService && !isSafetyRisk) return { level: "HIGH", text: "Workaround needed — service is active", color: "text-orange-700 dark:text-orange-400 bg-orange-500/10 border-orange-500/30" };
+    if (!isDuringService && isSafetyRisk) return { level: "HIGH", text: "Fix before opening — safety risk", color: "text-orange-700 dark:text-orange-400 bg-orange-500/10 border-orange-500/30" };
+    return { level: "STANDARD", text: "Schedule repair — no immediate risk", color: "text-blue-700 dark:text-blue-400 bg-blue-500/10 border-blue-500/30" };
+  };
+
   const generateResponse = async () => {
     if (mode === "breakdown" && !issueGoal) {
       toast({ title: "Please describe the issue", variant: "destructive" });
@@ -6819,6 +6965,8 @@ function FacilityCommandCenter() {
 
       let prompt = "";
       
+      const breakdownPriority = getBreakdownPriority();
+
       if (mode === "breakdown") {
         prompt = `You are "Facility Command Center," an AI maintenance operations assistant for a live restaurant.
 Your job is to prevent downtime, control repair costs, and keep the restaurant service-ready.
@@ -6826,11 +6974,13 @@ Your job is to prevent downtime, control repair costs, and keep the restaurant s
 SITUATION:
 - Equipment/Problem: ${issueGoal}
 - Equipment Type: ${equipmentLabel || "Not specified"}
-- Currently in active service: ${inActiveService === "yes" ? "YES" : "NO"}
-- Safety risk present: ${safetyRisk === "yes" ? "YES - PRIORITIZE SAFETY" : "No"}
+- Priority: ${breakdownPriority.level} (${breakdownPriority.text})
+- Service Status: ${inActiveService === "yes" ? "Active — restaurant is currently serving" : "Not in service"}
+- Safety Risk: ${safetyRisk === "yes" ? "YES - PRIORITIZE SAFETY" : "No"}
 ${equipmentName ? `- Equipment name/model: ${equipmentName}` : ""}
 ${lastServiceDate ? `- Last service date: ${lastServiceDate}` : ""}
 ${symptoms ? `- Symptoms: ${symptoms}` : ""}
+${quickTips.length > 0 ? `- Quick troubleshooting tips were shown to the operator: ${quickTips.join("; ")}` : ""}
 
 Follow this order: Recognize → Contain → Triage → Decide → Document.
 
@@ -7041,32 +7191,44 @@ Emergency After-Hours:
           </TabsList>
 
           <TabsContent value="breakdown" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="activeService">Are we in active service?</Label>
-                <Select value={inActiveService} onValueChange={setInActiveService}>
-                  <SelectTrigger id="activeService" className="mt-1" data-testid="select-active-service">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="no">No - Not in service</SelectItem>
-                    <SelectItem value="yes">Yes - Currently serving guests</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">During Active Service?</Label>
+                <Button
+                  variant={inActiveService === "yes" ? "default" : "outline"}
+                  size="sm"
+                  className={`w-full mt-1 ${inActiveService === "yes" ? "bg-red-600 text-white" : ""}`}
+                  onClick={() => setInActiveService(inActiveService === "yes" ? "no" : "yes")}
+                  data-testid="btn-during-service"
+                >
+                  {inActiveService === "yes" ? "Yes — In Service" : "No — Closed/Prep"}
+                </Button>
               </div>
               <div>
-                <Label htmlFor="safetyRisk">Safety risk present?</Label>
-                <Select value={safetyRisk} onValueChange={setSafetyRisk}>
-                  <SelectTrigger id="safetyRisk" className="mt-1" data-testid="select-safety-risk">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="no">No safety risk</SelectItem>
-                    <SelectItem value="yes">Yes - Safety hazard present</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">Safety Risk?</Label>
+                <Button
+                  variant={safetyRisk === "yes" ? "default" : "outline"}
+                  size="sm"
+                  className={`w-full mt-1 ${safetyRisk === "yes" ? "bg-red-600 text-white" : ""}`}
+                  onClick={() => setSafetyRisk(safetyRisk === "yes" ? "no" : "yes")}
+                  data-testid="btn-safety-risk"
+                >
+                  {safetyRisk === "yes" ? "Yes — Safety Risk" : "No Safety Risk"}
+                </Button>
               </div>
             </div>
+            {(inActiveService === "yes" || safetyRisk === "yes") && (() => {
+              const priority = getBreakdownPriority();
+              return (
+                <div className={`p-3 border rounded-lg ${priority.color}`} data-testid="breakdown-priority">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span className="font-bold text-sm">{priority.level}</span>
+                    <span className="text-sm">— {priority.text}</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div>
               <Label htmlFor="equipmentType">Equipment Type</Label>
@@ -7081,6 +7243,20 @@ Emergency After-Hours:
                 </SelectContent>
               </Select>
             </div>
+
+            {quickTips.length > 0 && (
+              <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                <p className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-2">Quick checks before calling for repair:</p>
+                <ul className="space-y-1">
+                  {quickTips.map((tip, i) => (
+                    <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                      <Check className="h-3 w-3 shrink-0 mt-0.5 text-blue-500" />
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="issueGoal">Issue / Problem Description</Label>
@@ -7792,7 +7968,7 @@ export default function DomainPage() {
             .filter(g => g.items.length > 0);
 
           return (
-            <Accordion type="multiple" className="space-y-4">
+            <Accordion type="multiple" className="space-y-4" defaultValue={grouped.length > 0 ? [`group-${grouped[0].type}`] : []}>
               {grouped.map(({ type, config, items }) => {
                 const IconComponent = config.icon;
                 const preview = items[0]?.content?.slice(0, 100).replace(/\n/g, " ").trim();
