@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ChefHat, Loader2, Crown, Users, ClipboardList, ArrowRight, ArrowLeft, SkipForward } from "lucide-react";
 import { USER_ROLES, type User, type UserRole } from "@shared/models/auth";
-import logoImage from "@/assets/logo.png";
+import { BrandLogoNav } from "@/components/BrandLogo";
 
 interface OnboardingPageProps {
   user: User;
@@ -106,10 +106,7 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex items-center justify-between px-6 py-4 border-b">
-        <div className="flex items-center gap-3">
-          <img src={logoImage} alt="The Restaurant Consultant" className="h-8 w-8 rounded-xl object-contain ring-1 ring-primary/20" />
-          <span className="font-bold text-sm tracking-tight">The Restaurant Consultant</span>
-        </div>
+        <BrandLogoNav />
         <Button
           variant="ghost"
           size="sm"
