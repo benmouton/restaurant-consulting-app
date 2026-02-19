@@ -2277,6 +2277,55 @@ Generate JSON with:
     }
   });
 
+  // Nextdoor OAuth start
+  app.get("/api/oauth/nextdoor/start", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { authUrl } = await socialMediaService.startNextdoorOAuth(userId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Nextdoor OAuth:", error);
+      res.status(500).json({ message: "Failed to start Nextdoor OAuth" });
+    }
+  });
+
+  // Nextdoor OAuth callback
+  app.get("/api/oauth/nextdoor/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        res.redirect("/domain/social-media?error=missing_params");
+        return;
+      }
+
+      const stateData = await socialMediaService.validateAndConsumeState(state as string);
+      if (!stateData || stateData.provider !== 'nextdoor') {
+        res.redirect("/domain/social-media?error=invalid_state");
+        return;
+      }
+      const userId = stateData.userId;
+
+      const tokens = await socialMediaService.exchangeNextdoorCode(code as string);
+      const profile = await socialMediaService.getNextdoorProfile(tokens.accessToken);
+
+      await socialMediaService.saveConnectedAccount(
+        userId,
+        'nextdoor',
+        profile.id,
+        profile.name,
+        tokens.accessToken,
+        tokens.refreshToken,
+        tokens.expiresIn,
+        { nextdoorProfileId: profile.id }
+      );
+
+      res.redirect("/domain/social-media?connected=nextdoor");
+    } catch (error) {
+      console.error("Nextdoor OAuth callback error:", error);
+      res.redirect("/domain/social-media?error=oauth_failed");
+    }
+  });
+
   // Create and schedule a post
   app.post("/api/social-media/posts", isAuthenticated, async (req: any, res) => {
     try {
@@ -2466,6 +2515,26 @@ Generate JSON with:
             }
           }
           result = await socialMediaService.postToX(currentToken, post.caption);
+        } else if (account.provider === 'nextdoor') {
+          let currentToken = token;
+          if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) < new Date()) {
+            const refreshToken = socialMediaService.getDecryptedRefreshToken(account);
+            if (refreshToken) {
+              try {
+                const refreshed = await socialMediaService.refreshNextdoorToken(refreshToken);
+                currentToken = refreshed.accessToken;
+                await storage.updateConnectedAccount(account.id, {
+                  accessTokenEncrypted: encrypt(refreshed.accessToken),
+                  refreshTokenEncrypted: refreshed.refreshToken ? encrypt(refreshed.refreshToken) : account.refreshTokenEncrypted,
+                  tokenExpiresAt: refreshed.expiresIn ? new Date(Date.now() + refreshed.expiresIn * 1000) : account.tokenExpiresAt,
+                });
+              } catch (refreshErr: any) {
+                console.error(`[EXEC_POST] Nextdoor token refresh failed:`, refreshErr.message);
+                throw new Error('Nextdoor token expired and refresh failed. Please reconnect your Nextdoor account.');
+              }
+            }
+          }
+          result = await socialMediaService.postToNextdoor(currentToken, post.caption, post.mediaUrls || undefined);
         }
 
         console.log(`[EXEC_POST] SUCCESS for ${account.provider}:`, JSON.stringify(result));

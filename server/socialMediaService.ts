@@ -14,6 +14,8 @@ const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID;
 const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
 const X_CLIENT_ID = process.env.X_CLIENT_ID;
 const X_CLIENT_SECRET = process.env.X_CLIENT_SECRET;
+const NEXTDOOR_CLIENT_ID = process.env.NEXTDOOR_CLIENT_ID;
+const NEXTDOOR_CLIENT_SECRET = process.env.NEXTDOOR_CLIENT_SECRET;
 
 const STATE_EXPIRY_MS = 10 * 60 * 1000;
 
@@ -780,6 +782,133 @@ export const socialMediaService = {
 
     const result = JSON.parse(rawText);
     return { id: result.data?.id || 'posted' };
+  },
+
+  // Nextdoor OAuth 2.0
+  async startNextdoorOAuth(userId: string): Promise<OAuthStartResult> {
+    await cleanupExpiredStates();
+    const state = crypto.randomBytes(32).toString('hex');
+    await db.insert(oauthStates).values({ state, userId, provider: 'nextdoor' });
+    const redirectUri = `${getBaseUrl()}/api/oauth/nextdoor/callback`;
+    const scopes = 'profile:read post:write';
+    const authUrl = `https://auth.nextdoor.com/v2/authorize?` +
+      `response_type=code` +
+      `&client_id=${NEXTDOOR_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&state=${state}` +
+      `&scope=${encodeURIComponent(scopes)}`;
+    return { authUrl, state };
+  },
+
+  async exchangeNextdoorCode(code: string): Promise<TokenExchangeResult> {
+    const redirectUri = `${getBaseUrl()}/api/oauth/nextdoor/callback`;
+    const basicAuth = Buffer.from(`${NEXTDOOR_CLIENT_ID}:${NEXTDOOR_CLIENT_SECRET}`).toString('base64');
+    const response = await fetch('https://auth.nextdoor.com/v2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Nextdoor token exchange failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    };
+  },
+
+  async refreshNextdoorToken(refreshToken: string): Promise<TokenExchangeResult> {
+    const basicAuth = Buffer.from(`${NEXTDOOR_CLIENT_ID}:${NEXTDOOR_CLIENT_SECRET}`).toString('base64');
+    const response = await fetch('https://auth.nextdoor.com/v2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Nextdoor token refresh failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    };
+  },
+
+  async getNextdoorProfile(accessToken: string): Promise<{ id: string; name: string; profileUrl?: string }> {
+    const response = await fetch('https://nextdoor.com/external/api/partner/v1/me/', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Nextdoor profile fetch failed: ${error}`);
+    }
+    const data = await response.json();
+    return {
+      id: data.secure_profile_id || data.id || 'unknown',
+      name: data.name || data.display_name || 'Nextdoor User',
+      profileUrl: data.profile_url,
+    };
+  },
+
+  async postToNextdoor(
+    accessToken: string,
+    message: string,
+    mediaUrls?: string[]
+  ): Promise<{ id: string; shareLink?: string }> {
+    console.log(`[POST_ND] Posting to Nextdoor`);
+    const body: any = {
+      body_text: message,
+    };
+
+    if (mediaUrls && mediaUrls.length > 0) {
+      body.media_attachments = mediaUrls;
+    }
+
+    const response = await fetch('https://nextdoor.com/external/api/partner/v1/post/create/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const rawText = await response.text();
+    console.log(`[POST_ND] Response status: ${response.status}, body: ${rawText}`);
+
+    if (!response.ok) {
+      let errMsg = 'Failed to post to Nextdoor';
+      try { errMsg = JSON.parse(rawText)?.message || JSON.parse(rawText)?.error || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+
+    const result = JSON.parse(rawText);
+    return {
+      id: result.post_share_id || result.id || 'posted',
+      shareLink: result.share_link,
+    };
   },
 
   // Helper: Get decrypted token for an account

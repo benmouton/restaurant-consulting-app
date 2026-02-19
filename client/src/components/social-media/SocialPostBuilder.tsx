@@ -392,6 +392,17 @@ export default function SocialPostBuilder() {
     }
   };
 
+  const handleConnectNextdoor = async () => {
+    try {
+      const response = await fetch("/api/oauth/nextdoor/start", { credentials: "include" });
+      const data = await response.json();
+      if (data.authUrl) window.location.href = data.authUrl;
+      else toast({ title: "Error", description: data.message || "Failed to start connection.", variant: "destructive" });
+    } catch {
+      toast({ title: "Error", description: "Failed to start connection.", variant: "destructive" });
+    }
+  };
+
   const handlePublish = () => {
     if (selectedAccountIds.length === 0) {
       toast({ title: "Select channels", description: "Please select at least one channel to publish to.", variant: "destructive" });
@@ -434,6 +445,7 @@ export default function SocialPostBuilder() {
       case 'google_business': return <MapPin className="h-3.5 w-3.5 text-red-500" />;
       case 'linkedin': return <SiLinkedin className="h-3.5 w-3.5 text-blue-700" />;
       case 'x': return <SiX className="h-3.5 w-3.5" />;
+      case 'nextdoor': return <SiNextdoor className="h-3.5 w-3.5 text-green-600" />;
       default: return <Link2 className="h-3.5 w-3.5" />;
     }
   };
@@ -445,6 +457,7 @@ export default function SocialPostBuilder() {
       case 'google_business': return 'bg-blue-500';
       case 'linkedin': return 'bg-blue-700';
       case 'x': return 'bg-black dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600';
+      case 'nextdoor': return 'bg-green-600';
       default: return 'bg-muted-foreground';
     }
   };
@@ -590,6 +603,7 @@ export default function SocialPostBuilder() {
                                 {account.provider === 'google_business' && <MapPin className="h-2.5 w-2.5" />}
                                 {account.provider === 'linkedin' && <SiLinkedin className="h-2.5 w-2.5" />}
                                 {account.provider === 'x' && <SiX className="h-2.5 w-2.5" />}
+                                {account.provider === 'nextdoor' && <SiNextdoor className="h-2.5 w-2.5" />}
                               </span>
                             </button>
                           );
@@ -1037,9 +1051,9 @@ export default function SocialPostBuilder() {
                     <SiX className="h-4 w-4 mr-2" />
                     Connect X
                   </Button>
-                  <Button variant="outline" size="sm" disabled data-testid="button-connect-nextdoor">
+                  <Button onClick={handleConnectNextdoor} variant="outline" size="sm" data-testid="button-connect-nextdoor">
                     <SiNextdoor className="h-4 w-4 mr-2 text-green-600" />
-                    Nextdoor (Coming Soon)
+                    Connect Nextdoor
                   </Button>
                 </div>
               </div>
@@ -1074,6 +1088,7 @@ export default function SocialPostBuilder() {
                             {account.provider === 'google_business' && <MapPin className="h-2.5 w-2.5" />}
                             {account.provider === 'linkedin' && <SiLinkedin className="h-2.5 w-2.5" />}
                             {account.provider === 'x' && <SiX className="h-2.5 w-2.5" />}
+                            {account.provider === 'nextdoor' && <SiNextdoor className="h-2.5 w-2.5" />}
                           </span>
                         </div>
                         <div>
@@ -1084,6 +1099,7 @@ export default function SocialPostBuilder() {
                              account.provider === 'google_business' ? 'Google Business Profile' :
                              account.provider === 'linkedin' ? 'LinkedIn Profile' :
                              account.provider === 'x' ? 'X (Twitter) Account' :
+                             account.provider === 'nextdoor' ? 'Nextdoor Account' :
                              account.provider.replace('_', ' ')}
                           </div>
                         </div>
