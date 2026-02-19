@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Users, DollarSign, TrendingUp, Shield, ArrowLeft, Trash2, Eye, X, Building } from "lucide-react";
+import { Loader2, Users, DollarSign, TrendingUp, Shield, ArrowLeft, Trash2, Eye, X, Building, Link2, Copy, Ban, RefreshCw, Plus, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -17,6 +17,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +75,22 @@ interface OrganizationMember {
   joinedAt: string;
 }
 
+interface TestAccessToken {
+  id: number;
+  token: string;
+  name: string;
+  email: string | null;
+  accessLevel: string;
+  durationDays: number;
+  createdAt: string;
+  expiresAt: string;
+  status: string;
+  usedAt: string | null;
+  userId: string | null;
+  createdBy: string;
+  revokedAt: string | null;
+}
+
 export default function AdminDashboard() {
   const { isAdmin, isLoading: adminLoading } = useAdmin();
   const { user, isLoading: authLoading } = useAuth();
@@ -65,6 +98,11 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = useState<UserInfo | null>(null);
   const [userToRemove, setUserToRemove] = useState<UserInfo | null>(null);
+  const [testName, setTestName] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [testDuration, setTestDuration] = useState("7");
+  const [generatedLink, setGeneratedLink] = useState("");
+  const [showLinkField, setShowLinkField] = useState(false);
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<UserInfo[]>({
     queryKey: ["/api/admin/users"],
@@ -100,6 +138,78 @@ export default function AdminDashboard() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete user.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { data: testAccessTokens = [] } = useQuery<TestAccessToken[]>({
+    queryKey: ["/api/admin/test-access"],
+    enabled: isAdmin,
+  });
+
+  const createTestAccessMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; durationDays: number; accessLevel: string }) => {
+      const res = await apiRequest("POST", "/api/admin/test-access", data);
+      return await res.json();
+    },
+    onSuccess: (token: TestAccessToken) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/test-access"] });
+      const link = `${window.location.origin}/test-access/${token.token}`;
+      setGeneratedLink(link);
+      setShowLinkField(true);
+      setTestName("");
+      setTestEmail("");
+      setTestDuration("7");
+      toast({
+        title: "Test link created",
+        description: "The test access link has been generated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create test access link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testAccessActionMutation = useMutation({
+    mutationFn: async ({ id, action, additionalDays }: { id: number; action: string; additionalDays?: number }) => {
+      await apiRequest("PATCH", `/api/admin/test-access/${id}`, { action, additionalDays });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/test-access"] });
+      toast({
+        title: "Action completed",
+        description: "The test access link has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update test access link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTestAccessMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/test-access/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/test-access"] });
+      toast({
+        title: "Link deleted",
+        description: "The test access link has been deleted.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete test access link.",
         variant: "destructive",
       });
     },
@@ -349,9 +459,227 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+
+        <div className="mt-8 mb-6">
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Link2 className="h-6 w-6" />
+            Test Access Manager
+          </h2>
+          <p className="text-muted-foreground">Create and manage test access links</p>
+        </div>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Create Test Access Link
+            </CardTitle>
+            <CardDescription>Generate a shareable link for test users</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="space-y-2">
+                <Label htmlFor="test-name">Name *</Label>
+                <Input
+                  id="test-name"
+                  placeholder="Enter name"
+                  value={testName}
+                  onChange={(e) => setTestName(e.target.value)}
+                  data-testid="input-test-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="test-email">Email (optional)</Label>
+                <Input
+                  id="test-email"
+                  placeholder="Enter email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  data-testid="input-test-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="test-duration">Access Duration</Label>
+                <Select value={testDuration} onValueChange={setTestDuration}>
+                  <SelectTrigger data-testid="select-duration">
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">7 days</SelectItem>
+                    <SelectItem value="14">14 days</SelectItem>
+                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="90">90 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                if (!testName.trim()) {
+                  toast({ title: "Error", description: "Name is required.", variant: "destructive" });
+                  return;
+                }
+                createTestAccessMutation.mutate({
+                  name: testName.trim(),
+                  email: testEmail.trim(),
+                  durationDays: parseInt(testDuration),
+                  accessLevel: "full",
+                });
+              }}
+              disabled={createTestAccessMutation.isPending}
+              data-testid="button-generate-link"
+            >
+              {createTestAccessMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              Generate Test Link
+            </Button>
+
+            {showLinkField && generatedLink && (
+              <div className="flex items-center gap-2 mt-4">
+                <Input
+                  readOnly
+                  value={generatedLink}
+                  className="flex-1"
+                  data-testid="input-generated-link"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedLink);
+                    toast({ title: "Copied", description: "Link copied to clipboard." });
+                  }}
+                  data-testid="button-copy-link"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Test Access Links</CardTitle>
+            <CardDescription>Track and manage all generated test access links</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+              <Badge variant="outline">Total: {testAccessTokens.length}</Badge>
+              <Badge variant="default">Active: {testAccessTokens.filter(t => t.status === "active").length}</Badge>
+              <Badge variant="secondary">Used: {testAccessTokens.filter(t => t.status === "used").length}</Badge>
+              <Badge variant="outline" className="text-amber-600">Expired: {testAccessTokens.filter(t => t.status === "expired").length}</Badge>
+              <Badge variant="destructive">Revoked: {testAccessTokens.filter(t => t.status === "revoked").length}</Badge>
+            </div>
+
+            {testAccessTokens.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No test access links created yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Used</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {testAccessTokens.map((token) => (
+                      <TableRow key={token.id} data-testid={`row-test-access-${token.id}`}>
+                        <TableCell className="font-medium">{token.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{token.email || "—"}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              token.status === "active" ? "default" :
+                              token.status === "used" ? "secondary" :
+                              token.status === "revoked" ? "destructive" : "outline"
+                            }
+                            className={token.status === "expired" ? "text-amber-600" : ""}
+                          >
+                            {token.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(token.createdAt), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(token.expiresAt), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell>{token.usedAt ? "Yes" : "No"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                const link = `${window.location.origin}/test-access/${token.token}`;
+                                navigator.clipboard.writeText(link);
+                                toast({ title: "Copied", description: "Link copied to clipboard." });
+                              }}
+                              data-testid={`button-copy-link-${token.id}`}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            {(token.status === "active" || token.status === "used") && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => testAccessActionMutation.mutate({ id: token.id, action: "revoke" })}
+                                data-testid={`button-revoke-${token.id}`}
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => testAccessActionMutation.mutate({ id: token.id, action: "extend", additionalDays: 7 })}
+                              data-testid={`button-extend-${token.id}`}
+                            >
+                              <Clock className="h-4 w-4" />
+                            </Button>
+                            {token.status === "expired" && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => testAccessActionMutation.mutate({ id: token.id, action: "resend" })}
+                                data-testid={`button-resend-${token.id}`}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => deleteTestAccessMutation.mutate(token.id)}
+                              data-testid={`button-delete-${token.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* User Detail Dialog */}
+      {/* User Detail Dialog - portalled, so it's OK outside max-w-7xl */}
       <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

@@ -31,8 +31,10 @@ import PrivacyPolicy from "@/pages/privacy";
 import DataDeletion from "@/pages/data-deletion";
 import TermsOfService from "@/pages/terms";
 import CertificationPage from "@/pages/certification";
+import TestAccessPage from "@/pages/test-access";
 import NotFound from "@/pages/not-found";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
+import { TestAccessBanner } from "@/components/TestAccessBanner";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
   return (
@@ -55,6 +57,7 @@ function Router() {
 
   return (
     <>
+      <TestAccessBanner />
       <Switch>
         <Route path="/">
           {user ? <Dashboard /> : <Landing />}
@@ -102,6 +105,7 @@ function Router() {
           {user ? <ProtectedPage component={CertificationPage} /> : <Landing />}
         </Route>
         {/* Public Pages */}
+        <Route path="/test-access/:token" component={TestAccessPage} />
         <Route path="/privacy" component={PrivacyPolicy} />
         <Route path="/data-deletion" component={DataDeletion} />
         <Route path="/terms" component={TermsOfService} />

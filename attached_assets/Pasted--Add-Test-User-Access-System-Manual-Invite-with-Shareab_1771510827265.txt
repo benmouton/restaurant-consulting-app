@@ -1,0 +1,175 @@
+# Add Test User Access System — Manual Invite with Shareable Links
+
+I need the ability to manually add test users and send them a direct link to access the app with a temporary test account. This should be simple and admin-only.
+
+---
+
+## What I Need
+
+1. An admin-only page or section where I can create test access links
+2. Each link gives the recipient full access to the app without needing to pay
+3. Links should be shareable via text/email (just a URL I can copy and paste)
+4. I should be able to see who I've invited, whether they've used their link, and revoke access
+
+---
+
+## 1. Admin Panel — Test User Management
+
+### Add a new section to the Admin Dashboard (`/admin`)
+
+**"Test Access Manager"** section with:
+
+#### Create Test Access Form:
+- **Name** (text field) — who is this for (e.g., "Rick")
+- **Email** (text field, optional) — for tracking purposes
+- **Access Duration** (dropdown): 7 days, 14 days, 30 days, Unlimited
+- **Access Level** (dropdown): Full Access (all domains), Read Only (can view but not generate), Specific Domains (checkboxes)
+- **"Generate Test Link"** button
+
+#### When the button is clicked:
+1. Create a unique token (e.g., UUID or random string)
+2. Store in the database: token, name, email, access level, duration, created date, expiry date, status (active/used/expired/revoked)
+3. Generate a URL like: `https://restaurantai.consulting/test-access/{token}`
+4. Show the URL in a copyable field with a **"Copy Link"** button
+5. Optionally show a **"Send via Email"** button if you have email configured
+
+---
+
+## 2. Test Access Route
+
+### Create a new route: `/test-access/:token`
+
+**File:** Add to `App.tsx` routing
+
+When someone visits this URL:
+
+1. Look up the token in the database
+2. **If valid and not expired:**
+   - Create a temporary user account (or session) with the specified access level
+   - Set a flag on the account: `isTestUser: true`
+   - Set the expiry date from the token config
+   - Skip the subscription gate for test users — they should NOT see the subscription page
+   - Redirect to the dashboard
+   - Show a subtle banner at the top: "Test Access — Expires [date]. Enjoying this? Subscribe for $10/month →"
+3. **If expired:**
+   - Show a clean page: "This test link has expired. Want full access? Get started for $10/month →" with a subscribe button
+4. **If invalid or revoked:**
+   - Show: "This link is no longer valid." with a link to the landing page
+
+---
+
+## 3. Test User Experience
+
+### What test users should see:
+- Full dashboard with all 12 operational domains (or whatever access level was set)
+- All tools functional — they should be able to generate staffing plans, recovery advice, HR docs, etc.
+- The Consultant page should work
+- Training Templates should be visible
+
+### What test users should NOT see:
+- Admin panel
+- Billing/subscription management
+- Other test users' data
+
+### Test user banner:
+- Show a persistent but non-intrusive banner at the top of every page:
+  ```
+  🔑 Test Access — [X] days remaining | Enjoying The Restaurant Consultant? Subscribe for $10/month →
+  ```
+- The subscribe link should go to the subscription page
+- The banner should be dismissible but come back on next page load
+- When 3 days or fewer remain, make the banner more prominent (yellow/orange background)
+
+---
+
+## 4. Admin Tracking Dashboard
+
+### In the Admin Panel, show a table of all test access links:
+
+| Name | Email | Link | Access Level | Created | Expires | Status | Used | Actions |
+|------|-------|------|-------------|---------|---------|--------|------|---------|
+| Rick | rick@email.com | /test-access/abc123 | Full | Feb 18 | Mar 18 | Active | Yes - Feb 20 | Revoke / Extend |
+| James | — | /test-access/def456 | Full | Feb 18 | Mar 4 | Expired | No | Resend |
+
+### Actions per link:
+- **Copy Link** — copy the URL to clipboard
+- **Revoke** — immediately deactivate the link and log the test user out
+- **Extend** — add more days to the expiry
+- **Resend** — generate a new link with a fresh expiry (if the old one expired)
+- **Delete** — remove the record entirely
+
+### Summary stats at the top:
+- Total test links created
+- Currently active test users
+- Converted to paid (test users who subscribed)
+- Expired without converting
+
+---
+
+## 5. Subscription Gate Bypass
+
+### Modify the SubscriptionGate component
+
+**File:** `src/components/subscription-gate.tsx`
+
+Add logic to check if the current user is a test user:
+
+```tsx
+// Pseudocode for the logic:
+if (user.isTestUser && user.testAccessExpiry > new Date()) {
+  // Allow access — bypass subscription check
+  return children;
+} else if (user.isTestUser && user.testAccessExpiry <= new Date()) {
+  // Test access expired — show upgrade prompt
+  return <TestAccessExpiredPage />;
+} else {
+  // Normal subscription check
+  return existingSubscriptionGateLogic;
+}
+```
+
+---
+
+## 6. Database Schema
+
+### Add a `test_access_tokens` table (or collection):
+
+```
+- id (primary key)
+- token (unique string, indexed)
+- name (string)
+- email (string, nullable)
+- access_level (enum: full, read_only, custom)
+- allowed_domains (array of domain slugs, nullable — only used if access_level is custom)
+- duration_days (integer)
+- created_at (datetime)
+- expires_at (datetime)
+- status (enum: active, used, expired, revoked)
+- used_at (datetime, nullable — when the link was first clicked)
+- user_id (foreign key, nullable — links to the user account created when they used the link)
+- created_by (foreign key — the admin who created it)
+```
+
+---
+
+## 7. Security Considerations
+
+- Tokens should be long enough to prevent guessing (at least 32 characters)
+- Rate limit the `/test-access/:token` endpoint to prevent brute force
+- Test users should NOT be able to:
+  - Access the admin panel
+  - Create other test links
+  - Modify subscription settings
+  - See or interact with other users' data
+- When a test user's access expires, their session should be invalidated on next page load
+- All test user data (any documents they uploaded, SOPs they created, etc.) should be cleaned up after expiry OR preserved if they convert to paid
+
+---
+
+## Priority
+1. Create the test access token generation in admin panel
+2. Build the `/test-access/:token` route with account creation
+3. Bypass subscription gate for test users
+4. Add the test access banner
+5. Build the admin tracking table
+6. Add revoke/extend/resend actions

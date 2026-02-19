@@ -791,6 +791,27 @@ export type TrainingDayCompletion = typeof trainingDayCompletions.$inferSelect;
 export type InsertTrainingAssignment = z.infer<typeof insertTrainingAssignmentSchema>;
 export type InsertTrainingDayCompletion = z.infer<typeof insertTrainingDayCompletionSchema>;
 
+// Test Access Tokens for admin-created test user links
+export const testAccessTokens = pgTable("test_access_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  name: text("name").notNull(),
+  email: text("email"),
+  accessLevel: text("access_level").notNull().default("full"),
+  durationDays: integer("duration_days").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  status: text("status").notNull().default("active"),
+  usedAt: timestamp("used_at"),
+  userId: text("user_id"),
+  createdBy: text("created_by").notNull(),
+  revokedAt: timestamp("revoked_at"),
+});
+
+export const insertTestAccessTokenSchema = createInsertSchema(testAccessTokens).omit({ id: true, createdAt: true, usedAt: true, revokedAt: true });
+export type TestAccessToken = typeof testAccessTokens.$inferSelect;
+export type InsertTestAccessToken = z.infer<typeof insertTestAccessTokenSchema>;
+
 export const oauthStates = pgTable("oauth_states", {
   state: text("state").primaryKey(),
   userId: text("user_id").notNull(),

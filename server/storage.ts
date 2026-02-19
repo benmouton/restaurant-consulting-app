@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, restaurantStandards, certificationAttempts, trainingAssignments, trainingDayCompletions, conversations, messages, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings, type RestaurantStandards, type CertificationAttempt, type InsertRestaurantStandards, type InsertCertificationAttempt, type TrainingAssignment, type TrainingDayCompletion, type InsertTrainingAssignment, type InsertTrainingDayCompletion, type Conversation, type Message } from "@shared/schema";
+import { testAccessTokens, type TestAccessToken, type InsertTestAccessToken } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -211,6 +212,14 @@ export interface IStorage {
   getConversationMessages(conversationId: number): Promise<Message[]>;
   addMessage(conversationId: number, role: string, content: string): Promise<Message>;
   updateConversationTitle(id: number, title: string): Promise<void>;
+
+  // Test Access Tokens
+  createTestAccessToken(data: InsertTestAccessToken): Promise<TestAccessToken>;
+  getTestAccessTokens(): Promise<TestAccessToken[]>;
+  getTestAccessTokenByToken(token: string): Promise<TestAccessToken | undefined>;
+  getTestAccessTokenById(id: number): Promise<TestAccessToken | undefined>;
+  updateTestAccessToken(id: number, data: Partial<TestAccessToken>): Promise<TestAccessToken | undefined>;
+  deleteTestAccessToken(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1735,6 +1744,35 @@ export class DatabaseStorage implements IStorage {
 
   async updateConversationTitle(id: number, title: string): Promise<void> {
     await db.update(conversations).set({ title }).where(eq(conversations.id, id));
+  }
+
+  // Test Access Tokens
+  async createTestAccessToken(data: InsertTestAccessToken): Promise<TestAccessToken> {
+    const [token] = await db.insert(testAccessTokens).values(data).returning();
+    return token;
+  }
+
+  async getTestAccessTokens(): Promise<TestAccessToken[]> {
+    return await db.select().from(testAccessTokens).orderBy(desc(testAccessTokens.createdAt));
+  }
+
+  async getTestAccessTokenByToken(token: string): Promise<TestAccessToken | undefined> {
+    const [result] = await db.select().from(testAccessTokens).where(eq(testAccessTokens.token, token));
+    return result;
+  }
+
+  async getTestAccessTokenById(id: number): Promise<TestAccessToken | undefined> {
+    const [result] = await db.select().from(testAccessTokens).where(eq(testAccessTokens.id, id));
+    return result;
+  }
+
+  async updateTestAccessToken(id: number, data: Partial<TestAccessToken>): Promise<TestAccessToken | undefined> {
+    const [result] = await db.update(testAccessTokens).set(data).where(eq(testAccessTokens.id, id)).returning();
+    return result;
+  }
+
+  async deleteTestAccessToken(id: number): Promise<void> {
+    await db.delete(testAccessTokens).where(eq(testAccessTokens.id, id));
   }
 }
 

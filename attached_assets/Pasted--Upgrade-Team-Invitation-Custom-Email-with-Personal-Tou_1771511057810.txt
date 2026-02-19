@@ -1,0 +1,151 @@
+# Upgrade Team Invitation — Custom Email with Personal Touch
+
+The current "Invite Team Member" flow sends a generic invitation. We need to upgrade it so the invite email feels personal, warm, and makes the recipient feel like a valued early tester — not just another user.
+
+---
+
+## 1. Update the Invite Form
+
+**File:** Wherever the "Invite Team Member" button/modal lives (likely in the profile/account settings page)
+
+### Add new fields to the invite form:
+- **Email address** (already exists)
+- **Their first name** (new field — so the email can address them personally)
+- **Their role/relationship** (dropdown: Fellow Operator, Manager, Industry Friend, Mentor/Advisor, Other)
+- **Personal message** (optional textarea, pre-filled with a default they can edit):
+
+Default message:
+```
+Hey [first name],
+
+I've been building something I'm really excited about — a restaurant operations platform called The Restaurant Consultant. It's built from everything I've learned running my own restaurants, and I'd love your honest feedback on it.
+
+You know this business better than most, and your perspective would mean a lot to me as I shape this into something that actually helps operators like us.
+
+Take a look when you get a chance — no pressure, no sales pitch. Just want to know if this is something you'd actually use on a Tuesday night when everything's going sideways.
+
+— Ben
+```
+
+- The personal message should be fully editable before sending
+- Pre-fill "[first name]" with whatever they entered in the name field
+- Pre-fill the sign-off with the current user's first name
+
+---
+
+## 2. Build the Custom Email Template
+
+### Email design:
+- Clean, simple design — NOT a heavy marketing email with banners and graphics
+- Should feel like a personal email, not an automated blast
+- Use the app's dark color scheme subtly (dark header bar with logo, otherwise clean white/light email body for readability in email clients)
+
+### Email structure:
+
+```
+─────────────────────────────────────────
+[Chef Hat Logo]  The Restaurant Consultant
+─────────────────────────────────────────
+
+Hey [first name],
+
+[Personal message from the invite form — whatever Ben wrote or the default]
+
+────────────────
+
+Here's what you'll get access to:
+
+🔪 12 operational domains — from kitchen readiness to HR compliance
+📋 Training templates and employee handbooks
+💰 Food cost tools and financial analysis
+🚨 Crisis management playbooks
+💬 An operations consultant for any question
+
+────────────────
+
+[  Accept Invitation  →  ]   (big, clear CTA button)
+
+This invitation expires in 7 days.
+
+────────────────
+
+Questions? Just reply to this email — it goes directly to [Ben's email].
+
+─────────────────────────────────────────
+The Restaurant Consultant
+Systems that work on your worst night.
+─────────────────────────────────────────
+```
+
+### Key email details:
+- **From name:** "[Ben Mouton] via The Restaurant Consultant" (personal, not corporate)
+- **Reply-to:** Set to Ben's actual email address so replies go to him, not a no-reply address
+- **Subject line options** (let the inviter pick or use a smart default):
+  - Default: "Hey [first name] — I'd love your feedback on something I'm building"
+  - Alternative: "[Ben] invited you to try The Restaurant Consultant"
+  - Alternative: "Got 10 minutes? I built something for operators like us"
+- The subject should feel personal, not automated. Default to the first option.
+
+---
+
+## 3. Post-Send Experience
+
+### After the invite is sent:
+- Show a success message: "Invitation sent to [name] at [email]! They have 7 days to accept."
+- Show the sent email preview so Ben can see exactly what was sent
+- Add a "Send another" button for quick batch inviting
+
+### Track invite status:
+- In the Pending Invitations list on the Account Settings page, show:
+  - Recipient name (not just email)
+  - Date sent
+  - Status: Sent → Opened → Accepted (if email tracking is possible) or just Sent → Accepted/Expired
+  - Expiration date
+  - "Resend" button for expired invitations (resend with a fresh link and updated expiration)
+
+---
+
+## 4. Acceptance Landing Page
+
+### When the recipient clicks "Accept Invitation":
+- Don't just dump them on a generic signup page
+- Show a personalized welcome:
+  - "Hey [first name], [Ben] invited you to check out The Restaurant Consultant."
+  - "[Ben]'s message: [personal message preview]"
+  - Simple signup form: Name, email (pre-filled), password
+  - "Create Account & Start Exploring" button
+- After account creation, take them directly to the dashboard with a first-time user experience
+- Consider giving invited users a **free trial period** (7 or 14 days) so they can actually explore before being asked to subscribe — this is critical for getting real feedback
+
+---
+
+## 5. Follow-Up Reminder (Optional but Valuable)
+
+### If the invitation hasn't been accepted after 3 days:
+- Auto-send a gentle reminder email:
+
+```
+Subject: Quick follow-up — still want your take on this
+
+Hey [first name],
+
+Just bumping this — I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.
+
+Here's your invite link: [Accept Invitation →]
+
+Expires in [X] days.
+
+— Ben
+```
+
+- Only send ONE reminder, not a drip campaign — respect their time
+- Let Ben opt out of auto-reminders per invitation if he wants
+
+---
+
+## Priority Order
+1. **Custom email template with personal message** (the core feature)
+2. **Updated invite form with name and editable message** (enables personalization)
+3. **Personalized acceptance landing page** (better first impression)
+4. **Invite status tracking** (visibility into what's working)
+5. **Auto-reminder at 3 days** (increases acceptance rate without being pushy)

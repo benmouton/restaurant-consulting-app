@@ -1,7 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 
-async function fetchUser(): Promise<User | null> {
+async function fetchUser(): Promise<(User & { isTestUser?: boolean; testAccessExpiresAt?: string; testAccessLevel?: string }) | null> {
+  // First check for test access session
+  const testRes = await fetch("/api/test-access/user", { credentials: "include" });
+  if (testRes.ok) {
+    const testUser = await testRes.json();
+    if (testUser) return testUser;
+  }
+
+  // Fall back to normal Replit Auth
   const response = await fetch("/api/auth/user", {
     credentials: "include",
   });
@@ -23,7 +31,7 @@ async function logout(): Promise<void> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading } = useQuery<(User & { isTestUser?: boolean; testAccessExpiresAt?: string; testAccessLevel?: string }) | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
@@ -31,7 +39,15 @@ export function useAuth() {
   });
 
   const logoutMutation = useMutation({
-    mutationFn: logout,
+    mutationFn: async () => {
+      // If test user, clear test session instead
+      if (user?.isTestUser) {
+        await fetch("/api/test-access/logout", { method: "POST", credentials: "include" });
+        window.location.href = "/";
+        return;
+      }
+      window.location.href = "/api/logout";
+    },
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/user"], null);
     },
@@ -41,6 +57,7 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
+    isTestUser: !!user?.isTestUser,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
   };

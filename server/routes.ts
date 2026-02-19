@@ -129,7 +129,31 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/subscription/status", isAuthenticated, async (req: any, res) => {
+  app.get("/api/subscription/status", async (req: any, res, next) => {
+    // Check for test access session first
+    const testAccess = req.session?.testAccess;
+    if (testAccess) {
+      const now = new Date();
+      const expiresAt = new Date(testAccess.expiresAt);
+      if (now <= expiresAt) {
+        const remainingMs = expiresAt.getTime() - now.getTime();
+        const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+        return res.json({
+          hasSubscription: true,
+          subscriptionStatus: "test_access",
+          isTestUser: true,
+          testAccessExpiresAt: testAccess.expiresAt,
+          testAccessRemainingDays: remainingDays,
+          testAccessName: testAccess.name,
+        });
+      } else {
+        delete req.session.testAccess;
+        req.session.save();
+      }
+    }
+    // Fall through to normal auth check
+    return isAuthenticated(req, res, next);
+  }, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUserById(userId);
@@ -591,6 +615,268 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Admin delete user error:', error);
       res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Test Access Token Routes (Admin)
+  app.post("/api/admin/test-access", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { name, email, accessLevel, durationDays } = req.body;
+      if (!name || !durationDays) {
+        return res.status(400).json({ error: "Name and duration are required" });
+      }
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + parseInt(durationDays));
+      
+      const result = await storage.createTestAccessToken({
+        token,
+        name,
+        email: email || null,
+        accessLevel: accessLevel || "full",
+        durationDays: parseInt(durationDays),
+        expiresAt,
+        status: "active",
+        userId: null,
+        createdBy: req.user.claims.sub,
+      });
+      res.json({ ...result, token });
+    } catch (error) {
+      console.error("Create test access error:", error);
+      res.status(500).json({ error: "Failed to create test access token" });
+    }
+  });
+
+  app.get("/api/admin/test-access", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const tokens = await storage.getTestAccessTokens();
+      res.json(tokens);
+    } catch (error) {
+      console.error("Get test access tokens error:", error);
+      res.status(500).json({ error: "Failed to fetch test access tokens" });
+    }
+  });
+
+  app.patch("/api/admin/test-access/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { action, additionalDays } = req.body;
+      const token = await storage.getTestAccessTokenById(id);
+      if (!token) {
+        return res.status(404).json({ error: "Token not found" });
+      }
+
+      if (action === "revoke") {
+        const result = await storage.updateTestAccessToken(id, {
+          status: "revoked",
+          revokedAt: new Date(),
+        });
+        return res.json(result);
+      }
+
+      if (action === "extend" && additionalDays) {
+        const newExpiry = new Date(token.expiresAt);
+        newExpiry.setDate(newExpiry.getDate() + parseInt(additionalDays));
+        const result = await storage.updateTestAccessToken(id, {
+          expiresAt: newExpiry,
+          status: "active",
+          durationDays: token.durationDays + parseInt(additionalDays),
+        });
+        return res.json(result);
+      }
+
+      if (action === "resend") {
+        const newToken = crypto.randomBytes(32).toString("hex");
+        const newExpiry = new Date();
+        newExpiry.setDate(newExpiry.getDate() + token.durationDays);
+        const result = await storage.updateTestAccessToken(id, {
+          token: newToken,
+          expiresAt: newExpiry,
+          status: "active",
+          usedAt: null,
+          userId: null,
+          revokedAt: null,
+        });
+        return res.json({ ...result, token: newToken });
+      }
+
+      res.status(400).json({ error: "Invalid action" });
+    } catch (error) {
+      console.error("Update test access error:", error);
+      res.status(500).json({ error: "Failed to update test access token" });
+    }
+  });
+
+  app.delete("/api/admin/test-access/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteTestAccessToken(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete test access error:", error);
+      res.status(500).json({ error: "Failed to delete test access token" });
+    }
+  });
+
+  // Public test access activation route
+  app.get("/api/test-access/:token/validate", async (req: any, res) => {
+    try {
+      const tokenRecord = await storage.getTestAccessTokenByToken(req.params.token);
+      if (!tokenRecord) {
+        return res.json({ valid: false, reason: "invalid" });
+      }
+      if (tokenRecord.status === "revoked") {
+        return res.json({ valid: false, reason: "revoked" });
+      }
+      if (new Date() > new Date(tokenRecord.expiresAt)) {
+        if (tokenRecord.status !== "expired") {
+          await storage.updateTestAccessToken(tokenRecord.id, { status: "expired" });
+        }
+        return res.json({ valid: false, reason: "expired" });
+      }
+      res.json({ valid: true, name: tokenRecord.name, accessLevel: tokenRecord.accessLevel });
+    } catch (error) {
+      console.error("Validate test access error:", error);
+      res.status(500).json({ error: "Failed to validate token" });
+    }
+  });
+
+  app.post("/api/test-access/:token/activate", async (req: any, res) => {
+    try {
+      const tokenRecord = await storage.getTestAccessTokenByToken(req.params.token);
+      if (!tokenRecord) {
+        return res.status(404).json({ error: "Invalid token" });
+      }
+      if (tokenRecord.status === "revoked") {
+        return res.status(403).json({ error: "This link has been revoked" });
+      }
+      if (new Date() > new Date(tokenRecord.expiresAt)) {
+        await storage.updateTestAccessToken(tokenRecord.id, { status: "expired" });
+        return res.status(403).json({ error: "This link has expired" });
+      }
+
+      // Create a test user ID based on the token
+      const testUserId = `test_${tokenRecord.id}`;
+      
+      // Check if user already exists for this token
+      let user = await storage.getUserById(testUserId);
+      if (!user) {
+        // Create test user in DB
+        await db.insert((await import("@shared/schema")).users).values({
+          id: testUserId,
+          firstName: tokenRecord.name,
+          lastName: "(Test)",
+          email: tokenRecord.email,
+          role: "owner",
+          subscriptionStatus: "test_access",
+          isAdmin: "false",
+        });
+        user = await storage.getUserById(testUserId);
+      }
+
+      // Mark token as used
+      if (!tokenRecord.usedAt) {
+        await storage.updateTestAccessToken(tokenRecord.id, {
+          status: "used",
+          usedAt: new Date(),
+          userId: testUserId,
+        });
+      }
+
+      // Set test access session
+      if (req.session) {
+        req.session.testAccess = {
+          userId: testUserId,
+          tokenId: tokenRecord.id,
+          expiresAt: tokenRecord.expiresAt,
+          accessLevel: tokenRecord.accessLevel,
+          name: tokenRecord.name,
+        };
+        req.session.save();
+      }
+
+      res.json({ success: true, userId: testUserId });
+    } catch (error) {
+      console.error("Activate test access error:", error);
+      res.status(500).json({ error: "Failed to activate test access" });
+    }
+  });
+
+  // Test access session status (for banner and subscription bypass)
+  app.get("/api/test-access/status", async (req: any, res) => {
+    try {
+      const testAccess = req.session?.testAccess;
+      if (!testAccess) {
+        return res.json({ active: false });
+      }
+      
+      const now = new Date();
+      const expiresAt = new Date(testAccess.expiresAt);
+      if (now > expiresAt) {
+        delete req.session.testAccess;
+        req.session.save();
+        return res.json({ active: false, expired: true });
+      }
+
+      const remainingMs = expiresAt.getTime() - now.getTime();
+      const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+
+      res.json({
+        active: true,
+        name: testAccess.name,
+        accessLevel: testAccess.accessLevel,
+        expiresAt: testAccess.expiresAt,
+        remainingDays,
+        userId: testAccess.userId,
+      });
+    } catch (error) {
+      console.error("Test access status error:", error);
+      res.status(500).json({ error: "Failed to get test access status" });
+    }
+  });
+
+  // Test access user info (mimics /api/auth/user for test sessions)
+  app.get("/api/test-access/user", async (req: any, res) => {
+    try {
+      const testAccess = req.session?.testAccess;
+      if (!testAccess) {
+        return res.json(null);
+      }
+      
+      const now = new Date();
+      const expiresAt = new Date(testAccess.expiresAt);
+      if (now > expiresAt) {
+        delete req.session.testAccess;
+        req.session.save();
+        return res.json(null);
+      }
+
+      const user = await storage.getUserById(testAccess.userId);
+      if (!user) {
+        return res.json(null);
+      }
+
+      res.json({
+        ...user,
+        isTestUser: true,
+        testAccessExpiresAt: testAccess.expiresAt,
+        testAccessLevel: testAccess.accessLevel,
+      });
+    } catch (error) {
+      console.error("Test access user error:", error);
+      res.status(500).json({ error: "Failed to get test user" });
+    }
+  });
+
+  app.post("/api/test-access/logout", async (req: any, res) => {
+    try {
+      if (req.session?.testAccess) {
+        delete req.session.testAccess;
+        req.session.save();
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to logout" });
     }
   });
 
