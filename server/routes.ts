@@ -644,10 +644,9 @@ export async function registerRoutes(
 
       let emailSent = false;
       if (email) {
-        const protocol = process.env.REPL_SLUG ? 'https' : 'http';
-        const host = process.env.REPL_SLUG 
-          ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-          : 'localhost:5000';
+        const reqHost = req.get('host') || '';
+        const protocol = reqHost.includes('localhost') ? 'http' : 'https';
+        const host = reqHost || 'localhost:5000';
         const accessLink = `${protocol}://${host}/test-access/${token}`;
 
         const adminUser = await storage.getUserById(req.user.claims.sub);
@@ -734,10 +733,9 @@ export async function registerRoutes(
         if (!token.email) {
           return res.status(400).json({ error: "No email address on this token" });
         }
-        const protocol = process.env.REPL_SLUG ? 'https' : 'http';
-        const host = process.env.REPL_SLUG 
-          ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-          : 'localhost:5000';
+        const reqHost = req.get('host') || '';
+        const protocol = reqHost.includes('localhost') ? 'http' : 'https';
+        const host = reqHost || 'localhost:5000';
         const accessLink = `${protocol}://${host}/test-access/${token.token}`;
 
         const adminUser = await storage.getUserById(req.user.claims.sub);
@@ -4573,10 +4571,11 @@ async function processInviteReminders() {
       ));
 
       const inviterName = [inviter.firstName, inviter.lastName].filter(Boolean).join(' ') || 'Your colleague';
-      const protocol = process.env.REPL_SLUG ? 'https' : 'http';
-      const host = process.env.REPL_SLUG 
-        ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-        : 'localhost:5000';
+      const deployedDomain = process.env.REPLIT_DEPLOYMENT 
+        ? (process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || '')
+        : (process.env.REPLIT_DEV_DOMAIN || '');
+      const host = deployedDomain || 'localhost:5000';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
       const inviteLink = `${protocol}://${host}/accept-invite/${invite.inviteToken}`;
 
       const sent = await sendInviteReminderEmail({
