@@ -444,7 +444,7 @@ export default function SocialPostBuilder() {
       case 'instagram': return 'bg-gradient-to-tr from-purple-600 via-pink-500 to-orange-400';
       case 'google_business': return 'bg-blue-500';
       case 'linkedin': return 'bg-blue-700';
-      case 'x': return 'bg-black dark:bg-white';
+      case 'x': return 'bg-black dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600';
       default: return 'bg-muted-foreground';
     }
   };
