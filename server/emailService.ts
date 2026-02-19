@@ -38,6 +38,15 @@ async function getResendClient() {
   };
 }
 
+function buildFromAddress(displayName: string, fromEmail: string | undefined): string {
+  if (!fromEmail) {
+    return `${displayName} <noreply@restaurantai.consulting>`;
+  }
+  const emailMatch = fromEmail.match(/<(.+)>/);
+  const bareEmail = emailMatch ? emailMatch[1] : fromEmail.trim();
+  return `${displayName} <${bareEmail}>`;
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -91,13 +100,10 @@ export async function sendOrganizationInviteEmail(
     const subject = opts.subjectLine || `Hey ${recipientFirst} — I'd love your feedback on something I'm building`;
 
     const fromDisplay = `${opts.inviterName} via The Restaurant Consultant`;
-    const senderFrom = fromEmail 
-      ? fromEmail.replace(/<.*>/, '').trim() 
-        ? fromEmail.replace(/^[^<]*/, `${fromDisplay} `) 
-        : `${fromDisplay} <${fromEmail}>`
-      : `${fromDisplay} <noreply@restaurantai.consulting>`;
+    const senderFrom = buildFromAddress(fromDisplay, fromEmail);
 
-    const fromEmailAddr = fromEmail?.match(/<(.+)>/)?.[1] || fromEmail || 'noreply@restaurantai.consulting';
+    const emailMatch = fromEmail?.match(/<(.+)>/);
+    const fromEmailAddr = emailMatch ? emailMatch[1] : (fromEmail?.trim() || 'noreply@restaurantai.consulting');
 
     const messageHtml = opts.personalMessage 
       ? nl2br(opts.personalMessage)
@@ -150,10 +156,9 @@ export async function sendInviteReminderEmail(opts: {
 
     const recipientFirst = opts.recipientName || '';
     const fromDisplay = `${opts.inviterName} via The Restaurant Consultant`;
-    const senderFrom = fromEmail 
-      ? fromEmail.replace(/^[^<]*/, `${fromDisplay} `) 
-      : `${fromDisplay} <noreply@restaurantai.consulting>`;
-    const fromEmailAddr = fromEmail?.match(/<(.+)>/)?.[1] || fromEmail || 'noreply@restaurantai.consulting';
+    const senderFrom = buildFromAddress(fromDisplay, fromEmail);
+    const emailMatch2 = fromEmail?.match(/<(.+)>/);
+    const fromEmailAddr = emailMatch2 ? emailMatch2[1] : (fromEmail?.trim() || 'noreply@restaurantai.consulting');
 
     const messageHtml = `Just bumping this &mdash; I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.`;
 
@@ -203,9 +208,7 @@ export async function sendTestAccessEmail(opts: {
     const fromDisplay = opts.senderName 
       ? `${opts.senderName} via The Restaurant Consultant`
       : 'The Restaurant Consultant';
-    const senderFrom = fromEmail 
-      ? fromEmail.replace(/^[^<]*/, `${fromDisplay} `) 
-      : `${fromDisplay} <noreply@restaurantai.consulting>`;
+    const senderFrom = buildFromAddress(fromDisplay, fromEmail);
 
     const recipientFirst = opts.recipientName.split(' ')[0];
     const greeting = `Hey ${escapeHtml(recipientFirst)},`;
