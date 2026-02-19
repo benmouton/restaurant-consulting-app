@@ -77,16 +77,18 @@ function Router() {
         </Route>
         <Route path="/financial">
           {user ? (
-            <SubscriptionGate>
+            <ProtectedPage component={() => (
               <RoleGate requiredRole={USER_ROLES.OWNER}>
                 <FinancialPage />
               </RoleGate>
-            </SubscriptionGate>
+            )} />
           ) : <Landing />}
         </Route>
-        <Route path="/admin" component={AdminDashboard} />
+        <Route path="/admin">
+          {user ? <ProtectedPage component={AdminDashboard} /> : <Landing />}
+        </Route>
         <Route path="/profile">
-          {user ? <ProfilePage /> : <Landing />}
+          {user ? <ProtectedPage component={ProfilePage} /> : <Landing />}
         </Route>
         <Route path="/messages">
           {user ? <ProtectedPage component={MessagesPage} /> : <Landing />}
