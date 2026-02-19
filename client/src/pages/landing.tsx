@@ -574,9 +574,11 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-4 border-t border-border">
-        <div className="container mx-auto text-center text-sm text-muted-foreground">
-          <div className="flex flex-wrap items-center justify-center gap-4 mb-2">
+      <footer className="py-10 px-4 border-t border-border">
+        <div className="container mx-auto flex flex-col items-center gap-4 text-sm text-muted-foreground">
+          <BrandLogoNav linkTo="/" />
+          <p className="italic text-xs text-muted-foreground">Systems that work on your worst night.</p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link href="/privacy" className="hover:underline" data-testid="link-privacy">Privacy Policy</Link>
             <span>|</span>
             <Link href="/terms" className="hover:underline" data-testid="link-terms">Terms of Service</Link>

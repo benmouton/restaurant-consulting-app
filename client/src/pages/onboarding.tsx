@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ChefHat, Loader2, Crown, Users, ClipboardList, ArrowRight, ArrowLeft, SkipForward } from "lucide-react";
 import { USER_ROLES, type User, type UserRole } from "@shared/models/auth";
-import { BrandLogoNav } from "@/components/BrandLogo";
+import { BrandLogoNav, BrandLogoWithTagline } from "@/components/BrandLogo";
 
 interface OnboardingPageProps {
   user: User;
@@ -139,8 +139,8 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
           {step === 1 && (
             <div className="space-y-6">
               <div className="text-center mb-6">
-                <div className="inline-flex p-3 rounded-full bg-primary/10 mb-4">
-                  <ChefHat className="h-8 w-8 text-primary" />
+                <div className="flex justify-center mb-4">
+                  <BrandLogoWithTagline />
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight" data-testid="text-onboarding-title">Let's get you set up</h1>
                 <p className="text-muted-foreground mt-1">Tell us about yourself so we can personalize your experience.</p>

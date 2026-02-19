@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Calendar, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { BrandLogoFull } from "@/components/BrandLogo";
 
 export default function EmployeeLoginPage() {
   const [, setLocation] = useLocation();
@@ -42,10 +43,10 @@ export default function EmployeeLoginPage() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-            <Calendar className="h-8 w-8 text-primary" />
+          <div className="flex justify-center mb-4">
+            <BrandLogoFull />
           </div>
-          <CardTitle className="text-2xl">Staff Portal</CardTitle>
+          <CardTitle className="text-2xl" data-testid="text-staff-portal-title">Staff Portal</CardTitle>
           <CardDescription>
             Sign in to view your schedule and announcements
           </CardDescription>

@@ -1,0 +1,175 @@
+# Logo & Brand Identity — The Restaurant Consultant
+
+## Brand Name
+**The Restaurant Consultant**
+
+## Tagline Options (implement the one the owner chooses, default to Option 1)
+1. "Systems That Work on Your Worst Night"
+2. "Every Service, Backed by Systems"
+3. "Built for the Real Kitchen, Real Floor"
+
+---
+
+## Logo Design Requirements
+
+### Keep the existing chef hat icon
+- The app already has a cyan chef hat outline icon in the nav bar — **keep this exact icon**
+- Do NOT redesign or replace the chef hat — it's already associated with the brand
+- The chef hat should be placed inside a thin circular border (emblem style)
+
+### Logo Structure
+The logo has three elements:
+1. **Chef hat icon** inside a circle (existing icon, cyan stroke, no fill)
+2. **"The Restaurant"** — serif font (Playfair Display), larger, primary text color (white on dark, dark on light)
+3. **"Consultant"** — sans-serif font (DM Sans), small caps, wide letter-spacing (3-4px), uppercase, cyan color
+
+Layout:
+```
+[Chef hat in circle]  The Restaurant
+                      CONSULTANT
+```
+
+The icon sits to the left. Text stacks vertically to the right of the icon. "The Restaurant" is the dominant line. "CONSULTANT" sits directly below in smaller, spaced-out uppercase.
+
+### Create Multiple Sizes
+
+**Full logo (landing page, marketing):**
+- Icon: 52px circle
+- "The Restaurant": 20px Playfair Display, font-weight 600
+- "CONSULTANT": 11px DM Sans, font-weight 600, letter-spacing 3px, uppercase
+
+**Nav logo (top navigation bar):**
+- Icon: 36px circle
+- "The Restaurant": 15px Playfair Display, font-weight 600
+- "CONSULTANT": 8.5px DM Sans, font-weight 600, letter-spacing 2.5px, uppercase
+- This needs to fit comfortably in the existing nav bar height
+
+**Icon only (favicon, app icon, mobile):**
+- Just the chef hat inside the circle
+- Must be legible at 16px, 32px, and 48px
+- At 16px, increase stroke width so it remains visible
+
+### Color Specifications
+
+**On dark backgrounds (#0d1117):**
+- Circle border: #22d3ee (cyan)
+- Chef hat stroke: #22d3ee
+- "The Restaurant": #ffffff
+- "CONSULTANT": #22d3ee
+
+**On light backgrounds (#f5f5f0 or white):**
+- Circle border: #0e7490 (darker teal)
+- Chef hat stroke: #0e7490
+- "The Restaurant": #0d1117
+- "CONSULTANT": #0e7490
+
+---
+
+## Where to Apply the Logo
+
+### 1. Navigation Bar (logged-in state)
+- Replace the current "Restaurant AI Consulting" or "The Restaurant Consultant" text + icon in the top nav
+- Use the **Nav size** logo
+- The logo should link back to the dashboard (home route)
+- Make sure it doesn't crowd the nav links — the nav logo should take up roughly the same space as the current one
+
+### 2. Navigation Bar (landing page / logged-out state)
+- Same nav size logo, left-aligned
+- "Sign In" button on the right
+- Clean, minimal nav — just the logo and sign in
+
+### 3. Landing Page Hero
+- The nav bar uses the nav size logo
+- Optionally, use the full size logo centered above the hero headline for extra brand presence
+- Below the logo or headline, show the tagline in a subtle, smaller font
+
+### 4. Favicon
+- Update `/public/favicon.png` with the icon-only version (chef hat in circle)
+- Update `/public/apple-touch-icon.png` with the icon-only version at 180x180px
+- Update `manifest.json` with the new name "The Restaurant Consultant"
+
+### 5. Loading State
+- The app shows a loading spinner/message on initial load — update any branding there to use the new logo
+
+### 6. Onboarding / Auth Pages
+- Login, signup, and onboarding pages should show the full logo centered at the top
+
+### 7. Employee Portal
+- The employee login page (`/employee/login`) should show the logo
+- Consider a slightly different treatment: logo + "Employee Portal" subtitle
+
+---
+
+## Tagline Placement
+
+The tagline should appear in these locations:
+
+1. **Landing page** — below the hero headline or below the logo in the nav area. Style: 14px, DM Sans, color #8b949e (muted gray), italic or normal weight
+2. **Login/Signup page** — below the logo, centered
+3. **Footer** — next to the logo or below it
+4. **Meta description** — update the HTML meta description to include the tagline
+5. **NOT in the nav bar** — the nav should stay clean with just the logo
+
+---
+
+## Update manifest.json
+
+```json
+{
+  "name": "The Restaurant Consultant",
+  "short_name": "TRC",
+  "description": "Systems That Work on Your Worst Night",
+  ...keep existing properties...
+}
+```
+
+---
+
+## Update index.html
+
+```html
+<title>The Restaurant Consultant</title>
+<meta name="description" content="The Restaurant Consultant — Systems that work on your worst night. Restaurant operations consulting platform for independent owners and operators." />
+<meta name="apple-mobile-web-app-title" content="The Restaurant Consultant" />
+```
+
+---
+
+## Typography Rules (for the whole app, not just the logo)
+
+While updating the logo, also consolidate fonts across the app:
+
+**Keep only these Google Fonts:**
+- **Playfair Display** — for headings, the logo "The Restaurant" text, and page titles
+- **DM Sans** — for body text, UI elements, buttons, form labels, and the logo "CONSULTANT" text
+
+**Remove all other fonts from index.html.** The current font import loads ~30 families. Strip it down to just these two. This will dramatically improve page load speed.
+
+Updated font import:
+```html
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+```
+
+Update CSS variables or Tailwind config to use:
+- `--font-heading: 'Playfair Display', serif`
+- `--font-body: 'DM Sans', sans-serif`
+
+Apply consistently:
+- Page titles and section headings → Playfair Display
+- Everything else (body, buttons, labels, nav links, descriptions) → DM Sans
+
+---
+
+## Summary Checklist
+- [ ] Create logo component with Full, Nav, and Icon-only variants
+- [ ] Apply nav logo to the main navigation bar (logged in and logged out)
+- [ ] Update landing page with new logo and tagline
+- [ ] Update favicon and apple-touch-icon
+- [ ] Update manifest.json
+- [ ] Update index.html title and meta tags
+- [ ] Update login/signup/onboarding pages with new logo
+- [ ] Update employee portal pages with new logo
+- [ ] Add tagline to landing page, login page, and footer
+- [ ] Strip Google Fonts down to Playfair Display and DM Sans only
+- [ ] Update CSS/Tailwind to use the two-font system consistently
+- [ ] Test at all breakpoints — logo should be readable on mobile
