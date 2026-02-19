@@ -1,0 +1,151 @@
+Restaurant AI Consulting — UI/UX Implementation Changes
+I need you to implement the following UI/UX improvements across my Restaurant AI Consulting app. Work through them one at a time, testing as you go.
+
+1. Smart Dashboard with Time-Based Priority Highlights
+File: src/pages/dashboard.tsx (or wherever the domain card grid lives)
+What to change:
+
+Add a "Priority Right Now" section at the top of the dashboard, above the full domain grid
+Show 2-3 domain cards highlighted based on current day/time:
+
+Before 11am weekdays: Show "Staffing & Labor" (pre-shift planning) and "Kitchen Operations" (prep)
+11am-2pm: Show "Service Standards" and "Cost & Margin Control"
+3pm-5pm (pre-dinner): Show "Staffing & Labor" (dinner staffing) and "Training Systems"
+Friday/Saturday: Always include "Crisis Management" in the priority row
+Monday: Always include "Cost & Margin Control" and "HR & Documentation"
+
+
+Style the priority cards slightly differently — give them a subtle cyan/teal left border or glow to distinguish them from the regular grid below
+Add a small label above them like "Priority for tonight" or "Focus for this morning"
+Keep the full 12-card grid below, unchanged
+
+
+2. Fix Onboarding Modal Timing
+File: src/components/onboarding-modal.tsx and src/App.tsx
+What to change:
+
+Instead of showing the onboarding modal as an overlay on top of the domain page content, trigger it BEFORE the user sees any domain content
+On first login (when the user hasn't completed onboarding), route them to a dedicated full-screen onboarding flow — not a modal
+Create a new component or page: src/pages/onboarding.tsx (or convert the modal to a full-page layout)
+The flow should be:
+
+Full-screen page with the same form fields (Restaurant Name, Type, Seat Count, Staff Count)
+Multi-step wizard (keep the existing steps)
+After completion, redirect to the dashboard
+
+
+Add a "Skip for now" option that takes them to the dashboard but shows a subtle banner reminding them to complete setup
+In App.tsx, add routing logic: if user && !user.onboardingComplete → show onboarding page instead of dashboard
+
+
+3. Make AI Tool Forms Feel More Dynamic
+Files: The domain page components that contain the Guest Recovery Decision Advisor, Labor Demand & Cut-Decision Engine, and similar AI forms
+What to change for ALL AI tool forms across the app:
+Add sample output previews
+
+Below each "Get Recovery Advice" / "Generate Staffing Plan" button, add a collapsed section: "See example output →"
+When clicked, show a brief sample of what the AI response looks like (use realistic placeholder text)
+This helps users understand the value before they fill in the form
+
+Improve the submit buttons
+
+Add a subtle loading state with a shimmer/pulse animation when the AI is generating
+Change button text while loading: "Analyzing..." or "Building your plan..."
+Add a sparkle/AI icon animation on hover
+
+Add smart defaults
+
+Pre-fill the day field with today's actual day (you're already showing dates elsewhere)
+Pre-fill daypart based on current time (Lunch if before 3pm, Dinner if after)
+If the user has filled in their restaurant info during onboarding, pre-fill Average Check and Staff Count from their profile
+
+
+4. Improve the Content Library Accordions
+Files: Domain page components — the Principle, Framework, Checklist, Script accordion sections
+What to change:
+
+Add a count badge next to each accordion header showing how many items are inside, e.g. "Core Principle (1)" or "Checklists (4)"
+Show a 1-line preview snippet below the accordion title (before expanding), pulled from the first item's content
+Add a subtle icon or color-coded tag for each type that's consistent:
+
+Principle = amber/gold
+Framework = blue
+Checklist = green
+Script = purple
+
+
+These colors may already exist based on the screenshots — just make sure they're used consistently and the badges/previews are added
+
+
+5. Tighten Typography on Dashboard
+File: src/pages/dashboard.tsx
+What to change:
+
+Reduce the "Welcome, Ben" heading size — it's currently very large relative to the rest of the page. Bring it down to something like text-3xl or text-2xl instead of what looks like text-5xl
+Add a brief contextual subtitle below the welcome that changes based on time:
+
+Morning: "Here's what to focus on before service"
+Afternoon: "Mid-shift priorities"
+Evening: "Closing out the day"
+
+
+Tighten the spacing between the welcome section and the domain grid
+
+
+6. Consolidate Navigation
+File: src/components/ — wherever the top nav bar is defined
+What to change:
+
+The nav currently shows: Templates, Playbooks, Financial, Certification, Ask Consultant, Admin
+Group "Templates" and "Playbooks" under a single dropdown called "Resources" (or "Library")
+Group "Financial" and "Certification" under a dropdown called "Tools"
+Keep "Ask Consultant" as a standalone nav item — it's a key feature and should be prominent
+Keep "Admin" visible but consider moving it to the user avatar dropdown menu instead of the main nav
+This reduces the nav from 6 items to 3: Resources, Tools, Ask Consultant
+Make sure the nav is responsive — on mobile, collapse into a hamburger menu
+
+
+7. Secure the Admin Route
+File: src/App.tsx
+What to change:
+
+The /admin route currently has NO authentication or role protection:
+
+tsx  <Route path="/admin" component={AdminDashboard} />
+
+Wrap it with auth and role checks:
+
+tsx  <Route path="/admin">
+    {user ? (
+      <RoleGate requiredRole={USER_ROLES.ADMIN}>
+        <AdminDashboard />
+      </RoleGate>
+    ) : <Landing />}
+  </Route>
+
+Make sure non-admin users who somehow navigate to /admin see a "Not authorized" message or get redirected
+
+
+8. Reduce Google Fonts Loading
+File: index.html
+What to change:
+
+You're currently loading ~30 Google Font families in a single massive request. This kills page load performance.
+Audit which fonts are actually used in your CSS/components
+Keep only the fonts you're actually using (probably 2-3 max: likely Inter or DM Sans for body, maybe one accent font)
+Remove all unused font imports from the <link> tag
+Add &display=swap to the remaining font URL if not already present (it is, good)
+Consider self-hosting the fonts for even better performance
+
+
+Priority Order
+Implement in this order (highest impact first):
+
+#7 — Secure admin route (security fix, do this first)
+#8 — Reduce fonts (quick performance win)
+#1 — Smart dashboard priorities (biggest UX improvement)
+#5 — Typography fixes (quick visual improvement)
+#6 — Nav consolidation (cleaner navigation)
+#4 — Accordion improvements (content discoverability)
+#3 — AI form enhancements (polish)
+#2 — Onboarding flow (largest refactor, save for last)
