@@ -26,7 +26,7 @@ import {
   TrendingUp,
   Flame
 } from "lucide-react";
-import logoImage from "@/assets/logo.png";
+import { BrandLogoNav } from "@/components/BrandLogo";
 import screenshotKitchen from "@/assets/images/screenshot-kitchen.png";
 import screenshotHr from "@/assets/images/screenshot-hr.png";
 import screenshotFoodcost from "@/assets/images/screenshot-foodcost.png";
@@ -190,11 +190,7 @@ export default function Landing() {
       {/* Header */}
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <img src={logoImage} alt="Restaurant Operations Consulting" className="h-9 w-9 rounded-lg object-contain shrink-0" />
-            <span className="text-lg font-bold truncate hidden sm:inline">Restaurant Operations Consulting</span>
-            <span className="text-lg font-bold truncate sm:hidden">ROC</span>
-          </div>
+          <BrandLogoNav linkTo="/" />
           <Button asChild data-testid="button-login-header">
             <a href="/api/login">Sign In</a>
           </Button>
@@ -223,8 +219,11 @@ export default function Landing() {
               </a>
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-4">
-            Then $10/month. No contracts. Cancel anytime. Works on your worst nights.
+          <p className="text-sm text-primary font-medium italic mt-4" data-testid="text-tagline">
+            Systems that work on your worst night.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Then $10/month. No contracts. Cancel anytime.
           </p>
           <p className="text-sm font-medium mt-3" data-testid="text-social-proof">
             Built by Ben Mouton — restaurant owner, operator, and consultant.
@@ -557,10 +556,10 @@ export default function Landing() {
             Start Building Real Systems Today
           </h2>
           <p className="text-primary-foreground/80 mb-3">
-            $10/month. 12 operational domains. Expert consultant included. 
+            Systems that work on your worst night. $10/month. No contracts.
           </p>
           <p className="text-primary-foreground/70 mb-8 text-sm">
-            If it wouldn't hold up during a slammed dinner rush, it's not in here.
+            12 operational domains. Expert consultant included. If it wouldn't hold up during a slammed dinner rush, it's not in here.
           </p>
           <Button size="lg" variant="secondary" asChild data-testid="button-cta-bottom">
             <a href="/api/login">
@@ -582,7 +581,7 @@ export default function Landing() {
             <span>|</span>
             <Link href="/terms" className="hover:underline" data-testid="link-terms">Terms of Service</Link>
           </div>
-          <p>&copy; 2026 Restaurant Operations Consulting. Built by operators, for operators.</p>
+          <p>&copy; 2026 The Restaurant Consultant. All rights reserved.</p>
         </div>
       </footer>
     </div>

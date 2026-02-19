@@ -1,7 +1,13 @@
 # The Restaurant Consultant
 
 ## Overview
+**Brand Name:** The Restaurant Consultant
+**Tagline:** "Systems that work on your worst night."
+**Logo:** CSS-based chef hat emblem + "The Restaurant / CONSULTANT" text, implemented as React component (`BrandLogo.tsx`)
+
 A full-stack web application for restaurant owners and operators, designed to build durable operational systems. It offers an expert operations consultant, operational framework content, training templates, and staff management tools. The project's vision is to provide independent restaurants with repeatable systems to overcome operational challenges and foster discipline. Key capabilities include comprehensive staff scheduling, employee portal access, labor demand analysis, food costing, and an expert-driven leadership command center.
+
+**Important:** The word "AI" must never appear anywhere a user can see it. The technology is invisible. The expertise is the product. System prompts in backend code are the only exception.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

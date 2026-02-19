@@ -324,7 +324,7 @@ export default function ConsultantPage() {
             </Button>
             <div className="flex items-center gap-2">
               <ChefHat className="h-5 w-5 text-primary" />
-              <span className="font-bold text-sm sm:text-base" data-testid="text-page-title">Operations Consultant</span>
+              <span className="font-bold text-sm sm:text-base" data-testid="text-page-title">The Consultant</span>
             </div>
           </div>
           <div className="flex items-center gap-1 flex-wrap">

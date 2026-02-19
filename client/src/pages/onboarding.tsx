@@ -63,7 +63,7 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
       queryClient.setQueryData(["/api/auth/user"], updatedUser);
       localStorage.removeItem("onboarding-skipped");
       toast({
-        title: "Welcome to Restaurant Operations Consulting!",
+        title: "Welcome to The Restaurant Consultant!",
         description: `Your experience is now personalized for ${updatedUser.restaurantName}.`,
       });
       navigate("/");
@@ -107,8 +107,8 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex items-center justify-between px-6 py-4 border-b">
         <div className="flex items-center gap-3">
-          <img src={logoImage} alt="Restaurant Operations Consulting" className="h-8 w-8 rounded-xl object-contain ring-1 ring-primary/20" />
-          <span className="font-bold text-sm tracking-tight">Restaurant Operations Consulting</span>
+          <img src={logoImage} alt="The Restaurant Consultant" className="h-8 w-8 rounded-xl object-contain ring-1 ring-primary/20" />
+          <span className="font-bold text-sm tracking-tight">The Restaurant Consultant</span>
         </div>
         <Button
           variant="ghost"

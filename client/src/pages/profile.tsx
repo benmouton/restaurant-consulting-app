@@ -726,7 +726,7 @@ export default function ProfilePage() {
                     <div>
                       <p className="text-sm font-medium">Upgrade to unlock all features</p>
                       <p className="text-xs text-muted-foreground">
-                        Get access to the AI consultant, financial analysis, training templates, and more for $10/month
+                        Get access to the consultant, financial analysis, training templates, and more for $10/month
                       </p>
                     </div>
                     <Button 

@@ -19,13 +19,13 @@ export default function TermsOfService() {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl" data-testid="text-terms-title">Terms of Service</CardTitle>
-            <p className="text-muted-foreground">Restaurant Operations Consulting</p>
+            <p className="text-muted-foreground">The Restaurant Consultant</p>
             <p className="text-sm text-muted-foreground">Effective Date: January 23, 2026</p>
           </CardHeader>
           <CardContent className="prose prose-neutral dark:prose-invert max-w-none space-y-6">
             <p className="text-muted-foreground">
-              These Terms of Service ("Terms") govern your access to and use of Restaurant Operations Consulting 
-              (the "App," "Service," "Platform"), operated by Restaurant Operations Consulting ("we," "us," or "our").
+              These Terms of Service ("Terms") govern your access to and use of The Restaurant Consultant 
+              (the "App," "Service," "Platform"), operated by The Restaurant Consultant ("we," "us," or "our").
             </p>
             <p className="text-muted-foreground">
               By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, 
@@ -35,7 +35,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold mb-3">1. Description of the Service</h2>
               <p className="text-muted-foreground mb-3">
-                Restaurant Operations Consulting provides restaurant operators with tools, guidance, automation, 
+                The Restaurant Consultant provides restaurant operators with tools, guidance, automation, 
                 and expert-driven features related to operations, training, marketing, scheduling, social media, 
                 and business management.
               </p>
@@ -122,7 +122,7 @@ export default function TermsOfService() {
                 <li>Final decisions and actions remain your responsibility</li>
               </ul>
               <p className="text-muted-foreground mt-3">
-                <strong>Restaurant Operations Consulting is not liable for decisions made based on generated content.</strong>
+                <strong>The Restaurant Consultant is not liable for decisions made based on generated content.</strong>
               </p>
             </section>
 
@@ -145,7 +145,7 @@ export default function TermsOfService() {
               <h2 className="text-xl font-semibold mb-3">8. Intellectual Property</h2>
               <p className="text-muted-foreground mb-3">
                 All content, software, designs, text, graphics, and features of the Service are owned by or 
-                licensed to Restaurant Operations Consulting and are protected by intellectual property laws.
+                licensed to The Restaurant Consultant and are protected by intellectual property laws.
               </p>
               <p className="text-muted-foreground mb-2">
                 You are granted a limited, non-exclusive, non-transferable license to use the Service for 
@@ -189,7 +189,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold mb-3">12. Limitation of Liability</h2>
               <p className="text-muted-foreground mb-2">
-                To the maximum extent permitted by law, Restaurant Operations Consulting shall not be liable for:
+                To the maximum extent permitted by law, The Restaurant Consultant shall not be liable for:
               </p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-1">
                 <li>Indirect, incidental, or consequential damages</li>
@@ -205,7 +205,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold mb-3">13. Indemnification</h2>
               <p className="text-muted-foreground mb-2">
-                You agree to indemnify and hold harmless Restaurant Operations Consulting from any claims, damages, 
+                You agree to indemnify and hold harmless The Restaurant Consultant from any claims, damages, 
                 losses, or expenses arising from:
               </p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-1">

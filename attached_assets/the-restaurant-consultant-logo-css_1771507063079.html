@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Restaurant Consultant — Logo System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'DM Sans', sans-serif;
+    padding: 40px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: #666;
+    margin-bottom: 60px;
+  }
+  .logo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .logo-card {
+    border: 1px solid #1a1a1a;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .logo-card .preview {
+    padding: 60px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+  }
+  .logo-card .preview.dark { background: #0d1117; }
+  .logo-card .preview.light { background: #f5f5f0; }
+  .logo-card .label {
+    padding: 16px 24px;
+    background: #111;
+    border-top: 1px solid #1a1a1a;
+    font-size: 13px;
+    color: #888;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .logo-card .label span { color: #555; font-size: 11px; }
+  .full-width { grid-column: 1 / -1; }
+
+  /* ── CSS Chef Hat Icon ── */
+  .chef-hat {
+    position: relative;
+    display: inline-block;
+  }
+  /* Large hat */
+  .chef-hat.lg {
+    width: 26px;
+    height: 24px;
+  }
+  .chef-hat.lg .hat-top {
+    position: absolute;
+    top: 0;
+    left: 2px;
+    width: 22px;
+    height: 16px;
+    border: 2px solid #22d3ee;
+    border-radius: 11px 11px 4px 4px;
+    border-bottom: none;
+  }
+  .chef-hat.lg .hat-band {
+    position: absolute;
+    top: 14px;
+    left: 0;
+    width: 26px;
+    height: 2px;
+    background: #22d3ee;
+    border-radius: 1px;
+  }
+  .chef-hat.lg .hat-body {
+    position: absolute;
+    top: 16px;
+    left: 4px;
+    width: 18px;
+    height: 8px;
+    border: 2px solid #22d3ee;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+  }
+  /* Small hat (nav size) */
+  .chef-hat.sm {
+    width: 18px;
+    height: 17px;
+  }
+  .chef-hat.sm .hat-top {
+    position: absolute;
+    top: 0;
+    left: 1px;
+    width: 16px;
+    height: 11px;
+    border: 1.5px solid #22d3ee;
+    border-radius: 8px 8px 3px 3px;
+    border-bottom: none;
+  }
+  .chef-hat.sm .hat-band {
+    position: absolute;
+    top: 10px;
+    left: 0;
+    width: 18px;
+    height: 1.5px;
+    background: #22d3ee;
+    border-radius: 1px;
+  }
+  .chef-hat.sm .hat-body {
+    position: absolute;
+    top: 11.5px;
+    left: 3px;
+    width: 12px;
+    height: 5.5px;
+    border: 1.5px solid #22d3ee;
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+  }
+  /* Dark variant (for light backgrounds) */
+  .chef-hat.dark .hat-top { border-color: #0e7490; }
+  .chef-hat.dark .hat-band { background: #0e7490; }
+  .chef-hat.dark .hat-body { border-color: #0e7490; }
+
+  /* ── FULL LOGO ── */
+  .logo-full {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .logo-full .emblem {
+    width: 52px;
+    height: 52px;
+    border: 2px solid #22d3ee;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-full .emblem.dark-border { border-color: #0e7490; }
+  .logo-full .text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .logo-full .text .line1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.3px;
+    line-height: 1.1;
+  }
+  .logo-full .text .line1.dark-text { color: #0d1117; }
+  .logo-full .text .line2 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #22d3ee;
+  }
+  .logo-full .text .line2.dark-text { color: #0e7490; }
+
+  /* ── NAV LOGO ── */
+  .logo-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-nav .emblem {
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid #22d3ee;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .logo-nav .emblem.dark-border { border-color: #0e7490; }
+  .logo-nav .text {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .logo-nav .text .line1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.2px;
+    line-height: 1.15;
+  }
+  .logo-nav .text .line1.dark-text { color: #0d1117; }
+  .logo-nav .text .line2 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #22d3ee;
+  }
+  .logo-nav .text .line2.dark-text { color: #0e7490; }
+
+  /* ── LOGO + TAGLINE ── */
+  .logo-with-tagline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .tagline {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #666;
+    letter-spacing: 0.5px;
+    font-style: italic;
+  }
+  .tagline.dark-text { color: #999; }
+
+  /* ── ICON ONLY ── */
+  .icon-only .emblem {
+    width: 48px;
+    height: 48px;
+    border: 2px solid #22d3ee;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── FAVICON SIZES ── */
+  .favicon-row {
+    display: flex;
+    gap: 32px;
+    align-items: flex-end;
+  }
+  .favicon-item {
+    text-align: center;
+  }
+  .favicon-item .fav {
+    border: 2px solid #22d3ee;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d1117;
+    margin: 0 auto;
+  }
+  .favicon-item .fav-48 { width: 48px; height: 48px; }
+  .favicon-item .fav-32 { width: 32px; height: 32px; border-width: 1.5px; }
+  .favicon-item .fav-16 { width: 16px; height: 16px; border-width: 1px; }
+  .favicon-item .size-label {
+    font-size: 10px;
+    color: #555;
+    margin-top: 8px;
+  }
+  /* Tiny hat for 16px */
+  .chef-hat.xs {
+    width: 8px;
+    height: 8px;
+  }
+  .chef-hat.xs .hat-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 5px;
+    border: 1px solid #22d3ee;
+    border-radius: 4px 4px 1px 1px;
+    border-bottom: none;
+  }
+  .chef-hat.xs .hat-band {
+    position: absolute;
+    top: 4.5px;
+    left: 0;
+    width: 8px;
+    height: 1px;
+    background: #22d3ee;
+  }
+  .chef-hat.xs .hat-body {
+    position: absolute;
+    top: 5.5px;
+    left: 1px;
+    width: 6px;
+    height: 2.5px;
+    border: 1px solid #22d3ee;
+    border-top: none;
+    border-radius: 0 0 2px 2px;
+  }
+
+  /* ── NAV BAR PREVIEW ── */
+  .nav-preview {
+    grid-column: 1 / -1;
+    border: 1px solid #1a1a1a;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: #0d1117;
+    border-bottom: 1px solid #1c2333;
+  }
+  .nav-bar .nav-links {
+    display: flex;
+    gap: 28px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8b949e;
+  }
+  .nav-bar .nav-links span.active { color: #22d3ee; }
+  .nav-bar .user-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .nav-bar .user-area .avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #22d3ee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0d1117;
+  }
+  .nav-bar .user-area .user-info { text-align: right; }
+  .nav-bar .user-area .user-name { font-size: 13px; color: #ccc; }
+  .nav-bar .user-area .user-role { font-size: 10px; color: #666; }
+  .nav-preview .label {
+    padding: 16px 24px;
+    background: #111;
+    border-top: 1px solid #1a1a1a;
+    font-size: 13px;
+    color: #888;
+  }
+
+  /* ── LANDING HERO PREVIEW ── */
+  .hero-preview {
+    grid-column: 1 / -1;
+    border: 1px solid #1a1a1a;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .hero-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 40px;
+    background: #0d1117;
+    border-bottom: 1px solid #1c2333;
+  }
+  .hero-bar .sign-in {
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+    background: transparent;
+    border: 1px solid #333;
+    padding: 7px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .hero-content {
+    padding: 80px 40px;
+    text-align: center;
+    background: linear-gradient(180deg, #0d1117 0%, #0a1628 100%);
+  }
+  .hero-content h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 48px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+  .hero-content h2 em {
+    font-style: normal;
+    color: #22d3ee;
+  }
+  .hero-content p {
+    font-size: 16px;
+    color: #8b949e;
+    max-width: 540px;
+    margin: 0 auto 8px;
+    line-height: 1.6;
+  }
+  .hero-content .hero-tagline {
+    font-size: 14px;
+    color: #22d3ee;
+    font-style: italic;
+    margin-bottom: 28px;
+  }
+  .hero-content .cta {
+    display: inline-block;
+    background: #22d3ee;
+    color: #0d1117;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 14px 32px;
+    border-radius: 10px;
+    text-decoration: none;
+    letter-spacing: 0.2px;
+  }
+  .hero-content .sub-cta {
+    display: block;
+    margin-top: 12px;
+    font-size: 13px;
+    color: #555;
+  }
+  .hero-preview .label {
+    padding: 16px 24px;
+    background: #111;
+    border-top: 1px solid #1a1a1a;
+    font-size: 13px;
+    color: #888;
+  }
+
+  /* ── TAGLINE OPTIONS SECTION ── */
+  .tagline-section {
+    grid-column: 1 / -1;
+    border: 1px solid #1a1a1a;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .tagline-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .tagline-option {
+    padding: 32px 40px;
+    background: #0d1117;
+    border-bottom: 1px solid #1a1a1a;
+    border-right: 1px solid #1a1a1a;
+  }
+  .tagline-option:nth-child(even) { border-right: none; }
+  .tagline-option .tl-number {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #22d3ee;
+    margin-bottom: 8px;
+  }
+  .tagline-option .tl-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+  .tagline-option .tl-why {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+  }
+  .tagline-option.recommended {
+    background: #0d1a1f;
+    border: 1px solid #22d3ee20;
+  }
+  .tagline-option.recommended .tl-number::after {
+    content: " ★ RECOMMENDED";
+    color: #22d3ee;
+  }
+  .tagline-section > .label {
+    padding: 16px 24px;
+    background: #111;
+    border-top: 1px solid #1a1a1a;
+    font-size: 13px;
+    color: #888;
+  }
+</style>
+</head>
+<body>
+
+<h1>The Restaurant Consultant — Logo System (Pure CSS)</h1>
+
+<div class="logo-grid">
+
+  <!-- FULL LOGO — Dark -->
+  <div class="logo-card">
+    <div class="preview dark">
+      <div class="logo-full">
+        <div class="emblem">
+          <div class="chef-hat lg">
+            <div class="hat-top"></div>
+            <div class="hat-band"></div>
+            <div class="hat-body"></div>
+          </div>
+        </div>
+        <div class="text">
+          <span class="line1">The Restaurant</span>
+          <span class="line2">Consultant</span>
+        </div>
+      </div>
+    </div>
+    <div class="label">Full Logo <span>Dark</span></div>
+  </div>
+
+  <!-- FULL LOGO — Light -->
+  <div class="logo-card">
+    <div class="preview light">
+      <div class="logo-full">
+        <div class="emblem dark-border">
+          <div class="chef-hat lg dark">
+            <div class="hat-top"></div>
+            <div class="hat-band"></div>
+            <div class="hat-body"></div>
+          </div>
+        </div>
+        <div class="text">
+          <span class="line1 dark-text">The Restaurant</span>
+          <span class="line2 dark-text">Consultant</span>
+        </div>
+      </div>
+    </div>
+    <div class="label">Full Logo <span>Light</span></div>
+  </div>
+
+  <!-- NAV SIZE — Dark -->
+  <div class="logo-card">
+    <div class="preview dark">
+      <div class="logo-nav">
+        <div class="emblem">
+          <div class="chef-hat sm">
+            <div class="hat-top"></div>
+            <div class="hat-band"></div>
+            <div class="hat-body"></div>
+          </div>
+        </div>
+        <div class="text">
+          <span class="line1">The Restaurant</span>
+          <span class="line2">Consultant</span>
+        </div>
+      </div>
+    </div>
+    <div class="label">Nav Size <span>Dark</span></div>
+  </div>
+
+  <!-- NAV SIZE — Light -->
+  <div class="logo-card">
+    <div class="preview light">
+      <div class="logo-nav">
+        <div class="emblem dark-border">
+          <div class="chef-hat sm dark">
+            <div class="hat-top"></div>
+            <div class="hat-band"></div>
+            <div class="hat-body"></div>
+          </div>
+        </div>
+        <div class="text">
+          <span class="line1 dark-text">The Restaurant</span>
+          <span class="line2 dark-text">Consultant</span>
+        </div>
+      </div>
+    </div>
+    <div class="label">Nav Size <span>Light</span></div>
+  </div>
+
+  <!-- FULL LOGO + TAGLINE — Dark -->
+  <div class="logo-card full-width">
+    <div class="preview dark">
+      <div class="logo-with-tagline">
+        <div class="logo-full">
+          <div class="emblem">
+            <div class="chef-hat lg">
+              <div class="hat-top"></div>
+              <div class="hat-band"></div>
+              <div class="hat-body"></div>
+            </div>
+          </div>
+          <div class="text">
+            <span class="line1">The Restaurant</span>
+            <span class="line2">Consultant</span>
+          </div>
+        </div>
+        <div class="tagline">Systems that work on your worst night.</div>
+      </div>
+    </div>
+    <div class="label">Full Logo + Tagline <span>Dark</span></div>
+  </div>
+
+  <!-- ICON ONLY + FAVICONS -->
+  <div class="logo-card">
+    <div class="preview dark">
+      <div class="favicon-row">
+        <div class="favicon-item">
+          <div class="fav fav-48">
+            <div class="chef-hat lg">
+              <div class="hat-top"></div>
+              <div class="hat-band"></div>
+              <div class="hat-body"></div>
+            </div>
+          </div>
+          <div class="size-label">48px</div>
+        </div>
+        <div class="favicon-item">
+          <div class="fav fav-32">
+            <div class="chef-hat sm">
+              <div class="hat-top"></div>
+              <div class="hat-band"></div>
+              <div class="hat-body"></div>
+            </div>
+          </div>
+          <div class="size-label">32px</div>
+        </div>
+        <div class="favicon-item">
+          <div class="fav fav-16">
+            <div class="chef-hat xs">
+              <div class="hat-top"></div>
+              <div class="hat-band"></div>
+              <div class="hat-body"></div>
+            </div>
+          </div>
+          <div class="size-label">16px</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">Icon Only / Favicon Sizes <span>Dark</span></div>
+  </div>
+
+  <!-- ICON ONLY — Light -->
+  <div class="logo-card">
+    <div class="preview light">
+      <div class="favicon-row">
+        <div class="favicon-item">
+          <div class="fav fav-48" style="border-color: #0e7490; background: #f5f5f0;">
+            <div class="chef-hat lg dark">
+              <div class="hat-top"></div>
+              <div class="hat-band"></div>
+              <div class="hat-body"></div>
+            </div>
+          </div>
+          <div class="size-label" style="color: #999;">48px</div>
+        </div>
+        <div class="favicon-item">
+          <div class="fav fav-32" style="border-color: #0e7490; background: #f5f5f0;">
+            <div class="chef-hat sm dark">
+              <div class="hat-top"></div>
+              <div class="hat-band"></div>
+              <div class="hat-body"></div>
+            </div>
+          </div>
+          <div class="size-label" style="color: #999;">32px</div>
+        </div>
+        <div class="favicon-item">
+          <div class="fav fav-16" style="border-color: #0e7490; background: #f5f5f0;">
+            <div class="chef-hat xs dark">
+              <div class="hat-top"></div>
+              <div class="hat-band"></div>
+              <div class="hat-body"></div>
+            </div>
+          </div>
+          <div class="size-label" style="color: #999;">16px</div>
+        </div>
+      </div>
+    </div>
+    <div class="label">Icon Only / Favicon Sizes <span>Light</span></div>
+  </div>
+
+  <!-- NAV BAR IN CONTEXT -->
+  <div class="nav-preview">
+    <div class="nav-bar">
+      <div class="logo-nav">
+        <div class="emblem">
+          <div class="chef-hat sm">
+            <div class="hat-top"></div>
+            <div class="hat-band"></div>
+            <div class="hat-body"></div>
+          </div>
+        </div>
+        <div class="text">
+          <span class="line1">The Restaurant</span>
+          <span class="line2">Consultant</span>
+        </div>
+      </div>
+      <div class="nav-links">
+        <span class="active">Resources</span>
+        <span>Tools</span>
+        <span>Consultant</span>
+      </div>
+      <div class="user-area">
+        <div class="user-info">
+          <div class="user-name">Ben</div>
+          <div class="user-role">Owner</div>
+        </div>
+        <div class="avatar">B</div>
+      </div>
+    </div>
+    <div class="label">Navigation bar — logged in view</div>
+  </div>
+
+  <!-- LANDING PAGE HERO PREVIEW -->
+  <div class="hero-preview">
+    <div class="hero-bar">
+      <div class="logo-nav">
+        <div class="emblem">
+          <div class="chef-hat sm">
+            <div class="hat-top"></div>
+            <div class="hat-band"></div>
+            <div class="hat-body"></div>
+          </div>
+        </div>
+        <div class="text">
+          <span class="line1">The Restaurant</span>
+          <span class="line2">Consultant</span>
+        </div>
+      </div>
+      <button class="sign-in">Sign In</button>
+    </div>
+    <div class="hero-content">
+      <h2>Replace Chaos with <em>Systems</em></h2>
+      <p>A hands-on restaurant consultant built by real service, real payroll, real guests, and real consequences. Not theory. Not motivation. Structure.</p>
+      <div class="hero-tagline">Systems that work on your worst night.</div>
+      <a class="cta" href="#">Get Started for $10/month →</a>
+      <span class="sub-cta">No contracts. Cancel anytime.</span>
+    </div>
+    <div class="label">Landing page hero — full context preview</div>
+  </div>
+
+  <!-- TAGLINE OPTIONS -->
+  <div class="tagline-section">
+    <div class="tagline-grid">
+      <div class="tagline-option recommended">
+        <div class="tl-number">Option 1</div>
+        <div class="tl-text">Systems that work on your worst night.</div>
+        <div class="tl-why">Restaurant-specific. Emotionally resonant. Every operator knows their worst night. Positions the product as battle-tested, not theoretical.</div>
+      </div>
+      <div class="tagline-option">
+        <div class="tl-number">Option 2</div>
+        <div class="tl-text">Every service, backed by systems.</div>
+        <div class="tl-why">"Service" is pure restaurant language. Implies consistency — every shift, every night, not just when the owner is watching.</div>
+      </div>
+      <div class="tagline-option">
+        <div class="tl-number">Option 3</div>
+        <div class="tl-text">Built for the real floor.</div>
+        <div class="tl-why">Short, punchy, operator-authentic. "The floor" is industry-specific language. Implies it was built by someone who's actually worked one.</div>
+      </div>
+      <div class="tagline-option">
+        <div class="tl-number">Option 4</div>
+        <div class="tl-text">From chaos to command center.</div>
+        <div class="tl-why">References your actual product (Kitchen Command Center, Leadership Command Center). Shows the transformation promise.</div>
+      </div>
+    </div>
+    <div class="label">Tagline options — pick one to pair with the logo</div>
+  </div>
+
+</div>
+
+</body>
+</html>

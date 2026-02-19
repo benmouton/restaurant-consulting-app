@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
             <section>
               <h2 className="text-xl font-semibold mb-3">1. Introduction</h2>
               <p className="text-muted-foreground">
-                Restaurant Operations Consulting ("we", "our", or "us") is committed to protecting your privacy. 
+                The Restaurant Consultant ("we", "our", or "us") is committed to protecting your privacy. 
                 This Privacy Policy explains how we collect, use, and safeguard your information when you 
                 use our restaurant consulting platform.
               </p>

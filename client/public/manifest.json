@@ -1,7 +1,7 @@
 {
-  "name": "Restaurant Operations Consulting",
-  "short_name": "ROC",
-  "description": "Restaurant operations consulting platform. Replace chaos with systems.",
+  "name": "The Restaurant Consultant",
+  "short_name": "TRC",
+  "description": "Systems that work on your worst night.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
