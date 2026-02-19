@@ -1,0 +1,127 @@
+# Page-Specific Improvements — Account Settings
+
+---
+
+## 1. Fix Truncated Restaurant Name
+
+- Under Team Organization, the restaurant name displays as **"Mouton's Bistr & Bar"** — the "o" in "Bistro" is cut off
+- Check two things:
+  - Is the stored value correct in the database? If so, it's a display issue
+  - Is the element width too narrow and truncating the text? If so, increase the max-width or allow text wrapping
+- Make sure the restaurant name displays fully everywhere it appears across the app
+
+---
+
+## 2. Expired Invitations Handling
+
+- All 5 pending invitations show "Pending" but expired on 2/9/2026 — they're dead invitations displayed as if they're still active
+- Add logic to compare the expiration date against today's date:
+  - If expired: change the badge from "Pending" to **"Expired"** in red/orange
+  - Show a **"Resend"** button next to expired invitations that generates a fresh invite link with a new expiration date
+  - Add a "Resend All Expired" bulk action if there are multiple
+- Consider adding a subtle note: "Invitations expire after [X] days. Resend to generate a new link."
+
+---
+
+## 3. Fix "Unknown User" Display
+
+- The team member with email autumn.rose.nix@gmail.com shows as **"Unknown User"** — this looks like a bug to the user
+- Add a fallback display name hierarchy:
+  1. Full name (if available in their profile)
+  2. First name only
+  3. Email address (e.g., "autumn.rose.nix")
+  4. Never show "Unknown User" — it looks broken
+- If the user hasn't completed their profile, show their email with a subtle tag: "Profile incomplete" or "Hasn't set up profile yet"
+
+---
+
+## 4. Phone Number Formatting
+
+- The phone number displays as raw digits: "5126561026"
+- Format it as **(512) 656-1026** for readability
+- Apply phone formatting on display (not on the stored value) — use a formatter that handles standard US phone numbers
+- Apply this formatting everywhere phone numbers appear in the app (profile, handbook builder, etc.)
+
+---
+
+## 5. Profile Photo Upload
+
+- Currently the profile shows a cyan circle with initials "BM" — there's no option to upload a photo
+- Add a camera/edit icon overlay on the avatar circle in Edit mode
+- On click, allow the user to:
+  - Upload an image (JPEG, PNG, WebP)
+  - Crop to a circle
+  - Save
+- The avatar should update everywhere it appears: top nav, profile page, team members list
+
+---
+
+## 6. Team Members — Add Role Assignment
+
+- Team members currently show name and email but no role assignment
+- Add a role dropdown next to each team member:
+  - Owner, Manager, Shift Lead, Viewer (read-only)
+- Different roles should have different access levels throughout the app:
+  - **Owner:** Full access to everything including Financial Insights and Admin
+  - **Manager:** Access to all operational domains, no financial data
+  - **Shift Lead:** Access to Kitchen Ops, Scheduling, Crisis Management only
+  - **Viewer:** Read-only access to training materials and SOPs
+- Show the role as a badge next to each team member's name (similar to how "Owner" badge already appears for Ben)
+
+---
+
+## 7. Subscription Section Enhancement
+
+- The Subscription section just shows "Status: Admin (Free)" — this is minimal
+- If the user is on a paid plan, show:
+  - Plan name and price
+  - Billing cycle (monthly/annual)
+  - Next billing date
+  - "Manage Subscription" button (links to Stripe customer portal or your subscription page)
+  - "View Invoices" link
+- If on a free/admin plan, show what upgrading would unlock — brief feature comparison or a link to the subscription page
+
+---
+
+## 8. Invite Team Members — Improve the Flow
+
+- The "Invite Team Member" button should open a form or modal with:
+  - Email address field
+  - Role selection dropdown (Owner, Manager, Shift Lead, Viewer)
+  - Optional personal message field
+- Show a preview of the invitation email before sending
+- After sending, show a success message with the expiration date: "Invitation sent! Expires in 7 days."
+
+---
+
+## 9. Account Information Section
+
+- "Member since: January 13, 2026" is good to have
+- Consider adding:
+  - Last login date
+  - Total team members / invite limit (if applicable)
+  - Data usage (documents uploaded, SOPs created, etc.) — shows the user how much value they've built in the platform, which increases retention
+
+---
+
+## 10. Danger Zone
+
+- At the bottom of the Account Settings page, add a "Danger Zone" section (collapsed by default) with:
+  - "Delete Account" button with confirmation modal
+  - "Export My Data" button — lets the user download all their data (GDPR/privacy compliance)
+  - "Transfer Ownership" — allows the owner to transfer the organization to another team member
+- This is important for compliance and also signals trustworthiness — users feel safer when they know they can leave
+
+---
+
+## Priority Order
+1. **Fix truncated restaurant name** (visible bug)
+2. **Fix "Unknown User" display** (looks broken)
+3. **Expired invitations handling** (confusing UX)
+4. **Phone number formatting** (quick polish)
+5. **Team member role assignment** (functional improvement)
+6. **Invite flow improvements** (better onboarding for team members)
+7. **Profile photo upload** (personalization)
+8. **Subscription section enhancement** (clarity for paying users)
+9. **Danger Zone / data export** (compliance and trust)
+10. **Account information additions** (retention metric)

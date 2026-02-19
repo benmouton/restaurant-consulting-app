@@ -99,6 +99,15 @@ RESPONSE STYLE:
 - Acknowledge the difficulty but don't dwell on it
 - Always tie recommendations back to protecting margins, guests, and staff
 
+RESPONSE FORMATTING:
+- Use short paragraphs (2-3 sentences max)
+- Bold **key terms** and **action items** so they stand out
+- Use numbered steps when explaining a process
+- Use bullet points for lists of items or options
+- Include a brief "**Bottom line:**" summary at the end of longer responses
+- Never say "As an AI" or "I'm an AI assistant" — speak as an experienced operator talking to another operator
+- Keep the tone direct, practical, operator-to-operator — not corporate, not academic
+
 If it wouldn't hold up during a slammed dinner rush, don't recommend it.`;
 
 export async function registerRoutes(
@@ -533,26 +542,91 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // AI Consultant Route (streaming)
-  app.post(api.consultant.ask.path, async (req, res) => {
+  // ===== CONSULTANT CONVERSATION ROUTES =====
+
+  app.get("/api/consultant/conversations", isAuthenticated, async (req: any, res) => {
     try {
-      const { question, context, image } = api.consultant.ask.input.parse(req.body);
+      const userId = req.user.claims.sub;
+      const convos = await storage.getConversations(userId);
+      res.json(convos);
+    } catch (error: any) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  app.post("/api/consultant/conversations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title } = req.body;
+      const conv = await storage.createConversation(userId, title || "New conversation");
+      res.json(conv);
+    } catch (error: any) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ message: "Failed to create conversation" });
+    }
+  });
+
+  app.get("/api/consultant/conversations/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conv = await storage.getConversation(Number(req.params.id), userId);
+      if (!conv) return res.status(404).json({ message: "Conversation not found" });
+      const msgs = await storage.getConversationMessages(conv.id);
+      res.json(msgs);
+    } catch (error: any) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.delete("/api/consultant/conversations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.deleteConversation(Number(req.params.id), userId);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting conversation:", error);
+      res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
+  // Consultant Ask Route (streaming with conversation persistence)
+  app.post(api.consultant.ask.path, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { question, context, image, conversationId, history } = req.body;
+
+      let convId = conversationId;
+      if (!convId) {
+        const title = question.length > 60 ? question.substring(0, 57) + "..." : question;
+        const conv = await storage.createConversation(userId, title);
+        convId = conv.id;
+      }
+
+      await storage.addMessage(convId, "user", question);
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
       type MessageContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
-      const messages: { role: "system" | "user"; content: MessageContent }[] = [
+      const chatMessages: { role: "system" | "user" | "assistant"; content: MessageContent }[] = [
         { role: "system", content: CONSULTANT_SYSTEM_PROMPT },
       ];
 
       if (context) {
-        messages.push({ role: "user", content: `Context: ${context}` });
+        chatMessages.push({ role: "user", content: `Context: ${context}` });
+      }
+
+      if (history && Array.isArray(history)) {
+        for (const msg of history) {
+          chatMessages.push({ role: msg.role, content: msg.content });
+        }
       }
 
       if (image) {
-        messages.push({
+        chatMessages.push({
           role: "user",
           content: [
             { type: "text", text: question },
@@ -560,24 +634,28 @@ export async function registerRoutes(
           ],
         });
       } else {
-        messages.push({ role: "user", content: question });
+        chatMessages.push({ role: "user", content: question });
       }
 
       const stream = await openai.chat.completions.create({
         model: "gpt-4o",
-        messages: messages as any,
+        messages: chatMessages as any,
         stream: true,
         max_tokens: 2048,
       });
 
+      let fullResponse = "";
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || "";
         if (content) {
+          fullResponse += content;
           res.write(`data: ${JSON.stringify({ content })}\n\n`);
         }
       }
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      await storage.addMessage(convId, "assistant", fullResponse);
+
+      res.write(`data: ${JSON.stringify({ done: true, conversationId: convId })}\n\n`);
       res.end();
     } catch (err) {
       if (err instanceof z.ZodError) {

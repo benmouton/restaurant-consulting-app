@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect } from "react";
-import { Link } from "wouter";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Link, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,23 +15,131 @@ import {
   Send,
   LogOut,
   Loader2,
-  User
+  User,
+  Plus,
+  MessageSquare,
+  Trash2,
+  Clock,
+  Users,
+  DollarSign,
+  Star,
+  Briefcase,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-interface Message {
+interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
 }
 
+interface Conversation {
+  id: number;
+  userId: string;
+  title: string;
+  createdAt: string;
+}
+
+interface DbMessage {
+  id: number;
+  conversationId: number;
+  role: string;
+  content: string;
+  createdAt: string;
+}
+
+const QUESTION_CATEGORIES = [
+  {
+    label: "Staffing & Labor",
+    icon: Users,
+    questions: [
+      "How do I handle a no-call no-show during a busy shift?",
+      "What's a fair tip-out structure for my servers and support staff?",
+    ],
+  },
+  {
+    label: "Cost & Margins",
+    icon: DollarSign,
+    questions: [
+      "My food cost is out of control. Where do I start?",
+      "How do I figure out if a menu item is actually profitable?",
+    ],
+  },
+  {
+    label: "Service & Guest Experience",
+    icon: Star,
+    questions: [
+      "What's a good comp policy for service failures?",
+      "How do I deal with a bad Google review from last night?",
+    ],
+  },
+  {
+    label: "Leadership & Operations",
+    icon: Briefcase,
+    questions: [
+      "I'm working 70 hours a week. How do I start delegating?",
+      "How do I hold my managers accountable without micromanaging?",
+    ],
+  },
+];
+
+function getContextAwareQuestions(profile: any): typeof QUESTION_CATEGORIES {
+  if (!profile) return QUESTION_CATEGORIES;
+
+  const categories = QUESTION_CATEGORIES.map((cat) => ({ ...cat, questions: [...cat.questions] }));
+
+  if (profile.staffCount && profile.staffCount > 20) {
+    categories[3].questions = [
+      "With a team my size, how do I build management layers that actually work?",
+      "How do I hold my managers accountable without micromanaging?",
+    ];
+  }
+
+  if (profile.restaurantType === "bar") {
+    categories[2].questions = [
+      "What's a good policy for cutting off intoxicated guests?",
+      "How do I handle late-night incidents without calling the cops every time?",
+    ];
+  }
+
+  const hour = new Date().getHours();
+  const dayOfWeek = new Date().getDay();
+
+  if (dayOfWeek === 5 && hour >= 12) {
+    categories[0].questions[0] = "How should I prepare my team for a busy weekend service?";
+  } else if (hour < 11) {
+    categories[3].questions[0] = "What should I prioritize in my morning walkthrough before open?";
+  }
+
+  return categories;
+}
+
 export default function ConsultantPage() {
   const { user, logout } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const queryClient = useQueryClient();
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
+
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [autoSentRef, setAutoSentRef] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: conversationList } = useQuery<Conversation[]>({
+    queryKey: ["/api/consultant/conversations"],
+  });
+
+  const { data: restaurantProfile } = useQuery<any>({
+    queryKey: ["/api/restaurant-profile"],
+  });
+
+  const categories = getContextAwareQuestions(restaurantProfile);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -36,17 +147,63 @@ export default function ConsultantPage() {
     }
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  useEffect(() => {
+    const prompt = params.get("prompt");
+    const context = params.get("context");
+    if (prompt && !autoSentRef && messages.length === 0) {
+      setAutoSentRef(true);
+      submitQuestion(prompt, context || undefined);
+    }
+  }, []);
 
-    const userMessage: Message = {
+  const loadConversation = useCallback(async (convId: number) => {
+    try {
+      const res = await fetch(`/api/consultant/conversations/${convId}/messages`, { credentials: "include" });
+      if (!res.ok) return;
+      const msgs: DbMessage[] = await res.json();
+      setMessages(
+        msgs.map((m) => ({
+          id: m.id.toString(),
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }))
+      );
+      setActiveConversationId(convId);
+      setShowHistory(false);
+    } catch (err) {
+      console.error("Failed to load conversation:", err);
+    }
+  }, []);
+
+  const startNewConversation = useCallback(() => {
+    setMessages([]);
+    setActiveConversationId(null);
+    setInput("");
+  }, []);
+
+  const deleteConversation = useCallback(async (convId: number) => {
+    try {
+      await apiRequest("DELETE", `/api/consultant/conversations/${convId}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/consultant/conversations"] });
+      if (activeConversationId === convId) {
+        startNewConversation();
+      }
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+    }
+  }, [activeConversationId, startNewConversation, queryClient]);
+
+  const submitQuestion = async (questionText: string, context?: string) => {
+    if (!questionText.trim() || isLoading) return;
+
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: questionText.trim(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const currentMessages = [...messages, userMessage];
+    setMessages(currentMessages);
     setInput("");
     setIsLoading(true);
 
@@ -56,11 +213,19 @@ export default function ConsultantPage() {
       { id: assistantId, role: "assistant", content: "" },
     ]);
 
+    const history = messages.map((m) => ({ role: m.role, content: m.content }));
+
     try {
       const response = await fetch("/api/consultant/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: userMessage.content }),
+        credentials: "include",
+        body: JSON.stringify({
+          question: userMessage.content,
+          context,
+          conversationId: activeConversationId || undefined,
+          history: history.length > 0 ? history : undefined,
+        }),
       });
 
       if (!response.ok) throw new Error("Failed to get response");
@@ -92,12 +257,16 @@ export default function ConsultantPage() {
                   )
                 );
               }
+              if (data.conversationId && !activeConversationId) {
+                setActiveConversationId(data.conversationId);
+                queryClient.invalidateQueries({ queryKey: ["/api/consultant/conversations"] });
+              }
             } catch {
-              // Ignore parse errors for incomplete chunks
             }
           }
         }
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/consultant/conversations"] });
     } catch (error) {
       console.error("Error:", error);
       setMessages((prev) =>
@@ -112,6 +281,11 @@ export default function ConsultantPage() {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    submitQuestion(input);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -119,122 +293,235 @@ export default function ConsultantPage() {
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    return d.toLocaleDateString();
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
+    <div className="h-screen bg-background flex flex-col">
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <Link href="/">
               <Button variant="ghost" size="icon" data-testid="button-back">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowHistory(!showHistory)}
+              data-testid="button-toggle-history"
+            >
+              {showHistory ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </Button>
             <div className="flex items-center gap-2">
-              <ChefHat className="h-6 w-6 text-primary" />
-              <span className="font-bold">Operations Consultant</span>
+              <ChefHat className="h-5 w-5 text-primary" />
+              <span className="font-bold text-sm sm:text-base" data-testid="text-page-title">Operations Consultant</span>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => logout()}
-            data-testid="button-logout"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={startNewConversation}
+              data-testid="button-new-conversation"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">New</span>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => logout()}
+              data-testid="button-logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col container mx-auto max-w-3xl px-4">
-        <ScrollArea className="flex-1 py-4" ref={scrollRef}>
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center py-20">
-              <ChefHat className="h-16 w-16 text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Ask the Consultant</h2>
-              <p className="text-muted-foreground max-w-md">
-                Ask anything about restaurant operations. You'll get direct, practical answers—no fluff, 
-                no theory, just what works on a real floor.
-              </p>
-              <div className="mt-6 space-y-2 text-sm text-muted-foreground">
-                <p>"How do I handle a no-call no-show during a busy shift?"</p>
-                <p>"What's a good comp policy for service failures?"</p>
-                <p>"My food cost is out of control. Where do I start?"</p>
-              </div>
+      <div className="flex-1 flex overflow-hidden">
+        {showHistory && (
+          <div className="w-72 border-r border-border bg-muted/30 flex flex-col shrink-0" data-testid="panel-history">
+            <div className="p-3 border-b border-border">
+              <h3 className="font-semibold text-sm">Past Conversations</h3>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  {message.role === "assistant" && (
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        <ChefHat className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                  <Card
-                    className={`p-4 max-w-[85%] ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card"
-                    }`}
-                  >
-                    {message.role === "assistant" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown>{message.content || "..."}</ReactMarkdown>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {!conversationList || conversationList.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-sm text-muted-foreground" data-testid="text-no-conversations">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    No conversations yet
+                  </div>
+                ) : (
+                  conversationList.map((conv) => (
+                    <div
+                      key={conv.id}
+                      className={`group flex items-start gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover-elevate ${
+                        activeConversationId === conv.id ? "bg-accent" : ""
+                      }`}
+                      data-testid={`conversation-item-${conv.id}`}
+                    >
+                      <button
+                        type="button"
+                        className="flex-1 text-left min-w-0"
+                        onClick={() => loadConversation(conv.id)}
+                        data-testid={`button-load-conversation-${conv.id}`}
+                      >
+                        <p className="font-medium truncate">{conv.title}</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(conv.createdAt)}
+                        </p>
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 invisible group-hover:visible"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(conv.id);
+                        }}
+                        data-testid={`button-delete-conversation-${conv.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col min-w-0">
+          <ScrollArea className="flex-1" ref={scrollRef}>
+            <div className="max-w-3xl mx-auto px-4 py-4">
+              {messages.length === 0 ? (
+                <div className="py-8 sm:py-16">
+                  <div className="text-center mb-8">
+                    <ChefHat className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <h2 className="text-xl font-semibold mb-2" data-testid="text-empty-title">Ask the Consultant</h2>
+                    <p className="text-muted-foreground max-w-md mx-auto text-sm">
+                      Ask anything about restaurant operations. You'll get direct, practical answers—no fluff,
+                      no theory, just what works on a real floor.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto" data-testid="section-question-categories">
+                    {categories.map((category) => (
+                      <div key={category.label}>
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <category.icon className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{category.label}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {category.questions.map((q) => (
+                            <Card
+                              key={q}
+                              className="p-3 cursor-pointer hover-elevate active-elevate-2"
+                              onClick={() => submitQuestion(q)}
+                              data-testid={`card-question-${q.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}`}
+                            >
+                              <p className="text-sm">{q}</p>
+                            </Card>
+                          ))}
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    )}
-                  </Card>
-                  {message.role === "user" && (
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarImage src={user?.profileImageUrl || undefined} />
-                      <AvatarFallback>
-                        <User className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
+                    ))}
+                  </div>
+
+                  {restaurantProfile?.restaurantName && (
+                    <p className="text-xs text-muted-foreground text-center mt-6" data-testid="text-personalized">
+                      Suggestions tailored for <span className="font-medium text-foreground">{restaurantProfile.restaurantName}</span>
+                    </p>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-
-        {/* Input Area */}
-        <div className="py-4 border-t border-border">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything about restaurant operations..."
-              className="min-h-[60px] resize-none"
-              disabled={isLoading}
-              data-testid="input-consultant-message"
-            />
-            <Button 
-              type="submit" 
-              size="icon"
-              className="h-[60px] w-[60px]"
-              disabled={isLoading || !input.trim()}
-              data-testid="button-send-message"
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <Send className="h-5 w-5" />
+                <div className="space-y-6 pb-4">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex gap-3 flex-wrap ${
+                        message.role === "user" ? "justify-end" : "justify-start"
+                      }`}
+                      data-testid={`message-${message.role}-${message.id}`}
+                    >
+                      {message.role === "assistant" && (
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarFallback className="bg-primary text-primary-foreground">
+                            <ChefHat className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <Card
+                        className={`p-4 max-w-[85%] ${
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card"
+                        }`}
+                      >
+                        {message.role === "assistant" ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown>{message.content || "..."}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        )}
+                      </Card>
+                      {message.role === "user" && (
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarImage src={user?.profileImageUrl || undefined} />
+                          <AvatarFallback>
+                            <User className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
-            </Button>
-          </form>
+            </div>
+          </ScrollArea>
+
+          <div className="border-t border-border bg-background">
+            <div className="max-w-3xl mx-auto px-4 py-3">
+              <form onSubmit={handleSubmit} className="flex gap-2">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask anything about restaurant operations..."
+                  className="min-h-[52px] max-h-[120px] resize-none"
+                  disabled={isLoading}
+                  data-testid="input-consultant-message"
+                />
+                <Button 
+                  type="submit" 
+                  size="icon"
+                  className="shrink-0"
+                  disabled={isLoading || !input.trim()}
+                  data-testid="button-send-message"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </Button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     </div>

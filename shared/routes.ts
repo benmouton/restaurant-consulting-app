@@ -69,6 +69,8 @@ export const api = {
         question: z.string(),
         context: z.string().optional(),
         image: z.string().optional(),
+        conversationId: z.number().optional(),
+        history: z.array(z.object({ role: z.string(), content: z.string() })).optional(),
       }),
       streaming: true,
       responses: {

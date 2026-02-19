@@ -568,6 +568,15 @@ export default function FinancialPage() {
                           </CardContent>
                         </Card>
                       )}
+
+                      {extract && (
+                        <Link href={`/consultant?prompt=${encodeURIComponent("Based on my financial data, what should I focus on to improve my margins?")}&context=${encodeURIComponent(`Financial data: Food cost ${extract.foodCost || 'unknown'}%, Labor cost ${extract.laborCost || 'unknown'}%, Revenue ${extract.revenue || 'unknown'}, Net profit ${extract.netProfit || 'unknown'}%`)}`}>
+                          <Button variant="outline" className="w-full mt-2" data-testid="btn-discuss-financials">
+                            <ChefHat className="h-4 w-4 mr-2" />
+                            Discuss These Numbers with the Consultant
+                          </Button>
+                        </Link>
+                      )}
                     </>
                   )}
                 </CardContent>
