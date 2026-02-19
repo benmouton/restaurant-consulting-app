@@ -140,6 +140,34 @@ app.use((req, res, next) => {
     throw err;
   });
 
+  app.get("/media-kit", (req, res, next) => {
+    const ua = (req.headers["user-agent"] || "").toLowerCase();
+    const isCrawler = /facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|slackbot|discordbot|googlebot/i.test(ua);
+    if (!isCrawler) return next();
+
+    const host = req.get("host") || "";
+    const protocol = req.headers["x-forwarded-proto"] || "https";
+    const origin = `${protocol}://${host}`;
+    res.status(200).set({ "Content-Type": "text/html" }).end(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Ben Mouton — Restaurant Owner, Operator, Consultant</title>
+<meta name="description" content="35+ years in the restaurant industry. Builder of The Restaurant Consultant." />
+<meta property="og:title" content="Ben Mouton — Restaurant Owner, Operator, Consultant" />
+<meta property="og:description" content="35+ years in the restaurant industry. Builder of The Restaurant Consultant." />
+<meta property="og:image" content="${origin}/images/og-image.png" />
+<meta property="og:url" content="${origin}/media-kit" />
+<meta property="og:type" content="profile" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Ben Mouton — Restaurant Owner, Operator, Consultant" />
+<meta name="twitter:description" content="35+ years in the restaurant industry. Builder of The Restaurant Consultant." />
+<meta name="twitter:image" content="${origin}/images/og-image.png" />
+</head>
+<body></body>
+</html>`);
+  });
+
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
