@@ -1,0 +1,92 @@
+# Rewrite Invitation Email — Make It Personal and Warm
+
+The current invitation email reads like a generic SaaS onboarding message. These invitations are being sent to trusted friends and valued restaurant operators — people Ben knows personally. The email needs to feel like a personal invitation from a fellow operator, not a corporate welcome email.
+
+---
+
+## Current Problems:
+1. "Ben Mouton has given you access to The Restaurant Consultant" — sounds like a system notification, not a personal invitation
+2. The feature list is generic bullet points — doesn't convey why this person specifically should care
+3. "Your access expires in 7 days" — feels transactional and pressuring
+4. The overall tone is cold and corporate
+
+---
+
+## Rewrite the Email
+
+### Header area:
+- Keep "The Restaurant CONSULTANT" branding at the top
+- Add the chef hat logo icon if possible
+
+### Email body — rewrite to this tone and structure:
+
+**Subject line options (pick one):**
+- "Ben built something for you"
+- "An operator's toolbox — Ben wants you to try it"
+- "Ben Mouton invited you to The Restaurant Consultant"
+
+**Body:**
+
+```
+Hey [First Name],
+
+It's Ben. I've been building something I think you're going to find useful.
+
+The Restaurant Consultant is an operations platform I built for people like us — 
+independent operators who are tired of carrying everything themselves. It's got 
+the systems, frameworks, and tools I wish I had when I was figuring things out 
+the hard way.
+
+Here's what's inside:
+
+→ Kitchen readiness scoring — know if you're ready before service, not during it
+→ HR documentation that actually holds up at a hearing  
+→ Training programs your new hires can follow without you hovering
+→ A staffing engine that tells you exactly who to cut and when
+→ Crisis playbooks for the nights that go sideways
+→ An operations consultant you can ask anything, anytime
+
+I'm giving you full access for 7 days to explore everything — no credit card, 
+no strings. I'd genuinely love your feedback on it.
+
+[GET STARTED →]
+
+If you have questions or want me to walk you through it, just text me. 
+You know how to reach me.
+
+— Ben
+```
+
+### Footer:
+```
+The Restaurant Consultant
+Systems that work on your worst night.
+
+Austin, TX
+
+You received this because Ben Mouton personally invited you to try the platform.
+Don't want these emails? Reply with "unsubscribe" and we'll stop.
+```
+
+---
+
+## Key Changes:
+1. **First person voice** — "It's Ben. I've been building something..." not "Ben Mouton has given you access to..."
+2. **Benefits, not features** — "Know if you're ready before service, not during it" instead of "12 operational domains"
+3. **Personal close** — "just text me. You know how to reach me." reinforces this is a personal invite from a friend
+4. **Softer urgency** — "full access for 7 days to explore everything" feels generous, not pressuring
+5. **Asks for feedback** — "I'd genuinely love your feedback" makes the recipient feel valued, not sold to
+
+---
+
+## Technical Implementation:
+- The email template is likely in your server-side code — search for the invitation email template (could be in `/server/` or wherever email sending is handled)
+- Replace `[First Name]` with the recipient's first name if available, otherwise use the part of their email before the @ symbol
+- The sender name should show as "Ben Mouton" or "Ben from The Restaurant Consultant" — not just "The Restaurant Consultant"
+- Make sure the "Get Started" button is prominent — keep the cyan color, it works
+
+---
+
+## Also Update:
+- **The re-invitation email** (for expired invites that get resent) — should say something like "Hey [Name], just wanted to make sure you saw this — your last invite expired but I've sent you a fresh one. No rush, but I think you'll dig it."
+- **Any follow-up reminder emails** — keep the same warm, personal tone throughout the sequence

@@ -112,7 +112,7 @@ function buildCtaButton(href: string, label: string): string {
               </table>`;
 }
 
-function buildFeatureList(): string {
+function buildFeatureListGeneric(): string {
   return `
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 30px 0; width: 100%;">
                 <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
@@ -129,6 +129,30 @@ function buildFeatureList(): string {
                 </td></tr>
                 <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
                   &rarr; An operations consultant for any question
+                </td></tr>
+              </table>`;
+}
+
+function buildFeatureListPersonal(): string {
+  return `
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 30px 0; width: 100%;">
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; Kitchen readiness scoring &mdash; know if you're ready before service, not during it
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; HR documentation that actually holds up when it matters
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; Training programs your new hires can follow without you hovering
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; A staffing engine that tells you exactly who to cut and when
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; Crisis playbooks for the nights that go sideways
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; An operations consultant you can ask anything, anytime
                 </td></tr>
               </table>`;
 }
@@ -224,7 +248,7 @@ ${buildBrandHeader()}
                 Here's what you'll get access to:
               </p>
               
-${buildFeatureList()}
+${buildFeatureListGeneric()}
               
               <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
               
@@ -295,14 +319,9 @@ export async function sendInviteReminderEmail(opts: {
     const greeting = buildGreeting(opts.recipientName);
     const fromDisplay = `${opts.inviterName} via The Restaurant Consultant`;
     const senderFrom = buildFromAddress(fromDisplay, fromEmail);
+    const inviterFirst = getFirstName(opts.inviterName);
 
     const expiryNote = `Your access expires in ${opts.daysRemaining} day${opts.daysRemaining === 1 ? '' : 's'}.`;
-
-    const messageHtml = `Just following up &mdash; I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.`;
-
-    const replyNote = opts.inviterEmail 
-      ? `Questions? Just reply to this email &mdash; it goes directly to ${escapeHtml(opts.inviterName)}.`
-      : `Questions? Reach out to ${escapeHtml(opts.inviterName)} directly.`;
 
     const bodyHtml = `
 ${buildBrandHeader()}
@@ -313,27 +332,25 @@ ${buildBrandHeader()}
                 ${greeting}
               </p>
               
-              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
-                ${messageHtml}
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 20px 0;">
+                Just wanted to make sure you saw this &mdash; I sent you access to The Restaurant Consultant a few days ago. Your last link may have expired, so I've sent you a fresh one.
               </p>
-              
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
+                No rush at all, but if you get 10 minutes I think you'll dig it. I'd really appreciate your honest take.
+              </p>
               
 ${buildCtaButton(opts.inviteLink, 'Check It Out &rarr;')}
               
               <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
                 ${expiryNote}
               </p>
-              
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
-              
-              <p style="color: #888888; font-size: 14px; margin: 0;">
-                ${replyNote}
-              </p>
+
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 30px 0 0 0;">&mdash; ${escapeHtml(inviterFirst)}</p>
             </td>
           </tr>
           
-${buildComplianceFooter(`You received this because ${escapeHtml(opts.inviterName)} invited you to join their team.`)}`;
+${buildComplianceFooter(`You received this because ${escapeHtml(opts.inviterName)} personally invited you to try the platform.`)}`;
 
     const html = buildEmailWrapper(bodyHtml);
 
@@ -341,6 +358,7 @@ ${buildComplianceFooter(`You received this because ${escapeHtml(opts.inviterName
     const plainText = buildReminderPlainText({
       greeting: recipientFirst ? `Hey ${recipientFirst},` : 'Hey there,',
       inviterName: opts.inviterName,
+      inviterFirst,
       inviteLink: opts.inviteLink,
       expiryNote,
     });
@@ -349,7 +367,7 @@ ${buildComplianceFooter(`You received this because ${escapeHtml(opts.inviterName
       from: senderFrom,
       to: opts.toEmail,
       replyTo: opts.inviterEmail || undefined,
-      subject: `Following up -- ${opts.inviterName} still wants your take`,
+      subject: `Hey ${recipientFirst || 'there'} -- just making sure you saw this`,
       html,
       text: plainText,
     });
@@ -385,14 +403,27 @@ export async function sendTestAccessEmail(opts: {
 
     const greeting = buildGreeting(opts.recipientName);
     const durationText = opts.durationDays === 1 ? '1 day' : `${opts.durationDays} days`;
-
-    const inviterLine = opts.senderName
-      ? `${escapeHtml(opts.senderName)} has given you access to <strong>The Restaurant Consultant</strong> &mdash; an operations platform built for independent restaurant operators.`
-      : `You've been given access to <strong>The Restaurant Consultant</strong> &mdash; an operations platform built for independent restaurant operators.`;
+    const senderFirst = opts.senderName ? getFirstName(opts.senderName) : '';
 
     const subjectLine = opts.senderName
-      ? `${opts.senderName} invited you to The Restaurant Consultant`
+      ? `${senderFirst} built something for you`
       : `You're invited to try The Restaurant Consultant`;
+
+    const introHtml = opts.senderName
+      ? `It's ${escapeHtml(senderFirst)}. I've been building something I think you're going to find useful.`
+      : `Someone who knows the restaurant business thought you'd find this useful.`;
+
+    const platformHtml = opts.senderName
+      ? `<strong>The Restaurant Consultant</strong> is an operations platform I built for people like us &mdash; independent operators who are tired of carrying everything themselves. It's got the systems, frameworks, and tools I wish I had when I was figuring things out the hard way.`
+      : `<strong>The Restaurant Consultant</strong> is an operations platform built for independent operators &mdash; the systems, frameworks, and tools you wish you had when you were figuring things out the hard way.`;
+
+    const closingHtml = opts.senderName
+      ? `I'm giving you full access for <strong>${durationText}</strong> to explore everything &mdash; no credit card, no strings. I'd genuinely love your feedback on it.`
+      : `You've got full access for <strong>${durationText}</strong> to explore everything &mdash; no credit card, no strings.`;
+
+    const signoffHtml = opts.senderName
+      ? `<p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 30px 0 0 0;">If you have questions or want me to walk you through it, just reach out. You know how to find me.</p><p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 16px 0 0 0;">&mdash; ${escapeHtml(senderFirst)}</p>`
+      : '';
 
     const bodyHtml = `
 ${buildBrandHeader()}
@@ -403,27 +434,31 @@ ${buildBrandHeader()}
                 ${greeting}
               </p>
               
-              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 10px 0;">
-                ${inviterLine}
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 20px 0;">
+                ${introHtml}
               </p>
 
-              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
-                You've got <strong>${durationText}</strong> to explore everything:
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 24px 0;">
+                ${platformHtml}
               </p>
               
-${buildFeatureList()}
+              <p style="color: #1a1a1a; font-size: 15px; font-weight: 600; margin: 0 0 16px 0;">
+                Here's what's inside:
+              </p>
+
+${buildFeatureListPersonal()}
               
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
+                ${closingHtml}
+              </p>
               
 ${buildCtaButton(opts.accessLink, 'Get Started &rarr;')}
               
-              <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
-                Your access expires in ${durationText}. No credit card required.
-              </p>
+              ${signoffHtml}
             </td>
           </tr>
           
-${buildComplianceFooter(opts.senderName ? `You received this because ${escapeHtml(opts.senderName)} invited you to try the platform.` : 'You received this because someone invited you to try the platform.')}`;
+${buildComplianceFooter(opts.senderName ? `You received this because ${escapeHtml(opts.senderName)} personally invited you to try the platform.` : 'You received this because someone invited you to try the platform.')}`;
 
     const html = buildEmailWrapper(bodyHtml);
 
@@ -431,6 +466,7 @@ ${buildComplianceFooter(opts.senderName ? `You received this because ${escapeHtm
     const plainText = buildTestAccessPlainText({
       greeting: recipientFirst ? `Hey ${recipientFirst},` : 'Hey there,',
       senderName: opts.senderName,
+      senderFirst,
       durationText,
       accessLink: opts.accessLink,
     });
@@ -459,36 +495,56 @@ ${buildComplianceFooter(opts.senderName ? `You received this because ${escapeHtm
 function buildTestAccessPlainText(params: {
   greeting: string;
   senderName?: string;
+  senderFirst?: string;
   durationText: string;
   accessLink: string;
 }): string {
-  const inviterLine = params.senderName
-    ? `${params.senderName} has given you access to The Restaurant Consultant -- an operations platform built for independent restaurant operators.`
-    : `You've been given access to The Restaurant Consultant -- an operations platform built for independent restaurant operators.`;
+  const first = params.senderFirst || '';
+
+  const intro = first
+    ? `It's ${first}. I've been building something I think you're going to find useful.`
+    : `Someone who knows the restaurant business thought you'd find this useful.`;
+
+  const platform = first
+    ? `The Restaurant Consultant is an operations platform I built for people like us -- independent operators who are tired of carrying everything themselves. It's got the systems, frameworks, and tools I wish I had when I was figuring things out the hard way.`
+    : `The Restaurant Consultant is an operations platform built for independent operators -- the systems, frameworks, and tools you wish you had when you were figuring things out the hard way.`;
+
+  const closing = first
+    ? `I'm giving you full access for ${params.durationText} to explore everything -- no credit card, no strings. I'd genuinely love your feedback on it.`
+    : `You've got full access for ${params.durationText} to explore everything -- no credit card, no strings.`;
+
+  const signoff = first
+    ? `If you have questions or want me to walk you through it, just reach out. You know how to find me.\n\n-- ${first}`
+    : '';
 
   return `The Restaurant Consultant
 
 ${params.greeting}
 
-${inviterLine}
+${intro}
 
-You've got ${params.durationText} to explore everything:
+${platform}
 
-- 12 operational domains -- from kitchen readiness to HR compliance
-- Training templates and employee handbooks personalized to your restaurant
-- Food cost tools and financial analysis
-- Crisis management playbooks for your worst nights
-- An operations consultant for any question
+Here's what's inside:
+
+- Kitchen readiness scoring -- know if you're ready before service, not during it
+- HR documentation that actually holds up when it matters
+- Training programs your new hires can follow without you hovering
+- A staffing engine that tells you exactly who to cut and when
+- Crisis playbooks for the nights that go sideways
+- An operations consultant you can ask anything, anytime
+
+${closing}
 
 Get Started: ${params.accessLink}
 
-Your access expires in ${params.durationText}. No credit card required.
+${signoff}
 
 ---
 The Restaurant Consultant
 Systems that work on your worst night.
 Austin, TX
-${params.senderName ? `You received this because ${params.senderName} invited you to try the platform.` : 'You received this because someone invited you to try the platform.'}
+${params.senderName ? `You received this because ${params.senderName} personally invited you to try the platform.` : 'You received this because someone invited you to try the platform.'}
 Don't want these emails? Reply with "unsubscribe" and we'll stop.`;
 }
 
@@ -532,25 +588,29 @@ Don't want these emails? Reply with "unsubscribe" and we'll stop.`;
 function buildReminderPlainText(params: {
   greeting: string;
   inviterName: string;
+  inviterFirst?: string;
   inviteLink: string;
   expiryNote: string;
 }): string {
+  const first = params.inviterFirst || getFirstName(params.inviterName);
   return `The Restaurant Consultant
 
 ${params.greeting}
 
-Just following up -- I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.
+Just wanted to make sure you saw this -- I sent you access to The Restaurant Consultant a few days ago. Your last link may have expired, so I've sent you a fresh one.
+
+No rush at all, but if you get 10 minutes I think you'll dig it. I'd really appreciate your honest take.
 
 Check It Out: ${params.inviteLink}
 
 ${params.expiryNote}
 
-Questions? Reach out to ${params.inviterName} directly.
+-- ${first}
 
 ---
 The Restaurant Consultant
 Systems that work on your worst night.
 Austin, TX
-You received this because ${params.inviterName} invited you to join their team.
+You received this because ${params.inviterName} personally invited you to try the platform.
 Don't want these emails? Reply with "unsubscribe" and we'll stop.`;
 }
