@@ -1,7 +1,7 @@
 {
-  "name": "Restaurant AI Consulting",
-  "short_name": "Restaurant AI",
-  "description": "AI-powered restaurant operations consulting platform",
+  "name": "Restaurant Operations Consulting",
+  "short_name": "ROC",
+  "description": "Restaurant operations consulting platform. Replace chaos with systems.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
