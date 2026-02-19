@@ -147,9 +147,26 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // Check for test access session first
+  const session = (req as any).session;
+  if (session?.testAccess) {
+    const expiresAt = new Date(session.testAccess.expiresAt);
+    if (new Date() <= expiresAt) {
+      // Populate req.user with test user claims so downstream handlers work
+      (req as any).user = {
+        claims: { sub: session.testAccess.userId },
+        isTestUser: true,
+      };
+      return next();
+    }
+    // Test access expired, clean up
+    delete session.testAccess;
+    session.save();
+  }
+
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated() || !user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

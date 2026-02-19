@@ -45,12 +45,9 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
 
   const totalSteps = 3;
 
-  const isTestUser = !!(user as any).isTestUser;
-
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { firstName: string; phone: string; restaurantName: string; role: UserRole }) => {
-      const endpoint = isTestUser ? "/api/test-access/user" : "/api/auth/user";
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/auth/user", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
