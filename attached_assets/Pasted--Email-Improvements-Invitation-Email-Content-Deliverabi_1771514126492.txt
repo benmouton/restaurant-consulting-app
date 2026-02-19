@@ -1,0 +1,174 @@
+# Email Improvements — Invitation Email Content & Deliverability
+
+Two issues to fix: the email content needs polish, and the emails are landing in spam/junk folders.
+
+---
+
+## 1. Email Content Improvements
+
+### The current email is decent but needs refinement:
+
+**Current header:** "The Restaurant CONSULTANT" — the all-caps "CONSULTANT" in green/cyan looks disconnected from the brand. Make it match the app's actual logo styling.
+
+**Current greeting:** "Hey Moutons," — This should use the recipient's first name, not their last name or restaurant name. If only email is available, use "Hey there," as a fallback. Never use the restaurant name as a greeting — it reads like a mail merge error.
+
+**Current body is good but can be tightened. Replace the full email body with:**
+
+---
+
+**Subject line:** "Ben Mouton invited you to The Restaurant Consultant"
+
+**Email body:**
+
+```
+[Logo: The Restaurant Consultant]
+
+Hey [First Name],
+
+[Inviter Name] has given you access to The Restaurant Consultant — an operations platform built for independent restaurant operators.
+
+You've got 7 days to explore everything:
+
+→ 12 operational domains — from kitchen readiness to HR compliance
+→ Training templates and employee handbooks personalized to your restaurant  
+→ Food cost tools and financial analysis
+→ Crisis management playbooks for your worst nights
+→ An operations consultant for any question
+
+[  Get Started →  ]
+
+Your access expires in 7 days. No credit card required.
+
+---
+
+The Restaurant Consultant
+Systems that work on your worst night.
+```
+
+---
+
+### Specific changes:
+- Use the inviter's actual name in the subject line and body — "Ben Mouton invited you" is more personal and trustworthy than "You've been given exclusive access"
+- Remove "exclusive access" language — it sounds like marketing spam, which is part of why it's hitting junk folders
+- The feature list is good — keep the emoji icons but make sure they render correctly across email clients (some strip emoji). Consider using simple text bullets as fallback
+- The footer tagline "Systems that work on your worst night" is perfect — keep it
+- Make the "Get Started" button large, centered, and clearly clickable
+
+---
+
+## 2. Email Deliverability — Preventing Junk/Spam Folder
+
+The email is being flagged for two reasons shown in the screenshot:
+1. **"Newly Registered Domain"** — your domain restaurantai.consulting is new and hasn't built sender reputation yet
+2. **"Mail thinks this message is Junk Mail"** — the content and/or sending configuration is triggering spam filters
+
+### Fix these in order of impact:
+
+### A. Set up email authentication records (CRITICAL — do this first)
+
+Add these DNS records for your domain. Check your domain registrar or wherever restaurantai.consulting DNS is managed:
+
+**SPF Record:**
+- Type: TXT
+- Host: @
+- Value: `v=spf1 include:[your-email-service-spf] ~all`
+- (Replace with the SPF include for whatever service sends your emails — SendGrid, Resend, AWS SES, Postmark, etc.)
+
+**DKIM Record:**
+- Your email service provider will give you a DKIM key to add as a TXT or CNAME record
+- This cryptographically signs your emails so recipients know they're really from you
+
+**DMARC Record:**
+- Type: TXT
+- Host: _dmarc
+- Value: `v=DMARC1; p=none; rua=mailto:dmarc@restaurantai.consulting`
+- Start with `p=none` (monitoring mode), then move to `p=quarantine` once you confirm everything works
+
+**If you're not sure which email service you're using**, search your codebase for email sending logic — look for packages like `@sendgrid/mail`, `resend`, `nodemailer`, `postmark`, `aws-ses`, or similar. Then check that service's documentation for DNS setup instructions.
+
+### B. Set up a proper "From" address
+
+**Current:** `noreply@restaurantai.consulting`
+
+**Problems:**
+- The domain still says "restaurantai" — update to match the rebrand if possible
+- `noreply@` addresses score poorly with spam filters
+- Consider using `ben@therestaurantconsultant.com` or `team@therestaurantconsultant.com` instead
+
+**If you can register a new domain** (e.g., `therestaurantconsultant.com`):
+- Set up all DNS authentication records on the new domain
+- Use that domain for sending emails
+- This also fixes the "newly registered domain" issue if the new domain has some age, or at least gives you a clean start with proper authentication
+
+**If staying on the current domain:**
+- At minimum, change from `noreply@` to a real-sounding address like `ben@restaurantai.consulting` or `team@restaurantai.consulting`
+- Set up a reply-to address so recipients can actually respond
+
+### C. Warm up the sending domain
+
+New domains that suddenly start sending dozens of emails get flagged. Warm up gradually:
+
+- **Week 1:** Send to 5-10 people per day maximum
+- **Week 2:** Increase to 20-30 per day
+- **Week 3:** Increase to 50+ per day
+- Ask early recipients to **open the email, click the link, and reply** — this trains email providers that your emails are wanted
+- Ask recipients to move the email from Junk to Inbox if it lands there — this directly improves your sender reputation with that email provider
+
+### D. Content changes that reduce spam scoring
+
+Spam filters score emails on content patterns. Fix these:
+
+- **Remove "exclusive access"** — spam trigger phrase
+- **Don't use ALL CAPS** in any part of the email (the current "CONSULTANT" in the header)
+- **Reduce the number of links** — keep it to one primary CTA button ("Get Started") and minimal footer links
+- **Include a plain text version** of the email alongside the HTML version — emails with only HTML score higher on spam filters
+- **Include a physical mailing address** in the footer — required by CAN-SPAM law and improves deliverability
+- **Include an unsubscribe link** in the footer — also required by law and improves spam scoring
+- **Keep the email short** — your current length is good, don't add more
+
+### E. Add these to the email footer for compliance and deliverability:
+
+```
+The Restaurant Consultant
+Systems that work on your worst night.
+
+[Your business address]
+You received this because [Inviter Name] invited you to join their team.
+Unsubscribe | Privacy Policy
+```
+
+### F. Consider switching email providers if needed
+
+Some providers have better deliverability than others for transactional emails:
+
+**Best for deliverability:**
+- **Postmark** — specifically designed for transactional emails, excellent deliverability
+- **Resend** — modern, developer-friendly, good deliverability
+- **AWS SES** — cheap and reliable once warmed up, but requires more setup
+
+**Avoid for transactional emails:**
+- Generic SMTP through your hosting provider
+- Gmail SMTP (rate limits and deliverability issues)
+
+---
+
+## 3. Consider Splitting Invitation from Marketing Emails
+
+The invitation email is a **transactional email** (someone took an action that triggered it), not a marketing email. Transactional emails should:
+- Come from a different subdomain or sender than marketing emails (e.g., `notifications@` vs `marketing@`)
+- Be sent through a transactional email service, not a marketing email service
+- Have minimal design — simple, clean, text-focused
+- Not include marketing content or promotional language
+
+The current email is already mostly transactional in tone, which is good. Just remove the "exclusive" language and keep it straightforward: "You were invited. Here's what you get. Click to start."
+
+---
+
+## Priority Order
+1. **DNS authentication (SPF, DKIM, DMARC)** — biggest deliverability impact
+2. **Fix the "From" address** — stop using noreply@, consider new domain
+3. **Update email content** — remove spam trigger words, fix greeting, tighten copy
+4. **Add compliance footer** — unsubscribe link, physical address
+5. **Add plain text version** — reduces spam scoring
+6. **Domain warmup** — gradual sending increase
+7. **Consider Postmark or Resend** — if current provider has poor deliverability

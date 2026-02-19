@@ -40,7 +40,7 @@ async function getResendClient() {
 
 function buildFromAddress(displayName: string, fromEmail: string | undefined): string {
   if (!fromEmail) {
-    return `${displayName} <noreply@restaurantai.consulting>`;
+    return `${displayName} <noreply@therestaurantconsultant.com>`;
   }
   const emailMatch = fromEmail.match(/<(.+)>/);
   const bareEmail = emailMatch ? emailMatch[1] : fromEmail.trim();
@@ -58,6 +58,101 @@ function escapeHtml(str: string): string {
 
 function nl2br(str: string): string {
   return escapeHtml(str).replace(/\n/g, '<br>');
+}
+
+function getFirstName(fullName: string | undefined): string {
+  if (!fullName || !fullName.trim()) return '';
+  return fullName.trim().split(/\s+/)[0];
+}
+
+function buildGreeting(recipientName: string | undefined): string {
+  const first = getFirstName(recipientName);
+  return first ? `Hey ${escapeHtml(first)},` : 'Hey there,';
+}
+
+function buildBrandHeader(): string {
+  return `
+          <tr>
+            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <span style="color: #ffffff; font-family: 'Georgia', 'Times New Roman', serif; font-size: 18px; font-weight: bold;">The Restaurant</span>
+                    <span style="color: #14b8a6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin-left: 6px; font-weight: 500;">Consultant</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+}
+
+function buildComplianceFooter(reasonText: string): string {
+  return `
+          <tr>
+            <td style="background-color: #0d1117; padding: 24px 30px; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="color: #999999; font-size: 13px; margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">The Restaurant Consultant</p>
+              <p style="color: #777777; font-size: 12px; font-style: italic; margin: 0 0 16px 0; font-family: 'Georgia', serif;">Systems that work on your worst night.</p>
+              <p style="color: #666666; font-size: 11px; line-height: 1.5; margin: 0 0 8px 0;">Austin, TX</p>
+              <p style="color: #666666; font-size: 11px; line-height: 1.5; margin: 0 0 8px 0;">${reasonText}</p>
+              <p style="color: #555555; font-size: 11px; line-height: 1.5; margin: 0;">Don't want these emails? Reply with "unsubscribe" and we'll stop.</p>
+            </td>
+          </tr>`;
+}
+
+function buildCtaButton(href: string, label: string): string {
+  return `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding: 10px 0 20px 0;">
+                    <a href="${href}" style="background-color: #14b8a6; color: #ffffff; padding: 16px 48px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; display: inline-block; letter-spacing: 0.3px; mso-padding-alt: 0; text-align: center;">
+                      ${label}
+                    </a>
+                  </td>
+                </tr>
+              </table>`;
+}
+
+function buildFeatureList(): string {
+  return `
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 30px 0; width: 100%;">
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; 12 operational domains &mdash; from kitchen readiness to HR compliance
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; Training templates and employee handbooks personalized to your restaurant
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; Food cost tools and financial analysis
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; Crisis management playbooks for your worst nights
+                </td></tr>
+                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
+                  &rarr; An operations consultant for any question
+                </td></tr>
+              </table>`;
+}
+
+function buildEmailWrapper(bodyHtml: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+${bodyHtml}
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
 interface PersonalizedInviteOptions {
@@ -96,26 +191,68 @@ export async function sendOrganizationInviteEmail(
     const { client, fromEmail } = await getResendClient();
     console.log(`[Email] Got Resend client, fromEmail: ${fromEmail || 'using default'}`);
 
-    const recipientFirst = opts.recipientName || '';
-    const subject = opts.subjectLine || `Hey ${recipientFirst} — I'd love your feedback on something I'm building`;
+    const greeting = buildGreeting(opts.recipientName);
+    const subject = opts.subjectLine || `${opts.inviterName} invited you to The Restaurant Consultant`;
 
     const fromDisplay = `${opts.inviterName} via The Restaurant Consultant`;
     const senderFrom = buildFromAddress(fromDisplay, fromEmail);
 
-    const emailMatch = fromEmail?.match(/<(.+)>/);
-    const fromEmailAddr = emailMatch ? emailMatch[1] : (fromEmail?.trim() || 'noreply@restaurantai.consulting');
-
     const messageHtml = opts.personalMessage 
       ? nl2br(opts.personalMessage)
-      : `I've been building something I'm really excited about &mdash; a restaurant operations platform called The Restaurant Consultant. It's built from everything I've learned running my own restaurants, and I'd love your honest feedback on it.<br><br>You know this business better than most, and your perspective would mean a lot to me as I shape this into something that actually helps operators like us.<br><br>Take a look when you get a chance &mdash; no pressure, no sales pitch. Just want to know if this is something you'd actually use on a Tuesday night when everything's going sideways.<br><br>&mdash; ${escapeHtml(opts.inviterName)}`;
+      : `I've been building something I'm really excited about &mdash; a restaurant operations platform called The Restaurant Consultant. It's built from everything I've learned running my own restaurants, and I'd love your honest feedback on it.<br><br>You know this business better than most, and your perspective would mean a lot to me as I shape this into something that actually helps operators like us.<br><br>Take a look when you get a chance &mdash; no rush at all. Just want to know if this is something you'd actually use on a Tuesday night when everything's going sideways.<br><br>&mdash; ${escapeHtml(opts.inviterName)}`;
 
-    const html = buildInviteEmailHtml({
-      recipientName: recipientFirst,
-      messageHtml,
+    const replyNote = opts.inviterEmail 
+      ? `Questions? Just reply to this email &mdash; it goes directly to ${escapeHtml(opts.inviterName)}.`
+      : `Questions? Reach out to ${escapeHtml(opts.inviterName)} directly.`;
+
+    const bodyHtml = `
+${buildBrandHeader()}
+          
+          <tr>
+            <td style="background-color: #ffffff; padding: 40px 30px;">
+              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                ${greeting}
+              </p>
+              
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
+                ${messageHtml}
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <p style="color: #1a1a1a; font-size: 15px; font-weight: 600; margin: 0 0 16px 0;">
+                Here's what you'll get access to:
+              </p>
+              
+${buildFeatureList()}
+              
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+${buildCtaButton(opts.inviteLink, 'Accept Invitation &rarr;')}
+              
+              <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
+                This invitation expires in 7 days.
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <p style="color: #888888; font-size: 14px; margin: 0;">
+                ${replyNote}
+              </p>
+            </td>
+          </tr>
+          
+${buildComplianceFooter(`You received this because ${escapeHtml(opts.inviterName)} invited you to join their team.`)}`;
+
+    const html = buildEmailWrapper(bodyHtml);
+
+    const recipientFirst = getFirstName(opts.recipientName);
+    const plainText = buildInvitePlainText({
+      greeting: recipientFirst ? `Hey ${recipientFirst},` : 'Hey there,',
+      messageText: opts.personalMessage || `I've been building something I'm really excited about -- a restaurant operations platform called The Restaurant Consultant. It's built from everything I've learned running my own restaurants, and I'd love your honest feedback on it.\n\nYou know this business better than most, and your perspective would mean a lot to me as I shape this into something that actually helps operators like us.\n\nTake a look when you get a chance -- no rush at all. Just want to know if this is something you'd actually use on a Tuesday night when everything's going sideways.\n\n-- ${opts.inviterName}`,
       inviteLink: opts.inviteLink,
+      expiryNote: 'This invitation expires in 7 days.',
       inviterName: opts.inviterName,
-      inviterEmail: opts.inviterEmail,
-      senderEmailAddr: fromEmailAddr,
     });
     
     const result = await client.emails.send({
@@ -124,6 +261,7 @@ export async function sendOrganizationInviteEmail(
       replyTo: opts.inviterEmail || undefined,
       subject,
       html,
+      text: plainText,
     });
     
     console.log(`[Email] Resend API response:`, JSON.stringify(result));
@@ -154,31 +292,66 @@ export async function sendInviteReminderEmail(opts: {
     console.log(`[Email] Sending reminder email to ${opts.toEmail}`);
     const { client, fromEmail } = await getResendClient();
 
-    const recipientFirst = opts.recipientName || '';
+    const greeting = buildGreeting(opts.recipientName);
     const fromDisplay = `${opts.inviterName} via The Restaurant Consultant`;
     const senderFrom = buildFromAddress(fromDisplay, fromEmail);
-    const emailMatch2 = fromEmail?.match(/<(.+)>/);
-    const fromEmailAddr = emailMatch2 ? emailMatch2[1] : (fromEmail?.trim() || 'noreply@restaurantai.consulting');
 
-    const messageHtml = `Just bumping this &mdash; I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.`;
+    const expiryNote = `Your access expires in ${opts.daysRemaining} day${opts.daysRemaining === 1 ? '' : 's'}.`;
 
-    const html = buildInviteEmailHtml({
-      recipientName: recipientFirst,
-      messageHtml,
-      inviteLink: opts.inviteLink,
+    const messageHtml = `Just following up &mdash; I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.`;
+
+    const replyNote = opts.inviterEmail 
+      ? `Questions? Just reply to this email &mdash; it goes directly to ${escapeHtml(opts.inviterName)}.`
+      : `Questions? Reach out to ${escapeHtml(opts.inviterName)} directly.`;
+
+    const bodyHtml = `
+${buildBrandHeader()}
+          
+          <tr>
+            <td style="background-color: #ffffff; padding: 40px 30px;">
+              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                ${greeting}
+              </p>
+              
+              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
+                ${messageHtml}
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+${buildCtaButton(opts.inviteLink, 'Check It Out &rarr;')}
+              
+              <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
+                ${expiryNote}
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+              
+              <p style="color: #888888; font-size: 14px; margin: 0;">
+                ${replyNote}
+              </p>
+            </td>
+          </tr>
+          
+${buildComplianceFooter(`You received this because ${escapeHtml(opts.inviterName)} invited you to join their team.`)}`;
+
+    const html = buildEmailWrapper(bodyHtml);
+
+    const recipientFirst = getFirstName(opts.recipientName);
+    const plainText = buildReminderPlainText({
+      greeting: recipientFirst ? `Hey ${recipientFirst},` : 'Hey there,',
       inviterName: opts.inviterName,
-      inviterEmail: opts.inviterEmail,
-      senderEmailAddr: fromEmailAddr,
-      isReminder: true,
-      daysRemaining: opts.daysRemaining,
+      inviteLink: opts.inviteLink,
+      expiryNote,
     });
 
     const result = await client.emails.send({
       from: senderFrom,
       to: opts.toEmail,
       replyTo: opts.inviterEmail || undefined,
-      subject: `Quick follow-up — still want your take on this`,
+      subject: `Following up -- ${opts.inviterName} still wants your take`,
       html,
+      text: plainText,
     });
 
     if (result.error) {
@@ -210,38 +383,20 @@ export async function sendTestAccessEmail(opts: {
       : 'The Restaurant Consultant';
     const senderFrom = buildFromAddress(fromDisplay, fromEmail);
 
-    const recipientFirst = opts.recipientName.split(' ')[0];
-    const greeting = `Hey ${escapeHtml(recipientFirst)},`;
+    const greeting = buildGreeting(opts.recipientName);
     const durationText = opts.durationDays === 1 ? '1 day' : `${opts.durationDays} days`;
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+    const inviterLine = opts.senderName
+      ? `${escapeHtml(opts.senderName)} has given you access to <strong>The Restaurant Consultant</strong> &mdash; an operations platform built for independent restaurant operators.`
+      : `You've been given access to <strong>The Restaurant Consultant</strong> &mdash; an operations platform built for independent restaurant operators.`;
+
+    const subjectLine = opts.senderName
+      ? `${opts.senderName} invited you to The Restaurant Consultant`
+      : `You're invited to try The Restaurant Consultant`;
+
+    const bodyHtml = `
+${buildBrandHeader()}
           
-          <!-- Header -->
-          <tr>
-            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 8px 8px 0 0;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td>
-                    <span style="color: #ffffff; font-family: 'Georgia', serif; font-size: 18px; font-weight: bold;">The Restaurant</span>
-                    <span style="color: #14b8a6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-left: 6px;">Consultant</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Body -->
           <tr>
             <td style="background-color: #ffffff; padding: 40px 30px;">
               <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
@@ -249,51 +404,18 @@ export async function sendTestAccessEmail(opts: {
               </p>
               
               <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 10px 0;">
-                You've been given exclusive access to <strong>The Restaurant Consultant</strong> &mdash; a complete operations platform built for independent restaurant operators.
+                ${inviterLine}
               </p>
 
               <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
-                Take it for a spin and let us know what you think. Your access lasts <strong>${durationText}</strong>.
+                You've got <strong>${durationText}</strong> to explore everything:
               </p>
               
-              <!-- Divider -->
+${buildFeatureList()}
+              
               <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
               
-              <p style="color: #1a1a1a; font-size: 15px; font-weight: 600; margin: 0 0 16px 0;">
-                Here's what you'll have access to:
-              </p>
-              
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 30px 0;">
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F52A;</span> 12 operational domains &mdash; from kitchen readiness to HR compliance
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F4CB;</span> Training templates and employee handbooks
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F4B0;</span> Food cost tools and financial analysis
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F6A8;</span> Crisis management playbooks
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F4AC;</span> An operations consultant for any question
-                </td></tr>
-              </table>
-              
-              <!-- Divider -->
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
-              
-              <!-- CTA Button -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding: 10px 0 20px 0;">
-                    <a href="${opts.accessLink}" style="background-color: #14b8a6; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; display: inline-block; letter-spacing: 0.3px;">
-                      Get Started &rarr;
-                    </a>
-                  </td>
-                </tr>
-              </table>
+${buildCtaButton(opts.accessLink, 'Get Started &rarr;')}
               
               <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
                 Your access expires in ${durationText}. No credit card required.
@@ -301,26 +423,24 @@ export async function sendTestAccessEmail(opts: {
             </td>
           </tr>
           
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="color: #888888; font-size: 13px; margin: 0 0 4px 0;">The Restaurant Consultant</p>
-              <p style="color: #666666; font-size: 12px; font-style: italic; margin: 0;">Systems that work on your worst night.</p>
-            </td>
-          </tr>
-          
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+${buildComplianceFooter(opts.senderName ? `You received this because ${escapeHtml(opts.senderName)} invited you to try the platform.` : 'You received this because someone invited you to try the platform.')}`;
+
+    const html = buildEmailWrapper(bodyHtml);
+
+    const recipientFirst = getFirstName(opts.recipientName);
+    const plainText = buildTestAccessPlainText({
+      greeting: recipientFirst ? `Hey ${recipientFirst},` : 'Hey there,',
+      senderName: opts.senderName,
+      durationText,
+      accessLink: opts.accessLink,
+    });
 
     const result = await client.emails.send({
       from: senderFrom,
       to: opts.toEmail,
-      subject: `${escapeHtml(recipientFirst)}, you've been invited to try The Restaurant Consultant`,
+      subject: subjectLine,
       html,
+      text: plainText,
     });
 
     if (result.error) {
@@ -336,126 +456,101 @@ export async function sendTestAccessEmail(opts: {
   }
 }
 
-function buildInviteEmailHtml(params: {
-  recipientName: string;
-  messageHtml: string;
-  inviteLink: string;
-  inviterName: string;
-  inviterEmail?: string;
-  senderEmailAddr: string;
-  isReminder?: boolean;
-  daysRemaining?: number;
+function buildTestAccessPlainText(params: {
+  greeting: string;
+  senderName?: string;
+  durationText: string;
+  accessLink: string;
 }): string {
-  const greeting = params.recipientName ? `Hey ${escapeHtml(params.recipientName)},` : `Hey there,`;
-  const expiryNote = params.isReminder && params.daysRemaining 
-    ? `Expires in ${params.daysRemaining} day${params.daysRemaining === 1 ? '' : 's'}.`
-    : `This invitation expires in 7 days.`;
-  const replyNote = params.inviterEmail 
-    ? `Questions? Just reply to this email &mdash; it goes directly to ${escapeHtml(params.inviterName)}.`
-    : `Questions? Reach out to ${escapeHtml(params.inviterName)} directly.`;
+  const inviterLine = params.senderName
+    ? `${params.senderName} has given you access to The Restaurant Consultant -- an operations platform built for independent restaurant operators.`
+    : `You've been given access to The Restaurant Consultant -- an operations platform built for independent restaurant operators.`;
 
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
-          
-          <!-- Header -->
-          <tr>
-            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 8px 8px 0 0;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td>
-                    <span style="color: #ffffff; font-family: 'Georgia', serif; font-size: 18px; font-weight: bold;">The Restaurant</span>
-                    <span style="color: #14b8a6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-left: 6px;">Consultant</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Body -->
-          <tr>
-            <td style="background-color: #ffffff; padding: 40px 30px;">
-              <p style="color: #1a1a1a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                ${greeting}
-              </p>
-              
-              <p style="color: #333333; font-size: 16px; line-height: 1.7; margin: 0 0 30px 0;">
-                ${params.messageHtml}
-              </p>
-              
-              <!-- Divider -->
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
-              
-              <p style="color: #1a1a1a; font-size: 15px; font-weight: 600; margin: 0 0 16px 0;">
-                Here's what you'll get access to:
-              </p>
-              
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 30px 0;">
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F52A;</span> 12 operational domains &mdash; from kitchen readiness to HR compliance
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F4CB;</span> Training templates and employee handbooks
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F4B0;</span> Food cost tools and financial analysis
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F6A8;</span> Crisis management playbooks
-                </td></tr>
-                <tr><td style="padding: 6px 0; color: #444; font-size: 15px; line-height: 1.5;">
-                  <span style="margin-right: 8px;">&#x1F4AC;</span> An operations consultant for any question
-                </td></tr>
-              </table>
-              
-              <!-- Divider -->
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
-              
-              <!-- CTA Button -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding: 10px 0 20px 0;">
-                    <a href="${params.inviteLink}" style="background-color: #14b8a6; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; display: inline-block; letter-spacing: 0.3px;">
-                      Accept Invitation &rarr;
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              
-              <p style="color: #888888; font-size: 13px; text-align: center; margin: 10px 0 0 0;">
-                ${expiryNote}
-              </p>
-              
-              <!-- Divider -->
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
-              
-              <p style="color: #888888; font-size: 14px; margin: 0;">
-                ${replyNote}
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #0d1117; padding: 20px 30px; border-radius: 0 0 8px 8px; text-align: center;">
-              <p style="color: #888888; font-size: 13px; margin: 0 0 4px 0;">The Restaurant Consultant</p>
-              <p style="color: #666666; font-size: 12px; font-style: italic; margin: 0;">Systems that work on your worst night.</p>
-            </td>
-          </tr>
-          
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  return `The Restaurant Consultant
+
+${params.greeting}
+
+${inviterLine}
+
+You've got ${params.durationText} to explore everything:
+
+- 12 operational domains -- from kitchen readiness to HR compliance
+- Training templates and employee handbooks personalized to your restaurant
+- Food cost tools and financial analysis
+- Crisis management playbooks for your worst nights
+- An operations consultant for any question
+
+Get Started: ${params.accessLink}
+
+Your access expires in ${params.durationText}. No credit card required.
+
+---
+The Restaurant Consultant
+Systems that work on your worst night.
+Austin, TX
+${params.senderName ? `You received this because ${params.senderName} invited you to try the platform.` : 'You received this because someone invited you to try the platform.'}
+Don't want these emails? Reply with "unsubscribe" and we'll stop.`;
+}
+
+function buildInvitePlainText(params: {
+  greeting: string;
+  messageText: string;
+  inviteLink: string;
+  expiryNote: string;
+  inviterName: string;
+}): string {
+  return `The Restaurant Consultant
+
+${params.greeting}
+
+${params.messageText}
+
+---
+
+Here's what you'll get access to:
+
+- 12 operational domains -- from kitchen readiness to HR compliance
+- Training templates and employee handbooks personalized to your restaurant
+- Food cost tools and financial analysis
+- Crisis management playbooks for your worst nights
+- An operations consultant for any question
+
+Accept Invitation: ${params.inviteLink}
+
+${params.expiryNote}
+
+Questions? Reach out to ${params.inviterName} directly.
+
+---
+The Restaurant Consultant
+Systems that work on your worst night.
+Austin, TX
+You received this because ${params.inviterName} invited you to join their team.
+Don't want these emails? Reply with "unsubscribe" and we'll stop.`;
+}
+
+function buildReminderPlainText(params: {
+  greeting: string;
+  inviterName: string;
+  inviteLink: string;
+  expiryNote: string;
+}): string {
+  return `The Restaurant Consultant
+
+${params.greeting}
+
+Just following up -- I sent you access to The Restaurant Consultant a few days ago. No rush at all, but if you get 10 minutes, I'd really appreciate your honest take.
+
+Check It Out: ${params.inviteLink}
+
+${params.expiryNote}
+
+Questions? Reach out to ${params.inviterName} directly.
+
+---
+The Restaurant Consultant
+Systems that work on your worst night.
+Austin, TX
+You received this because ${params.inviterName} invited you to join their team.
+Don't want these emails? Reply with "unsubscribe" and we'll stop.`;
 }
