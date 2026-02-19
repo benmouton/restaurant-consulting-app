@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -54,6 +54,11 @@ import {
   Zap,
   Eye,
   GraduationCap,
+  Search,
+  UserCheck,
+  BookOpen,
+  CircleDot,
+  ChevronDown,
 } from "lucide-react";
 import type { RestaurantStandards, CertificationAttempt } from "@shared/schema";
 
@@ -81,7 +86,7 @@ const DEFAULT_STANDARDS = {
     managerEscalation: "Always involve manager for cut-off situations",
   },
   safetyRules: [
-    "Danger zone: Keep hot food above 140°F, cold food below 40°F",
+    "Danger zone: Keep hot food above 140\u00B0F, cold food below 40\u00B0F",
     "Raw chicken always on bottom shelf",
     "Wash hands after touching raw proteins",
     "Clean and sanitize cutting boards between proteins",
@@ -123,10 +128,249 @@ const ROLES = [
 ];
 
 const PHASES = [
-  { value: "shadow", label: "Shadow Phase", description: "Knowledge + judgment scenarios. Lower difficulty, more guidance." },
-  { value: "perform", label: "Perform Phase", description: "Less guidance, more complexity. Adds interruptions and stricter scoring." },
-  { value: "certify", label: "Certify Phase", description: "Must demonstrate perfect compliance. Randomized, high-pressure." },
+  { value: "shadow", label: "Shadow Phase", description: "Knowledge + judgment scenarios. Lower difficulty, more guidance.", example: "You'll observe and narrate what you would do. Think of it as a walk-through." },
+  { value: "perform", label: "Perform Phase", description: "Less guidance, more complexity. Adds interruptions and stricter scoring.", example: "You'll handle multi-table scenarios with simultaneous demands and curveballs." },
+  { value: "certify", label: "Certify Phase", description: "Must demonstrate perfect compliance. Randomized, high-pressure.", example: "Final test: randomized high-pressure scenario. Must pass to be certified." },
 ];
+
+function getStandardsCompletion(standards: RestaurantStandards | undefined) {
+  if (!standards) return { completed: 0, total: 8, sections: [] };
+  const sections = [
+    { name: "Service Philosophy", done: !!(standards.servicePhilosophy as string)?.trim() },
+    { name: "Steps of Service", done: !!(standards.stepsOfService as any)?.greetingTiming?.trim() },
+    { name: "Speed Targets", done: !!(standards.speedTargets as any)?.drinks?.trim() },
+    { name: "Recovery Framework", done: !!(standards.recoveryFramework as any)?.method?.trim() },
+    { name: "Alcohol Policy", done: !!(standards.alcoholPolicy as any)?.idRules?.trim() },
+    { name: "Safety Rules", done: Array.isArray(standards.safetyRules) && (standards.safetyRules as string[]).length > 0 },
+    { name: "Critical Errors", done: Array.isArray(standards.criticalErrors) && (standards.criticalErrors as string[]).length > 0 },
+    { name: "Rubric Weights", done: !!(standards.rubricWeights as any)?.prioritization },
+  ];
+  return { completed: sections.filter(s => s.done).length, total: sections.length, sections };
+}
+
+function StaffSearchDropdown({ value, onChange }: { value: string; onChange: (name: string) => void }) {
+  const [searchTerm, setSearchTerm] = useState(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: staffMembers } = useQuery<any[]>({
+    queryKey: ["/api/scheduling/staff"],
+  });
+
+  const filteredStaff = useMemo(() => {
+    if (!staffMembers || !searchTerm.trim()) return staffMembers || [];
+    const lower = searchTerm.toLowerCase();
+    return staffMembers.filter((m: any) =>
+      m.name?.toLowerCase().includes(lower) ||
+      m.position?.toLowerCase().includes(lower)
+    );
+  }, [staffMembers, searchTerm]);
+
+  useEffect(() => {
+    setSearchTerm(value);
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search staff or type a name..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          className="pl-9"
+          data-testid="input-trainee-name"
+        />
+      </div>
+      {isOpen && staffMembers && staffMembers.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg" role="listbox" data-testid="staff-dropdown-list">
+          <ScrollArea className="max-h-48">
+            <div className="p-1">
+              {filteredStaff.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">No matching staff found</div>
+              ) : (
+                filteredStaff.slice(0, 10).map((member: any) => (
+                  <button
+                    type="button"
+                    key={member.id}
+                    role="option"
+                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-md cursor-pointer hover-elevate w-full text-left"
+                    onClick={() => {
+                      onChange(member.name);
+                      setSearchTerm(member.name);
+                      setIsOpen(false);
+                    }}
+                    data-testid={`staff-option-${member.id}`}
+                  >
+                    <UserCheck className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                    <span className="font-medium">{member.name}</span>
+                    {member.position && (
+                      <Badge variant="secondary" className="text-xs ml-auto">{member.position}</Badge>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StandardsCompletionBanner({ activeStandards, onGoToStandards }: { activeStandards: RestaurantStandards | undefined; onGoToStandards: () => void }) {
+  const completion = getStandardsCompletion(activeStandards);
+  const pct = Math.round((completion.completed / completion.total) * 100);
+
+  if (!activeStandards) {
+    return (
+      <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+        <CardContent className="pt-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-sm">No standards configured</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Go to the Standards tab to set up your restaurant's standards. Without them, generic industry defaults will be used.
+              </p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={onGoToStandards} data-testid="btn-goto-standards">
+                <Settings className="h-4 w-4 mr-2" />
+                Set Up Standards
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (pct === 100) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <CheckCircle2 className="h-4 w-4 text-green-500" />
+        Using standards: <span className="font-medium text-foreground">{activeStandards.name}</span>
+        <Badge variant="secondary">{activeStandards.passThreshold}+ to pass</Badge>
+        <Badge variant="outline" className="text-green-600 dark:text-green-400">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Complete
+        </Badge>
+      </div>
+    );
+  }
+
+  return (
+    <Card className="border-blue-500/30">
+      <CardContent className="pt-4">
+        <div className="flex items-start gap-3">
+          <BookOpen className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-medium text-sm">Standards: {activeStandards.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{completion.completed}/{completion.total} sections configured</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={onGoToStandards} data-testid="btn-complete-standards">
+                Complete Setup
+              </Button>
+            </div>
+            <Progress value={pct} className="h-1.5 mt-2" />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {completion.sections.map((s) => (
+                <Badge key={s.name} variant={s.done ? "secondary" : "outline"} className="text-xs">
+                  {s.done ? <CheckCircle2 className="h-3 w-3 mr-1 text-green-500" /> : <CircleDot className="h-3 w-3 mr-1 text-muted-foreground" />}
+                  {s.name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RubricPreviewDialog({ standards }: { standards: RestaurantStandards }) {
+  const rw = standards.rubricWeights as any;
+  const ce = standards.criticalErrors as string[] || [];
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" data-testid="btn-preview-rubric">
+          <Eye className="h-4 w-4 mr-2" />
+          Preview as Rubric
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Certification Rubric Preview</DialogTitle>
+          <DialogDescription>
+            This is what trainees will be scored against: {standards.name}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 mt-2">
+          <div>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Scoring Categories</Label>
+            <div className="space-y-2 mt-2">
+              {[
+                { label: "Prioritization & Triage", weight: rw?.prioritization || 0 },
+                { label: "Guest Communication", weight: rw?.guestCommunication || 0 },
+                { label: "Recovery & Escalation", weight: rw?.recovery || 0 },
+                { label: "Policy & Safety Compliance", weight: rw?.policyCompliance || 0 },
+                { label: "Professionalism & Brand Fit", weight: rw?.professionalism || 0 },
+              ].map((cat) => (
+                <div key={cat.label} className="flex items-center gap-2">
+                  <div className="flex-1 text-sm">{cat.label}</div>
+                  <div className="w-24">
+                    <Progress value={cat.weight} className="h-2" />
+                  </div>
+                  <span className="text-sm font-medium w-10 text-right">{cat.weight}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Pass Threshold</Label>
+              <Badge variant="secondary" className="text-sm">{standards.passThreshold}/100</Badge>
+            </div>
+          </div>
+          {ce.length > 0 && (
+            <div className="border-t pt-3">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <ShieldAlert className="h-3 w-3 text-destructive" />
+                Auto-Fail Triggers
+              </Label>
+              <ul className="mt-2 space-y-1">
+                {ce.map((err, i) => (
+                  <li key={i} className="text-sm text-destructive/80 flex items-start gap-2">
+                    <XCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    {err}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function StandardsEditor() {
   const { toast } = useToast();
@@ -161,6 +405,8 @@ function StandardsEditor() {
   const { data: activeStandards } = useQuery<RestaurantStandards>({
     queryKey: ["/api/standards/active"],
   });
+
+  const isFirstVisit = !activeStandards && (!existingStandards || existingStandards.length === 0);
 
   useEffect(() => {
     if (activeStandards) {
@@ -273,24 +519,66 @@ function StandardsEditor() {
 
   const totalWeight = prioritizationWeight + communicationWeight + recoveryWeight + complianceWeight + professionalismWeight;
 
+  const sectionWarnings = [];
+  if (!philosophy.trim()) sectionWarnings.push("Service Philosophy is empty");
+  if (!greetingTiming.trim() && !checkBackTiming.trim()) sectionWarnings.push("Steps of Service needs at least one timing");
+  if (safetyRules.split("\n").filter(Boolean).length === 0) sectionWarnings.push("No safety rules defined");
+  if (criticalErrors.split("\n").filter(Boolean).length === 0) sectionWarnings.push("No critical errors defined - trainees can never auto-fail");
+  if (totalWeight !== 100) sectionWarnings.push(`Rubric weights total ${totalWeight} instead of 100`);
+
   return (
     <div className="space-y-6">
+      {isFirstVisit && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-sm">Welcome to Standards Setup</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Start with our default template - it covers service timing, safety rules, and scoring weights based on industry best practices. You can customize everything to match your restaurant.
+                </p>
+                <Button size="sm" className="mt-3" onClick={loadDefaults} data-testid="btn-load-defaults-cta">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Load Default Template & Get Started
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold" data-testid="text-standards-title">Restaurant Standards</h2>
           <p className="text-sm text-muted-foreground">Configure the standards your staff will be tested against</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={loadDefaults} data-testid="btn-load-defaults">
-            <FileText className="h-4 w-4 mr-2" />
-            Load Default Template
-          </Button>
+          {!isFirstVisit && (
+            <Button variant="outline" size="sm" onClick={loadDefaults} data-testid="btn-load-defaults">
+              <FileText className="h-4 w-4 mr-2" />
+              Load Default Template
+            </Button>
+          )}
+          {activeStandards && <RubricPreviewDialog standards={activeStandards} />}
           <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="btn-save-standards">
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Standards
           </Button>
         </div>
       </div>
+
+      {sectionWarnings.length > 0 && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30">
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div className="text-sm">
+            <span className="font-medium text-amber-700 dark:text-amber-400">Heads up:</span>
+            <ul className="mt-1 space-y-0.5 text-muted-foreground">
+              {sectionWarnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div>
@@ -475,7 +763,7 @@ function StandardsEditor() {
   );
 }
 
-function CertificationTest() {
+function CertificationTest({ onGoToStandards }: { onGoToStandards: () => void }) {
   const { toast } = useToast();
   const [role, setRole] = useState("server");
   const [phase, setPhase] = useState("shadow");
@@ -661,47 +949,24 @@ function CertificationTest() {
     toast({ title: "Copied to clipboard" });
   };
 
+  const selectedPhase = PHASES.find(p => p.value === phase);
+
   return (
     <div className="space-y-6">
-      {!activeStandards && (
-        <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-sm">No standards configured</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Go to the Standards tab to set up your restaurant's standards. Without them, generic industry defaults will be used.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeStandards && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          Using standards: <span className="font-medium text-foreground">{activeStandards.name}</span>
-          <Badge variant="secondary">{activeStandards.passThreshold}+ to pass</Badge>
-        </div>
-      )}
+      <StandardsCompletionBanner activeStandards={activeStandards} onGoToStandards={onGoToStandards} />
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Test Setup</CardTitle>
+          <CardDescription>Select a trainee, their role, and the certification phase</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="traineeName">Trainee Name</Label>
-            <Input
-              id="traineeName"
-              placeholder="Enter trainee's name..."
-              value={traineeName}
-              onChange={(e) => setTraineeName(e.target.value)}
-              className="mt-1"
-              data-testid="input-trainee-name"
-            />
+            <div className="mt-1">
+              <StaffSearchDropdown value={traineeName} onChange={setTraineeName} />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Search from your staff list or type any name</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -729,11 +994,20 @@ function CertificationTest() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {PHASES.find(p => p.value === phase)?.description}
-              </p>
             </div>
           </div>
+          {selectedPhase && (
+            <div className="p-3 rounded-md bg-muted/50 border">
+              <div className="flex items-start gap-2">
+                <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">{selectedPhase.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{selectedPhase.description}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1 italic">{selectedPhase.example}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -747,7 +1021,7 @@ function CertificationTest() {
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Generating {PHASES.find(p => p.value === phase)?.label} scenario...
+              Generating {selectedPhase?.label} scenario...
             </>
           ) : (
             <>
@@ -764,13 +1038,14 @@ function CertificationTest() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <CardTitle className="text-base">Scenario</CardTitle>
-                <Badge variant="secondary">{PHASES.find(p => p.value === phase)?.label}</Badge>
+                <Badge variant="secondary">{selectedPhase?.label}</Badge>
                 <Badge variant="outline">{ROLES.find(r => r.value === role)?.label}</Badge>
               </div>
               <Button variant="ghost" size="icon" onClick={() => copyText(scenario)} data-testid="btn-copy-scenario">
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
+            <CardDescription>Read this scenario aloud to {traineeName || "the trainee"}, then record their response below</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
@@ -884,7 +1159,7 @@ function CertificationTest() {
   );
 }
 
-function AttemptHistory() {
+function AttemptHistory({ onGoToCertify }: { onGoToCertify: () => void }) {
   const { data: attempts, isLoading } = useQuery<CertificationAttempt[]>({
     queryKey: ["/api/certification/attempts"],
   });
@@ -910,6 +1185,55 @@ function AttemptHistory() {
     );
   }
 
+  if (!attempts || attempts.length === 0) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="pt-8 pb-8">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <BarChart3 className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg" data-testid="text-empty-dashboard">No Certification Data Yet</h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                  Run your first certification test to start tracking trainee performance, pass rates, and role-specific trends.
+                </p>
+              </div>
+              <Button onClick={onGoToCertify} data-testid="btn-start-first-test">
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Run First Certification Test
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">What You'll See Here</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { icon: Target, label: "Pass/fail rates per trainee" },
+                { icon: Users, label: "Performance breakdown by role" },
+                { icon: TrendingUp, label: "Score trends over time" },
+                { icon: Award, label: "Phase completion tracking" },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const passRate = stats && stats.totalAttempts > 0 ? Math.round((stats.passed / stats.totalAttempts) * 100) : 0;
+
   return (
     <div className="space-y-6">
       {stats && stats.totalAttempts > 0 && (
@@ -934,8 +1258,12 @@ function AttemptHistory() {
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold" data-testid="text-avg-score">{stats.avgScore}</div>
-              <p className="text-xs text-muted-foreground">Avg Score</p>
+              <div className="flex items-end gap-1.5">
+                <div className="text-2xl font-bold" data-testid="text-avg-score">{stats.avgScore}</div>
+                <span className="text-xs text-muted-foreground mb-1">avg</span>
+              </div>
+              <Progress value={passRate} className="h-1.5 mt-1" />
+              <p className="text-xs text-muted-foreground mt-1">{passRate}% pass rate</p>
             </CardContent>
           </Card>
         </div>
@@ -949,15 +1277,15 @@ function AttemptHistory() {
           <CardContent>
             <div className="space-y-3">
               {Object.entries(stats.byRole).map(([roleName, data]) => {
-                const passRate = data.attempts > 0 ? Math.round((data.passed / data.attempts) * 100) : 0;
+                const rolePassRate = data.attempts > 0 ? Math.round((data.passed / data.attempts) * 100) : 0;
                 return (
                   <div key={roleName} className="flex items-center gap-3">
                     <div className="w-28 text-sm font-medium capitalize">{roleName.replace("-", " ")}</div>
                     <div className="flex-1">
-                      <Progress value={passRate} className="h-2" />
+                      <Progress value={rolePassRate} className="h-2" />
                     </div>
                     <div className="w-20 text-right text-xs text-muted-foreground">
-                      {data.passed}/{data.attempts} ({passRate}%)
+                      {data.passed}/{data.attempts} ({rolePassRate}%)
                     </div>
                     <Badge variant="secondary" className="text-xs">{data.avgScore} avg</Badge>
                   </div>
@@ -987,45 +1315,47 @@ function AttemptHistory() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent Attempts</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-base">Recent Attempts</CardTitle>
+            <Button variant="outline" size="sm" onClick={onGoToCertify} data-testid="btn-run-another-test">
+              <Plus className="h-4 w-4 mr-2" />
+              Run New Test
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {!attempts || attempts.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No certification tests yet. Run your first test to see results here.</p>
-          ) : (
-            <div className="space-y-2">
-              {attempts.map((attempt) => (
-                <div
-                  key={attempt.id}
-                  className="flex flex-wrap items-center gap-2 p-3 rounded-lg border hover-elevate cursor-pointer"
-                  onClick={() => setSelectedAttempt(selectedAttempt?.id === attempt.id ? null : attempt)}
-                  data-testid={`attempt-row-${attempt.id}`}
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {attempt.passed ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                    ) : attempt.hasCriticalError ? (
-                      <ShieldAlert className="h-4 w-4 text-destructive flex-shrink-0" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-                    )}
-                    <span className="font-medium text-sm truncate">{attempt.traineeName}</span>
-                  </div>
-                  <Badge variant="outline" className="capitalize text-xs">{attempt.role.replace("-", " ")}</Badge>
-                  <Badge variant="secondary" className="capitalize text-xs">{attempt.phase}</Badge>
-                  {attempt.totalScore !== null && (
-                    <Badge variant={attempt.passed ? "default" : "destructive"} className="text-xs">
-                      {attempt.totalScore}/100
-                    </Badge>
+          <div className="space-y-2">
+            {attempts.map((attempt) => (
+              <div
+                key={attempt.id}
+                className="flex flex-wrap items-center gap-2 p-3 rounded-lg border hover-elevate cursor-pointer"
+                onClick={() => setSelectedAttempt(selectedAttempt?.id === attempt.id ? null : attempt)}
+                data-testid={`attempt-row-${attempt.id}`}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {attempt.passed ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  ) : attempt.hasCriticalError ? (
+                    <ShieldAlert className="h-4 w-4 text-destructive flex-shrink-0" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-destructive flex-shrink-0" />
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    {attempt.createdAt ? new Date(attempt.createdAt).toLocaleDateString() : ""}
-                  </span>
-                  <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${selectedAttempt?.id === attempt.id ? "rotate-90" : ""}`} />
+                  <span className="font-medium text-sm truncate">{attempt.traineeName}</span>
                 </div>
-              ))}
-            </div>
-          )}
+                <Badge variant="outline" className="capitalize text-xs">{attempt.role.replace("-", " ")}</Badge>
+                <Badge variant="secondary" className="capitalize text-xs">{attempt.phase}</Badge>
+                {attempt.totalScore !== null && (
+                  <Badge variant={attempt.passed ? "default" : "destructive"} className="text-xs">
+                    {attempt.totalScore}/100
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {attempt.createdAt ? new Date(attempt.createdAt).toLocaleDateString() : ""}
+                </span>
+                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${selectedAttempt?.id === attempt.id ? "rotate-90" : ""}`} />
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -1113,11 +1443,11 @@ export default function CertificationPage() {
           </TabsList>
 
           <TabsContent value="test">
-            <CertificationTest />
+            <CertificationTest onGoToStandards={() => setActiveTab("standards")} />
           </TabsContent>
 
           <TabsContent value="dashboard">
-            <AttemptHistory />
+            <AttemptHistory onGoToCertify={() => setActiveTab("test")} />
           </TabsContent>
 
           <TabsContent value="standards">

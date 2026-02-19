@@ -1,0 +1,97 @@
+# Page-Specific Improvements — Consultant Page
+
+---
+
+## 1. Rebrand — Remove "AI" from the Header
+
+- The page header says **"AI Consultant"** → Change to **"The Consultant"** or **"Operations Consultant"**
+- The centered title "Ask the Consultant" is already good — no change needed there
+- The subtitle copy is excellent: "Ask anything about restaurant operations. You'll get direct, practical answers—no fluff, no theory, just what works on a real floor." Keep it.
+
+---
+
+## 2. Make the Example Questions Clickable
+
+- The three example questions are great prompts:
+  - "How do I handle a no-call no-show during a busy shift?"
+  - "What's a good comp policy for service failures?"
+  - "My food cost is out of control. Where do I start?"
+- But they're currently just static text. **Make them clickable buttons or chips** — when tapped, they auto-submit as the user's first message
+- Style them as subtle bordered cards or pills that highlight on hover
+- This removes friction for first-time users who don't know what to ask
+
+---
+
+## 3. Add More Starter Questions Organized by Category
+
+- Three questions is a good start, but consider showing 6-9 organized by domain:
+
+**Staffing & Labor:**
+- "How do I handle a no-call no-show during a busy shift?"
+- "What's a fair tip-out structure for my servers and support staff?"
+
+**Cost & Margins:**
+- "My food cost is out of control. Where do I start?"
+- "How do I figure out if a menu item is actually profitable?"
+
+**Service & Guest Experience:**
+- "What's a good comp policy for service failures?"
+- "How do I deal with a bad Google review from last night?"
+
+**Leadership & Operations:**
+- "I'm working 70 hours a week. How do I start delegating?"
+- "How do I hold my managers accountable without micromanaging?"
+
+- Show these as a grid of clickable cards, grouped under subtle category headers
+- Keep it clean — don't overwhelm. 6-9 total is the sweet spot.
+
+---
+
+## 4. Context-Aware Suggestions
+
+- If the user has restaurant data in their profile (from onboarding), personalize the suggestions:
+  - If they have staff count > 20: show questions about delegation and management layers
+  - If they entered a restaurant type of "Bar": include questions about alcohol policy and late-night operations  
+  - If it's Friday afternoon: show "How should I prepare for a busy weekend service?"
+  - If they recently uploaded a P&L: show "Based on my financials, where should I cut costs?"
+
+---
+
+## 5. Conversation History
+
+- Does the consultant save past conversations? If not, add this:
+  - Show a sidebar or dropdown with previous conversations
+  - Each conversation shows: first question asked, date, brief preview
+  - Let users continue a previous conversation or start a new one
+- Operators will ask something during a crisis, then want to reference the answer later during a calmer moment
+
+---
+
+## 6. Deep Link from Other Pages
+
+- When other tools in the app generate output (staffing plans, recovery advice, financial summaries), add a "Discuss with Consultant →" button that opens the Consultant page with context pre-loaded
+- Example: after the Financial Insights page generates a P&L summary, show a button: "Ask the Consultant about these numbers"
+- This makes the Consultant feel like the connective tissue of the entire platform, not a standalone chat page
+
+---
+
+## 7. Response Formatting
+
+- Make sure the Consultant's responses use clean formatting:
+  - Short paragraphs, not walls of text
+  - Bold key terms and action items
+  - Numbered steps when giving a process
+  - A brief "Bottom line:" summary at the end of longer responses
+- The voice should match the app's personality: direct, practical, operator-to-operator. Not corporate, not academic.
+- Avoid phrases like "As an AI..." or "I'm an AI assistant..." — the Consultant should speak as an experienced operator, not as a technology
+
+---
+
+## Priority Order
+1. **Rename header from "AI Consultant"** (branding fix)
+2. **Make example questions clickable** (biggest quick UX win)
+3. **Conversation history** (retention feature — users come back to reference past advice)
+4. **Expanded question categories** (better onboarding for new users)
+5. **Deep links from other pages** (makes the Consultant central to the platform)
+6. **Context-aware suggestions** (personalization polish)
+7. **Response formatting guidelines** (quality of output)

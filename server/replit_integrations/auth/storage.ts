@@ -24,13 +24,24 @@ class AuthStorage implements IAuthStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // Automatically set admin status for designated admin emails
     const isAdminEmail = userData.email && ADMIN_EMAILS.includes(userData.email.toLowerCase());
     const dataToInsert = {
       ...userData,
       isAdmin: isAdminEmail ? "true" : userData.isAdmin,
     };
-    
+
+    if (userData.email) {
+      const [existingByEmail] = await db.select().from(users).where(eq(users.email, userData.email));
+      if (existingByEmail && existingByEmail.id !== userData.id) {
+        const [updated] = await db
+          .update(users)
+          .set({ ...dataToInsert, id: userData.id, updatedAt: new Date() })
+          .where(eq(users.email, userData.email))
+          .returning();
+        return updated;
+      }
+    }
+
     const [user] = await db
       .insert(users)
       .values(dataToInsert)
