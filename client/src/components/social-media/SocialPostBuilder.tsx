@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, parse } from "date-fns";
+import { format, parse, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, isSameDay, isAfter, startOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -45,6 +45,9 @@ import {
   Upload,
   Eye,
   CalendarIcon,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { SiLinkedin, SiX, SiNextdoor } from "react-icons/si";
 import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
@@ -530,6 +533,10 @@ export default function SocialPostBuilder() {
             <TabsTrigger value="create" data-testid="tab-create-post">
               <Wand2 className="h-4 w-4 mr-2" />
               Create
+            </TabsTrigger>
+            <TabsTrigger value="schedule" data-testid="tab-schedule">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Schedule
             </TabsTrigger>
             <TabsTrigger value="accounts" data-testid="tab-accounts">
               <Link2 className="h-4 w-4 mr-2" />
@@ -1065,6 +1072,19 @@ export default function SocialPostBuilder() {
           </div>
         </TabsContent>
 
+        {/* Schedule Calendar Tab */}
+        <TabsContent value="schedule">
+          <ScheduleCalendar
+            posts={postHistory || []}
+            connectedAccounts={connectedAccounts || []}
+            onReuse={(caption) => {
+              setCaption(caption);
+              setActiveTab("create");
+              toast({ title: "Post content loaded", description: "Edit and repost!" });
+            }}
+          />
+        </TabsContent>
+
         {/* Channels / Accounts Tab */}
         <TabsContent value="accounts">
           <Card>
@@ -1339,6 +1359,340 @@ export default function SocialPostBuilder() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function ScheduleCalendar({
+  posts,
+  connectedAccounts,
+  onReuse,
+}: {
+  posts: ScheduledPost[];
+  connectedAccounts: SafeConnectedAccount[];
+  onReuse: (caption: string) => void;
+}) {
+  const [currentWeekStart, setCurrentWeekStart] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 0 })
+  );
+  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
+  const [viewMode, setViewMode] = useState<"week" | "list">("week");
+  const [listFilter, setListFilter] = useState<"all" | "upcoming" | "past">("all");
+
+  const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
+  const days = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+  const today = startOfDay(new Date());
+
+  const getPostDate = (post: ScheduledPost) => {
+    const d = post.scheduledFor || post.createdAt;
+    return d ? startOfDay(new Date(d)) : null;
+  };
+
+  const getPostsForDay = (day: Date) => {
+    return posts.filter((p) => {
+      const d = getPostDate(p);
+      return d && isSameDay(d, day);
+    });
+  };
+
+  const filteredPosts = posts
+    .filter((p) => {
+      if (listFilter === "all") return true;
+      const d = getPostDate(p);
+      if (!d) return false;
+      if (listFilter === "upcoming") return isAfter(d, today) || isSameDay(d, today);
+      return !isAfter(d, today) && !isSameDay(d, today);
+    })
+    .sort((a, b) => {
+      const da = getPostDate(a);
+      const db = getPostDate(b);
+      if (!da || !db) return 0;
+      return db.getTime() - da.getTime();
+    });
+
+  const getProviderIcon = (provider: string) => {
+    switch (provider) {
+      case "facebook": return <Facebook className="h-3 w-3 text-blue-600" />;
+      case "instagram": return <Instagram className="h-3 w-3 text-pink-500" />;
+      case "google_business": return <MapPin className="h-3 w-3 text-green-600" />;
+      case "linkedin": return <SiLinkedin className="h-3 w-3 text-blue-700" />;
+      case "x": return <SiX className="h-3 w-3" />;
+      case "nextdoor": return <SiNextdoor className="h-3 w-3 text-green-500" />;
+      default: return null;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "posted": return "bg-green-500/15 border-green-500/30 text-green-700 dark:text-green-400";
+      case "scheduled": return "bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-400";
+      case "draft": return "bg-muted border-border text-muted-foreground";
+      case "failed": return "bg-red-500/15 border-red-500/30 text-red-700 dark:text-red-400";
+      case "partial": return "bg-yellow-500/15 border-yellow-500/30 text-yellow-700 dark:text-yellow-400";
+      default: return "bg-muted border-border";
+    }
+  };
+
+  const getAccountProviders = (post: ScheduledPost) => {
+    return (post.platformTargets || []).map((targetId) => {
+      const acct = connectedAccounts.find((a) => a.id === targetId);
+      return acct?.provider || "unknown";
+    });
+  };
+
+  const totalThisWeek = days.reduce((sum, day) => sum + getPostsForDay(day).length, 0);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-base">Post Schedule</CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-muted rounded-md p-0.5">
+                <Button
+                  variant={viewMode === "week" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("week")}
+                  data-testid="btn-view-week"
+                >
+                  <CalendarDays className="h-3 w-3 mr-1" />
+                  Week
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  data-testid="btn-view-list"
+                >
+                  <History className="h-3 w-3 mr-1" />
+                  List
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {viewMode === "week" ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}
+                  data-testid="btn-prev-week"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="text-center">
+                  <p className="text-sm font-medium" data-testid="text-week-range">
+                    {format(currentWeekStart, "MMM d")} – {format(weekEnd, "MMM d, yyyy")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {totalThisWeek} post{totalThisWeek !== 1 ? "s" : ""} this week
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }))}
+                    className="text-xs px-2"
+                    data-testid="btn-today"
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}
+                    data-testid="btn-next-week"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1" data-testid="schedule-week-grid">
+                {days.map((day) => {
+                  const dayPosts = getPostsForDay(day);
+                  const isToday = isSameDay(day, today);
+                  return (
+                    <div key={day.toISOString()} className="min-h-[120px]">
+                      <div
+                        className={`text-center py-1 rounded-t-md text-xs font-medium ${
+                          isToday
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <div>{format(day, "EEE")}</div>
+                        <div className={isToday ? "font-bold" : ""}>{format(day, "d")}</div>
+                      </div>
+                      <div className="border border-t-0 rounded-b-md p-1 space-y-1 min-h-[88px]">
+                        {dayPosts.length === 0 && (
+                          <div className="text-[10px] text-muted-foreground/50 text-center pt-4">
+                            —
+                          </div>
+                        )}
+                        {dayPosts.slice(0, 3).map((post) => {
+                          const providers = getAccountProviders(post);
+                          return (
+                            <button
+                              key={post.id}
+                              onClick={() => setSelectedPost(selectedPost?.id === post.id ? null : post)}
+                              className={`w-full text-left p-1 rounded border text-[10px] leading-tight truncate cursor-pointer ${getStatusColor(post.status)}`}
+                              data-testid={`schedule-post-${post.id}`}
+                            >
+                              <div className="flex items-center gap-0.5 mb-0.5">
+                                {providers.slice(0, 2).map((p, i) => (
+                                  <span key={i} data-testid={`icon-provider-${p}`}>{getProviderIcon(p)}</span>
+                                ))}
+                                {providers.length > 2 && (
+                                  <span className="text-[9px] text-muted-foreground">+{providers.length - 2}</span>
+                                )}
+                              </div>
+                              <span className="line-clamp-2">{(post.caption || "").substring(0, 50)}</span>
+                            </button>
+                          );
+                        })}
+                        {dayPosts.length > 3 && (
+                          <p className="text-[10px] text-muted-foreground text-center">
+                            +{dayPosts.length - 3} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1" data-testid="list-filter-controls">
+                {(["all", "upcoming", "past"] as const).map((f) => (
+                  <Button
+                    key={f}
+                    variant={listFilter === f ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setListFilter(f)}
+                    data-testid={`btn-filter-${f}`}
+                  >
+                    {f === "all" ? "All" : f === "upcoming" ? "Upcoming" : "Past"}
+                  </Button>
+                ))}
+              </div>
+              {filteredPosts.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No posts found</p>
+                  <p className="text-sm mt-1">Posts you create will appear here</p>
+                </div>
+              ) : (
+                filteredPosts.slice(0, 30).map((post: ScheduledPost) => {
+                  const providers = getAccountProviders(post);
+                  const postDate = getPostDate(post);
+                  return (
+                    <button
+                      key={post.id}
+                      onClick={() => setSelectedPost(selectedPost?.id === post.id ? null : post)}
+                      className={`w-full text-left p-3 rounded-md border ${
+                        selectedPost?.id === post.id ? "ring-2 ring-primary" : ""
+                      }`}
+                      data-testid={`list-post-${post.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm line-clamp-1">{post.caption || "No content"}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-1">
+                              {providers.map((p, i) => (
+                                <span key={i} data-testid={`list-icon-${p}`}>{getProviderIcon(p)}</span>
+                              ))}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {postDate ? format(postDate, "EEE, MMM d") : "No date"}
+                            </span>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] shrink-0 ${getStatusColor(post.status)}`}
+                        >
+                          {post.status}
+                        </Badge>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {selectedPost && (
+            <div className="mt-4 p-4 border rounded-md bg-muted/30" data-testid="post-detail-panel">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <Badge variant="outline" className={`text-xs ${getStatusColor(selectedPost.status)}`}>
+                    {selectedPost.status === "posted" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    {selectedPost.status === "failed" && <AlertCircle className="h-3 w-3 mr-1" />}
+                    {selectedPost.status}
+                  </Badge>
+                  {selectedPost.postType && (
+                    <Badge variant="secondary" className="text-xs ml-1">
+                      {POST_TYPES.find((t) => t.value === selectedPost.postType)?.label || selectedPost.postType}
+                    </Badge>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSelectedPost(null)}
+                  data-testid="btn-close-post-detail"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <p className="text-sm mb-3 whitespace-pre-wrap">{selectedPost.caption || "No content"}</p>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-3">
+                <Clock className="h-3 w-3" />
+                {selectedPost.scheduledFor
+                  ? format(new Date(selectedPost.scheduledFor), "EEE, MMM d, yyyy 'at' h:mm a")
+                  : selectedPost.createdAt
+                  ? format(new Date(selectedPost.createdAt), "EEE, MMM d, yyyy 'at' h:mm a")
+                  : "No date"}
+                <span className="mx-1">•</span>
+                <div className="flex items-center gap-1">
+                  {getAccountProviders(selectedPost).map((p, i) => (
+                    <span key={i}>{getProviderIcon(p)}</span>
+                  ))}
+                </div>
+              </div>
+              {selectedPost.mediaUrls && selectedPost.mediaUrls.length > 0 && (
+                <div className="flex gap-2 mb-3">
+                  {selectedPost.mediaUrls.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt="Post media"
+                      className="h-16 w-16 object-cover rounded-md border"
+                    />
+                  ))}
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onReuse(selectedPost.caption)}
+                data-testid="btn-reuse-from-schedule"
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                Reuse Content
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
