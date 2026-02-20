@@ -1,7 +1,5 @@
-const CACHE_NAME = 'trc-v1';
+const CACHE_NAME = 'trc-v2';
 const urlsToCache = [
-  '/',
-  '/index.html',
   '/favicon.svg',
   '/manifest.json',
   '/icon-192.png',
@@ -31,7 +29,10 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  
+
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/')) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -43,6 +44,10 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          return cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+        });
+      })
   );
 });
