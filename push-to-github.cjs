@@ -30,7 +30,7 @@ async function main() {
 
   const url = `https://x-access-token:${token}@github.com/benmouton/restaurant-consulting-app.git`;
   try {
-    const output = execSync(`git push ${url} main 2>&1`, {
+    const output = execSync(`git push --force ${url} main 2>&1`, {
       cwd: "/home/runner/workspace",
       encoding: "utf-8",
       timeout: 30000,
