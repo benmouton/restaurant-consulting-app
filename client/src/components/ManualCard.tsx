@@ -44,8 +44,8 @@ export function ManualCard({ section, isAcknowledged, onAcknowledge, isPending }
         
         <span className={cn(
           "text-xs font-semibold uppercase tracking-wider",
-          section.role === 'FOH' ? 'text-blue-600' :
-          section.role === 'BOH' ? 'text-orange-600' : 'text-gray-500'
+          section.role === 'FOH' ? 'text-primary' :
+          section.role === 'BOH' ? 'text-orange-600' : 'text-muted-foreground'
         )}>
           {section.role === 'ALL' ? 'Everyone' : section.role}
         </span>

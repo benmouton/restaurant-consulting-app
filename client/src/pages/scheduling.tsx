@@ -1086,10 +1086,10 @@ export default function SchedulingPage() {
             <div className="space-y-4">
               {announcements.map(announcement => {
                 const priorityColors: Record<string, string> = {
-                  low: "bg-gray-100 text-gray-700",
-                  normal: "bg-blue-100 text-blue-700",
-                  high: "bg-orange-100 text-orange-700",
-                  urgent: "bg-red-100 text-red-700",
+                  low: "bg-muted text-foreground",
+                  normal: "bg-primary/10 text-primary",
+                  high: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                  urgent: "bg-red-500/10 text-red-600 dark:text-red-400",
                 };
                 return (
                   <Card key={announcement.id} className="relative group" data-testid={`announcement-card-${announcement.id}`}>

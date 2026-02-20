@@ -102,7 +102,7 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
                   "max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm",
                   msg.role === "user" 
                     ? "bg-primary text-primary-foreground rounded-tr-none" 
-                    : "bg-white text-foreground rounded-tl-none border"
+                    : "bg-card text-foreground rounded-tl-none border"
                 )}>
                   <div className="prose prose-sm max-w-none dark:prose-invert">
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -121,7 +121,7 @@ export function ChatInterface({ userId }: ChatInterfaceProps) {
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
                   <Bot className="h-5 w-5" />
                 </div>
-                <div className="max-w-[80%] rounded-2xl rounded-tl-none border bg-white px-4 py-3 text-sm shadow-sm">
+                <div className="max-w-[80%] rounded-2xl rounded-tl-none border bg-card px-4 py-3 text-sm shadow-sm">
                   <div className="prose prose-sm max-w-none">
                     <ReactMarkdown>{streamingContent}</ReactMarkdown>
                   </div>

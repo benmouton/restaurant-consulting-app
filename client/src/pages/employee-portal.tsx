@@ -97,8 +97,8 @@ export default function EmployeePortalPage() {
   };
 
   const priorityColors = {
-    low: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-    normal: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    low: "bg-muted text-muted-foreground",
+    normal: "bg-primary/10 text-primary",
     high: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
     urgent: "bg-red-500/10 text-red-600 dark:text-red-400",
   };

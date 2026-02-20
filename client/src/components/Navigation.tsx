@@ -42,7 +42,7 @@ export function Navigation() {
 
   return (
     <>
-    <nav className="fixed left-0 top-0 z-50 flex h-16 w-full items-center justify-between border-b bg-white/80 px-4 backdrop-blur-md transition-all lg:h-full lg:w-72 lg:flex-col lg:border-r lg:border-b-0 lg:px-6 lg:py-8">
+    <nav className="fixed left-0 top-0 z-50 flex h-16 w-full items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md transition-all lg:h-full lg:w-72 lg:flex-col lg:border-r lg:border-b-0 lg:px-6 lg:py-8">
       {/* Brand */}
       <div className="lg:w-full lg:mb-10">
         <BrandLogoNav />

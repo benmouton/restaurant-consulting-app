@@ -274,10 +274,10 @@ function StandardsCompletionBanner({ activeStandards, onGoToStandards }: { activ
   }
 
   return (
-    <Card className="border-blue-500/30">
+    <Card className="border-primary/30">
       <CardContent className="pt-4">
         <div className="flex items-start gap-3">
-          <BookOpen className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+          <BookOpen className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -1072,7 +1072,7 @@ function CertificationTest({ onGoToStandards }: { onGoToStandards: () => void })
           <CardContent className="space-y-4">
             <div>
               <Label className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-blue-500" />
+                <Zap className="h-4 w-4 text-primary" />
                 What They DO (action steps, in order)
               </Label>
               <Textarea

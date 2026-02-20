@@ -64,7 +64,7 @@ const contentTypeIcons: Record<string, React.ComponentType<{ className?: string 
 };
 
 const contentTypeColors: Record<string, string> = {
-  overview: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  overview: "bg-primary/10 text-primary",
   procedure: "bg-green-500/10 text-green-600 dark:text-green-400",
   checklist: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
   assessment: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
@@ -217,7 +217,7 @@ function TrainingProgressPanel({ activeCategory }: { activeCategory: string }) {
     if (isOverdue) {
       return <Badge variant="secondary" className="bg-red-500/10 text-red-600 dark:text-red-400" data-testid={`badge-status-${assignment.id}`}>Overdue</Badge>;
     }
-    return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 dark:text-blue-400" data-testid={`badge-status-${assignment.id}`}>In Progress</Badge>;
+    return <Badge variant="secondary" className="bg-primary/10 text-primary" data-testid={`badge-status-${assignment.id}`}>In Progress</Badge>;
   }
 
   function handleSubmitAssignment(e: React.FormEvent) {
@@ -467,7 +467,7 @@ function TrainingDashboardSummary() {
       <Card>
         <CardContent className="pt-4 pb-3">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <Clock className="h-4 w-4 text-blue-500" />
+            <Clock className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">In Training</span>
           </div>
           <div className="text-2xl font-bold" data-testid="stat-in-training">{inProgress.length}</div>

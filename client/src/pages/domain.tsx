@@ -207,7 +207,7 @@ function FoodCostCalculator() {
     if (totalPlateCost === 0) return null;
     if (actualFoodCostPercent === 0 && menuPriceNum === 0) {
       if (suggestedPrice > 0) {
-        return { color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950", message: `Price this at $${suggestedPrice.toFixed(2)} to hit ${targetFoodCost}% food cost` };
+        return { color: "text-primary", bg: "bg-primary/10", message: `Price this at $${suggestedPrice.toFixed(2)} to hit ${targetFoodCost}% food cost` };
       }
       return null;
     }
@@ -1376,11 +1376,11 @@ Provide actionable summary and follow-up plan.`;
 
           <TabsContent value="readiness" className="space-y-4 mt-4">
             {lastDebrief && (lastDebrief.fixForTomorrow || lastDebrief.debriefStructured?.fixForTomorrow) && (
-              <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/5">
+              <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
                 <div className="flex items-start gap-2">
-                  <ArrowRight className="h-4 w-4 mt-0.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <ArrowRight className="h-4 w-4 mt-0.5 text-primary shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Last shift's fix</p>
+                    <p className="text-sm font-medium text-primary">Last shift's fix</p>
                     <p className="text-sm text-muted-foreground" data-testid="text-last-debrief-fix">
                       {lastDebrief.debriefStructured?.fixForTomorrow || lastDebrief.fixForTomorrow}
                       {(lastDebrief.debriefStructured?.fixOwner) && <span> &mdash; Owner: {lastDebrief.debriefStructured.fixOwner}</span>}
@@ -1637,7 +1637,7 @@ Provide actionable summary and follow-up plan.`;
                   {scoreData.topFixes.map((fix, i) => (
                     <div key={i} className="flex items-center justify-between gap-2 text-xs">
                       <span className="flex items-center gap-1">
-                        <ArrowRight className="h-3 w-3 text-blue-500" /> {fix.label}
+                        <ArrowRight className="h-3 w-3 text-primary" /> {fix.label}
                       </span>
                       <span className="text-green-600 dark:text-green-400 font-medium">+{fix.points} pts</span>
                     </div>
@@ -1879,7 +1879,7 @@ Provide actionable summary and follow-up plan.`;
 
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="fixForTomorrow" className="text-blue-600 dark:text-blue-400 font-medium">One fix for tomorrow</Label>
+                  <Label htmlFor="fixForTomorrow" className="text-primary font-medium">One fix for tomorrow</Label>
                   <VoiceButton field="fix" label="Dictate tomorrow's fix" />
                 </div>
                 <Textarea
@@ -4730,13 +4730,13 @@ function TaskProgressDashboard() {
   };
   
   const categoryColors: Record<string, string> = {
-    labor: 'bg-blue-500',
+    labor: 'bg-primary',
     inventory: 'bg-green-500',
     training: 'bg-purple-500', 
     service: 'bg-orange-500',
-    admin: 'bg-gray-500',
+    admin: 'bg-muted-foreground',
     finance: 'bg-red-500',
-    uncategorized: 'bg-slate-400'
+    uncategorized: 'bg-muted-foreground'
   };
   
   if (statsLoading || trendsLoading) {
@@ -4825,7 +4825,7 @@ function TaskProgressDashboard() {
               const rate = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
               return (
                 <div key={cat} className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${categoryColors[cat] || 'bg-slate-400'}`} />
+                  <div className={`w-2 h-2 rounded-full ${categoryColors[cat] || 'bg-muted-foreground'}`} />
                   <span className="text-sm flex-1">{categoryLabels[cat] || cat}</span>
                   <span className="text-xs text-muted-foreground">
                     {data.completed}/{data.total}
@@ -6941,7 +6941,7 @@ function FacilityCommandCenter() {
     if (isDuringService && isSafetyRisk) return { level: "CRITICAL", text: "Act now — safety risk during active service", color: "text-red-700 dark:text-red-400 bg-red-500/10 border-red-500/30" };
     if (isDuringService && !isSafetyRisk) return { level: "HIGH", text: "Workaround needed — service is active", color: "text-orange-700 dark:text-orange-400 bg-orange-500/10 border-orange-500/30" };
     if (!isDuringService && isSafetyRisk) return { level: "HIGH", text: "Fix before opening — safety risk", color: "text-orange-700 dark:text-orange-400 bg-orange-500/10 border-orange-500/30" };
-    return { level: "STANDARD", text: "Schedule repair — no immediate risk", color: "text-blue-700 dark:text-blue-400 bg-blue-500/10 border-blue-500/30" };
+    return { level: "STANDARD", text: "Schedule repair — no immediate risk", color: "text-primary bg-primary/10 border-primary/30" };
   };
 
   const generateResponse = async () => {
@@ -7245,12 +7245,12 @@ Emergency After-Hours:
             </div>
 
             {quickTips.length > 0 && (
-              <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-                <p className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-2">Quick checks before calling for repair:</p>
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <p className="text-xs font-medium text-primary mb-2">Quick checks before calling for repair:</p>
                 <ul className="space-y-1">
                   {quickTips.map((tip, i) => (
                     <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                      <Check className="h-3 w-3 shrink-0 mt-0.5 text-blue-500" />
+                      <Check className="h-3 w-3 shrink-0 mt-0.5 text-primary" />
                       {tip}
                     </li>
                   ))}
@@ -7634,8 +7634,8 @@ Emergency After-Hours:
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">{issueStats?.resolved || 0}</div>
                 <div className="text-xs text-muted-foreground">Resolved</div>
               </div>
-              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 text-center">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{issueStats?.avgResolutionDays || 0}</div>
+              <div className="p-3 bg-primary/10 rounded-lg border border-primary/20 text-center">
+                <div className="text-2xl font-bold text-primary">{issueStats?.avgResolutionDays || 0}</div>
                 <div className="text-xs text-muted-foreground">Avg. Days to Fix</div>
               </div>
             </div>
@@ -7827,7 +7827,7 @@ Emergency After-Hours:
 
 const contentTypeConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   principle: { icon: Lightbulb, label: "Principle", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-  output: { icon: FileOutput, label: "Framework", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  output: { icon: FileOutput, label: "Framework", color: "bg-primary/10 text-primary" },
   checklist: { icon: CheckSquare, label: "Checklist", color: "bg-green-500/10 text-green-600 dark:text-green-400" },
   script: { icon: ScriptIcon, label: "Script", color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
 };

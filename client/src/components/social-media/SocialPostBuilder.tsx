@@ -466,7 +466,7 @@ export default function SocialPostBuilder() {
     switch (provider) {
       case 'facebook': return 'bg-blue-600';
       case 'instagram': return 'bg-gradient-to-tr from-purple-600 via-pink-500 to-orange-400';
-      case 'google_business': return 'bg-blue-500';
+      case 'google_business': return 'bg-primary';
       case 'linkedin': return 'bg-blue-700';
       case 'x': return 'bg-black dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600';
       case 'nextdoor': return 'bg-green-600';
@@ -1425,7 +1425,7 @@ function ScheduleCalendar({
   const getStatusColor = (status: string) => {
     switch (status) {
       case "posted": return "bg-green-500/15 border-green-500/30 text-green-700 dark:text-green-400";
-      case "scheduled": return "bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-400";
+      case "scheduled": return "bg-primary/15 border-primary/30 text-primary";
       case "draft": return "bg-muted border-border text-muted-foreground";
       case "failed": return "bg-red-500/15 border-red-500/30 text-red-700 dark:text-red-400";
       case "partial": return "bg-yellow-500/15 border-yellow-500/30 text-yellow-700 dark:text-yellow-400";
