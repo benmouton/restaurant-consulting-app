@@ -18,20 +18,9 @@ function getSystemTheme(): "dark" | "light" {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("theme") as Theme | null;
-      return stored || "system";
-    }
-    return "system";
-  });
+  const [theme, setTheme] = useState<Theme>("dark");
   
-  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">(() => {
-    if (theme === "system") {
-      return getSystemTheme();
-    }
-    return theme as "dark" | "light";
-  });
+  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
     const root = document.documentElement;
