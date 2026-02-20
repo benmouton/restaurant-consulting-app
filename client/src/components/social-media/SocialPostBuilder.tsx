@@ -1546,7 +1546,7 @@ function ScheduleCalendar({
                             >
                               <div className="flex items-center gap-0.5 mb-0.5">
                                 {providers.slice(0, 2).map((p, i) => (
-                                  <span key={i} data-testid={`icon-provider-${p}`}>{getProviderIcon(p)}</span>
+                                  <span key={i} data-testid={`icon-provider-${p}-${post.id}`}>{getProviderIcon(p)}</span>
                                 ))}
                                 {providers.length > 2 && (
                                   <span className="text-[9px] text-muted-foreground">+{providers.length - 2}</span>
@@ -1569,7 +1569,7 @@ function ScheduleCalendar({
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center gap-1" data-testid="list-filter-controls">
+              <div className="flex flex-wrap items-center gap-1" data-testid="list-filter-controls">
                 {(["all", "upcoming", "past"] as const).map((f) => (
                   <Button
                     key={f}
@@ -1596,8 +1596,8 @@ function ScheduleCalendar({
                     <button
                       key={post.id}
                       onClick={() => setSelectedPost(selectedPost?.id === post.id ? null : post)}
-                      className={`w-full text-left p-3 rounded-md border ${
-                        selectedPost?.id === post.id ? "ring-2 ring-primary" : ""
+                      className={`w-full text-left p-3 rounded-md border transition-colors hover:bg-accent ${
+                        selectedPost?.id === post.id ? "ring-2 ring-primary bg-accent/50" : ""
                       }`}
                       data-testid={`list-post-${post.id}`}
                     >
@@ -1607,7 +1607,7 @@ function ScheduleCalendar({
                           <div className="flex items-center gap-2 mt-1">
                             <div className="flex items-center gap-1">
                               {providers.map((p, i) => (
-                                <span key={i} data-testid={`list-icon-${p}`}>{getProviderIcon(p)}</span>
+                                <span key={i} data-testid={`list-icon-${p}-${post.id}`}>{getProviderIcon(p)}</span>
                               ))}
                             </div>
                             <span className="text-xs text-muted-foreground">
