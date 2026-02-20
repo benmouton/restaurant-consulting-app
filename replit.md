@@ -29,7 +29,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript with ES modules
 - **API Style**: RESTful endpoints (`/api/*`)
-- **Authentication**: Replit Auth (OpenID Connect) with Passport.js. The `isAuthenticated` middleware also recognizes test access sessions (`req.session.testAccess`), populating `req.user.claims.sub` with the test user ID so all protected endpoints work for test users.
+- **Authentication**: Replit Auth (OpenID Connect) with Passport.js
 - **Session Management**: PostgreSQL-backed sessions (`connect-pg-simple`)
 - **Key Design Decisions**: Modular integration pattern (`server/replit_integrations/`), custom build scripts (`esbuild` for server, `Vite` for client), production builds to `dist/`.
 

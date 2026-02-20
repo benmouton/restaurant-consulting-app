@@ -12,7 +12,7 @@ import { USER_ROLES, type User, type UserRole } from "@shared/models/auth";
 import { BrandLogoNav, BrandLogoWithTagline } from "@/components/BrandLogo";
 
 interface OnboardingPageProps {
-  user: User & { isTestUser?: boolean };
+  user: User;
 }
 
 const roleDescriptions = {

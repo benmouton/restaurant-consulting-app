@@ -32,7 +32,6 @@ import DataDeletion from "@/pages/data-deletion";
 import TermsOfService from "@/pages/terms";
 import CertificationPage from "@/pages/certification";
 import TestAccessPage from "@/pages/test-access";
-import MediaKitPage from "@/pages/media-kit";
 import NotFound from "@/pages/not-found";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { TestAccessBanner } from "@/components/TestAccessBanner";
@@ -110,7 +109,6 @@ function Router() {
         <Route path="/privacy" component={PrivacyPolicy} />
         <Route path="/data-deletion" component={DataDeletion} />
         <Route path="/terms" component={TermsOfService} />
-        <Route path="/media-kit" component={MediaKitPage} />
         {/* Organization invite acceptance */}
         <Route path="/accept-invite/:token" component={AcceptInvitePage} />
         {/* Employee Portal Routes - separate from main app auth */}
