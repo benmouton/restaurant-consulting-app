@@ -32,11 +32,16 @@ import {
 import ReactMarkdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
 
+interface AttachedImage {
+  base64: string;
+  previewUrl: string;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  imageUrl?: string;
+  imageUrls?: string[];
 }
 
 interface Conversation {
@@ -132,7 +137,7 @@ export default function ConsultantPage() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [autoSentRef, setAutoSentRef] = useState(false);
-  const [attachedImage, setAttachedImage] = useState<{ base64: string; previewUrl: string } | null>(null);
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -187,31 +192,33 @@ export default function ConsultantPage() {
     setMessages([]);
     setActiveConversationId(null);
     setInput("");
-    setAttachedImage(null);
+    setAttachedImages([]);
   }, []);
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "Image too large", description: "Please choose an image under 10MB.", variant: "destructive" });
-      return;
-    }
+    Array.from(files).forEach((file) => {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "Image too large", description: `"${file.name}" is over 10MB and was skipped.`, variant: "destructive" });
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64 = result.split(",")[1];
-      setAttachedImage({ base64, previewUrl: result });
-    };
-    reader.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(",")[1];
+        setAttachedImages((prev) => [...prev, { base64, previewUrl: result }]);
+      };
+      reader.readAsDataURL(file);
+    });
 
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [toast]);
 
-  const removeAttachedImage = useCallback(() => {
-    setAttachedImage(null);
+  const removeAttachedImage = useCallback((index: number) => {
+    setAttachedImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const deleteConversation = useCallback(async (convId: number) => {
@@ -227,22 +234,22 @@ export default function ConsultantPage() {
   }, [activeConversationId, startNewConversation, queryClient]);
 
   const submitQuestion = async (questionText: string, context?: string) => {
-    if ((!questionText.trim() && !attachedImage) || isLoading) return;
+    if ((!questionText.trim() && attachedImages.length === 0) || isLoading) return;
 
-    const messageText = questionText.trim() || (attachedImage ? "What do you see in this image?" : "");
-    const currentImage = attachedImage;
+    const messageText = questionText.trim() || (attachedImages.length > 0 ? "What do you see in these images?" : "");
+    const currentImages = [...attachedImages];
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
       content: messageText,
-      imageUrl: currentImage?.previewUrl,
+      imageUrls: currentImages.length > 0 ? currentImages.map((img) => img.previewUrl) : undefined,
     };
 
     const currentMessages = [...messages, userMessage];
     setMessages(currentMessages);
     setInput("");
-    setAttachedImage(null);
+    setAttachedImages([]);
     setIsLoading(true);
 
     const assistantId = (Date.now() + 1).toString();
@@ -261,7 +268,7 @@ export default function ConsultantPage() {
         body: JSON.stringify({
           question: messageText,
           context,
-          image: currentImage?.base64,
+          images: currentImages.length > 0 ? currentImages.map((img) => img.base64) : undefined,
           conversationId: activeConversationId || undefined,
           history: history.length > 0 ? history : undefined,
         }),
@@ -509,13 +516,18 @@ export default function ConsultantPage() {
                             : "bg-card"
                         }`}
                       >
-                        {message.imageUrl && (
-                          <img
-                            src={message.imageUrl}
-                            alt="Attached"
-                            className="rounded-lg mb-2 max-h-48 w-auto object-contain"
-                            data-testid={`img-attachment-${message.id}`}
-                          />
+                        {message.imageUrls && message.imageUrls.length > 0 && (
+                          <div className={`mb-2 flex flex-wrap gap-2 ${message.imageUrls.length === 1 ? '' : 'grid grid-cols-2'}`}>
+                            {message.imageUrls.map((url, idx) => (
+                              <img
+                                key={idx}
+                                src={url}
+                                alt={`Attached ${idx + 1}`}
+                                className="rounded-lg max-h-48 w-auto object-contain"
+                                data-testid={`img-attachment-${message.id}-${idx}`}
+                              />
+                            ))}
+                          </div>
                         )}
                         {message.role === "assistant" ? (
                           <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -542,24 +554,26 @@ export default function ConsultantPage() {
 
           <div className="border-t border-border bg-background">
             <div className="max-w-3xl mx-auto px-4 py-3">
-              {attachedImage && (
-                <div className="mb-2 inline-flex items-start gap-1">
-                  <div className="relative">
-                    <img
-                      src={attachedImage.previewUrl}
-                      alt="Attached preview"
-                      className="h-20 w-auto rounded-lg border border-border object-contain"
-                      data-testid="img-attachment-preview"
-                    />
-                    <button
-                      type="button"
-                      onClick={removeAttachedImage}
-                      className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm"
-                      data-testid="button-remove-attachment"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
+              {attachedImages.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {attachedImages.map((img, idx) => (
+                    <div key={idx} className="relative">
+                      <img
+                        src={img.previewUrl}
+                        alt={`Attached preview ${idx + 1}`}
+                        className="h-20 w-auto rounded-lg border border-border object-contain"
+                        data-testid={`img-attachment-preview-${idx}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeAttachedImage(idx)}
+                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm"
+                        data-testid={`button-remove-attachment-${idx}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
               <form onSubmit={handleSubmit} className="flex gap-2 items-end">
@@ -567,6 +581,7 @@ export default function ConsultantPage() {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={handleImageSelect}
                   data-testid="input-file-upload"
@@ -596,7 +611,7 @@ export default function ConsultantPage() {
                   type="submit" 
                   size="icon"
                   className="shrink-0 mb-0.5"
-                  disabled={isLoading || (!input.trim() && !attachedImage)}
+                  disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
                   data-testid="button-send-message"
                 >
                   {isLoading ? (

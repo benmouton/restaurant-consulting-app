@@ -1034,7 +1034,7 @@ export async function registerRoutes(
   app.post(api.consultant.ask.path, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { question, context, image, conversationId, history } = req.body;
+      const { question, context, image, images, conversationId, history } = req.body;
 
       let convId = conversationId;
       if (!convId) {
@@ -1064,14 +1064,15 @@ export async function registerRoutes(
         }
       }
 
-      if (image) {
-        chatMessages.push({
-          role: "user",
-          content: [
-            { type: "text", text: question },
-            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${image}` } },
-          ],
-        });
+      const imageList: string[] = images && Array.isArray(images) ? images : (image ? [image] : []);
+      if (imageList.length > 0) {
+        const contentParts: Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }> = [
+          { type: "text", text: question },
+        ];
+        for (const img of imageList) {
+          contentParts.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
+        }
+        chatMessages.push({ role: "user", content: contentParts });
       } else {
         chatMessages.push({ role: "user", content: question });
       }
