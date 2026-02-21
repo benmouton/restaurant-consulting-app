@@ -25,14 +25,18 @@ import {
   Star,
   Briefcase,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  ImagePlus,
+  X
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  imageUrl?: string;
 }
 
 interface Conversation {
@@ -128,8 +132,12 @@ export default function ConsultantPage() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [autoSentRef, setAutoSentRef] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<{ base64: string; previewUrl: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { toast } = useToast();
 
   const { data: conversationList } = useQuery<Conversation[]>({
     queryKey: ["/api/consultant/conversations"],
@@ -179,6 +187,31 @@ export default function ConsultantPage() {
     setMessages([]);
     setActiveConversationId(null);
     setInput("");
+    setAttachedImage(null);
+  }, []);
+
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Image too large", description: "Please choose an image under 10MB.", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      setAttachedImage({ base64, previewUrl: result });
+    };
+    reader.readAsDataURL(file);
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  const removeAttachedImage = useCallback(() => {
+    setAttachedImage(null);
   }, []);
 
   const deleteConversation = useCallback(async (convId: number) => {
@@ -194,17 +227,22 @@ export default function ConsultantPage() {
   }, [activeConversationId, startNewConversation, queryClient]);
 
   const submitQuestion = async (questionText: string, context?: string) => {
-    if (!questionText.trim() || isLoading) return;
+    if ((!questionText.trim() && !attachedImage) || isLoading) return;
+
+    const messageText = questionText.trim() || (attachedImage ? "What do you see in this image?" : "");
+    const currentImage = attachedImage;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: questionText.trim(),
+      content: messageText,
+      imageUrl: currentImage?.previewUrl,
     };
 
     const currentMessages = [...messages, userMessage];
     setMessages(currentMessages);
     setInput("");
+    setAttachedImage(null);
     setIsLoading(true);
 
     const assistantId = (Date.now() + 1).toString();
@@ -221,8 +259,9 @@ export default function ConsultantPage() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          question: userMessage.content,
+          question: messageText,
           context,
+          image: currentImage?.base64,
           conversationId: activeConversationId || undefined,
           history: history.length > 0 ? history : undefined,
         }),
@@ -470,6 +509,14 @@ export default function ConsultantPage() {
                             : "bg-card"
                         }`}
                       >
+                        {message.imageUrl && (
+                          <img
+                            src={message.imageUrl}
+                            alt="Attached"
+                            className="rounded-lg mb-2 max-h-48 w-auto object-contain"
+                            data-testid={`img-attachment-${message.id}`}
+                          />
+                        )}
                         {message.role === "assistant" ? (
                           <div className="prose prose-sm dark:prose-invert max-w-none">
                             <ReactMarkdown>{message.content || "..."}</ReactMarkdown>
@@ -495,7 +542,46 @@ export default function ConsultantPage() {
 
           <div className="border-t border-border bg-background">
             <div className="max-w-3xl mx-auto px-4 py-3">
-              <form onSubmit={handleSubmit} className="flex gap-2">
+              {attachedImage && (
+                <div className="mb-2 inline-flex items-start gap-1">
+                  <div className="relative">
+                    <img
+                      src={attachedImage.previewUrl}
+                      alt="Attached preview"
+                      className="h-20 w-auto rounded-lg border border-border object-contain"
+                      data-testid="img-attachment-preview"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeAttachedImage}
+                      className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm"
+                      data-testid="button-remove-attachment"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                  data-testid="input-file-upload"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 mb-0.5"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  data-testid="button-attach-image"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                </Button>
                 <Textarea
                   ref={textareaRef}
                   value={input}
@@ -509,8 +595,8 @@ export default function ConsultantPage() {
                 <Button 
                   type="submit" 
                   size="icon"
-                  className="shrink-0"
-                  disabled={isLoading || !input.trim()}
+                  className="shrink-0 mb-0.5"
+                  disabled={isLoading || (!input.trim() && !attachedImage)}
                   data-testid="button-send-message"
                 >
                   {isLoading ? (
