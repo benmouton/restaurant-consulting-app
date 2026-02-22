@@ -1096,21 +1096,24 @@ export default function SocialPostBuilder() {
                     <Facebook className="h-4 w-4 mr-2 text-blue-600" />
                     Connect Facebook / Instagram
                   </Button>
-                  <Button onClick={handleConnectGoogle} variant="outline" size="sm" data-testid="button-connect-google">
+                  <Button variant="outline" size="sm" disabled className="opacity-60" data-testid="button-connect-google">
                     <MapPin className="h-4 w-4 mr-2 text-red-500" />
-                    Connect Google Business
+                    Google Business
+                    <span className="ml-2 text-[10px] uppercase font-semibold bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
                   </Button>
-                  <Button onClick={handleConnectLinkedIn} variant="outline" size="sm" data-testid="button-connect-linkedin">
+                  <Button variant="outline" size="sm" disabled className="opacity-60" data-testid="button-connect-linkedin">
                     <SiLinkedin className="h-4 w-4 mr-2 text-blue-700" />
-                    Connect LinkedIn
+                    LinkedIn
+                    <span className="ml-2 text-[10px] uppercase font-semibold bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
                   </Button>
                   <Button onClick={handleConnectX} variant="outline" size="sm" data-testid="button-connect-x">
                     <SiX className="h-4 w-4 mr-2" />
                     Connect X
                   </Button>
-                  <Button onClick={handleConnectNextdoor} variant="outline" size="sm" data-testid="button-connect-nextdoor">
+                  <Button variant="outline" size="sm" disabled className="opacity-60" data-testid="button-connect-nextdoor">
                     <SiNextdoor className="h-4 w-4 mr-2 text-green-600" />
-                    Connect Nextdoor
+                    Nextdoor
+                    <span className="ml-2 text-[10px] uppercase font-semibold bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
                   </Button>
                 </div>
               </div>
