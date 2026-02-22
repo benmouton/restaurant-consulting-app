@@ -936,6 +936,58 @@ export async function registerRoutes(
     }
   });
 
+  // Apple App Review login endpoint (username/password for App Store review)
+  app.post("/api/review-login", async (req: any, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      const reviewUsername = process.env.REVIEW_USERNAME || "applereview";
+      const reviewPassword = process.env.REVIEW_PASSWORD;
+      
+      if (!reviewPassword) {
+        return res.status(503).json({ error: "Review login not configured" });
+      }
+      
+      if (username !== reviewUsername || password !== reviewPassword) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+      
+      const reviewUserId = "review_apple";
+      
+      let user = await storage.getUserById(reviewUserId);
+      if (!user) {
+        await db.insert((await import("@shared/schema")).users).values({
+          id: reviewUserId,
+          firstName: "Apple",
+          lastName: "Reviewer",
+          email: "review@apple.com",
+          role: "owner",
+          subscriptionStatus: "test_access",
+          isAdmin: "false",
+        });
+      }
+      
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 90);
+      
+      if (req.session) {
+        req.session.testAccess = {
+          userId: reviewUserId,
+          tokenId: 0,
+          expiresAt: expiresAt.toISOString(),
+          accessLevel: "full",
+          name: "Apple Reviewer",
+        };
+        req.session.save();
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Review login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
   // Domain Routes
   app.get(api.domains.list.path, async (req, res) => {
     const domainsList = await storage.getDomains();

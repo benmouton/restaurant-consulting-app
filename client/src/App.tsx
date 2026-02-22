@@ -32,6 +32,7 @@ import DataDeletion from "@/pages/data-deletion";
 import TermsOfService from "@/pages/terms";
 import CertificationPage from "@/pages/certification";
 import TestAccessPage from "@/pages/test-access";
+import ReviewLoginPage from "@/pages/review-login";
 import NotFound from "@/pages/not-found";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { TestAccessBanner } from "@/components/TestAccessBanner";
@@ -105,6 +106,7 @@ function Router() {
           {user ? <ProtectedPage component={CertificationPage} /> : <Landing />}
         </Route>
         {/* Public Pages */}
+        <Route path="/review-login" component={ReviewLoginPage} />
         <Route path="/test-access/:token" component={TestAccessPage} />
         <Route path="/privacy" component={PrivacyPolicy} />
         <Route path="/data-deletion" component={DataDeletion} />
