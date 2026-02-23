@@ -1,5 +1,5 @@
 import { useSubscription } from "@/hooks/use-subscription";
-import { FREE_DOMAIN_SLUGS } from "@shared/models/auth";
+import { getRequiredTier } from "@/config/tierConfig";
 
 export function useTierAccess() {
   const { subscriptionTier, isLoading, isAdmin } = useSubscription();
@@ -7,7 +7,7 @@ export function useTierAccess() {
   const canAccessDomain = (slug: string): boolean => {
     if (isAdmin) return true;
     if (subscriptionTier === "basic" || subscriptionTier === "pro") return true;
-    return (FREE_DOMAIN_SLUGS as readonly string[]).includes(slug);
+    return getRequiredTier(slug) === "free";
   };
 
   const isDomainLocked = (slug: string): boolean => {

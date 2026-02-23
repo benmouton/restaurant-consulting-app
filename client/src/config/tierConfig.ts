@@ -1,5 +1,3 @@
-import { FREE_DOMAIN_SLUGS } from "@shared/models/auth";
-
 export type TierRequirement = "free" | "basic" | "pro";
 
 export interface DomainTierInfo {
@@ -102,7 +100,7 @@ export const FREE_DOMAIN_COUNT = FREE_DOMAINS.length;
 export const TOTAL_DOMAIN_COUNT = Object.keys(DOMAIN_TIER_MAP).filter(k => k !== "consultant").length;
 
 export function isDomainFree(slug: string): boolean {
-  return (FREE_DOMAIN_SLUGS as readonly string[]).includes(slug);
+  return DOMAIN_TIER_MAP[slug]?.requiredTier === "free";
 }
 
 export function getRequiredTier(slug: string): TierRequirement {

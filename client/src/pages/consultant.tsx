@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,12 +27,13 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ImagePlus,
-  X
+  X,
+  Lock,
+  ArrowRight
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
 import { useTierAccess } from "@/hooks/use-tier-access";
-import { ConsultantUpgradeGate } from "@/components/upgrade-gate";
 
 interface AttachedImage {
   base64: string;
@@ -399,10 +400,79 @@ export default function ConsultantPage() {
       </header>
 
       {!canAccessDomain("consultant") ? (
-        <div className="flex-1 overflow-auto">
-          <ConsultantUpgradeGate>
-            <div />
-          </ConsultantUpgradeGate>
+        <div className="flex-1 overflow-hidden relative">
+          <div className="absolute inset-0 pointer-events-none select-none" style={{ filter: "blur(6px)", opacity: 0.4 }}>
+            <div className="flex h-full flex-col">
+              <div className="flex-1 overflow-auto">
+                <div className="max-w-3xl mx-auto px-4 py-8 sm:py-16">
+                  <div className="text-center mb-8">
+                    <ChefHat className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <h2 className="text-xl font-semibold mb-2">Ask the Consultant</h2>
+                    <p className="text-muted-foreground max-w-md mx-auto text-sm">
+                      Ask anything about restaurant operations. You'll get direct, practical answers—no fluff,
+                      no theory, just what works on a real floor.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                    {categories.map((category) => (
+                      <div key={category.label}>
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <category.icon className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{category.label}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {category.questions.map((q) => (
+                            <Card key={q} className="p-3">
+                              <p className="text-sm">{q}</p>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-border bg-background">
+                <div className="max-w-3xl mx-auto px-4 py-3">
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 min-h-[44px] rounded-md border border-input bg-background px-3 py-2">
+                      <span className="text-sm text-muted-foreground">Ask about any restaurant operations challenge...</span>
+                    </div>
+                    <div className="h-10 w-10 rounded-md bg-primary flex items-center justify-center">
+                      <Send className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="absolute inset-0 flex items-start justify-center pt-20 z-10">
+            <Card className="max-w-md w-full shadow-xl border-primary/20 mx-4" data-testid="card-consultant-upgrade">
+              <CardContent className="p-8 text-center">
+                <div className="mx-auto w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-5">
+                  <Lock className="h-7 w-7 text-primary" />
+                </div>
+                <h2 className="text-xl font-bold mb-2" data-testid="text-consultant-upgrade-title">
+                  Unlock the Operations Consultant
+                </h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Expert guidance on any restaurant operations challenge — staffing, costs, service, leadership, and more.
+                </p>
+                <p className="text-sm font-medium mb-6">
+                  All 12 domains + consultant for <span className="text-primary">$10/month</span>
+                </p>
+                <Link href="/pricing">
+                  <Button className="w-full mb-3" data-testid="btn-consultant-upgrade">
+                    Upgrade Now
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+                <Link href="/pricing" className="text-sm text-muted-foreground underline underline-offset-4" data-testid="link-consultant-plans">
+                  See all plans
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       ) : (
       <div className="flex-1 flex overflow-hidden">

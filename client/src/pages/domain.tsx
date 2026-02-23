@@ -7838,6 +7838,7 @@ const contentTypeConfig: Record<string, { icon: React.ComponentType<{ className?
 export default function DomainPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user, logout } = useAuth();
+  const { isDomainLocked } = useTierAccess();
 
   const { data, isLoading } = useQuery<{ domain: Domain; content: FrameworkContent[] }>({
     queryKey: ["/api/domains", slug],
@@ -7886,7 +7887,6 @@ export default function DomainPage() {
   }
 
   const { domain, content } = data;
-  const { isDomainLocked } = useTierAccess();
   const domainLocked = slug ? isDomainLocked(slug) : false;
 
   return (
@@ -7925,18 +7925,77 @@ export default function DomainPage() {
         </div>
         {domainLocked ? (
           <UpgradeGate domain={slug || ""}>
-            <div className="space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i} className="premium-card">
-                  <CardContent className="p-6">
-                    <div className="h-5 w-2/3 bg-muted rounded mb-3" />
-                    <div className="h-3 w-full bg-muted/60 rounded mb-2" />
-                    <div className="h-3 w-5/6 bg-muted/60 rounded mb-2" />
-                    <div className="h-3 w-3/4 bg-muted/60 rounded" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {(() => {
+              const typeOrder = ["principle", "output", "checklist", "script"] as const;
+              const grouped = typeOrder
+                .map(type => ({
+                  type,
+                  config: contentTypeConfig[type],
+                  items: content.filter(c => c.contentType === type),
+                }))
+                .filter(g => g.items.length > 0);
+
+              if (grouped.length === 0) {
+                return (
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Card key={i}>
+                        <CardContent className="p-6">
+                          <div className="h-5 w-2/3 bg-muted rounded mb-3" />
+                          <div className="h-3 w-full bg-muted/60 rounded mb-2" />
+                          <div className="h-3 w-5/6 bg-muted/60 rounded mb-2" />
+                          <div className="h-3 w-3/4 bg-muted/60 rounded" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                );
+              }
+
+              return (
+                <Accordion type="multiple" className="space-y-4" defaultValue={[`group-${grouped[0].type}`]}>
+                  {grouped.map(({ type, config, items }) => {
+                    const IconComponent = config.icon;
+                    const preview = items[0]?.content?.slice(0, 100).replace(/\n/g, " ").trim();
+                    return (
+                      <AccordionItem key={type} value={`group-${type}`} className="border rounded-lg px-4">
+                        <AccordionTrigger className="hover:no-underline py-4">
+                          <div className="flex flex-col gap-1 text-left w-full mr-2">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <Badge variant="secondary" className={config.color}>
+                                <IconComponent className="h-3 w-3 mr-1" />
+                                {config.label} ({items.length})
+                              </Badge>
+                            </div>
+                            {preview && (
+                              <p className="text-xs text-muted-foreground line-clamp-1 pl-0.5">
+                                {preview}{items[0]?.content && items[0].content.length > 100 ? "..." : ""}
+                              </p>
+                            )}
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-4 space-y-4">
+                          {items.map((item) => (
+                            <div key={item.id}>
+                              <h4 className="font-medium text-sm mb-2">{item.title}</h4>
+                              <div className={`whitespace-pre-wrap text-sm leading-relaxed ${
+                                item.contentType === 'script' || item.contentType === 'checklist'
+                                  ? 'font-mono bg-muted p-4 rounded-md'
+                                  : item.contentType === 'principle'
+                                  ? 'border-l-4 border-primary pl-4 italic text-muted-foreground'
+                                  : ''
+                              }`}>
+                                {item.content}
+                              </div>
+                            </div>
+                          ))}
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              );
+            })()}
           </UpgradeGate>
         ) : (
         <>

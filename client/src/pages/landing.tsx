@@ -214,7 +214,7 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" asChild data-testid="button-get-started">
               <a href="/api/login">
-                Start Your 7-Day Free Trial
+                Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </a>
             </Button>
@@ -223,7 +223,7 @@ export default function Landing() {
             Systems that work on your worst night.
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Then $10/month. No contracts. Cancel anytime.
+            Free forever for 3 core domains. Unlock everything for $10/month.
           </p>
           <p className="text-sm font-medium mt-3" data-testid="text-social-proof">
             Built by Ben Mouton — restaurant owner, operator, and consultant.
@@ -454,10 +454,10 @@ export default function Landing() {
       <section className="py-16 md:py-20 px-4">
         <div className="container mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold mb-3" data-testid="text-pricing-heading">
-            $10/month — Everything. No Tiers. No Upsells.
+            Start Free. Upgrade When You're Ready.
           </h2>
           <p className="text-muted-foreground mb-8">
-            The power of $10/month is that it's a no-brainer for any restaurant. Here's everything that's included:
+            Three core domains — Leadership, Kitchen, and Crisis — are free forever. No credit card. No trial expiration. Upgrade to $10/month to unlock everything:
           </p>
           <Card className="p-6 md:p-8 text-left">
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
@@ -470,11 +470,11 @@ export default function Landing() {
             </div>
             <div className="mt-6 pt-6 border-t border-border text-center">
               <p className="text-sm text-muted-foreground">
-                7-day free trial. No contracts. Cancel anytime.
+                No credit card required. No contracts. Cancel anytime.
               </p>
               <Button size="lg" asChild className="mt-4" data-testid="button-pricing-cta">
                 <a href="/api/login">
-                  Start Free Trial
+                  Get Started Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </a>
               </Button>
@@ -563,12 +563,12 @@ export default function Landing() {
           </p>
           <Button size="lg" variant="secondary" asChild data-testid="button-cta-bottom">
             <a href="/api/login">
-              Start Your 7-Day Free Trial
+              Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
             </a>
           </Button>
           <p className="text-primary-foreground/60 text-sm mt-4">
-            No credit card required for trial. Cancel anytime.
+            No credit card required. Free forever on core domains.
           </p>
         </div>
       </section>
