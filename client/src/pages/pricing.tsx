@@ -21,14 +21,14 @@ const tiers = [
     annualLabel: "Free forever",
     cta: "Current Plan",
     features: [
-      { text: "Leadership Command Center", included: true },
-      { text: "Training Templates", included: true },
+      { text: "Ownership & Leadership", included: true },
+      { text: "Kitchen Operations", included: true },
       { text: "Crisis Management", included: true },
-      { text: "Expert Consultant (limited)", included: true },
-      { text: "All 12 operational domains", included: false },
+      { text: "3 of 12 operational domains", included: true },
+      { text: "All 12 domains + tools", included: false },
+      { text: "Operations Consultant", included: false },
       { text: "Staff scheduling", included: false },
       { text: "Food costing tools", included: false },
-      { text: "Social media builder", included: false },
       { text: "Data export", included: false },
       { text: "Priority support", included: false },
     ],
@@ -45,14 +45,14 @@ const tiers = [
     popular: true,
     cta: "Start 7-Day Free Trial",
     features: [
-      { text: "Leadership Command Center", included: true },
-      { text: "Training Templates", included: true },
-      { text: "Crisis Management", included: true },
-      { text: "Expert Consultant (unlimited)", included: true },
       { text: "All 12 operational domains", included: true },
+      { text: "Operations Consultant", included: true },
       { text: "Staff scheduling", included: true },
       { text: "Food costing tools", included: true },
       { text: "Social media builder", included: true },
+      { text: "Living Playbooks", included: true },
+      { text: "Employee Handbook Builder", included: true },
+      { text: "Kitchen Command Center", included: true },
       { text: "Data export", included: false },
       { text: "Priority support", included: false },
     ],
@@ -68,16 +68,16 @@ const tiers = [
     annualLabel: "/year",
     cta: "Start 7-Day Free Trial",
     features: [
-      { text: "Leadership Command Center", included: true },
-      { text: "Training Templates", included: true },
-      { text: "Crisis Management", included: true },
-      { text: "Expert Consultant (unlimited)", included: true },
+      { text: "Everything in Basic", included: true },
       { text: "All 12 operational domains", included: true },
+      { text: "Operations Consultant", included: true },
+      { text: "Data export", included: true },
+      { text: "Priority support", included: true },
+      { text: "Advanced analytics", included: true },
       { text: "Staff scheduling", included: true },
       { text: "Food costing tools", included: true },
       { text: "Social media builder", included: true },
-      { text: "Data export", included: true },
-      { text: "Priority support", included: true },
+      { text: "Living Playbooks", included: true },
     ],
   },
 ];
@@ -267,6 +267,71 @@ export default function PricingPage() {
               </Card>
             );
           })}
+        </div>
+
+        <div className="mt-16 mb-12">
+          <h2 className="text-2xl font-bold text-center mb-8 tracking-tight" data-testid="text-comparison-title">
+            What's Included in Each Plan
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" data-testid="table-comparison">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-4 font-semibold text-muted-foreground w-1/2">Feature</th>
+                  <th className="text-center py-3 px-4 font-semibold w-1/6">Free</th>
+                  <th className="text-center py-3 px-4 font-semibold text-primary w-1/6">Basic</th>
+                  <th className="text-center py-3 px-4 font-semibold w-1/6">Pro</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: "Kitchen Operations", free: true, basic: true, pro: true, section: "Domains" },
+                  { label: "Crisis Management", free: true, basic: true, pro: true },
+                  { label: "Ownership & Leadership", free: true, basic: true, pro: true },
+                  { label: "HR & Documentation", free: false, basic: true, pro: true },
+                  { label: "Staffing & Labor", free: false, basic: true, pro: true },
+                  { label: "Cost & Margin Control", free: false, basic: true, pro: true },
+                  { label: "Training Systems", free: false, basic: true, pro: true },
+                  { label: "Service Standards", free: false, basic: true, pro: true },
+                  { label: "SOPs & Scalability", free: false, basic: true, pro: true },
+                  { label: "Reviews & Reputation", free: false, basic: true, pro: true },
+                  { label: "Social Media Tools", free: false, basic: true, pro: true },
+                  { label: "Facilities & Asset Protection", free: false, basic: true, pro: true },
+                  { label: "Operations Consultant", free: false, basic: true, pro: true, section: "Tools" },
+                  { label: "Staff Scheduling", free: false, basic: true, pro: true },
+                  { label: "Food Costing", free: false, basic: true, pro: true },
+                  { label: "Living Playbooks", free: false, basic: true, pro: true },
+                  { label: "Data Export", free: false, basic: false, pro: true, section: "Pro Features" },
+                  { label: "Priority Support", free: false, basic: false, pro: true },
+                  { label: "Advanced Analytics", free: false, basic: false, pro: true },
+                ].map((row, idx) => (
+                  <tr 
+                    key={idx} 
+                    className={`border-b border-border/50 ${row.section ? 'bg-muted/30' : ''}`}
+                    data-testid={`row-feature-${idx}`}
+                  >
+                    <td className="py-3 px-4">
+                      {row.section && (
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+                          {row.section}
+                        </span>
+                      )}
+                      {row.label}
+                    </td>
+                    <td className="text-center py-3 px-4">
+                      {row.free ? <Check className="h-4 w-4 text-primary mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                    </td>
+                    <td className="text-center py-3 px-4">
+                      {row.basic ? <Check className="h-4 w-4 text-primary mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                    </td>
+                    <td className="text-center py-3 px-4">
+                      {row.pro ? <Check className="h-4 w-4 text-primary mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="mt-12 text-center">

@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
+import { useTierAccess } from "@/hooks/use-tier-access";
+import { ConsultantUpgradeGate } from "@/components/upgrade-gate";
 
 interface AttachedImage {
   base64: string;
@@ -127,6 +129,7 @@ function getContextAwareQuestions(profile: any): typeof QUESTION_CATEGORIES {
 
 export default function ConsultantPage() {
   const { user, logout } = useAuth();
+  const { canAccessDomain } = useTierAccess();
   const queryClient = useQueryClient();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
@@ -395,6 +398,13 @@ export default function ConsultantPage() {
         </div>
       </header>
 
+      {!canAccessDomain("consultant") ? (
+        <div className="flex-1 overflow-auto">
+          <ConsultantUpgradeGate>
+            <div />
+          </ConsultantUpgradeGate>
+        </div>
+      ) : (
       <div className="flex-1 flex overflow-hidden">
         {showHistory && (
           <div className="w-72 border-r border-border bg-muted/30 flex flex-col shrink-0" data-testid="panel-history">
@@ -625,6 +635,7 @@ export default function ConsultantPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -51,7 +51,7 @@ export const SUBSCRIPTION_TIERS = {
 
 export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[keyof typeof SUBSCRIPTION_TIERS];
 
-export const FREE_DOMAIN_SLUGS = ["leadership", "training", "crisis"] as const;
+export const FREE_DOMAIN_SLUGS = ["leadership", "kitchen", "crisis"] as const;
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

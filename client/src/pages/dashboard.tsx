@@ -420,9 +420,9 @@ export default function Dashboard() {
                 const IconComponent = iconMap[domain.icon] || ClipboardList;
                 const locked = isDomainLocked(domain.slug);
                 return (
-                  <Link key={domain.id} href={locked ? "/pricing" : `/domain/${domain.slug}`}>
+                  <Link key={domain.id} href={`/domain/${domain.slug}`}>
                     <Card 
-                      className={`premium-card hover-elevate cursor-pointer h-full relative ${locked ? 'opacity-75' : ''}`}
+                      className={`premium-card hover-elevate cursor-pointer h-full relative ${locked ? 'opacity-80' : ''}`}
                       data-testid={`card-domain-${domain.slug}`}
                     >
                       {locked && (
@@ -436,7 +436,7 @@ export default function Dashboard() {
                         </div>
                         <h3 className="font-semibold text-sm sm:text-base mb-2 tracking-tight">{domain.name}</h3>
                         <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                          {locked ? "Upgrade to unlock this domain" : domain.description}
+                          {domain.description}
                         </p>
                       </CardContent>
                     </Card>
@@ -446,6 +446,31 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {isFreeTier && !domainsLoading && (
+          <div className="mb-8 sm:mb-10">
+            <Link href="/pricing">
+              <Card 
+                className="cursor-pointer bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20"
+                data-testid="card-upgrade-nudge"
+              >
+                <CardContent className="p-5 sm:p-6 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-md bg-primary/10 flex-shrink-0">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        You're using 3 of 12 domains. Unlock everything for $10/month.
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-primary flex-shrink-0" />
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <Card className="premium-card">
