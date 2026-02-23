@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -459,7 +460,7 @@ export default function ConsultantPage() {
                   Expert guidance on any restaurant operations challenge — staffing, costs, service, leadership, and more.
                 </p>
                 <p className="text-sm font-medium mb-6">
-                  All 12 domains + consultant for <span className="text-primary">$10/month</span>
+                  All {TOTAL_DOMAIN_COUNT} domains + consultant starting at <span className="text-primary">$10/month</span>
                 </p>
                 <Link href="/pricing">
                   <Button className="w-full mb-3" data-testid="btn-consultant-upgrade">

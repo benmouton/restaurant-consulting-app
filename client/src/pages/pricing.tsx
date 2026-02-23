@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
+import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,8 +25,8 @@ const tiers = [
       { text: "Ownership & Leadership", included: true },
       { text: "Kitchen Operations", included: true },
       { text: "Crisis Management", included: true },
-      { text: "3 of 12 operational domains", included: true },
-      { text: "All 12 domains + tools", included: false },
+      { text: `${FREE_DOMAIN_COUNT} of ${TOTAL_DOMAIN_COUNT} operational domains`, included: true },
+      { text: `All ${TOTAL_DOMAIN_COUNT} domains + tools`, included: false },
       { text: "Operations Consultant", included: false },
       { text: "Staff scheduling", included: false },
       { text: "Food costing tools", included: false },
@@ -45,7 +46,7 @@ const tiers = [
     popular: true,
     cta: "Start 7-Day Free Trial",
     features: [
-      { text: "All 12 operational domains", included: true },
+      { text: `All ${TOTAL_DOMAIN_COUNT} operational domains`, included: true },
       { text: "Operations Consultant", included: true },
       { text: "Staff scheduling", included: true },
       { text: "Food costing tools", included: true },
@@ -69,7 +70,7 @@ const tiers = [
     cta: "Start 7-Day Free Trial",
     features: [
       { text: "Everything in Basic", included: true },
-      { text: "All 12 operational domains", included: true },
+      { text: `All ${TOTAL_DOMAIN_COUNT} operational domains`, included: true },
       { text: "Operations Consultant", included: true },
       { text: "Data export", included: true },
       { text: "Priority support", included: true },

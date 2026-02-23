@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
+import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -115,7 +116,7 @@ const consultantExamples = [
 ];
 
 const pricingFeatures = [
-  "All 12 operational domains",
+  `All ${TOTAL_DOMAIN_COUNT} operational domains`,
   "Operations Consultant (unlimited)",
   "Kitchen Command Center",
   "HR Documentation & Compliance Engine",
@@ -223,7 +224,7 @@ export default function Landing() {
             Systems that work on your worst night.
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Free forever for 3 core domains. Unlock everything for $10/month.
+            {FREE_DOMAIN_COUNT} core domains free forever. No credit card required.
           </p>
           <p className="text-sm font-medium mt-3" data-testid="text-social-proof">
             Built by Ben Mouton — restaurant owner, operator, and consultant.
@@ -457,7 +458,7 @@ export default function Landing() {
             Start Free. Upgrade When You're Ready.
           </h2>
           <p className="text-muted-foreground mb-8">
-            Three core domains — Leadership, Kitchen, and Crisis — are free forever. No credit card. No trial expiration. Upgrade to $10/month to unlock everything:
+            {FREE_DOMAIN_COUNT} core domains — Leadership, Kitchen, and Crisis — are free forever. No credit card. No trial expiration. Upgrade to unlock all {TOTAL_DOMAIN_COUNT}:
           </p>
           <Card className="p-6 md:p-8 text-left">
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
@@ -556,10 +557,10 @@ export default function Landing() {
             Start Building Real Systems Today
           </h2>
           <p className="text-primary-foreground/80 mb-3">
-            Systems that work on your worst night. $10/month. No contracts.
+            Systems that work on your worst night. Start free. No contracts.
           </p>
           <p className="text-primary-foreground/70 mb-8 text-sm">
-            12 operational domains. Expert consultant included. If it wouldn't hold up during a slammed dinner rush, it's not in here.
+            {TOTAL_DOMAIN_COUNT} operational domains. Expert consultant included. If it wouldn't hold up during a slammed dinner rush, it's not in here.
           </p>
           <Button size="lg" variant="secondary" asChild data-testid="button-cta-bottom">
             <a href="/api/login">

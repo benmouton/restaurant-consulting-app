@@ -39,7 +39,7 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
               {domainDescription}
             </p>
             <p className="text-sm font-medium mb-6">
-              All {TOTAL_DOMAIN_COUNT} domains + tools for <span className="text-primary">$10/month</span>
+              All {TOTAL_DOMAIN_COUNT} domains + tools starting at <span className="text-primary">$10/month</span>
             </p>
             <Link href="/pricing">
               <Button className="w-full mb-3" data-testid="btn-upgrade-now">

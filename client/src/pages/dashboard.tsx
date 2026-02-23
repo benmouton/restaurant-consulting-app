@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
 import { useRole } from "@/hooks/use-role";
@@ -461,7 +462,7 @@ export default function Dashboard() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium">
-                        You're using 3 of 12 domains. Unlock everything for $10/month.
+                        You're using {FREE_DOMAIN_COUNT} of {TOTAL_DOMAIN_COUNT} domains. Unlock everything with a paid plan.
                       </p>
                     </div>
                   </div>
