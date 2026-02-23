@@ -195,6 +195,12 @@ export async function registerRoutes(
             subscriptionTier: effectiveTier,
             subscriptionId: subscription.id
           });
+        } else if (user.subscriptionTier && user.subscriptionTier !== "free") {
+          // No active subscription found but user still has a paid tier stored — downgrade
+          await storage.updateUserStripeInfo(userId, {
+            subscriptionStatus: "canceled",
+            subscriptionTier: "free",
+          });
         }
       }
 

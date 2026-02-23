@@ -118,7 +118,28 @@ export class StripeService {
     const result = await db.execute(
       sql`SELECT * FROM stripe.subscriptions WHERE customer = ${customerId} AND (status = 'active' OR status = 'trialing') LIMIT 1`
     );
-    return result.rows[0] || null;
+    if (result.rows[0]) return result.rows[0];
+
+    try {
+      const stripe = await getUncachableStripeClient();
+      const subs = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'active',
+        limit: 1,
+      });
+      if (subs.data.length > 0) return subs.data[0];
+
+      const trialSubs = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'trialing',
+        limit: 1,
+      });
+      if (trialSubs.data.length > 0) return trialSubs.data[0];
+    } catch (err: any) {
+      console.log('Stripe API subscription check failed, using DB only:', err?.message);
+    }
+
+    return null;
   }
 
   async getEmployeeSeatPriceId(): Promise<string | null> {
