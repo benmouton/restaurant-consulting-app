@@ -1,0 +1,84 @@
+I need to update the freemium tier gating to use a specific domain split. The subscription tier system is already built with free/basic/pro tiers, Stripe integration, and tier-checking middleware. Now I need to configure exactly which domains are free vs. gated.
+Free Tier — These 3 domains are fully accessible without a subscription:
+
+Kitchen Operations (Kitchen Command Center) — all tabs: Readiness, Alerts, Quick, Debrief, Coach, Station Status
+Crisis Management Playbooks — all scenarios and playbooks
+Leadership & Culture — all principles, frameworks, checklists, scripts
+
+Gated Domains — These 9 domains require Basic ($10/month) or Pro ($25/month) subscription:
+
+HR & Documentation
+Staffing & Labor
+Cost & Margin Control
+Training Templates
+Skills Certification
+Financial Insights
+Reviews & Reputation
+Social Media Tools
+Operations Consultant (the chat feature)
+
+Here's how gating should work:
+On the Dashboard:
+
+Free-tier domains show normally — full color, clickable, no badge
+Gated domains show with a subtle lock icon in the corner of the card and a slight opacity reduction (opacity-75, not fully greyed out — they should still look appealing)
+Gated domain cards are still clickable — they take the user to the domain page, not to the pricing page directly
+
+On a Gated Domain Page (when a free-tier user clicks in):
+
+Show the actual page content behind a frosted glass / blur overlay (use backdrop-blur-md or similar)
+The real UI should be partially visible underneath — forms, fields, buttons — so the user can see what they're missing
+Centered over the blur, show an upgrade card:
+
+Headline: "Unlock [Domain Name]"
+One sentence describing what this domain does (use the existing domain descriptions/taglines)
+A line showing: "Access all 9 premium domains for $10/month"
+Primary CTA button: "Upgrade Now →" linking to the pricing page
+Secondary text link: "See all plans" linking to the pricing page
+
+
+The page header and navigation should still work normally — only the main content area gets the blur treatment
+
+For the Operations Consultant specifically:
+
+In the sidebar/navigation, the "Ask Consultant" link should be visible to all users
+When a free user clicks it, show the chat interface with the blur overlay and upgrade card
+Add a teaser: show 2-3 example questions in the background (visible through the blur) so they can see what kind of questions they could ask
+
+On the Dashboard — add an upgrade nudge:
+
+Below the free-tier domain cards, add a subtle banner:
+
+"You're using 3 of 12 domains. Unlock everything for $10/month →"
+Style it as a soft gradient card (not aggressive — think helpful, not pushy)
+The arrow links to the pricing page
+
+
+
+On the Pricing Page:
+
+Update the plan comparison to clearly show which domains are in each tier:
+
+Free: Kitchen Operations, Crisis Management, Leadership & Culture
+Basic ($10/month or $99/year): All 12 domains + all tools
+Pro ($25/month or $249/year): All 12 domains + analytics dashboard + data export + priority support
+
+
+Highlight the user's current plan
+Show a checkmark grid: rows = all 12 domains + key features, columns = Free / Basic / Pro
+
+Implementation notes:
+
+Create a config file or constant (e.g., tierConfig.ts) that maps each domain to its required tier. This makes it easy to change the split later without touching multiple files.
+The tier check should use the existing middleware/helper that reads the user's subscriptionTier field
+Do NOT break any existing Stripe checkout, webhook, or auth logic
+Do NOT change the actual domain page components — just wrap them with the blur/gate layer conditionally based on tier
+Make the blur overlay a reusable component (e.g., <UpgradeGate domain="hr-documentation">) that wraps any gated page content
+
+Build this in order:
+
+tierConfig.ts with the domain-to-tier mapping
+The reusable <UpgradeGate> blur overlay component
+Dashboard card updates (lock icons, opacity, nudge banner)
+Apply <UpgradeGate> to all 9 gated domain pages
+Pricing page comparison grid update
