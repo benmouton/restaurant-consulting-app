@@ -179,10 +179,16 @@ export default function PricingPage() {
             return (
               <Card
                 key={tier.id}
-                className={`relative flex flex-col ${isPopular ? 'border-primary shadow-lg ring-1 ring-primary/20' : 'premium-card'}`}
+                className={`relative flex flex-col transition-all ${
+                  isCurrentTier 
+                    ? 'border-primary/50 ring-2 ring-primary/30 shadow-lg shadow-primary/10' 
+                    : isPopular 
+                      ? 'border-primary shadow-lg ring-1 ring-primary/20' 
+                      : 'premium-card'
+                }`}
                 data-testid={`card-tier-${tier.id}`}
               >
-                {isPopular && (
+                {isPopular && !isCurrentTier && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <Badge className="bg-primary text-primary-foreground shadow-sm" data-testid="badge-popular">
                       Most Popular
@@ -190,8 +196,10 @@ export default function PricingPage() {
                   </div>
                 )}
                 {isCurrentTier && (
-                  <div className="absolute -top-3 right-4">
-                    <Badge variant="secondary" data-testid="badge-current">Current</Badge>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-primary text-primary-foreground shadow-sm" data-testid="badge-current">
+                      Your Plan
+                    </Badge>
                   </div>
                 )}
                 <CardHeader className="text-center pb-4">

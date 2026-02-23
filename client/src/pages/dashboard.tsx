@@ -44,7 +44,8 @@ import {
   Library,
   Briefcase,
   Zap,
-  Lock
+  Lock,
+  CreditCard
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 import { BrandLogoNav } from "@/components/BrandLogo";
@@ -119,7 +120,7 @@ export default function Dashboard() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const { isAdmin } = useAdmin();
   const { roleLabel, permissions } = useRole();
-  const { isDomainLocked, isFreeTier } = useTierAccess();
+  const { isDomainLocked, isFreeTier, tier } = useTierAccess();
   
   const { data: domains, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
@@ -272,9 +273,20 @@ export default function Dashboard() {
                   <span className="text-sm">
                     {user?.firstName || user?.email || "User"}
                   </span>
-                  <Badge variant="secondary" className="text-xs" data-testid="badge-user-role">
-                    {roleLabel}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="secondary" className="text-xs" data-testid="badge-user-role">
+                      {roleLabel}
+                    </Badge>
+                    <Link href="/pricing">
+                      <Badge 
+                        variant={isFreeTier ? "outline" : "default"} 
+                        className={`text-xs cursor-pointer ${!isFreeTier ? 'bg-primary/90 text-primary-foreground' : ''}`}
+                        data-testid="badge-current-plan"
+                      >
+                        {tier === "free" ? "Free Plan" : tier === "basic" ? "Basic Plan" : tier === "pro" ? "Pro Plan" : "Free Plan"}
+                      </Badge>
+                    </Link>
+                  </div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
               </DropdownMenuTrigger>
@@ -293,6 +305,14 @@ export default function Dashboard() {
                 >
                   <UserCog className="mr-2 h-4 w-4" />
                   Account Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => navigate("/pricing")}
+                  className="cursor-pointer"
+                  data-testid="button-manage-plan"
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  {isFreeTier ? "Upgrade Plan" : "Manage Plan"}
                 </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem 
