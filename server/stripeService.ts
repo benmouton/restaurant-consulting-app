@@ -15,7 +15,7 @@ export class StripeService {
     });
   }
 
-  async createCheckoutSession(customerId: string, priceId: string, successUrl: string, cancelUrl: string) {
+  async createCheckoutSession(customerId: string, priceId: string, successUrl: string, cancelUrl: string, metadata?: Record<string, string>) {
     const stripe = await getUncachableStripeClient();
     return await stripe.checkout.sessions.create({
       customer: customerId,
@@ -26,8 +26,56 @@ export class StripeService {
       cancel_url: cancelUrl,
       subscription_data: {
         trial_period_days: 7,
+        metadata: metadata || {},
       },
+      metadata: metadata || {},
     });
+  }
+
+  async getOrCreateTierPrice(tier: string, interval: 'month' | 'year'): Promise<string> {
+    const stripe = await getUncachableStripeClient();
+
+    const tierConfig: Record<string, { name: string; monthlyAmount: number; annualAmount: number }> = {
+      basic: { name: 'The Restaurant Consultant - Basic', monthlyAmount: 1000, annualAmount: 9900 },
+      pro: { name: 'The Restaurant Consultant - Pro', monthlyAmount: 2500, annualAmount: 24900 },
+    };
+
+    const config = tierConfig[tier];
+    if (!config) throw new Error(`Invalid tier: ${tier}`);
+
+    const amount = interval === 'year' ? config.annualAmount : config.monthlyAmount;
+    const lookupKey = `trc_${tier}_${interval}`;
+
+    const existing = await stripe.prices.list({
+      lookup_keys: [lookupKey],
+      active: true,
+      limit: 1,
+    });
+
+    if (existing.data.length > 0) {
+      return existing.data[0].id;
+    }
+
+    const products = await stripe.products.list({ active: true, limit: 100 });
+    let product = products.data.find(p => p.metadata?.tier === tier);
+
+    if (!product) {
+      product = await stripe.products.create({
+        name: config.name,
+        metadata: { tier },
+      });
+    }
+
+    const price = await stripe.prices.create({
+      product: product.id,
+      unit_amount: amount,
+      currency: 'usd',
+      recurring: { interval },
+      lookup_key: lookupKey,
+      metadata: { tier, interval },
+    });
+
+    return price.id;
   }
 
   async createCustomerPortalSession(customerId: string, returnUrl: string) {

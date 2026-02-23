@@ -33,6 +33,7 @@ import TermsOfService from "@/pages/terms";
 import CertificationPage from "@/pages/certification";
 import TestAccessPage from "@/pages/test-access";
 import ReviewLoginPage from "@/pages/review-login";
+import PricingPage from "@/pages/pricing";
 import NotFound from "@/pages/not-found";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { TestAccessBanner } from "@/components/TestAccessBanner";
@@ -40,6 +41,14 @@ import { TestAccessBanner } from "@/components/TestAccessBanner";
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
   return (
     <SubscriptionGate>
+      <Component />
+    </SubscriptionGate>
+  );
+}
+
+function PaidProtectedPage({ component: Component }: { component: React.ComponentType }) {
+  return (
+    <SubscriptionGate requirePaid>
       <Component />
     </SubscriptionGate>
   );
@@ -67,6 +76,7 @@ function Router() {
           {user ? <OnboardingPage user={user} /> : <Landing />}
         </Route>
         <Route path="/subscribe" component={SubscriptionPage} />
+        <Route path="/pricing" component={PricingPage} />
         <Route path="/subscription/success" component={SubscriptionSuccessPage} />
         <Route path="/subscription/cancel" component={SubscriptionCancelPage} />
         <Route path="/domain/:slug">
@@ -79,14 +89,14 @@ function Router() {
           {user ? <ProtectedPage component={TemplatesPage} /> : <Landing />}
         </Route>
         <Route path="/playbooks">
-          {user ? <ProtectedPage component={PlaybooksPage} /> : <Landing />}
+          {user ? <PaidProtectedPage component={PlaybooksPage} /> : <Landing />}
         </Route>
         <Route path="/scheduling">
-          {user ? <ProtectedPage component={SchedulingPage} /> : <Landing />}
+          {user ? <PaidProtectedPage component={SchedulingPage} /> : <Landing />}
         </Route>
         <Route path="/financial">
           {user ? (
-            <ProtectedPage component={() => (
+            <PaidProtectedPage component={() => (
               <RoleGate requiredRole={USER_ROLES.OWNER}>
                 <FinancialPage />
               </RoleGate>

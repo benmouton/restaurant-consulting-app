@@ -43,10 +43,12 @@ import {
   Sparkles,
   Library,
   Briefcase,
-  Zap
+  Zap,
+  Lock
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 import { BrandLogoNav } from "@/components/BrandLogo";
+import { useTierAccess } from "@/hooks/use-tier-access";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Crown,
@@ -117,6 +119,7 @@ export default function Dashboard() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const { isAdmin } = useAdmin();
   const { roleLabel, permissions } = useRole();
+  const { isDomainLocked, isFreeTier } = useTierAccess();
   
   const { data: domains, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
@@ -347,20 +350,24 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {priorityDomains.map((domain) => {
                 const IconComponent = iconMap[domain.icon] || ClipboardList;
+                const locked = isDomainLocked(domain.slug);
                 return (
                   <Link key={domain.id} href={`/domain/${domain.slug}`}>
                     <Card 
-                      className="premium-card hover-elevate cursor-pointer h-full border-l-2 border-l-primary"
+                      className={`premium-card hover-elevate cursor-pointer h-full border-l-2 ${locked ? 'border-l-muted-foreground/30 opacity-75' : 'border-l-primary'}`}
                       data-testid={`card-priority-${domain.slug}`}
                     >
                       <CardContent className="p-4 sm:p-5 flex items-center gap-4">
-                        <div className="p-2 rounded-md bg-primary/10 flex-shrink-0">
-                          <IconComponent className="h-6 w-6 text-primary" />
+                        <div className={`p-2 rounded-md flex-shrink-0 ${locked ? 'bg-muted' : 'bg-primary/10'}`}>
+                          <IconComponent className={`h-6 w-6 ${locked ? 'text-muted-foreground' : 'text-primary'}`} />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-semibold text-sm sm:text-base tracking-tight">{domain.name}</h3>
+                          <h3 className="font-semibold text-sm sm:text-base tracking-tight flex items-center gap-2">
+                            {domain.name}
+                            {locked && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
+                          </h3>
                           <p className="text-xs text-muted-foreground line-clamp-1">
-                            {domain.description}
+                            {locked ? "Upgrade to unlock" : domain.description}
                           </p>
                         </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-auto" />
@@ -391,19 +398,25 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
               {domains?.map((domain) => {
                 const IconComponent = iconMap[domain.icon] || ClipboardList;
+                const locked = isDomainLocked(domain.slug);
                 return (
-                  <Link key={domain.id} href={`/domain/${domain.slug}`}>
+                  <Link key={domain.id} href={locked ? "/pricing" : `/domain/${domain.slug}`}>
                     <Card 
-                      className="premium-card hover-elevate cursor-pointer h-full"
+                      className={`premium-card hover-elevate cursor-pointer h-full relative ${locked ? 'opacity-75' : ''}`}
                       data-testid={`card-domain-${domain.slug}`}
                     >
+                      {locked && (
+                        <div className="absolute top-3 right-3">
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
                       <CardContent className="p-5 sm:p-7">
                         <div className="mb-4">
-                          <IconComponent className="h-10 w-10 sm:h-12 sm:w-12 text-primary" />
+                          <IconComponent className={`h-10 w-10 sm:h-12 sm:w-12 ${locked ? 'text-muted-foreground' : 'text-primary'}`} />
                         </div>
                         <h3 className="font-semibold text-sm sm:text-base mb-2 tracking-tight">{domain.name}</h3>
                         <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                          {domain.description}
+                          {locked ? "Upgrade to unlock this domain" : domain.description}
                         </p>
                       </CardContent>
                     </Card>

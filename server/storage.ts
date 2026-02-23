@@ -55,6 +55,7 @@ export interface IStorage {
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
     subscriptionStatus?: string;
+    subscriptionTier?: string;
   }): Promise<User | undefined>;
   getAllUsersWithSubscriptions(): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
@@ -371,6 +372,7 @@ export class DatabaseStorage implements IStorage {
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
     subscriptionStatus?: string;
+    subscriptionTier?: string;
   }): Promise<User | undefined> {
     const [user] = await db.update(users).set(stripeInfo).where(eq(users.id, userId)).returning();
     return user;

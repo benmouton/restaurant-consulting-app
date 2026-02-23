@@ -37,10 +37,21 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status"),
+  subscriptionTier: varchar("subscription_tier").default("free"),
   isAdmin: varchar("is_admin").default("false"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const SUBSCRIPTION_TIERS = {
+  FREE: "free",
+  BASIC: "basic",
+  PRO: "pro",
+} as const;
+
+export type SubscriptionTier = typeof SUBSCRIPTION_TIERS[keyof typeof SUBSCRIPTION_TIERS];
+
+export const FREE_DOMAIN_SLUGS = ["leadership", "training", "crisis"] as const;
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

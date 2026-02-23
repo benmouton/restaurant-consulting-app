@@ -141,6 +141,7 @@ export async function registerRoutes(
         return res.json({
           hasSubscription: true,
           subscriptionStatus: "test_access",
+          subscriptionTier: "pro",
           isTestUser: true,
           testAccessExpiresAt: testAccess.expiresAt,
           testAccessRemainingDays: remainingDays,
@@ -167,6 +168,7 @@ export async function registerRoutes(
         return res.json({ 
           hasSubscription: true,
           subscriptionStatus: "admin",
+          subscriptionTier: "pro",
           isAdmin: true
         });
       }
@@ -175,13 +177,22 @@ export async function registerRoutes(
       if (user.stripeCustomerId) {
         const subscription = await stripeService.getActiveSubscriptionForCustomer(user.stripeCustomerId);
         if (subscription) {
+          const subMeta = (subscription as any).metadata;
+          let tier = user.subscriptionTier || "basic";
+          if (subMeta?.tier && ['basic', 'pro'].includes(subMeta.tier)) {
+            tier = subMeta.tier;
+          }
+          const isActive = subscription.status === 'active' || subscription.status === 'trialing';
+          const effectiveTier = isActive ? tier : "free";
           await storage.updateUserStripeInfo(userId, {
             stripeSubscriptionId: subscription.id as string,
             subscriptionStatus: subscription.status as string,
+            subscriptionTier: effectiveTier,
           });
           return res.json({ 
-            hasSubscription: subscription.status === 'active' || subscription.status === 'trialing',
+            hasSubscription: isActive,
             subscriptionStatus: subscription.status,
+            subscriptionTier: effectiveTier,
             subscriptionId: subscription.id
           });
         }
@@ -190,33 +201,32 @@ export async function registerRoutes(
       // Check if user is a member of an organization (org members get access through owner's subscription)
       const userOrg = await storage.getUserOrganization(userId);
       if (userOrg) {
-        // Check if org owner has an active subscription
         const owner = await storage.getUserById(userOrg.ownerId);
         if (owner) {
-          // If owner is admin, org members get access
           if (owner.isAdmin === "true") {
             return res.json({
               hasSubscription: true,
               subscriptionStatus: "organization_member",
+              subscriptionTier: "pro",
               organizationName: userOrg.name
             });
           }
-          // Check owner's subscription
           if (owner.stripeCustomerId) {
             const ownerSubscription = await stripeService.getActiveSubscriptionForCustomer(owner.stripeCustomerId);
             if (ownerSubscription && (ownerSubscription.status === 'active' || ownerSubscription.status === 'trialing')) {
               return res.json({
                 hasSubscription: true,
                 subscriptionStatus: "organization_member",
+                subscriptionTier: owner.subscriptionTier || "basic",
                 organizationName: userOrg.name
               });
             }
           }
-          // Check cached subscription status for owner
           if (owner.subscriptionStatus === 'active' || owner.subscriptionStatus === 'trialing') {
             return res.json({
               hasSubscription: true,
               subscriptionStatus: "organization_member",
+              subscriptionTier: owner.subscriptionTier || "basic",
               organizationName: userOrg.name
             });
           }
@@ -225,7 +235,8 @@ export async function registerRoutes(
 
       res.json({ 
         hasSubscription: user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trialing',
-        subscriptionStatus: user.subscriptionStatus 
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionTier: (user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trialing') ? (user.subscriptionTier || "basic") : "free"
       });
     } catch (error) {
       console.error('Subscription status error:', error);
@@ -242,6 +253,15 @@ export async function registerRoutes(
         return res.status(404).json({ error: "User not found" });
       }
 
+      const { tier = 'basic', interval = 'month' } = req.body || {};
+
+      if (!['basic', 'pro'].includes(tier)) {
+        return res.status(400).json({ error: "Invalid tier. Must be 'basic' or 'pro'." });
+      }
+      if (!['month', 'year'].includes(interval)) {
+        return res.status(400).json({ error: "Invalid interval. Must be 'month' or 'year'." });
+      }
+
       let customerId = user.stripeCustomerId;
       if (!customerId) {
         const customer = await stripeService.createCustomer(user.email || '', userId);
@@ -249,68 +269,17 @@ export async function registerRoutes(
         customerId = customer.id;
       }
 
-      // Get the main subscription price ($10/month) directly from Stripe API
-      // This is more reliable than syncing to database
-      console.log('Fetching subscription prices from Stripe API...');
-      
-      let priceId: string | null = null;
-      
-      // First try database
-      try {
-        const prices = await db.execute(
-          sql`SELECT id, unit_amount, metadata FROM stripe.prices 
-              WHERE active = true 
-              AND (metadata->>'is_employee_seat' IS NULL OR metadata->>'is_employee_seat' != 'true')
-              ORDER BY unit_amount ASC LIMIT 1`
-        );
-        
-        if (prices.rows && prices.rows.length > 0) {
-          priceId = prices.rows[0].id as string;
-          console.log('Found price in database:', priceId);
-        }
-      } catch (dbError: any) {
-        console.log('Database query failed, will try Stripe API directly:', dbError?.message);
-      }
-      
-      // If no price found in database, fetch directly from Stripe
-      if (!priceId) {
-        console.log('No price in database, fetching from Stripe API...');
-        try {
-          const stripe = await stripeService.getStripe();
-          const stripePrices = await stripe.prices.list({
-            active: true,
-            type: 'recurring',
-            limit: 10,
-          });
-          
-          // Find the $10 subscription price (not employee seat)
-          const mainPrice = stripePrices.data.find(p => {
-            const isEmployeeSeat = p.metadata?.is_employee_seat === 'true';
-            return p.unit_amount === 1000 && !isEmployeeSeat;
-          }) || stripePrices.data.find(p => !p.metadata?.is_employee_seat);
-          
-          if (mainPrice) {
-            priceId = mainPrice.id;
-            console.log('Found price from Stripe API:', priceId);
-          }
-        } catch (stripeError: any) {
-          console.error('Stripe API price fetch failed:', stripeError?.message);
-        }
-      }
-      
-      if (!priceId) {
-        console.error('No valid subscription price found from any source');
-        return res.status(400).json({ error: "No subscription price available. Please contact support." });
-      }
+      const priceId = await stripeService.getOrCreateTierPrice(tier, interval as 'month' | 'year');
+      console.log(`Creating checkout for tier=${tier}, interval=${interval}, priceId=${priceId}`);
 
-      console.log('Creating checkout with priceId:', priceId);
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       
       const session = await stripeService.createCheckoutSession(
         customerId,
         priceId,
         `${baseUrl}/subscription/success`,
-        `${baseUrl}/subscription/cancel`
+        `${baseUrl}/subscription/cancel`,
+        { tier, interval, userId }
       );
 
       res.json({ url: session.url });

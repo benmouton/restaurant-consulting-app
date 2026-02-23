@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 interface SubscriptionStatus {
   hasSubscription: boolean;
   subscriptionStatus?: string;
+  subscriptionTier?: string;
   subscriptionId?: string;
 }
 
@@ -23,8 +24,8 @@ export function useSubscription() {
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/subscription/checkout");
+    mutationFn: async (params?: { tier?: string; interval?: string }) => {
+      const res = await apiRequest("POST", "/api/subscription/checkout", params || {});
       if (res.status === 401) {
         throw new Error("SESSION_EXPIRED");
       }
@@ -49,7 +50,6 @@ export function useSubscription() {
           description: "Please log in again to continue.",
           variant: "destructive",
         });
-        // Redirect to login after a short delay
         setTimeout(() => {
           window.location.href = "/api/login";
         }, 1500);
@@ -75,12 +75,15 @@ export function useSubscription() {
     },
   });
 
-  // Admins get automatic access without subscription
   const hasAccess = isAdmin || (data?.hasSubscription ?? false);
+  const tier = data?.subscriptionTier || "free";
 
   return {
     hasSubscription: hasAccess,
     subscriptionStatus: data?.subscriptionStatus,
+    subscriptionTier: tier,
+    isBasicOrAbove: tier === "basic" || tier === "pro",
+    isPro: tier === "pro",
     isLoading: isLoading || adminLoading,
     error,
     checkout: checkoutMutation.mutate,

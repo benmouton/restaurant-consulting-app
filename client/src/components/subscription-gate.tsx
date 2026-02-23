@@ -7,11 +7,12 @@ import { Lock, CreditCard, Loader2 } from "lucide-react";
 
 interface SubscriptionGateProps {
   children: React.ReactNode;
+  requirePaid?: boolean;
 }
 
-export function SubscriptionGate({ children }: SubscriptionGateProps) {
+export function SubscriptionGate({ children, requirePaid = false }: SubscriptionGateProps) {
   const { user, isLoading: authLoading } = useAuth();
-  const { hasSubscription, isLoading: subLoading, checkout, isCheckingOut, error } = useSubscription();
+  const { hasSubscription, subscriptionTier, isLoading: subLoading, checkout, isCheckingOut, error } = useSubscription();
   const [, setLocation] = useLocation();
 
   if (authLoading) {
@@ -52,7 +53,7 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
     );
   }
 
-  if (!hasSubscription) {
+  if (requirePaid && subscriptionTier === "free") {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <Card className="max-w-md w-full">
@@ -60,36 +61,26 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
             <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
               <Lock className="h-6 w-6 text-muted-foreground" />
             </div>
-            <CardTitle>Subscription Required</CardTitle>
+            <CardTitle>Upgrade Required</CardTitle>
             <CardDescription>
-              Subscribe to Restaurant Consultant Pro to access this content.
+              Upgrade your plan to access this feature.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="bg-primary/10 border border-primary/20 rounded-md p-3 text-center mb-2">
-              <p className="text-sm font-medium text-primary">7-Day Free Trial</p>
-              <p className="text-xs text-muted-foreground">No charge until trial ends</p>
-            </div>
             <Button 
               className="w-full" 
-              onClick={() => checkout()}
-              disabled={isCheckingOut}
-              data-testid="btn-subscribe-gate"
+              onClick={() => setLocation("/pricing")}
+              data-testid="btn-view-plans"
             >
-              {isCheckingOut ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <CreditCard className="h-4 w-4 mr-2" />
-              )}
-              Start Free Trial - Then $10/month
+              View Plans
             </Button>
             <Button 
               className="w-full" 
               variant="outline"
-              onClick={() => setLocation("/subscribe")}
-              data-testid="btn-learn-more"
+              onClick={() => setLocation("/")}
+              data-testid="btn-go-back"
             >
-              Learn More
+              Go Back
             </Button>
           </CardContent>
         </Card>

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { jsPDF } from "jspdf";
 import { useAuth } from "@/hooks/use-auth";
 import { useRole } from "@/hooks/use-role";
+import { useTierAccess } from "@/hooks/use-tier-access";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
@@ -82,6 +83,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Search,
+  Lock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -7883,6 +7885,77 @@ export default function DomainPage() {
   }
 
   const { domain, content } = data;
+  const { isDomainLocked } = useTierAccess();
+  const [, setLocation] = useLocation();
+  const domainLocked = slug ? isDomainLocked(slug) : false;
+
+  if (domainLocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/">
+                <Button variant="ghost" size="icon" data-testid="button-back">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
+              <div className="flex items-center gap-2">
+                <ChefHat className="h-6 w-6 text-primary" />
+                <span className="font-bold hidden sm:inline">The Restaurant Consultant</span>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-8 max-w-4xl relative">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">{domain.name}</h1>
+            <p className="text-muted-foreground">{domain.description}</p>
+          </div>
+          <div className="relative">
+            <div className="blur-sm pointer-events-none select-none opacity-50">
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="premium-card">
+                    <CardContent className="p-6">
+                      <div className="h-4 w-3/4 bg-muted rounded mb-3" />
+                      <div className="h-3 w-full bg-muted/60 rounded mb-2" />
+                      <div className="h-3 w-2/3 bg-muted/60 rounded" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Card className="max-w-sm w-full shadow-lg border-primary/20" data-testid="card-upgrade-overlay">
+                <CardContent className="p-8 text-center">
+                  <div className="mx-auto w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                    <Lock className="h-7 w-7 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-bold mb-2">Upgrade to Unlock</h2>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Access {domain.name} and all other premium domains with a paid plan.
+                  </p>
+                  <Button 
+                    className="w-full mb-2" 
+                    onClick={() => setLocation("/pricing")}
+                    data-testid="btn-upgrade-domain"
+                  >
+                    View Plans
+                  </Button>
+                  <Link href="/">
+                    <Button variant="ghost" className="w-full" data-testid="btn-back-to-dashboard">
+                      Back to Dashboard
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
