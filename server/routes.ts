@@ -1041,6 +1041,15 @@ export async function registerRoutes(
     });
   });
 
+  app.post("/api/push/register", isAuthenticated, (req: any, res) => {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: "Missing push token" });
+    }
+    console.log(`Push token registered for user ${req.user?.claims?.sub}: ${token.substring(0, 20)}...`);
+    res.json({ success: true });
+  });
+
   // Domain Routes
   app.get(api.domains.list.path, async (req, res) => {
     const domainsList = await storage.getDomains();

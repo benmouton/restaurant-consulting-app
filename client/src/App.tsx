@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -9,6 +10,11 @@ import OnboardingPage from "@/pages/onboarding";
 import { SubscriptionGate } from "@/components/subscription-gate";
 import { RoleGate } from "@/components/role-gate";
 import { USER_ROLES } from "@shared/models/auth";
+import { isNativeApp } from "@/lib/native";
+import { useBiometric } from "@/hooks/use-native-features";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { Shield, Fingerprint } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import DomainPage from "@/pages/domain";
@@ -55,6 +61,65 @@ function PaidProtectedPage({ component: Component }: { component: React.Componen
   );
 }
 
+function BiometricGuard({ children }: { children: React.ReactNode }) {
+  const { enabled, verified, verify } = useBiometric();
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!isNativeApp()) {
+      setChecked(true);
+      return;
+    }
+    if (!enabled) {
+      setChecked(true);
+      return;
+    }
+    if (verified) {
+      setChecked(true);
+      return;
+    }
+    verify().then(() => setChecked(true));
+  }, [enabled, verified, verify]);
+
+  if (!checked && isNativeApp() && enabled) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4 p-6">
+          <div className="p-4 rounded-full bg-primary/10 inline-flex">
+            <Fingerprint className="h-12 w-12 text-primary" />
+          </div>
+          <h2 className="text-xl font-semibold">Locked</h2>
+          <p className="text-muted-foreground text-sm">Authenticate to continue</p>
+          <Button onClick={() => verify().then(() => setChecked(true))} data-testid="button-unlock">
+            <Shield className="h-4 w-4 mr-2" />
+            Unlock
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isNativeApp() && enabled && !verified) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4 p-6">
+          <div className="p-4 rounded-full bg-primary/10 inline-flex">
+            <Fingerprint className="h-12 w-12 text-primary" />
+          </div>
+          <h2 className="text-xl font-semibold">Authentication Required</h2>
+          <p className="text-muted-foreground text-sm">Use Face ID or Touch ID to unlock</p>
+          <Button onClick={() => verify()} data-testid="button-unlock">
+            <Shield className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function Router() {
   const { user, isLoading } = useAuth();
 
@@ -68,6 +133,7 @@ function Router() {
 
   return (
     <>
+      <OfflineBanner />
       <TestAccessBanner />
       <Switch>
         <Route path="/">
@@ -141,7 +207,9 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <BiometricGuard>
+            <Router />
+          </BiometricGuard>
           <PwaInstallBanner />
         </TooltipProvider>
       </ThemeProvider>

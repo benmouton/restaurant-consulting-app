@@ -56,8 +56,11 @@ import {
   Search,
   Filter,
   Star,
-  StarOff
+  StarOff,
+  Share2
 } from "lucide-react";
+import { isNativeApp, nativeShare, hapticTap, hapticSuccess, takePhoto, saveInspectionPhoto } from "@/lib/native";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import type { Playbook, PlaybookStep, InsertPlaybook, InsertPlaybookStep } from "@shared/schema";
 
 const categories = [
@@ -525,6 +528,22 @@ export default function PlaybooksPage() {
                           <Copy className="h-4 w-4 mr-2" />
                           Duplicate
                         </DropdownMenuItem>
+                        {isNativeApp() && (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              hapticTap();
+                              nativeShare({
+                                title: selectedPlaybook.title,
+                                text: `Playbook: ${selectedPlaybook.title}\n${selectedPlaybook.description || ''}`,
+                                url: `https://restaurantai.consulting/playbooks`,
+                              });
+                            }}
+                            data-testid="button-share-playbook"
+                          >
+                            <Share2 className="h-4 w-4 mr-2" />
+                            Share
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(selectedPlaybook.id)} data-testid="button-delete-playbook">
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -763,7 +782,22 @@ export default function PlaybooksPage() {
                                     <XCircle className="h-5 w-5" />
                                   </Button>
                                   {step.requiredPhoto && (
-                                    <Button variant="ghost" size="icon" data-testid={`audit-photo-${idx}`}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      data-testid={`audit-photo-${idx}`}
+                                      onClick={async () => {
+                                        if (isNativeApp()) {
+                                          hapticTap();
+                                          const photo = await takePhoto();
+                                          if (photo) {
+                                            await saveInspectionPhoto(photo, selectedPlaybook?.title || 'audit');
+                                            hapticSuccess();
+                                            toast({ title: "Photo captured", description: "Inspection photo saved" });
+                                          }
+                                        }
+                                      }}
+                                    >
                                       <Camera className="h-5 w-5" />
                                     </Button>
                                   )}

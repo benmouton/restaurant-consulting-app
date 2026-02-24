@@ -1,0 +1,146 @@
+Next critical fix: Add native iOS features to pass Apple's Guideline 4.2 
+(Minimum Functionality). Apple rejected us because the app is "not 
+sufficiently different from a web browsing experience." We need native 
+features that a website can't provide.
+
+Implement these features. They should only activate when running in the 
+Capacitor native app (use Capacitor.isNativePlatform() to check). The 
+web version should continue working exactly as it does now.
+
+=== 1. OFFLINE MODE WITH LOCAL CACHING ===
+
+This is the most important feature — it proves the app works without 
+a browser.
+
+import { Preferences } from '@capacitor/preferences';
+import { Network } from '@capacitor/network';
+
+- On app load (when native), cache key content locally:
+  - The user's dashboard data (domain cards, progress)
+  - Any checklists or templates they've viewed recently
+  - Crisis management protocols (these are critical to have offline)
+  - Training templates
+
+- Monitor network status with Network.addListener('networkStatusChange')
+
+- When offline:
+  - Show a subtle banner: "Offline — showing cached content"
+  - Load cached content from Preferences
+  - Allow users to view cached tools and checklists
+  - Queue any form submissions or changes for later sync
+
+- When back online:
+  - Remove the offline banner
+  - Sync any queued changes
+  - Refresh cached content in the background
+
+=== 2. BIOMETRIC AUTHENTICATION ===
+
+import NativeBiometric from 'capacitor-native-biometric';
+
+- Add a "Require Face ID" toggle in the app's settings/profile area
+- When enabled, show biometric prompt when the app opens
+- Use it to protect sensitive sections:
+  - Financial data / insights
+  - HR documents
+  - Employee records
+
+- Implementation:
+  const result = await NativeBiometric.isAvailable();
+  if (result.isAvailable) {
+    await NativeBiometric.verifyIdentity({
+      reason: 'Unlock The Restaurant Consultant',
+      title: 'Authenticate',
+    });
+  }
+
+=== 3. NATIVE CAMERA FOR KITCHEN INSPECTIONS ===
+
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+
+- Add a "Take Photo" button in relevant areas:
+  - Kitchen operations checklists (photo evidence of completion)
+  - Any inspection or audit tools
+  - Or create a simple "Kitchen Inspection Photos" section
+
+- When tapped:
+  const photo = await Camera.getPhoto({
+    quality: 80,
+    allowEditing: false,
+    resultType: CameraResultType.Base64,
+    source: CameraSource.Camera
+  });
+
+- Save photos locally with metadata (timestamp, category)
+- Display them in a simple gallery or attached to checklist items
+
+=== 4. HAPTIC FEEDBACK ===
+
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+
+- Add haptic feedback throughout the app when running natively:
+  - Light impact on button taps
+  - Success notification on form submissions
+  - Success notification on checklist item completion
+  - Error notification on validation failures
+  - Medium impact on pull-to-refresh
+
+- Create a utility:
+  export async function hapticTap() {
+    if (Capacitor.isNativePlatform()) {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    }
+  }
+  export async function hapticSuccess() {
+    if (Capacitor.isNativePlatform()) {
+      await Haptics.notification({ type: NotificationType.Success });
+    }
+  }
+
+- Add hapticTap() to major interactive elements
+- Add hapticSuccess() to form submissions and checklist completions
+
+=== 5. NATIVE SHARE ===
+
+import { Share } from '@capacitor/share';
+
+- Add share buttons on content that users would want to send to 
+  their team:
+  - Training templates
+  - Checklists
+  - HR document templates
+  - Any generated documents
+
+- When tapped:
+  await Share.share({
+    title: 'Kitchen Prep Checklist',
+    text: 'From The Restaurant Consultant',
+    url: 'https://restaurantai.consulting/tool/...',
+    dialogTitle: 'Share with your team'
+  });
+
+=== 6. PUSH NOTIFICATION REGISTRATION ===
+
+import { PushNotifications } from '@capacitor/push-notifications';
+
+- On first launch in native app, after user logs in, request 
+  push permission
+- Register for push notifications
+- Send the device token to our backend for future use
+- We don't need to send actual pushes yet — just having the 
+  registration and permission flow shows Apple we're using 
+  native capabilities
+
+- Show a brief explanation screen before requesting permission:
+  "Get notified about shift reminders, training deadlines, and 
+  certification expirations"
+
+=== IMPORTANT NOTES ===
+
+- ALL of these features should be gated behind Capacitor.isNativePlatform()
+- The web app must continue working exactly as before
+- Create a shared utility file (e.g., lib/native.ts or lib/capacitor-utils.ts) 
+  for all native feature helpers
+- Native features should feel integrated, not bolted on
+- Apple reviewers will test for about 30 seconds — make sure offline 
+  mode, haptics, and biometrics are visible immediately on launch

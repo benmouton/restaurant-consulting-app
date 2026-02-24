@@ -38,8 +38,12 @@ import {
   Clock,
   Trash2,
   Award,
-  Calendar
+  Calendar,
+  Share2
 } from "lucide-react";
+import { isNativeApp, nativeShare, hapticTap, hapticSuccess } from "@/lib/native";
+import { useOfflineCache } from "@/hooks/use-native-features";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { HandbookBuilder } from "@/components/handbook/HandbookBuilder";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -836,6 +840,24 @@ export default function TemplatesPage() {
                         <Printer className="h-4 w-4 mr-2" />
                         Print
                       </Button>
+                      {isNativeApp() && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            hapticTap();
+                            nativeShare({
+                              title: selectedTemplate.title,
+                              text: `Training Template: ${selectedTemplate.title}\n\n${selectedTemplate.content.slice(0, 200)}...`,
+                              url: `https://restaurantai.consulting/templates`,
+                            });
+                          }}
+                          data-testid="btn-share-template"
+                        >
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Share
+                        </Button>
+                      )}
                       <Badge 
                         variant="secondary"
                         className={contentTypeColors[selectedTemplate.contentType] || ""}

@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useOfflineCache, useNetworkStatus } from "@/hooks/use-native-features";
+import { hapticTap } from "@/lib/native";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -123,9 +125,12 @@ export default function Dashboard() {
   const { roleLabel, permissions } = useRole();
   const { isDomainLocked, isFreeTier, tier } = useTierAccess();
   
-  const { data: domains, isLoading: domainsLoading } = useQuery<Domain[]>({
+  const { data: domainsRaw, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
   });
+
+  const domains = useOfflineCache("domains", domainsRaw);
+  const { isOnline } = useNetworkStatus();
 
   const timeContext = useMemo(() => getTimeContext(), []);
 
@@ -373,7 +378,7 @@ export default function Dashboard() {
                 const IconComponent = iconMap[domain.icon] || ClipboardList;
                 const locked = isDomainLocked(domain.slug);
                 return (
-                  <Link key={domain.id} href={`/domain/${domain.slug}`}>
+                  <Link key={domain.id} href={`/domain/${domain.slug}`} onClick={() => hapticTap()}>
                     <Card 
                       className={`premium-card hover-elevate cursor-pointer h-full border-l-2 ${locked ? 'border-l-muted-foreground/30 opacity-75' : 'border-l-primary'}`}
                       data-testid={`card-priority-${domain.slug}`}
@@ -421,7 +426,7 @@ export default function Dashboard() {
                 const IconComponent = iconMap[domain.icon] || ClipboardList;
                 const locked = isDomainLocked(domain.slug);
                 return (
-                  <Link key={domain.id} href={`/domain/${domain.slug}`}>
+                  <Link key={domain.id} href={`/domain/${domain.slug}`} onClick={() => hapticTap()}>
                     <Card 
                       className={`premium-card hover-elevate cursor-pointer h-full relative ${locked ? 'opacity-80' : ''}`}
                       data-testid={`card-domain-${domain.slug}`}

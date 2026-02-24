@@ -8,6 +8,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { isNativeApp, hapticSuccess, hapticTap } from "@/lib/native";
+import { useBiometric, usePushNotifications } from "@/hooks/use-native-features";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -112,6 +115,72 @@ interface ProfileData {
     cancelAtPeriodEnd: boolean;
   } | null;
   createdAt: string;
+}
+
+function NativeSettingsCard() {
+  const { available: bioAvailable, enabled: bioEnabled, toggle: bioToggle } = useBiometric();
+  const { registered: pushRegistered, register: pushRegister } = usePushNotifications();
+  const [pushLoading, setPushLoading] = useState(false);
+
+  const handlePushRegister = async () => {
+    setPushLoading(true);
+    await pushRegister();
+    hapticSuccess();
+    setPushLoading(false);
+  };
+
+  return (
+    <Card data-testid="card-device-settings">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Device Settings
+        </CardTitle>
+        <CardDescription>Native app preferences for this device</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {bioAvailable && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Require Face ID / Touch ID</p>
+              <p className="text-xs text-muted-foreground">
+                Protect your account with biometric authentication on app launch
+              </p>
+            </div>
+            <Switch
+              checked={bioEnabled}
+              onCheckedChange={() => { bioToggle(); hapticTap(); }}
+              data-testid="switch-biometric"
+            />
+          </div>
+        )}
+
+        <Separator />
+
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Push Notifications</p>
+            <p className="text-xs text-muted-foreground">
+              Get notified about shift reminders, training deadlines, and certification expirations
+            </p>
+          </div>
+          {pushRegistered ? (
+            <Badge variant="secondary" data-testid="badge-push-enabled">Enabled</Badge>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handlePushRegister}
+              disabled={pushLoading}
+              data-testid="button-enable-push"
+            >
+              {pushLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enable"}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function ProfilePage() {
@@ -767,6 +836,8 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          {isNativeApp() && <NativeSettingsCard />}
 
           <Collapsible open={dangerZoneOpen} onOpenChange={setDangerZoneOpen}>
             <Card className={dangerZoneOpen ? "border-destructive/50" : ""}>
