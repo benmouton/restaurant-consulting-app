@@ -5571,24 +5571,15 @@ async function seedTrainingTemplates() {
 }
 
 async function seedRestaurantHolidays() {
+  await db.execute(sql`
+    DELETE FROM restaurant_holidays
+    WHERE id NOT IN (
+      SELECT MIN(id) FROM restaurant_holidays GROUP BY name
+    )
+  `);
+
   const allExisting = await db.select().from(restaurantHolidays);
-
-  const seenNames = new Set<string>();
-  const duplicateIds: number[] = [];
-  for (const h of allExisting) {
-    if (seenNames.has(h.name)) {
-      duplicateIds.push(h.id);
-    } else {
-      seenNames.add(h.name);
-    }
-  }
-  if (duplicateIds.length > 0) {
-    for (const id of duplicateIds) {
-      await db.delete(restaurantHolidays).where(sql`${restaurantHolidays.id} = ${id}`);
-    }
-  }
-
-  const existingNames = seenNames;
+  const existingNames = new Set(allExisting.map(h => h.name));
 
   const holidaysData = [
     // January
