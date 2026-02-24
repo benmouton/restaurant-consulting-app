@@ -1,0 +1,191 @@
+Goal: When user clicks a holiday, backend generates an image using a prompt built from that holiday’s name + description + tags, saves it under a unique ID, and frontend displays it with a cache-busting URL.
+
+1) Frontend: send the selected holiday to the backend (not just “generate”)
+
+Find the click handler for a holiday card (whatever runs when you click “National Meatball Day”, etc.).
+
+Change your request body to include:
+
+holidayName
+
+holidayDescription
+
+holidayTags
+
+holidayDate (optional)
+
+category (optional)
+
+Example (React/TS):
+
+// When a holiday is clicked:
+async function generateFromHoliday(holiday: {
+  name: string;
+  description?: string;
+  tags?: string[];
+  date?: string;
+  category?: string;
+}) {
+  const res = await fetch("/api/social/holiday/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      holidayName: holiday.name,
+      holidayDescription: holiday.description ?? "",
+      holidayTags: holiday.tags ?? [],
+      holidayDate: holiday.date ?? "",
+      category: holiday.category ?? "",
+    }),
+  });
+
+  const data = await res.json();
+  // data: { caption, imageUrl, imageId }
+  setCaption(data.caption);
+  setImageUrl(data.imageUrl); // important: unique URL
+  setImageKey(data.imageId);  // optional: force re-render
+}
+
+Important UI fix: if React is reusing the same image node, force it to remount:
+
+<img key={imageKey} src={imageUrl} alt="Post" />
+2) Backend: build an image prompt from the holiday (no more “default pancakes”)
+
+Create/modify this endpoint:
+
+POST /api/social/holiday/generate
+
+It should:
+
+Create an imagePrompt using the holiday values
+
+Generate an image (OpenAI Images or your provider)
+
+Save it with a unique filename or return a unique URL
+
+Return { caption, imageUrl, imageId }
+
+Example (Express + TypeScript):
+
+import crypto from "crypto";
+import path from "path";
+import fs from "fs/promises";
+// If using OpenAI:
+import OpenAI from "openai";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+function buildHolidayImagePrompt(input: {
+  holidayName: string;
+  holidayDescription?: string;
+  holidayTags?: string[];
+  category?: string;
+}) {
+  const tags = (input.holidayTags ?? []).slice(0, 6).join(", ");
+  // Make it obviously different per holiday:
+  return [
+    `Create a photorealistic, appetizing restaurant marketing image for: ${input.holidayName}.`,
+    input.holidayDescription ? `Theme: ${input.holidayDescription}.` : "",
+    tags ? `Keywords: ${tags}.` : "",
+    `Style: professional food photography, warm lighting, shallow depth of field, high detail.`,
+    `Do NOT include text, logos, watermarks, or words in the image.`,
+    `The subject must clearly match the holiday theme.`,
+  ].filter(Boolean).join(" ");
+}
+
+app.post("/api/social/holiday/generate", async (req, res) => {
+  try {
+    const { holidayName, holidayDescription, holidayTags, category } = req.body ?? {};
+    if (!holidayName) return res.status(400).json({ error: "holidayName is required" });
+
+    const imageId = crypto.randomUUID();
+    const imagePrompt = buildHolidayImagePrompt({
+      holidayName,
+      holidayDescription,
+      holidayTags,
+      category,
+    });
+
+    // --- IMAGE GENERATION (OpenAI example) ---
+    const img = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt: imagePrompt,
+      size: "1024x1024",
+    });
+
+    // The API returns base64 in some setups; handle both patterns safely
+    const b64 = (img.data?.[0] as any)?.b64_json;
+    const url = (img.data?.[0] as any)?.url;
+
+    let imageUrl = "";
+    if (b64) {
+      const buf = Buffer.from(b64, "base64");
+      const outDir = path.join(process.cwd(), "public", "generated");
+      await fs.mkdir(outDir, { recursive: true });
+      const fileName = `${imageId}.png`;
+      await fs.writeFile(path.join(outDir, fileName), buf);
+      // Cache buster prevents browser from reusing old image
+      imageUrl = `/generated/${fileName}?v=${Date.now()}`;
+    } else if (url) {
+      // If provider gives a URL, still add a cache buster
+      imageUrl = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+    } else {
+      return res.status(500).json({ error: "Image generation returned no image." });
+    }
+
+    // --- CAPTION GENERATION (optional) ---
+    const caption = `Happy ${holidayName}! 🍽️\nCome celebrate with us today.\n\n#${holidayName.replace(/\s+/g, "")}`;
+
+    res.json({ caption, imageUrl, imageId });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: e?.message ?? "Server error" });
+  }
+});
+3) Kill the “same image” bug: remove caching + remove shared filenames
+
+If your current code does either of these, it will “stick” on pancakes:
+
+Saves every image as post.png, holiday.png, image.png, etc.
+
+Returns the same URL every time (/generated/latest.png)
+
+Uses a fixed seed for image generation
+
+Uses a static stock photo query ("pancakes") in your image search
+
+Fix checklist:
+
+✅ Filename includes imageId (UUID)
+
+✅ Response imageUrl includes ?v=timestamp
+
+✅ Prompt includes holidayName (not optional)
+
+✅ Frontend <img key={imageId} …> to remount
+
+4) If you’re using Unsplash/Pexels instead of AI images
+
+Then your bug is probably a hardcoded query like search("pancakes").
+
+Replace it with:
+
+const query = [
+  holidayName,
+  ...(holidayTags ?? []),
+  holidayDescription ?? "",
+  "food",
+  "restaurant",
+].filter(Boolean).join(" ");
+
+const photo = await pexelsSearch(query); // or unsplashSearch(query)
+
+Also add a fallback map so “St. Patrick’s Day” doesn’t return random stuff:
+
+const fallbackQueries: Record<string, string> = {
+  "St. Patrick's Day": "irish pub green beer corned beef cabbage",
+  "National Meatball Day": "meatballs marinara appetizer",
+  "National Corn Dog Day": "corn dog fair food crispy",
+  "National Pancake Day": "stack of pancakes syrup butter",
+};
+
+const q = fallbackQueries[holidayName] ?? query;

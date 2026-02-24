@@ -138,6 +138,8 @@ export default function SocialPostBuilder() {
   const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [generatingHolidayId, setGeneratingHolidayId] = useState<number | null>(null);
+  const [imageKey, setImageKey] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
@@ -692,9 +694,14 @@ export default function SocialPostBuilder() {
                     className="hidden"
                     data-testid="input-file-upload"
                   />
-                  {mediaUrl ? (
+                  {generatingHolidayId && !mediaUrl ? (
+                    <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center gap-2 text-center">
+                      <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                      <div className="text-sm text-muted-foreground">Generating holiday image...</div>
+                    </div>
+                  ) : mediaUrl ? (
                     <div className="relative rounded-md border overflow-hidden">
-                      <img src={mediaUrl} alt="Post media" className="w-full max-h-64 object-cover" />
+                      <img key={imageKey} src={mediaUrl} alt="Post media" className="w-full max-h-64 object-cover" />
                       <Button
                         size="icon"
                         variant="secondary"
@@ -981,7 +988,7 @@ export default function SocialPostBuilder() {
                           <p className="text-sm whitespace-pre-wrap" data-testid="text-preview-caption">{caption}</p>
                         </div>
                         {mediaUrl && (
-                          <img src={mediaUrl} alt="Preview" className="w-full max-h-48 object-cover border-t" />
+                          <img key={imageKey} src={mediaUrl} alt="Preview" className="w-full max-h-48 object-cover border-t" />
                         )}
                         {generatedPost?.hashtags && generatedPost.hashtags.length > 0 && (
                           <div className="px-3 pb-3 flex flex-wrap gap-1">
@@ -1233,7 +1240,8 @@ export default function SocialPostBuilder() {
                             variant="ghost"
                             size="sm"
                             className="text-xs"
-                            onClick={(e) => {
+                            disabled={generatingHolidayId === holiday.id}
+                            onClick={async (e) => {
                               e.stopPropagation();
                               const curated = getCuratedPost(
                                 holiday.name,
@@ -1242,12 +1250,46 @@ export default function SocialPostBuilder() {
                                 holiday.suggestedTags ?? undefined
                               );
                               setCaption(curated.caption);
-                              setMediaUrl(window.location.origin + curated.imageUrl);
                               setActiveTab("create");
+                              setGeneratingHolidayId(holiday.id);
+                              setMediaUrl("");
+                              try {
+                                const res = await fetch("/api/social-media/holiday/generate", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  credentials: "include",
+                                  body: JSON.stringify({
+                                    holidayName: holiday.name,
+                                    holidayDescription: holiday.suggestedAngle ?? "",
+                                    holidayTags: holiday.suggestedTags ?? [],
+                                    category: holiday.category ?? "",
+                                  }),
+                                });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  const fullUrl = data.imageUrl.startsWith("http")
+                                    ? data.imageUrl
+                                    : window.location.origin + data.imageUrl;
+                                  setMediaUrl(fullUrl);
+                                  setImageKey(data.imageId || Date.now().toString());
+                                } else {
+                                  const fallbackUrl = window.location.origin + curated.imageUrl;
+                                  setMediaUrl(fallbackUrl);
+                                }
+                              } catch {
+                                const fallbackUrl = window.location.origin + curated.imageUrl;
+                                setMediaUrl(fallbackUrl);
+                              } finally {
+                                setGeneratingHolidayId(null);
+                              }
                             }}
                             data-testid={`btn-draft-holiday-${holiday.id}`}
                           >
-                            Draft Post
+                            {generatingHolidayId === holiday.id ? (
+                              <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generating...</>
+                            ) : (
+                              "Draft Post"
+                            )}
                           </Button>
                           <Badge variant="outline">{holiday.category}</Badge>
                         </div>

@@ -3035,6 +3035,55 @@ Generate JSON with:
     }
   });
 
+  app.post("/api/social-media/holiday/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { holidayName, holidayDescription, holidayTags, category } = req.body ?? {};
+      if (!holidayName) return res.status(400).json({ message: "holidayName is required" });
+
+      const imageId = crypto.randomUUID();
+      const tags = (holidayTags ?? []).slice(0, 6).join(", ");
+      const imagePrompt = [
+        `Create a photorealistic, appetizing restaurant marketing image for: ${holidayName}.`,
+        holidayDescription ? `Theme: ${holidayDescription}.` : "",
+        tags ? `Keywords: ${tags}.` : "",
+        `Style: professional food photography, warm lighting, shallow depth of field, high detail.`,
+        `Do NOT include text, logos, watermarks, or words in the image.`,
+        `The subject must clearly match the holiday theme.`,
+      ].filter(Boolean).join(" ");
+
+      const response = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt: imagePrompt,
+        n: 1,
+        size: "1024x1024",
+      });
+
+      const imageData = response.data[0];
+      const b64 = (imageData as any)?.b64_json;
+      const remoteUrl = (imageData as any)?.url;
+
+      let imageUrl = "";
+
+      if (b64) {
+        const buf = Buffer.from(b64, "base64");
+        const outDir = path.join(process.cwd(), "uploads", "social-media");
+        if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+        const fileName = `holiday-${imageId}.png`;
+        fs.writeFileSync(path.join(outDir, fileName), buf);
+        imageUrl = `/uploads/social-media/${fileName}?v=${Date.now()}`;
+      } else if (remoteUrl) {
+        imageUrl = `${remoteUrl}${remoteUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+      } else {
+        return res.status(500).json({ message: "Image generation returned no image." });
+      }
+
+      res.json({ imageUrl, imageId });
+    } catch (error: any) {
+      console.error("Error generating holiday image:", error);
+      res.status(500).json({ message: error?.message ?? "Failed to generate holiday image" });
+    }
+  });
+
   // Get user's posts
   app.get("/api/social-media/posts", isAuthenticated, async (req: any, res) => {
     try {
