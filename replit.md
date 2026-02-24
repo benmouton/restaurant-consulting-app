@@ -111,8 +111,16 @@ Preferred communication style: Simple, everyday language.
 - `META_APP_ID`, `META_APP_SECRET`
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 
+### Capacitor (iOS Native)
+- **App ID**: `com.alstiginc.restaurantconsultant`
+- **Config**: `capacitor.config.ts` — webDir: `dist/public`, server URL: `https://restaurantai.consulting`
+- **iOS Project**: `ios/App/` — requires `pod install` on macOS to complete setup
+- **Native Plugins**: @capacitor/browser, @capacitor/preferences, @capacitor/push-notifications, @capacitor/camera, @capacitor/haptics, @capacitor/share, @capacitor/network, @capacitor-community/apple-sign-in, capacitor-native-biometric
+- **Sync Command**: `npx cap sync ios` after any web build to refresh iOS assets
+
 ### Key NPM Packages
 - **UI**: Radix UI primitives, shadcn/ui, Framer Motion, react-markdown
 - **Data**: Drizzle ORM, drizzle-zod, @tanstack/react-query
 - **Auth**: passport, openid-client, express-session
 - **Build**: Vite, esbuild, tsx
+- **Native**: @capacitor/core, @capacitor/cli, @capacitor/ios
