@@ -618,18 +618,20 @@ export class DatabaseStorage implements IStorage {
     const allHolidays = await db.select().from(restaurantHolidays).orderBy(restaurantHolidays.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const twoWeeksOut = new Date(today);
-    twoWeeksOut.setDate(twoWeeksOut.getDate() + 14);
 
-    return allHolidays.filter((h) => {
+    const withDates = allHolidays.map((h) => {
       const [month, day] = h.date.split('-').map(Number);
       const holidayThisYear = new Date(today.getFullYear(), month - 1, day);
       holidayThisYear.setHours(0, 0, 0, 0);
       if (holidayThisYear < today) {
         holidayThisYear.setFullYear(holidayThisYear.getFullYear() + 1);
       }
-      return holidayThisYear >= today && holidayThisYear <= twoWeeksOut;
+      return { holiday: h, nextDate: holidayThisYear };
     });
+
+    withDates.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
+
+    return withDates.slice(0, 10).map((w) => w.holiday);
   }
 
   // Social Media - Brand Voice Settings

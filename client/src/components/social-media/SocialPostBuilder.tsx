@@ -1209,7 +1209,7 @@ export default function SocialPostBuilder() {
                 </div>
               ) : holidays && holidays.length > 0 ? (
                 <div className="space-y-2">
-                  {holidays.slice(0, 10).map((holiday) => (
+                  {holidays.map((holiday) => (
                     <div
                       key={holiday.id}
                       className="p-3 border rounded-md hover-elevate cursor-pointer"
