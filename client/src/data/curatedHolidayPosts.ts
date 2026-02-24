@@ -4,13 +4,119 @@ export interface CuratedPost {
   imageUrl: string;
 }
 
-const CATEGORY_IMAGES: Record<string, string> = {
+const HOLIDAY_IMAGES: Record<string, string> = {
+  "National Pancake Day": "/images/holiday-food.png",
+  "National Blueberry Pancake Day": "/images/holiday-food.png",
+  "Valentines Day": "/images/holiday-valentines.png",
+  "Valentine's Day": "/images/holiday-valentines.png",
+  "National Pizza Day": "/images/holiday-pizza.png",
+  "St. Patrick's Day": "/images/holiday-stpatricks.png",
+  "St Patricks Day": "/images/holiday-stpatricks.png",
+  "Mother's Day": "/images/holiday-family.png",
+  "Mothers Day": "/images/holiday-family.png",
+  "Father's Day": "/images/holiday-family.png",
+  "Fathers Day": "/images/holiday-family.png",
+  "Independence Day": "/images/holiday-patriotic.png",
+  "Memorial Day": "/images/holiday-patriotic.png",
+  "Labor Day": "/images/holiday-patriotic.png",
+  "National Taco Day": "/images/holiday-tacos.png",
+  "Cinco de Mayo": "/images/holiday-cincodemayo.png",
+  "Halloween": "/images/holiday-community.png",
+  "Thanksgiving": "/images/holiday-thanksgiving.png",
+  "Christmas": "/images/holiday-christmas.png",
+  "Christmas Eve": "/images/holiday-christmas.png",
+  "Christmas Day": "/images/holiday-christmas.png",
+  "New Year's Eve": "/images/holiday-newyears.png",
+  "New Years Eve": "/images/holiday-newyears.png",
+  "Super Bowl Sunday": "/images/holiday-sports.png",
+  "National Burger Day": "/images/holiday-burger.png",
+  "National Cheeseburger Day": "/images/holiday-burger.png",
+  "National Hamburger Day": "/images/holiday-burger.png",
+  "National Wine Day": "/images/holiday-cocktails.png",
+  "National Coffee Day": "/images/holiday-coffee.png",
+  "National Cappuccino Day": "/images/holiday-coffee.png",
+  "National Irish Coffee Day": "/images/holiday-coffee.png",
+  "National Espresso Day": "/images/holiday-coffee.png",
+  "National Hot Chocolate Day": "/images/holiday-coffee.png",
+  "National Ice Cream Day": "/images/holiday-icecream.png",
+  "National Waiter Day": "/images/holiday-hospitality.png",
+  "National Bartender Day": "/images/holiday-cocktails.png",
+  "Earth Day": "/images/holiday-community.png",
+  "National Frozen Food Day": "/images/holiday-frozen.png",
+  "National Chocolate Cake Day": "/images/holiday-chocolate.png",
+  "National Brownie Day": "/images/holiday-chocolate.png",
+  "National Cocoa Day": "/images/holiday-chocolate.png",
+  "National Grilled Cheese Day": "/images/holiday-grilledcheese.png",
+  "National Sandwich Day": "/images/holiday-sandwich.png",
+  "National Pie Day": "/images/holiday-pie.png",
+  "National Margarita Day": "/images/holiday-margarita.png",
+  "National Beer Day": "/images/holiday-beer.png",
+  "National IPA Day": "/images/holiday-beer.png",
+  "National Craft Beer Day": "/images/holiday-beer.png",
+  "National Pasta Day": "/images/holiday-pasta.png",
+  "National Fried Chicken Day": "/images/holiday-chicken.png",
+  "National Chicken Wing Day": "/images/holiday-chicken.png",
+  "National Shrimp Day": "/images/holiday-seafood.png",
+  "National Lobster Day": "/images/holiday-seafood.png",
+  "National Croissant Day": "/images/holiday-brunch.png",
+  "National Restaurant Week": "/images/holiday-hospitality.png",
+  "National Corn Dog Day": "/images/holiday-corndog.png",
+  "National Pretzel Day": "/images/holiday-brunch.png",
+  "National Iced Tea Day": "/images/holiday-cocktails.png",
+};
+
+const KEYWORD_IMAGE_MAP: [RegExp, string][] = [
+  [/pizza/i, "/images/holiday-pizza.png"],
+  [/burger|hamburger|cheeseburger/i, "/images/holiday-burger.png"],
+  [/taco|mexican|enchilada/i, "/images/holiday-tacos.png"],
+  [/beer|ale|lager|ipa|brew/i, "/images/holiday-beer.png"],
+  [/wine|champagne|prosecco/i, "/images/holiday-cocktails.png"],
+  [/margarita|tequila|cocktail/i, "/images/holiday-margarita.png"],
+  [/coffee|espresso|cappuccino|latte/i, "/images/holiday-coffee.png"],
+  [/chocolate|brownie|cocoa|fudge/i, "/images/holiday-chocolate.png"],
+  [/ice cream|gelato|sundae|frozen/i, "/images/holiday-icecream.png"],
+  [/chicken|wing/i, "/images/holiday-chicken.png"],
+  [/shrimp|lobster|seafood|crab|oyster/i, "/images/holiday-seafood.png"],
+  [/pasta|spaghetti|fettuccine|noodle/i, "/images/holiday-pasta.png"],
+  [/sandwich|sub|hoagie|deli/i, "/images/holiday-sandwich.png"],
+  [/pie|cobbler/i, "/images/holiday-pie.png"],
+  [/pancake|waffle|brunch|croissant|french toast/i, "/images/holiday-brunch.png"],
+  [/grilled cheese/i, "/images/holiday-grilledcheese.png"],
+  [/corn dog/i, "/images/holiday-corndog.png"],
+  [/patriot|independence|memorial|flag|july/i, "/images/holiday-patriotic.png"],
+  [/valentine|romance|love/i, "/images/holiday-valentines.png"],
+  [/patrick|irish|shamrock/i, "/images/holiday-stpatricks.png"],
+  [/cinco|mayo/i, "/images/holiday-cincodemayo.png"],
+  [/thanksgiving|turkey/i, "/images/holiday-thanksgiving.png"],
+  [/christmas|xmas|holiday season/i, "/images/holiday-christmas.png"],
+  [/new year|nye/i, "/images/holiday-newyears.png"],
+  [/super bowl|football|game day/i, "/images/holiday-sports.png"],
+  [/mother|father|family|parent/i, "/images/holiday-family.png"],
+  [/bartender|mixolog/i, "/images/holiday-cocktails.png"],
+  [/waiter|server|hospitality|restaurant week/i, "/images/holiday-hospitality.png"],
+];
+
+const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
   food: "/images/holiday-food.png",
   family: "/images/holiday-family.png",
   community: "/images/holiday-community.png",
   hospitality: "/images/holiday-hospitality.png",
   sports: "/images/holiday-sports.png",
 };
+
+function getHolidayImage(holidayName: string, category: string): string {
+  if (HOLIDAY_IMAGES[holidayName]) {
+    return HOLIDAY_IMAGES[holidayName];
+  }
+
+  for (const [pattern, imageUrl] of KEYWORD_IMAGE_MAP) {
+    if (pattern.test(holidayName)) {
+      return imageUrl;
+    }
+  }
+
+  return CATEGORY_FALLBACK_IMAGES[category] || CATEGORY_FALLBACK_IMAGES.food;
+}
 
 const HOLIDAY_POSTS: Record<string, { caption: string; hashtags?: string[] }> = {
   "National Pancake Day": {
@@ -119,7 +225,7 @@ export function getCuratedPost(
     ? "\n\n" + hashtags.map(t => t.startsWith("#") ? t : `#${t}`).join(" ")
     : "";
 
-  const imageUrl = CATEGORY_IMAGES[category] || CATEGORY_IMAGES.food;
+  const imageUrl = getHolidayImage(holidayName, category);
 
   return {
     caption: caption + hashtagLine,
