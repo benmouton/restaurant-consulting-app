@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { SiLinkedin, SiX, SiNextdoor } from "react-icons/si";
 import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
+import { getCuratedPost } from "@/data/curatedHolidayPosts";
 
 interface SafeConnectedAccount {
   id: number;
@@ -1234,7 +1235,14 @@ export default function SocialPostBuilder() {
                             className="text-xs"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setCaption(`Happy ${holiday.name}! [Share what you're doing to celebrate at your restaurant]`);
+                              const curated = getCuratedPost(
+                                holiday.name,
+                                holiday.category,
+                                holiday.suggestedAngle ?? undefined,
+                                holiday.suggestedTags ?? undefined
+                              );
+                              setCaption(curated.caption);
+                              setMediaUrl(window.location.origin + curated.imageUrl);
                               setActiveTab("create");
                             }}
                             data-testid={`btn-draft-holiday-${holiday.id}`}

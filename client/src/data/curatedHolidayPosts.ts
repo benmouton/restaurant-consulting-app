@@ -1,0 +1,129 @@
+export interface CuratedPost {
+  caption: string;
+  hashtags: string[];
+  imageUrl: string;
+}
+
+const CATEGORY_IMAGES: Record<string, string> = {
+  food: "/images/holiday-food.png",
+  family: "/images/holiday-family.png",
+  community: "/images/holiday-community.png",
+  hospitality: "/images/holiday-hospitality.png",
+  sports: "/images/holiday-sports.png",
+};
+
+const HOLIDAY_POSTS: Record<string, { caption: string; hashtags?: string[] }> = {
+  "National Pancake Day": {
+    caption: `It's National Pancake Day and we're flipping out! 🥞\n\nWhether you're a buttermilk classic fan or love something a little more creative, today's the day to treat yourself to a stack.\n\nSwing by for brunch and let us do the cooking — because pancakes always taste better when someone else makes them.\n\nTag your brunch crew below! 👇`,
+  },
+  "Valentine's Day": {
+    caption: `Love is in the air — and on the menu. 💕\n\nThis Valentine's Day, skip the ordinary and give your someone special a night they'll remember. Our kitchen is pulling out all the stops with a curated experience designed for two.\n\nReservations are filling fast. Don't wait — the best tables go first.\n\nLink in bio to reserve your spot.`,
+  },
+  "National Pizza Day": {
+    caption: `It's National Pizza Day and we're not about to let it pass quietly. 🍕\n\nOur ovens are fired up, the dough is stretched, and the cheese pull is real. Whether you're team classic margherita or you like to go bold, today belongs to you.\n\nDine in, carry out, or delivery — just don't miss it.\n\nDrop your go-to topping in the comments 👇`,
+  },
+  "St. Patrick's Day": {
+    caption: `Happy St. Patrick's Day! ☘️\n\nGreen beer? Sure. But we're going bigger — think hearty specials, great pours, and an atmosphere that makes you want to stay all night.\n\nNo reservation needed. Just walk in, grab a seat, and raise a glass with us.\n\nSee you tonight! 🍻`,
+  },
+  "Mother's Day": {
+    caption: `She deserves more than flowers. 💐\n\nThis Mother's Day, bring her somewhere special. A table set just for her, a meal she doesn't have to cook, and a moment she'll actually remember.\n\nWe're taking reservations now — and the best spots won't last.\n\nBook today. She's worth it.`,
+  },
+  "Father's Day": {
+    caption: `Dad doesn't ask for much — but he deserves a great meal. 🥩\n\nThis Father's Day, skip the ties and gift cards. Bring him in for a meal he'll actually enjoy. Great food, cold drinks, zero dishes to wash.\n\nReservations open now. Let's make Dad's day.`,
+  },
+  "Independence Day": {
+    caption: `Happy 4th of July! 🇺🇸\n\nCelebrate with cold drinks, great food, and even better company. Whether you're stopping in before the fireworks or making us your whole evening, we've got you covered.\n\nWalk-ins welcome. Patio is open. Let's celebrate together. 🎆`,
+  },
+  "National Taco Day": {
+    caption: `It's National Taco Day and we're ALL in. 🌮\n\nCrispy, soft, loaded, simple — however you like your tacos, today is your day. Our kitchen is ready to deliver.\n\nBring your appetite. Bring your crew. Let's taco 'bout it.\n\nComment your order below 👇`,
+  },
+  "Halloween": {
+    caption: `Something wicked this way comes... to our kitchen. 🎃\n\nHalloween night just got a whole lot tastier. Costumes encouraged, good vibes guaranteed, and our menu is hauntingly good.\n\nStop in for a bite — if you dare. 👻`,
+  },
+  "Thanksgiving": {
+    caption: `Grateful for good food, great people, and this incredible community. 🍂\n\nThis Thanksgiving, let us take the stress off your plate (and put the turkey on it). Whether you're dining in or ordering a feast to go, we've got everything you need for a perfect holiday.\n\nPre-orders are open now — don't wait until the last minute!`,
+  },
+  "Christmas": {
+    caption: `Merry Christmas from our family to yours. 🎄\n\nThe holidays are meant for gathering around great food with the people you love. Let us be part of your celebration this season.\n\nWarm wishes and full plates — that's our kind of holiday.\n\nHappy holidays, everyone. ❤️`,
+  },
+  "New Year's Eve": {
+    caption: `Ring in the New Year with us! 🥂\n\nForget the crowded bars and overpriced covers. Celebrate at our place with great food, craft cocktails, and a midnight toast worth remembering.\n\nLimited spots available — reserve now before they're gone.\n\nSee you at midnight! 🎉`,
+  },
+  "Super Bowl Sunday": {
+    caption: `Game day. Our place. Let's go. 🏈\n\nBig screens, bigger appetizers, and the coldest drinks in town. Whether you're here for the game or just the commercials, we've got a seat for you.\n\nNo cover. No hassle. Just show up hungry.\n\nWho are you rooting for? Drop it below 👇`,
+  },
+  "National Burger Day": {
+    caption: `It's National Burger Day and our grill is working overtime. 🍔\n\nJuicy, stacked, and made the way a burger should be — no shortcuts, no compromises. Today's the day to come in and taste what we're all about.\n\nDine in or carry out. Just don't let this one pass you by.`,
+  },
+  "National Wine Day": {
+    caption: `Pour yourself into something good. 🍷\n\nIt's National Wine Day and our wine list is ready for you. Whether you're a bold red lover or a crisp white enthusiast, we've got the perfect glass waiting.\n\nPair it with dinner and make tonight a proper celebration.\n\nWhat's your go-to pour? Tell us below 👇`,
+  },
+  "National Coffee Day": {
+    caption: `First sip of the day hits different here. ☕\n\nHappy National Coffee Day! Whether you're fueling up for the morning rush or settling in for a long brunch, our coffee game is strong.\n\nCome grab a cup and see why our regulars keep coming back.\n\nHow do you take yours?`,
+  },
+  "Cinco de Mayo": {
+    caption: `¡Feliz Cinco de Mayo! 🎉\n\nMargaritas are flowing, the kitchen is fired up, and the vibes are just right. Come celebrate with bold flavors, great drinks, and a night you won't forget.\n\nNo reservation needed — just bring your appetite and your crew. 🇲🇽`,
+  },
+  "National Ice Cream Day": {
+    caption: `Scoop season is officially here. 🍦\n\nHappy National Ice Cream Day! Our dessert menu is calling your name. Whether you finish your meal with a scoop or make it the main event, today is the day to indulge.\n\nLife's too short to skip dessert.`,
+  },
+  "National Waiter Day": {
+    caption: `Today we celebrate the heartbeat of every great restaurant — our service team. 🙌\n\nHappy National Waiter Day to the incredible people who make every guest feel welcome, remembered, and taken care of.\n\nNext time you're in, give your server a little extra love. They've earned it. ❤️`,
+  },
+  "National Bartender Day": {
+    caption: `Raise your glass to the ones who make the magic happen behind the bar. 🍸\n\nHappy National Bartender Day! Our bartenders don't just pour drinks — they create experiences. Come say cheers to them tonight.\n\nWhat's your favorite cocktail? Let us know 👇`,
+  },
+  "Earth Day": {
+    caption: `This planet gives us everything — including the ingredients on your plate. 🌍\n\nHappy Earth Day! We're proud to source locally, reduce waste, and cook with care for the world around us.\n\nGreat food and a better future — that's what we're about.\n\nHow are you celebrating today?`,
+  },
+  "Labor Day": {
+    caption: `You've worked hard. You deserve a meal you didn't have to make. 💪\n\nHappy Labor Day! Come relax, unwind, and let us take care of dinner tonight. You've earned it.\n\nWalk-ins welcome all day. See you soon!`,
+  },
+  "National Frozen Food Day": {
+    caption: `Behind every great dish is serious prep work — and yes, some of it involves our freezer. ❄️\n\nHappy National Frozen Food Day! From our house-made frozen desserts to perfectly prepped ingredients, we make freezer magic happen.\n\nCome taste the difference fresh-from-scratch makes (even when it starts frozen). 🍨`,
+  },
+};
+
+function getFallbackCaption(holidayName: string, category: string, suggestedAngle?: string): string {
+  const angleText = suggestedAngle ? `\n\n${suggestedAngle}` : "";
+
+  switch (category) {
+    case "food":
+      return `Happy ${holidayName}! 🍽️\n\nToday calls for something special from our kitchen. We're celebrating the only way we know how — with incredible food and great company.${angleText}\n\nCome see what we've got cooking. Walk-ins welcome!\n\nTag someone who needs to know about this 👇`;
+    case "family":
+      return `Happy ${holidayName}! ❤️\n\nSome days are made for gathering around a great table with the people who matter most. Today is one of those days.${angleText}\n\nLet us set the table — you just bring the ones you love.\n\nReservations recommended. Link in bio.`;
+    case "community":
+      return `Happy ${holidayName}! 🎉\n\nThis community is everything to us. Today we celebrate together — with great food, warm hospitality, and the kind of atmosphere that makes you want to stay.${angleText}\n\nCome be part of it. We'd love to see you tonight.`;
+    case "hospitality":
+      return `Happy ${holidayName}! 🙌\n\nBehind every great meal is a team that pours their heart into every detail. Today we recognize the people who make hospitality an art.${angleText}\n\nCome experience what real service feels like. We'll be here.`;
+    case "sports":
+      return `It's ${holidayName} and we're ready! 🏆\n\nBig screens, cold drinks, and an atmosphere that makes every play feel bigger. Whether you're here for the competition or the appetizers, we've got you covered.${angleText}\n\nNo cover. Walk-ins welcome. Let's do this!`;
+    default:
+      return `Happy ${holidayName}! 🎊\n\nWe're celebrating today with what we do best — great food, warm hospitality, and an atmosphere you won't want to leave.${angleText}\n\nCome join us. Walk-ins always welcome.`;
+  }
+}
+
+export function getCuratedPost(
+  holidayName: string,
+  category: string,
+  suggestedAngle?: string,
+  suggestedTags?: string[]
+): CuratedPost {
+  const known = HOLIDAY_POSTS[holidayName];
+  const caption = known
+    ? known.caption
+    : getFallbackCaption(holidayName, category, suggestedAngle);
+
+  const hashtags = known?.hashtags || suggestedTags || [];
+  const hashtagLine = hashtags.length > 0
+    ? "\n\n" + hashtags.map(t => t.startsWith("#") ? t : `#${t}`).join(" ")
+    : "";
+
+  const imageUrl = CATEGORY_IMAGES[category] || CATEGORY_IMAGES.food;
+
+  return {
+    caption: caption + hashtagLine,
+    hashtags,
+    imageUrl,
+  };
+}
