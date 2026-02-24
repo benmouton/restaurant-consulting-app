@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
+import { startLogin } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -192,8 +193,8 @@ export default function Landing() {
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <BrandLogoNav linkTo="/" />
-          <Button asChild data-testid="button-login-header">
-            <a href="/api/login">Sign In</a>
+          <Button onClick={startLogin} data-testid="button-login-header">
+            Sign In
           </Button>
         </div>
       </header>
@@ -213,11 +214,9 @@ export default function Landing() {
             Used by independent restaurant owners to cut labor costs, protect margins, and stop firefighting every shift.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" asChild data-testid="button-get-started">
-              <a href="/api/login">
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </a>
+            <Button size="lg" onClick={startLogin} data-testid="button-get-started">
+              Get Started Free
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
           <p className="text-sm text-primary font-medium italic mt-4" data-testid="text-tagline">
@@ -266,11 +265,9 @@ export default function Landing() {
                 ))}
               </div>
               <div className="mt-6">
-                <Button asChild variant="outline" data-testid="btn-try-consultant">
-                  <a href="/api/login">
-                    Try it yourself
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
+                <Button variant="outline" onClick={startLogin} data-testid="btn-try-consultant">
+                  Try it yourself
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -473,11 +470,9 @@ export default function Landing() {
               <p className="text-sm text-muted-foreground">
                 No credit card required. No contracts. Cancel anytime.
               </p>
-              <Button size="lg" asChild className="mt-4" data-testid="button-pricing-cta">
-                <a href="/api/login">
-                  Get Started Free
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </a>
+              <Button size="lg" onClick={startLogin} className="mt-4" data-testid="button-pricing-cta">
+                Get Started Free
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </div>
           </Card>
@@ -539,11 +534,9 @@ export default function Landing() {
               <p className="text-sm text-muted-foreground mb-3">
                 Be one of our founding members.
               </p>
-              <Button asChild variant="outline" data-testid="btn-founding-member">
-                <a href="/api/login">
-                  Join as a Founding Member
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
+              <Button variant="outline" onClick={startLogin} data-testid="btn-founding-member">
+                Join as a Founding Member
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </Card>
@@ -562,11 +555,9 @@ export default function Landing() {
           <p className="text-primary-foreground/70 mb-8 text-sm">
             {TOTAL_DOMAIN_COUNT} operational domains. Expert consultant included. If it wouldn't hold up during a slammed dinner rush, it's not in here.
           </p>
-          <Button size="lg" variant="secondary" asChild data-testid="button-cta-bottom">
-            <a href="/api/login">
-              Get Started Free
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </a>
+          <Button size="lg" variant="secondary" onClick={startLogin} data-testid="button-cta-bottom">
+            Get Started Free
+            <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
           <p className="text-primary-foreground/60 text-sm mt-4">
             No credit card required. Free forever on core domains.

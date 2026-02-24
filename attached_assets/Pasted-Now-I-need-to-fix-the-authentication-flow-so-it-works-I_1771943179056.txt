@@ -1,0 +1,59 @@
+Now I need to fix the authentication flow so it works INSIDE the app 
+instead of opening Safari. Apple rejected us because tapping "Sign In" 
+opens the default browser and the user can't get back to the app.
+
+Here's what needs to change:
+
+1. DETECT IF RUNNING IN CAPACITOR
+   Create a utility that checks if we're running in the native app:
+
+   import { Capacitor } from '@capacitor/core';
+   
+   export const isNativeApp = () => Capacitor.isNativePlatform();
+
+2. NATIVE SIGN IN WITH APPLE
+   When running in the native app, Sign in with Apple must use the 
+   native plugin instead of any web redirect:
+
+   import { SignInWithApple } from '@capacitor-community/apple-sign-in';
+   
+   If isNativeApp(), call SignInWithApple.authorize() which shows the 
+   native iOS Apple sign-in dialog. Extract the identityToken, email, 
+   givenName, and familyName from the response and send them to our 
+   backend auth endpoint.
+
+   CRITICAL: Do NOT show any form asking for name or email after Apple 
+   sign-in. Apple already provides this data and they rejected us for 
+   re-asking.
+
+3. IN-APP EMAIL/PASSWORD AUTH
+   When running in the native app, the login and registration forms 
+   must submit directly to our API endpoints via fetch() calls — 
+   NOT by navigating to a web page. The auth screens should be React 
+   components that render natively in the WebView, not external URLs.
+
+   - Find where login currently redirects to an external URL or opens 
+     a new window
+   - Replace with a direct API call: fetch('/api/auth/login', {...})
+   - On success, store the auth token and navigate to the dashboard
+   - On failure, show an error message inline
+
+4. REMOVE ALL EXTERNAL BROWSER OPENS FOR AUTH
+   Search the entire codebase for:
+   - window.open() calls related to auth
+   - window.location.href redirects to auth pages
+   - Any <a href> that opens auth in a new tab
+   - Any code that sends the user to Safari for login/registration
+   
+   Replace all of these with in-app navigation or direct API calls.
+
+5. HANDLE THE CAPACITOR URL SCHEME
+   Since our capacitor.config.ts points to the live site at 
+   restaurantai.consulting, the WebView loads our web app. Auth 
+   should work without leaving the WebView — the forms are already 
+   part of our React app. The key fix is making sure nothing forces 
+   an external browser open.
+
+Test criteria: When running in the Capacitor app, a user can tap 
+Sign In, authenticate via Apple or email/password, and land on the 
+dashboard — all without Safari ever opening.

@@ -19,6 +19,8 @@ import { db } from "./db";
 import { restaurantHolidays, insertHandbookSettingsSchema, insertRestaurantStandardsSchema, insertCertificationAttemptSchema } from "@shared/schema";
 import { sendOrganizationInviteEmail, sendInviteReminderEmail, sendTestAccessEmail } from "./emailService";
 import { encrypt } from "./encryption";
+import jwt from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -961,6 +963,82 @@ export async function registerRoutes(
       console.error("Review login error:", error);
       res.status(500).json({ error: "Login failed" });
     }
+  });
+
+  // Apple Sign In for native iOS app
+  const appleJwksClient = jwksClient({
+    jwksUri: "https://appleid.apple.com/auth/keys",
+    cache: true,
+    cacheMaxAge: 86400000,
+  });
+
+  app.post("/api/auth/apple", async (req: any, res) => {
+    try {
+      const { identityToken, email, givenName, familyName } = req.body;
+
+      if (!identityToken) {
+        return res.status(400).json({ error: "Missing identity token" });
+      }
+
+      const decoded = jwt.decode(identityToken, { complete: true });
+      if (!decoded || !decoded.header.kid) {
+        return res.status(401).json({ error: "Invalid token format" });
+      }
+
+      const key = await appleJwksClient.getSigningKey(decoded.header.kid);
+      const signingKey = key.getPublicKey();
+
+      const verified = jwt.verify(identityToken, signingKey, {
+        algorithms: ["RS256"],
+        issuer: "https://appleid.apple.com",
+        audience: "com.alstiginc.restaurantconsultant",
+      }) as any;
+
+      const appleUserId = `apple_${verified.sub}`;
+      const userEmail = email || verified.email || null;
+
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      await authStorage.upsertUser({
+        id: appleUserId,
+        email: userEmail,
+        firstName: givenName || null,
+        lastName: familyName || null,
+        profileImageUrl: null,
+      });
+
+      const sessionUser: any = {
+        claims: { sub: appleUserId },
+        expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(sessionUser, (err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      res.json({ success: true, userId: appleUserId });
+    } catch (error: any) {
+      console.error("Apple auth error:", error);
+      if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+        return res.status(401).json({ error: "Invalid or expired Apple token" });
+      }
+      res.status(500).json({ error: "Authentication failed" });
+    }
+  });
+
+  // Session logout for native app (no external redirect)
+  app.post("/api/auth/logout", (req: any, res) => {
+    if (req.session?.testAccess) {
+      delete req.session.testAccess;
+    }
+    req.logout(() => {
+      req.session?.destroy((err: any) => {
+        res.clearCookie("connect.sid");
+        res.json({ success: true });
+      });
+    });
   });
 
   // Domain Routes

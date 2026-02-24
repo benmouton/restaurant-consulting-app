@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
+import { startLogin } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -92,7 +93,7 @@ export default function PricingPage() {
 
   const handleCheckout = (tierId: string) => {
     if (!user) {
-      window.location.href = "/api/login";
+      startLogin();
       return;
     }
     setCheckingOutTier(tierId);
@@ -250,7 +251,7 @@ export default function PricingPage() {
                     disabled={btnState.disabled || isCheckingThisTier}
                     onClick={() => {
                       if (tier.id === "free") {
-                        if (!user) window.location.href = "/api/login";
+                        if (!user) startLogin();
                         else if (subscriptionTier !== "free") openPortal();
                         else setLocation("/");
                       } else {

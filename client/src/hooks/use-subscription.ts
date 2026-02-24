@@ -3,6 +3,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
 import { useToast } from "@/hooks/use-toast";
+import { startLogin } from "@/lib/native";
 
 interface SubscriptionStatus {
   hasSubscription: boolean;
@@ -51,7 +52,7 @@ export function useSubscription() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          startLogin();
         }, 1500);
       } else {
         toast({

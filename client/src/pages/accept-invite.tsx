@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { startLoginWithReturn } from "@/lib/native";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,8 +108,7 @@ export default function AcceptInvitePage() {
             <Button 
               className="w-full" 
               onClick={() => {
-                const returnTo = encodeURIComponent(window.location.pathname);
-                window.location.href = `/api/login?returnTo=${returnTo}`;
+                startLoginWithReturn(window.location.pathname);
               }}
               data-testid="btn-login-to-accept"
             >
