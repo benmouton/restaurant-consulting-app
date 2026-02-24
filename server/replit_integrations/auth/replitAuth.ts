@@ -104,7 +104,12 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req: any, res, next) => {
-    // Store the return URL in session if provided
+    const ua = req.headers["user-agent"] || "";
+    if (/capacitor/i.test(ua) || req.headers["x-capacitor-native"] === "true") {
+      const returnTo = req.query.returnTo as string;
+      const qs = returnTo && returnTo.startsWith("/") ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
+      return res.redirect(`/native-login${qs}`);
+    }
     const returnTo = req.query.returnTo as string;
     if (returnTo && returnTo.startsWith('/')) {
       req.session.returnTo = returnTo;
@@ -119,14 +124,16 @@ export async function setupAuth(app: Express) {
   app.get("/api/callback", (req: any, res, next) => {
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any) => {
+      const ua = req.headers["user-agent"] || "";
+      const isCapacitor = /capacitor/i.test(ua) || req.headers["x-capacitor-native"] === "true";
+      const failRedirect = isCapacitor ? "/native-login" : "/api/login";
       if (err || !user) {
-        return res.redirect("/api/login");
+        return res.redirect(failRedirect);
       }
       req.logIn(user, (loginErr: any) => {
         if (loginErr) {
-          return res.redirect("/api/login");
+          return res.redirect(failRedirect);
         }
-        // Check for returnTo in session, then redirect
         const returnTo = req.session?.returnTo;
         delete req.session?.returnTo;
         res.redirect(returnTo && returnTo.startsWith('/') ? returnTo : '/');

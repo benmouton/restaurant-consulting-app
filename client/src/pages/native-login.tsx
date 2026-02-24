@@ -59,9 +59,10 @@ export default function NativeLoginPage() {
     }
   }
 
-  if (!isNativeApp()) {
+  const native = isNativeApp();
+
+  function handleWebFallback() {
     window.location.href = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
-    return null;
   }
 
   return (
@@ -90,6 +91,17 @@ export default function NativeLoginPage() {
               )}
               Sign in with Apple
             </Button>
+
+            {!native && (
+              <Button
+                onClick={handleWebFallback}
+                variant="outline"
+                className="w-full h-12 text-base"
+                data-testid="btn-web-signin"
+              >
+                Sign in with Browser
+              </Button>
+            )}
 
             {error && (
               <p className="text-sm text-destructive text-center" data-testid="text-login-error">

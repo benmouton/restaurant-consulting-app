@@ -1,6 +1,13 @@
 import { Capacitor } from '@capacitor/core';
 
-export const isNativeApp = (): boolean => Capacitor.isNativePlatform();
+export const isNativeApp = (): boolean => {
+  try {
+    if (Capacitor.isNativePlatform()) return true;
+  } catch {}
+  if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform === true) return true;
+  if (typeof navigator !== 'undefined' && /capacitor/i.test(navigator.userAgent)) return true;
+  return false;
+};
 
 export function startLogin() {
   if (isNativeApp()) {
