@@ -2769,7 +2769,9 @@ Generate JSON with:
       } catch (locError: any) {
         console.error("[GOOGLE_OAUTH] Failed to fetch locations:", locError.message);
         const errorMsg = locError.message || '';
-        if (errorMsg.includes('403') || errorMsg.includes('forbidden') || errorMsg.includes('disabled')) {
+        if (errorMsg.includes('RATE_LIMITED') || errorMsg.includes('429')) {
+          res.redirect("/domain/social-media?error=google_rate_limited");
+        } else if (errorMsg.includes('403') || errorMsg.includes('forbidden') || errorMsg.includes('disabled')) {
           res.redirect("/domain/social-media?error=google_api_not_enabled");
         } else {
           res.redirect(`/domain/social-media?error=google_locations_failed&detail=${encodeURIComponent(errorMsg.slice(0, 200))}`);

@@ -334,18 +334,23 @@ export const socialMediaService = {
   },
 
   async getGoogleBusinessLocations(accessToken: string): Promise<GoogleLocation[]> {
-    const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
+    const fetchWithRetry = async (url: string, options: RequestInit, retries = 4): Promise<Response> => {
       for (let attempt = 0; attempt < retries; attempt++) {
         const response = await fetch(url, options);
         if (response.status === 429) {
-          const waitSec = Math.pow(2, attempt + 1);
+          const retryAfter = response.headers.get('Retry-After');
+          const waitSec = retryAfter ? parseInt(retryAfter, 10) : Math.min(5 * Math.pow(2, attempt), 60);
           console.log(`[GOOGLE_API] Rate limited (429), waiting ${waitSec}s before retry ${attempt + 1}/${retries}...`);
           await new Promise(resolve => setTimeout(resolve, waitSec * 1000));
           continue;
         }
         return response;
       }
-      return fetch(url, options);
+      const finalResponse = await fetch(url, options);
+      if (finalResponse.status === 429) {
+        throw new Error('RATE_LIMITED: Google is rate limiting requests. Please wait a minute and try connecting again.');
+      }
+      return finalResponse;
     };
 
     const accountsResponse = await fetchWithRetry(

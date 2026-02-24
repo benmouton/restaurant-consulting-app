@@ -1,0 +1,95 @@
+HTTP 429 = you’re rate-limited.
+Specifically: “Requests per minute” for mybusinessaccountmanagement.googleapis.com (the accounts API).
+
+So your app is getting a token and is hitting the right endpoint — it’s just calling it too many times too fast (usually due to a loop, repeated retries, or React double-run).
+
+Here’s what to do, in the exact order that fixes this fast.
+
+1) Stop the “repeat calls” bug (most common cause)
+If this is a React useEffect issue:
+
+In dev mode, React 18 + StrictMode runs effects twice, and if you have a retry, it can hammer the endpoint.
+
+Fix patterns:
+
+Ensure the fetch runs once per connection
+
+Guard with a useRef flag
+
+Don’t fetch until you truly have a token
+
+Don’t auto-retry instantly on error
+
+Example guard (conceptually):
+
+if (didFetch.current) return; didFetch.current = true;
+
+Also check you’re not doing:
+
+connect callback route → fetch accounts
+
+then page loads → fetch accounts again
+
+then state change → fetch accounts again
+
+That triple-hit can blow a tiny RPM quota instantly.
+
+2) Add backoff + “Retry-After” handling (you need this anyway)
+
+When you get 429:
+
+wait (ex: 2s, 4s, 8s…)
+
+try again
+
+cap retries (3–5)
+
+respect Retry-After header if present
+
+Do not immediate-retry; that creates a self-DDOS.
+
+3) Cache the accounts response (you should never call accounts.list repeatedly)
+
+accounts.list is basically static.
+
+Do this:
+
+After first successful connect, store accounts in DB (or at least in server cache for 10–60 minutes)
+
+Next requests use cached data
+
+Rule: One accounts.list per user per hour is plenty.
+
+4) Verify your quota settings (you currently have RPM = 0 or extremely low)
+
+Your earlier quotas screen showed Requests per minute = 0 for the Business Information API.
+This 429 is for Account Management API, which may also have a low RPM.
+
+Go to Google Cloud Console:
+
+APIs & Services → Enabled APIs & Services →
+My Business Account Management API → Quotas
+
+Look for:
+
+“Requests per minute”
+
+If it’s 0, that means “blocked” or “not allocated”
+
+If it’s like 1–5, you’ll trip it instantly in dev
+
+If it’s adjustable, raise it (sometimes it’s fixed). If fixed, you must throttle.
+
+5) Quick tactical fix (so you can keep working today)
+
+In your connect flow, change behavior:
+
+After OAuth callback:
+
+call accounts.list once
+
+if 429, show: “Google is rate limiting; retry in 60 seconds”
+
+do NOT keep re-triggering connect automatically
+
+Add a “Try again” button that reattempts after a cooldown.
