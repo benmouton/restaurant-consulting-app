@@ -4,6 +4,7 @@ import { X, Share, Plus, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogoIconOnly } from "@/components/BrandLogo";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { isNativeApp } from "@/lib/native";
 
 export function PwaInstallBanner() {
   const {
@@ -15,7 +16,7 @@ export function PwaInstallBanner() {
   } = usePwaInstall();
   const [showIOSSteps, setShowIOSSteps] = useState(false);
 
-  if (!shouldShowBanner) return null;
+  if (isNativeApp() || !shouldShowBanner) return null;
 
   const handleInstall = async () => {
     if (canPromptNative) {
