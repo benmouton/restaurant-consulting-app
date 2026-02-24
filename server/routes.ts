@@ -4652,10 +4652,16 @@ Be fair but rigorous. A real restaurant's reputation depends on this evaluation 
     }
   });
 
-  // Seed Data
-  await seedDatabase();
-  await seedTrainingTemplates();
-  await seedRestaurantHolidays();
+  // Seed Data (non-blocking — runs in background after server starts)
+  Promise.resolve().then(async () => {
+    try {
+      await seedDatabase();
+      await seedTrainingTemplates();
+      await seedRestaurantHolidays();
+    } catch (err) {
+      console.error("Seeding error:", err);
+    }
+  });
 
   // Auto-reminder: check every hour for invites that need 3-day reminders
   setInterval(async () => {
