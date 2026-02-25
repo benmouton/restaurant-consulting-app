@@ -140,6 +140,9 @@ export default function SocialPostBuilder() {
   const [isUploading, setIsUploading] = useState(false);
   const [generatingHolidayId, setGeneratingHolidayId] = useState<number | null>(null);
   const [imageKey, setImageKey] = useState("");
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
+  const [scheduleTime, setScheduleTime] = useState("12:00");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
@@ -436,6 +439,42 @@ export default function SocialPostBuilder() {
       generatedContent: generatedPost || undefined,
       mediaUrls: mediaUrl ? [mediaUrl] : [],
     });
+  };
+
+  const handleSchedulePost = () => {
+    if (selectedAccountIds.length === 0) {
+      toast({ title: "Select channels", description: "Please select at least one channel to publish to.", variant: "destructive" });
+      return;
+    }
+    if (!caption.trim()) {
+      toast({ title: "Write something", description: "Please write a caption for your post.", variant: "destructive" });
+      return;
+    }
+    if (!scheduleDate) {
+      toast({ title: "Pick a date", description: "Please select a date to schedule your post.", variant: "destructive" });
+      return;
+    }
+
+    const [hours, minutes] = scheduleTime.split(":").map(Number);
+    const scheduledFor = new Date(scheduleDate);
+    scheduledFor.setHours(hours, minutes, 0, 0);
+
+    if (scheduledFor <= new Date()) {
+      toast({ title: "Invalid time", description: "Scheduled time must be in the future.", variant: "destructive" });
+      return;
+    }
+
+    publishMutation.mutate({
+      caption: caption.trim(),
+      platformTargets: selectedAccountIds,
+      postNow: false,
+      scheduledFor: scheduledFor.toISOString(),
+      generatedContent: generatedPost || undefined,
+      mediaUrls: mediaUrl ? [mediaUrl] : [],
+    });
+    setShowSchedulePicker(false);
+    setScheduleDate(undefined);
+    setScheduleTime("12:00");
   };
 
   const toggleAccountSelection = (accountId: number) => {
@@ -792,6 +831,54 @@ export default function SocialPostBuilder() {
                           </>
                         )}
                       </Button>
+                      <Popover open={showSchedulePicker} onOpenChange={setShowSchedulePicker}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            disabled={!caption.trim() || selectedAccountIds.length === 0 || publishMutation.isPending}
+                            data-testid="button-schedule-post"
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Schedule
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-4" align="end">
+                          <div className="space-y-3">
+                            <div className="text-sm font-medium">Schedule Post</div>
+                            <Calendar
+                              mode="single"
+                              selected={scheduleDate}
+                              onSelect={setScheduleDate}
+                              disabled={(date) => date < startOfDay(new Date())}
+                              className="rounded-md border"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Label className="text-sm whitespace-nowrap">Time:</Label>
+                              <Input
+                                type="time"
+                                value={scheduleTime}
+                                onChange={(e) => setScheduleTime(e.target.value)}
+                                className="w-full"
+                                data-testid="input-schedule-time"
+                              />
+                            </div>
+                            {scheduleDate && (
+                              <div className="text-xs text-muted-foreground">
+                                Posting on {format(scheduleDate, "EEE, MMM d, yyyy")} at {scheduleTime}
+                              </div>
+                            )}
+                            <Button
+                              onClick={handleSchedulePost}
+                              disabled={!scheduleDate || publishMutation.isPending}
+                              className="w-full"
+                              data-testid="button-confirm-schedule"
+                            >
+                              <CalendarIcon className="h-4 w-4 mr-2" />
+                              Confirm Schedule
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                 </CardContent>
