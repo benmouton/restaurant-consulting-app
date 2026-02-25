@@ -4703,6 +4703,13 @@ Be fair but rigorous. A real restaurant's reputation depends on this evaluation 
     }
   });
 
+  app.get("/mycookbook/privacy", (req, res) => {
+    res.redirect(302, "https://my-cookbook.replit.app/privacy");
+  });
+  app.get("/mycookbook/terms", (req, res) => {
+    res.redirect(302, "https://my-cookbook.replit.app/terms");
+  });
+
   // Seed Data (non-blocking — runs in background after server starts)
   Promise.resolve().then(async () => {
     try {
