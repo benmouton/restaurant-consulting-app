@@ -6,6 +6,10 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection (non-fatal):', reason);
+});
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -40,8 +44,24 @@ async function initStripe() {
       } else {
         console.log('Webhook setup completed');
       }
-    } catch (webhookError) {
-      console.log('Webhook setup skipped (may already exist):', webhookError);
+    } catch (webhookError: any) {
+      const msg = webhookError?.message || String(webhookError);
+      if (msg.includes('No such webhook endpoint') || msg.includes('resource_missing')) {
+        console.log('Stale webhook reference detected, clearing cached webhook and retrying...');
+        try {
+          await stripeSync.clearManagedWebhook?.();
+        } catch {}
+        try {
+          const retryResult = await stripeSync.findOrCreateManagedWebhook(
+            `${webhookBaseUrl}/api/stripe/webhook`
+          );
+          console.log('Webhook recreated:', retryResult?.webhook?.url || 'ok');
+        } catch (retryErr: any) {
+          console.log('Webhook retry also failed (non-fatal):', retryErr?.message || retryErr);
+        }
+      } else {
+        console.log('Webhook setup skipped (non-fatal):', msg);
+      }
     }
 
     console.log('Syncing Stripe data...');
@@ -136,7 +156,11 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    if (process.env.NODE_ENV !== "production") {
+      throw err;
+    } else {
+      console.error('Express error:', err);
+    }
   });
 
   // importantly only setup vite in development and after
