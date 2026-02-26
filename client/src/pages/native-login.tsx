@@ -3,13 +3,14 @@ import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChefHat, Apple, Loader2 } from "lucide-react";
+import { ChefHat, Apple, Loader2, Globe } from "lucide-react";
 import { isNativeApp } from "@/lib/native";
 
 export default function NativeLoginPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showBrowserFallback, setShowBrowserFallback] = useState(false);
   const queryClient = useQueryClient();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -52,18 +53,36 @@ export default function NativeLoginPage() {
         setIsLoading(false);
         return;
       }
-      console.error("Apple Sign In error:", err);
-      setError(err.message || "Sign in failed. Please try again.");
+
+      const isPluginMissing = err?.message?.includes("not implemented") || err?.message?.includes("not available");
+      if (isPluginMissing) {
+        setShowBrowserFallback(true);
+        setError(null);
+      } else {
+        console.error("Apple Sign In error:", err);
+        setError(err.message || "Sign in failed. Please try again.");
+        setShowBrowserFallback(true);
+      }
     } finally {
       setIsLoading(false);
     }
   }
 
-  const native = isNativeApp();
-
   function handleWebFallback() {
-    window.location.href = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
+    if (isNativeApp()) {
+      try {
+        import("@capacitor/browser").then(({ Browser }) => {
+          Browser.open({ url: `https://restaurantai.consulting/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}` });
+        });
+      } catch {
+        window.location.href = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
+      }
+    } else {
+      window.location.href = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
+    }
   }
+
+  const native = isNativeApp();
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -92,14 +111,15 @@ export default function NativeLoginPage() {
               Sign in with Apple
             </Button>
 
-            {!native && (
+            {(showBrowserFallback || !native) && (
               <Button
                 onClick={handleWebFallback}
                 variant="outline"
                 className="w-full h-12 text-base"
                 data-testid="btn-web-signin"
               >
-                Sign in with Browser
+                <Globe className="h-5 w-5 mr-2" />
+                Continue in Browser
               </Button>
             )}
 
