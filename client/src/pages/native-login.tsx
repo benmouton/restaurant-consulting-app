@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,31 @@ export default function NativeLoginPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showBrowserFallback, setShowBrowserFallback] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
   const queryClient = useQueryClient();
 
   const searchParams = new URLSearchParams(window.location.search);
   const returnTo = searchParams.get("returnTo") || "/";
+
+  useEffect(() => {
+    async function checkApplePlugin() {
+      try {
+        const { SignInWithApple } = await import("@capacitor-community/apple-sign-in");
+        if (SignInWithApple && typeof SignInWithApple.authorize === "function") {
+          setAppleAvailable(true);
+        } else {
+          setAppleAvailable(false);
+        }
+      } catch {
+        setAppleAvailable(false);
+      }
+    }
+    if (isNativeApp()) {
+      checkApplePlugin();
+    } else {
+      setAppleAvailable(false);
+    }
+  }, []);
 
   async function handleAppleSignIn() {
     setIsLoading(true);
@@ -54,35 +74,27 @@ export default function NativeLoginPage() {
         return;
       }
 
-      const isPluginMissing = err?.message?.includes("not implemented") || err?.message?.includes("not available");
-      if (isPluginMissing) {
-        setShowBrowserFallback(true);
-        setError(null);
-      } else {
-        console.error("Apple Sign In error:", err);
-        setError(err.message || "Sign in failed. Please try again.");
-        setShowBrowserFallback(true);
-      }
+      console.error("Apple Sign In error:", err);
+      setAppleAvailable(false);
+      setError("Apple Sign In is not available. Please use Continue in Browser instead.");
     } finally {
       setIsLoading(false);
     }
   }
 
   function handleWebFallback() {
+    const loginUrl = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
+
     if (isNativeApp()) {
-      try {
-        import("@capacitor/browser").then(({ Browser }) => {
-          Browser.open({ url: `https://restaurantai.consulting/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}` });
-        });
-      } catch {
-        window.location.href = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
-      }
+      import("@capacitor/browser").then(({ Browser }) => {
+        Browser.open({ url: `https://restaurantai.consulting${loginUrl}` });
+      }).catch(() => {
+        window.location.href = loginUrl;
+      });
     } else {
-      window.location.href = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
+      window.location.href = loginUrl;
     }
   }
-
-  const native = isNativeApp();
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -97,31 +109,31 @@ export default function NativeLoginPage() {
 
         <Card>
           <CardContent className="p-6 space-y-4">
-            <Button
-              onClick={handleAppleSignIn}
-              disabled={isLoading}
-              className="w-full bg-black hover:bg-black/90 text-white h-12 text-base"
-              data-testid="btn-apple-signin"
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              ) : (
-                <Apple className="h-5 w-5 mr-2" />
-              )}
-              Sign in with Apple
-            </Button>
-
-            {(showBrowserFallback || !native) && (
+            {appleAvailable !== false && (
               <Button
-                onClick={handleWebFallback}
-                variant="outline"
-                className="w-full h-12 text-base"
-                data-testid="btn-web-signin"
+                onClick={handleAppleSignIn}
+                disabled={isLoading}
+                className="w-full bg-black hover:bg-black/90 text-white h-12 text-base"
+                data-testid="btn-apple-signin"
               >
-                <Globe className="h-5 w-5 mr-2" />
-                Continue in Browser
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                ) : (
+                  <Apple className="h-5 w-5 mr-2" />
+                )}
+                Sign in with Apple
               </Button>
             )}
+
+            <Button
+              onClick={handleWebFallback}
+              variant={appleAvailable === false ? "default" : "outline"}
+              className={`w-full h-12 text-base ${appleAvailable === false ? "" : ""}`}
+              data-testid="btn-web-signin"
+            >
+              <Globe className="h-5 w-5 mr-2" />
+              {appleAvailable === false ? "Sign In" : "Continue in Browser"}
+            </Button>
 
             {error && (
               <p className="text-sm text-destructive text-center" data-testid="text-login-error">
