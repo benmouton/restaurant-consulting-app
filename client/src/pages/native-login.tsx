@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,31 +10,12 @@ export default function NativeLoginPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [appleAvailable, setAppleAvailable] = useState<boolean | null>(null);
+  const [pluginFailed, setPluginFailed] = useState(false);
   const queryClient = useQueryClient();
 
   const searchParams = new URLSearchParams(window.location.search);
   const returnTo = searchParams.get("returnTo") || "/";
-
-  useEffect(() => {
-    async function checkApplePlugin() {
-      try {
-        const { SignInWithApple } = await import("@capacitor-community/apple-sign-in");
-        if (SignInWithApple && typeof SignInWithApple.authorize === "function") {
-          setAppleAvailable(true);
-        } else {
-          setAppleAvailable(false);
-        }
-      } catch {
-        setAppleAvailable(false);
-      }
-    }
-    if (isNativeApp()) {
-      checkApplePlugin();
-    } else {
-      setAppleAvailable(false);
-    }
-  }, []);
+  const native = isNativeApp();
 
   async function handleAppleSignIn() {
     setIsLoading(true);
@@ -69,14 +50,15 @@ export default function NativeLoginPage() {
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setLocation(returnTo);
     } catch (err: any) {
-      if (err?.message?.includes("canceled") || err?.message?.includes("cancelled")) {
+      const msg = err?.message || "";
+      if (msg.includes("canceled") || msg.includes("cancelled")) {
         setIsLoading(false);
         return;
       }
 
       console.error("Apple Sign In error:", err);
-      setAppleAvailable(false);
-      setError("Apple Sign In is not available. Please use Continue in Browser instead.");
+      setPluginFailed(true);
+      setError("Apple Sign In couldn't connect. Tap Sign In below to continue.");
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +67,7 @@ export default function NativeLoginPage() {
   function handleWebFallback() {
     const loginUrl = `/api/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
 
-    if (isNativeApp()) {
+    if (native) {
       import("@capacitor/browser").then(({ Browser }) => {
         Browser.open({ url: `https://restaurantai.consulting${loginUrl}` });
       }).catch(() => {
@@ -109,7 +91,7 @@ export default function NativeLoginPage() {
 
         <Card>
           <CardContent className="p-6 space-y-4">
-            {appleAvailable !== false && (
+            {native && !pluginFailed && (
               <Button
                 onClick={handleAppleSignIn}
                 disabled={isLoading}
@@ -127,12 +109,12 @@ export default function NativeLoginPage() {
 
             <Button
               onClick={handleWebFallback}
-              variant={appleAvailable === false ? "default" : "outline"}
-              className={`w-full h-12 text-base ${appleAvailable === false ? "" : ""}`}
+              variant={pluginFailed || !native ? "default" : "outline"}
+              className="w-full h-12 text-base"
               data-testid="btn-web-signin"
             >
               <Globe className="h-5 w-5 mr-2" />
-              {appleAvailable === false ? "Sign In" : "Continue in Browser"}
+              {native && !pluginFailed ? "Continue in Browser" : "Sign In"}
             </Button>
 
             {error && (
