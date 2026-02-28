@@ -966,7 +966,10 @@ function CertificationTest({ onGoToStandards }: { onGoToStandards: () => void })
             <div className="mt-1">
               <StaffSearchDropdown value={traineeName} onChange={setTraineeName} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Search from your staff list or type any name</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Search from your staff list or type any name. Staff are managed in{" "}
+              <Link href="/scheduling" className="text-primary hover:underline">Scheduling</Link>.
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
