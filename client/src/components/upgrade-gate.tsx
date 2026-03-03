@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
+import { isNativeApp } from "@/lib/native";
 
 interface UpgradeGateProps {
   domain: string;
@@ -38,18 +39,26 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
             <p className="text-sm text-muted-foreground mb-4">
               {domainDescription}
             </p>
-            <p className="text-sm font-medium mb-6">
-              All {TOTAL_DOMAIN_COUNT} domains + tools starting at <span className="text-primary">$10/month</span>
-            </p>
-            <Link href="/pricing">
-              <Button className="w-full mb-3" data-testid="btn-upgrade-now">
-                Upgrade Now
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground underline underline-offset-4" data-testid="link-see-plans">
-              See all plans
-            </Link>
+            {isNativeApp() ? (
+              <p className="text-sm text-muted-foreground">
+                This domain requires a subscription. Subscribe at <span className="font-medium text-primary">restaurantai.consulting</span>
+              </p>
+            ) : (
+              <>
+                <p className="text-sm font-medium mb-6">
+                  All {TOTAL_DOMAIN_COUNT} domains + tools starting at <span className="text-primary">$10/month</span>
+                </p>
+                <Link href="/pricing">
+                  <Button className="w-full mb-3" data-testid="btn-upgrade-now">
+                    Upgrade Now
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+                <Link href="/pricing" className="text-sm text-muted-foreground underline underline-offset-4" data-testid="link-see-plans">
+                  See all plans
+                </Link>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

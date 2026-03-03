@@ -1,0 +1,111 @@
+FIX 2: Hide ALL Payment/Stripe UI on iOS Native (Guideline 3.1.1)
+Apple flagged: (a) app accesses paid content from Stripe without IAP, (b) payment button opens Safari.
+Strategy: Reader App Model - Remove all purchase flows from native app. Users subscribe on the web, access content in the app. This is the fastest path to approval.
+NOTE: Apples US storefront exception (Epic ruling) allows linking out for payment, but requires StoreKit External Purchase Link entitlement. Reader app model avoids that complexity.
+Import isNativeApp from @/lib/native in EVERY file below.
+
+1. client/src/hooks/use-subscription.ts
+Block Stripe redirects on native. In checkout onSuccess and portal onSuccess:
+if (isNativeApp()) {
+  toast({ title: "Subscribe on the Web",
+    description: "Visit restaurantai.consulting to manage your subscription." });
+  return;
+}
+// existing Stripe redirect
+2. client/src/pages/pricing.tsx
+Replace entire pricing section when native:
+{isNative ? (
+  <Card><CardContent className="text-center">
+    <p>To subscribe, visit</p>
+    <p className="font-medium">restaurantai.consulting</p>
+  </CardContent></Card>
+) : ( existing pricing cards )}
+CRITICAL: Do NOT make restaurantai.consulting a clickable link.
+3. client/src/components/subscription-gate.tsx
+Hide View Plans button when native. Change description to:
+Subscribe at restaurantai.consulting to access this feature.
+4. client/src/components/upgrade-gate.tsx
+Remove $10/month text, Upgrade Now button, See all plans link when native.
+Replace with: This domain requires a subscription. Subscribe at restaurantai.consulting
+5. client/src/pages/subscription.tsx
+Hide Subscribe button (line 130) and Stripe text (line 143) when native.
+Replace with: Subscribe at restaurantai.consulting to access premium features.
+6. client/src/pages/dashboard.tsx
+Hide Upgrade Plan button (line 321) and /pricing links (286, 458) when native.
+Change Upgrade to unlock (line 396) to Premium domain.
+7. client/src/pages/scheduling.tsx
+Block $5 staff Stripe checkout (lines 177-178) when native.
+Show toast: Visit restaurantai.consulting to add team members.
+8. client/src/pages/profile.tsx
+Change Upgrade to unlock all features (line 796) to:
+Subscribe at restaurantai.consulting for full access.
+9. client/src/pages/landing.tsx
+Gate any clickable /pricing links with isNativeApp(). Marketing text is fine.
+
+Payment Fix Checklist
+FileChangehooks/use-subscription.tsBlock Stripe redirect on nativepages/pricing.tsxReplace checkout UI with web messagepages/subscription.tsxHide subscribe button + Stripe textpages/dashboard.tsxHide Upgrade button + /pricing linkspages/scheduling.tsxBlock $5 staff checkoutpages/profile.tsxChange upgrade textpages/landing.tsxGate /pricing linkscomponents/subscription-gate.tsxReplace View Plans with web messagecomponents/upgrade-gate.tsxRemove pricing + Upgrade Now button
+
+PART 2: VISION OCR INTEGRATION
+3 Files to Add
+FileLocationPurposeVisionOCRPlugin.swiftios/App/App/Native Swift OCR using Apple VisionVisionOCRPlugin.mios/App/App/Obj-C bridge for CapacitorvisionOCR.tsclient/src/lib/TypeScript wrapper
+Xcode Setup
+
+Open ios/App/App.xcworkspace
+Right-click App folder (with AppDelegate.swift)
+Add Files to App - select both .swift and .m files
+Check Copy items if needed + Target App
+Create bridging header if prompted
+
+Server: Add /api/consultant/analyze-text
+In server/routes.ts near line 1145. Same pattern as existing chat endpoint but:
+
+Receives ocrText instead of images
+Uses model: gpt-4o-mini instead of gpt-4o
+Includes OCR text in user message as context
+
+Client: Update consultant.tsx
+Import extractTextFromImage and isVisionOCRAvailable from @/lib/visionOCR.
+Before fetch, try on-device OCR. If succeeds, hit analyze-text endpoint.
+If unavailable (web), fall back to existing GPT-4o Vision flow.
+Cost: $0.02-0.03/call drops to $0.0002/call (99% savings)
+
+PART 3: BUILD ORDER
+
+Fix phone number (2 files)
+Fix ALL payment/Stripe UI (9 files)
+Verify no payment leaks (text search)
+Deploy to Replit
+Pull to Mac
+Add 3 Vision OCR files
+Register in Xcode
+Add /api/consultant/analyze-text endpoint
+Update consultant.tsx with OCR
+npx cap sync
+Xcode: Product - Archive - Distribute
+Submit with updated review notes
+
+
+PART 4: APP REVIEW NOTES (for resubmission)
+The Restaurant Consultant is an operational systems platform
+for independent restaurant owners and operators.
+CHANGES IN THIS BUILD:
+
+Phone number now optional during onboarding and profile
+All payment/subscription purchase UI removed from iOS app
+No in-app purchases or external payment flows
+No links to external payment pages
+Users subscribe on the web at restaurantai.consulting
+This is a reader/companion app for web subscribers
+
+NATIVE iOS FEATURES:
+
+On-device OCR via Apple Vision framework
+Biometric authentication (Face ID / Touch ID)
+Native camera for kitchen inspections
+Offline mode with local caching
+Push notifications, haptics, native share
+
+BUSINESS MODEL:
+Subscriptions managed entirely on our website. The iOS app
+provides access to subscription content. No payments occur
+in the app. No buttons or links to external payment pages.

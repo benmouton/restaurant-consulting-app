@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
-import { startLogin } from "@/lib/native";
+import { startLogin, isNativeApp } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -144,6 +144,23 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {isNativeApp() ? (
+          <Card className="max-w-md mx-auto">
+            <CardContent className="p-8 text-center space-y-4">
+              <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                <Crown className="h-6 w-6 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold">Subscribe on the Web</h2>
+              <p className="text-muted-foreground">To subscribe or manage your plan, visit</p>
+              <p className="font-medium text-primary">restaurantai.consulting</p>
+              <p className="text-xs text-muted-foreground">Open the site in your browser to get started.</p>
+              <Button variant="outline" className="w-full" onClick={() => setLocation("/")} data-testid="btn-go-back">
+                Go Back
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+        <>
         <div className="flex items-center justify-center gap-3 mb-10">
           <Label htmlFor="billing-toggle" className={`text-sm ${!isAnnual ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
             Monthly
@@ -341,6 +358,8 @@ export default function PricingPage() {
             All paid plans include a 7-day free trial. Cancel anytime. No questions asked.
           </p>
         </div>
+        </>
+        )}
       </main>
     </div>
   );

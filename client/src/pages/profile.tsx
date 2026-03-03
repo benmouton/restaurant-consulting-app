@@ -793,17 +793,23 @@ export default function ProfilePage() {
                   <Separator />
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium">Upgrade to unlock all features</p>
+                      <p className="text-sm font-medium">
+                        {isNativeApp() ? "Subscribe for full access" : "Upgrade to unlock all features"}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        Get access to the consultant, financial analysis, training templates, and more for $10/month
+                        {isNativeApp() 
+                          ? "Subscribe at restaurantai.consulting for full access."
+                          : "Get access to the consultant, financial analysis, training templates, and more for $10/month"}
                       </p>
                     </div>
-                    <Button 
-                      onClick={() => navigate("/subscribe")}
-                      data-testid="btn-subscribe"
-                    >
-                      Subscribe Now
-                    </Button>
+                    {!isNativeApp() && (
+                      <Button 
+                        onClick={() => navigate("/subscribe")}
+                        data-testid="btn-subscribe"
+                      >
+                        Subscribe Now
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}

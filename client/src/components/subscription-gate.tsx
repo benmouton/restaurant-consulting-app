@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, CreditCard, Loader2 } from "lucide-react";
+import { isNativeApp } from "@/lib/native";
 
 interface SubscriptionGateProps {
   children: React.ReactNode;
@@ -63,17 +64,21 @@ export function SubscriptionGate({ children, requirePaid = false }: Subscription
             </div>
             <CardTitle>Upgrade Required</CardTitle>
             <CardDescription>
-              Upgrade your plan to access this feature.
+              {isNativeApp()
+                ? "Subscribe at restaurantai.consulting to access this feature."
+                : "Upgrade your plan to access this feature."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button 
-              className="w-full" 
-              onClick={() => setLocation("/pricing")}
-              data-testid="btn-view-plans"
-            >
-              View Plans
-            </Button>
+            {!isNativeApp() && (
+              <Button 
+                className="w-full" 
+                onClick={() => setLocation("/pricing")}
+                data-testid="btn-view-plans"
+              >
+                View Plans
+              </Button>
+            )}
             <Button 
               className="w-full" 
               variant="outline"

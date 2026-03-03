@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { isNativeApp } from "@/lib/native";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -174,7 +175,10 @@ export default function SchedulingPage() {
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: typeof newStaff) => {
-      // Initiate Stripe checkout for $5 employee fee
+      if (isNativeApp()) {
+        toast({ title: "Add Staff on the Web", description: "Visit restaurantai.consulting to add team members." });
+        return null;
+      }
       const response = await apiRequest("POST", "/api/scheduling/staff/checkout", {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -778,7 +782,7 @@ export default function SchedulingPage() {
                     </div>
                   </div>
                   <DialogFooter className="flex-col sm:flex-row gap-2">
-                    <p className="text-xs text-muted-foreground w-full sm:w-auto">A $5 fee applies per new employee</p>
+                    {!isNativeApp() && <p className="text-xs text-muted-foreground w-full sm:w-auto">A $5 fee applies per new employee</p>}
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={() => setShowAddStaff(false)}>Cancel</Button>
                       <Button 
@@ -787,7 +791,7 @@ export default function SchedulingPage() {
                         data-testid="btn-save-staff"
                       >
                         <DollarSign className="h-4 w-4 mr-1" />
-                        {createStaffMutation.isPending ? "Processing..." : "Add Staff - $5"}
+                        {createStaffMutation.isPending ? "Processing..." : isNativeApp() ? "Add Staff" : "Add Staff - $5"}
                       </Button>
                     </div>
                   </DialogFooter>
@@ -907,7 +911,7 @@ export default function SchedulingPage() {
                   </div>
                   <div className="p-3 bg-amber-500/10 rounded-lg">
                     <p className="text-sm text-amber-700 dark:text-amber-400">
-                      <strong>Note:</strong> Each active employee adds $5/month to your subscription.
+                      <strong>Note:</strong> {isNativeApp() ? "Manage billing at restaurantai.consulting." : "Each active employee adds $5/month to your subscription."}
                     </p>
                   </div>
                 </div>

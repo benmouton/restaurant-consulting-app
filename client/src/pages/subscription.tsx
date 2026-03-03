@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Loader2, CreditCard, Shield, Sparkles, FileText, Users, Calculator } from "lucide-react";
 import { useLocation } from "wouter";
+import { isNativeApp } from "@/lib/native";
 
 export default function SubscriptionPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -124,24 +125,34 @@ export default function SubscriptionPage() {
                 ))}
               </ul>
 
-              <Button 
-                className="w-full" 
-                size="lg"
-                onClick={() => checkout()}
-                disabled={isCheckingOut}
-                data-testid="btn-subscribe"
-              >
-                {isCheckingOut ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CreditCard className="h-4 w-4 mr-2" />
-                )}
-                Start 7-Day Free Trial
-              </Button>
+              {isNativeApp() ? (
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Subscribe at <span className="font-medium text-primary">restaurantai.consulting</span> to access premium features.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <Button 
+                    className="w-full" 
+                    size="lg"
+                    onClick={() => checkout()}
+                    disabled={isCheckingOut}
+                    data-testid="btn-subscribe"
+                  >
+                    {isCheckingOut ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <CreditCard className="h-4 w-4 mr-2" />
+                    )}
+                    Start 7-Day Free Trial
+                  </Button>
 
-              <p className="text-xs text-center text-muted-foreground">
-                No charge for 7 days. Cancel anytime. Secure payment via Stripe.
-              </p>
+                  <p className="text-xs text-center text-muted-foreground">
+                    No charge for 7 days. Cancel anytime. Secure payment via Stripe.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 

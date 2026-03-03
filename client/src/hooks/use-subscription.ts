@@ -3,7 +3,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
 import { useToast } from "@/hooks/use-toast";
-import { startLogin } from "@/lib/native";
+import { startLogin, isNativeApp } from "@/lib/native";
 
 interface SubscriptionStatus {
   hasSubscription: boolean;
@@ -33,6 +33,11 @@ export function useSubscription() {
       return res.json();
     },
     onSuccess: (data) => {
+      if (isNativeApp()) {
+        toast({ title: "Subscribe on the Web",
+          description: "Visit restaurantai.consulting to manage your subscription." });
+        return;
+      }
       if (data.url) {
         window.location.href = data.url;
       } else {
@@ -70,6 +75,11 @@ export function useSubscription() {
       return res.json();
     },
     onSuccess: (data) => {
+      if (isNativeApp()) {
+        toast({ title: "Subscribe on the Web",
+          description: "Visit restaurantai.consulting to manage your subscription." });
+        return;
+      }
       if (data.url) {
         window.location.href = data.url;
       }

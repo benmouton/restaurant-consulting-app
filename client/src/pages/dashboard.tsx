@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useOfflineCache, useNetworkStatus } from "@/hooks/use-native-features";
-import { hapticTap } from "@/lib/native";
+import { hapticTap, isNativeApp } from "@/lib/native";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -283,15 +283,25 @@ export default function Dashboard() {
                     <Badge variant="secondary" className="text-xs" data-testid="badge-user-role">
                       {roleLabel}
                     </Badge>
-                    <Link href="/pricing">
+                    {isNativeApp() ? (
                       <Badge 
                         variant={isFreeTier ? "outline" : "default"} 
-                        className={`text-xs cursor-pointer ${!isFreeTier ? 'bg-primary/90 text-primary-foreground' : ''}`}
+                        className={`text-xs ${!isFreeTier ? 'bg-primary/90 text-primary-foreground' : ''}`}
                         data-testid="badge-current-plan"
                       >
                         {tier === "free" ? "Free Plan" : tier === "basic" ? "Basic Plan" : tier === "pro" ? "Pro Plan" : "Free Plan"}
                       </Badge>
-                    </Link>
+                    ) : (
+                      <Link href="/pricing">
+                        <Badge 
+                          variant={isFreeTier ? "outline" : "default"} 
+                          className={`text-xs cursor-pointer ${!isFreeTier ? 'bg-primary/90 text-primary-foreground' : ''}`}
+                          data-testid="badge-current-plan"
+                        >
+                          {tier === "free" ? "Free Plan" : tier === "basic" ? "Basic Plan" : tier === "pro" ? "Pro Plan" : "Free Plan"}
+                        </Badge>
+                      </Link>
+                    )}
                   </div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
@@ -312,14 +322,16 @@ export default function Dashboard() {
                   <UserCog className="mr-2 h-4 w-4" />
                   Account Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => navigate("/pricing")}
-                  className="cursor-pointer"
-                  data-testid="button-manage-plan"
-                >
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  {isFreeTier ? "Upgrade Plan" : "Manage Plan"}
-                </DropdownMenuItem>
+                {!isNativeApp() && (
+                  <DropdownMenuItem 
+                    onClick={() => navigate("/pricing")}
+                    className="cursor-pointer"
+                    data-testid="button-manage-plan"
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    {isFreeTier ? "Upgrade Plan" : "Manage Plan"}
+                  </DropdownMenuItem>
+                )}
                 {isAdmin && (
                   <DropdownMenuItem 
                     onClick={() => navigate("/admin")}
@@ -393,7 +405,7 @@ export default function Dashboard() {
                             {locked && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
                           </h3>
                           <p className="text-xs text-muted-foreground line-clamp-1">
-                            {locked ? "Upgrade to unlock" : domain.description}
+                            {locked ? (isNativeApp() ? "Premium domain" : "Upgrade to unlock") : domain.description}
                           </p>
                         </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-auto" />
@@ -453,7 +465,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {isFreeTier && !domainsLoading && (
+        {isFreeTier && !domainsLoading && !isNativeApp() && (
           <div className="mb-8 sm:mb-10">
             <Link href="/pricing">
               <Card 
