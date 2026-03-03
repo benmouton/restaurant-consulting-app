@@ -1,19 +1,16 @@
-import { registerPlugin } from '@capacitor/core';
-
-interface VisionOCRPlugin {
-  recognizeText(options: { imageBase64: string }): Promise<{ text: string }>;
-}
-
-const VisionOCR = registerPlugin<VisionOCRPlugin>('VisionOCR');
+import { Capacitor } from '@capacitor/core';
 
 export async function extractTextFromImage(imageBase64: string): Promise<string | null> {
   try {
-    alert('OCR: attempting call');
-    const result = await VisionOCR.recognizeText({ imageBase64 });
-    alert('OCR result: ' + (result.text || 'empty').substring(0, 100));
+    const bridge = (window as any).Capacitor;
+    if (!bridge || !bridge.Plugins || !bridge.Plugins.VisionOCR) {
+      console.log('VisionOCR plugin not available');
+      return null;
+    }
+    const result = await bridge.Plugins.VisionOCR.recognizeText({ imageBase64 });
     return result.text || null;
   } catch (e: any) {
-    alert('OCR error: ' + e.message);
+    console.error('Vision OCR failed:', e);
     return null;
   }
 }
