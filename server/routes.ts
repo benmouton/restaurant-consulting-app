@@ -252,6 +252,35 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/ocr/extract-text", isAuthenticated, async (req: any, res) => {
+    try {
+      const { imageBase64 } = req.body;
+      if (!imageBase64) {
+        return res.status(400).json({ error: "imageBase64 is required" });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Extract all the text you can see in this image. Return only the raw text, nothing else." },
+              { type: "image_url", image_url: { url: imageBase64 } },
+            ],
+          },
+        ],
+        max_tokens: 2000,
+      });
+
+      const text = response.choices[0]?.message?.content || "";
+      res.json({ text });
+    } catch (error: any) {
+      console.error("OCR extract error:", error);
+      res.status(500).json({ error: "Failed to extract text" });
+    }
+  });
+
   app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

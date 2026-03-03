@@ -1,14 +1,16 @@
 export async function extractTextFromImage(imageBase64: string): Promise<string | null> {
   try {
-    const cap = (window as any).Capacitor;
-    if (!cap || !cap.isNativePlatform()) return null;
-    
-    const { registerPlugin } = await import('@capacitor/core');
-    const VisionOCR = registerPlugin('VisionOCR');
-    const result: any = await VisionOCR.recognizeText({ imageBase64 });
-    return result?.text || null;
+    const res = await fetch('/api/ocr/extract-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ imageBase64 })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.text || null;
   } catch (e) {
-    console.error('Vision OCR failed:', e);
+    console.error('OCR extract failed:', e);
     return null;
   }
 }
