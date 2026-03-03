@@ -265,7 +265,7 @@ export async function registerRoutes(
           {
             role: "user",
             content: [
-              { type: "text", text: "Extract all the text you can see in this image. Return only the raw text, nothing else." },
+              { type: "text", text: "Extract only the customer review text from this screenshot. Ignore the reviewer's name, date, star rating, profile stats, navigation elements, and any UI buttons. Return only the actual review body text that the customer wrote, nothing else." },
               { type: "image_url", image_url: { url: imageBase64 } },
             ],
           },
