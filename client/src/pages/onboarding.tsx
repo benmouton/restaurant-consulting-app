@@ -78,7 +78,7 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
   });
 
   const handleSubmit = () => {
-    if (!firstName.trim() || !phone.trim() || !restaurantName.trim()) {
+    if (!firstName.trim() || !restaurantName.trim()) {
       toast({
         title: "Required fields",
         description: "Please fill in all fields before continuing.",
@@ -90,7 +90,7 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
   };
 
   const canProceed = () => {
-    if (step === 1) return firstName.trim().length > 0 && phone.trim().length > 0;
+    if (step === 1) return firstName.trim().length > 0;
     if (step === 2) return restaurantName.trim().length > 0;
     return true;
   };
@@ -159,7 +159,7 @@ export default function OnboardingPage({ user }: OnboardingPageProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
+                    <Label htmlFor="phone">Phone Number (optional)</Label>
                     <Input
                       id="phone"
                       type="tel"

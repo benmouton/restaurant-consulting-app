@@ -77,7 +77,7 @@ function formatPhoneNumber(phone: string | null | undefined): string {
 const profileFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  phone: z.string().min(1, "Phone number is required"),
+  phone: z.string().optional(),
   address: z.string().optional(),
   restaurantName: z.string().optional(),
   role: z.enum(["owner", "gm", "manager"]).optional(),
