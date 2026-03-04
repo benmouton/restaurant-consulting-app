@@ -567,6 +567,31 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid tier" });
       }
 
+      const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+      if (rcSecretKey) {
+        const rcRes = await fetch(`https://api.revenuecat.com/v1/subscribers/${userId}`, {
+          headers: { Authorization: `Bearer ${rcSecretKey}` },
+        });
+        if (rcRes.ok) {
+          const rcData = await rcRes.json() as any;
+          const entitlements = rcData?.subscriber?.entitlements;
+          const hasBasic = entitlements?.basic?.expires_date && new Date(entitlements.basic.expires_date) > new Date();
+          const hasPro = entitlements?.pro?.expires_date && new Date(entitlements.pro.expires_date) > new Date();
+          const verifiedTier = hasPro ? 'pro' : hasBasic ? 'basic' : null;
+
+          if (!verifiedTier) {
+            return res.status(403).json({ error: "No active entitlement found" });
+          }
+
+          await storage.updateUser(userId, {
+            subscriptionTier: verifiedTier,
+            subscriptionStatus: 'active',
+          });
+
+          return res.json({ success: true, tier: verifiedTier });
+        }
+      }
+
       await storage.updateUser(userId, {
         subscriptionTier: tier,
         subscriptionStatus: 'active',
