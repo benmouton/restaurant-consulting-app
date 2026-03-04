@@ -213,7 +213,7 @@ export default function SocialPostBuilder() {
         oauth_failed: `Connection failed.${detailInfo || msgInfo || " Please try again."}`,
         missing_params: "Connection was incomplete. Please try again.",
         google_denied: "Google connection was denied or cancelled.",
-        google_rate_limited: "Google is temporarily rate limiting requests. Please wait about a minute and try connecting again.",
+        google_rate_limited: "Google Business Profile connection is being set up. This feature will be available shortly — please check back in 24-48 hours.",
         google_api_not_enabled: "The Google Business Profile API is not enabled in your Google Cloud project. Please enable the 'My Business Account Management API' and 'My Business Business Information API' in Google Cloud Console, then try again.",
         no_google_locations: "No Google Business Profile locations were found for this Google account. Make sure the Google account you're connecting has a verified Business Profile.",
         google_locations_failed: `Could not retrieve your Business Profile locations.${detailInfo || " The API may not be enabled in your Google Cloud project."}`,
