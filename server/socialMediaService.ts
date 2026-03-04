@@ -264,6 +264,8 @@ export const socialMediaService = {
     const state = crypto.randomBytes(32).toString('hex');
     await db.insert(oauthStates).values({ state, userId, provider: 'google' });
     const redirectUri = `${getBaseUrl()}/api/oauth/google/callback`;
+    console.log('[GOOGLE_OAUTH] Base URL:', getBaseUrl());
+    console.log('[GOOGLE_OAUTH] Redirect URI:', redirectUri);
     
     const scopes = [
       'https://www.googleapis.com/auth/business.manage'
