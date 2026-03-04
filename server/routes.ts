@@ -558,6 +558,27 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/subscription/native-verify", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tier, platform } = req.body;
+
+      if (!tier || !['basic', 'pro'].includes(tier)) {
+        return res.status(400).json({ error: "Invalid tier" });
+      }
+
+      await storage.updateUser(userId, {
+        subscriptionTier: tier,
+        subscriptionStatus: 'active',
+      });
+
+      res.json({ success: true, tier });
+    } catch (error) {
+      console.error('Native verify error:', error);
+      res.status(500).json({ error: "Failed to verify purchase" });
+    }
+  });
+
   // Admin middleware
   const isAdmin = async (req: any, res: any, next: any) => {
     if (!req.user?.claims?.sub) {

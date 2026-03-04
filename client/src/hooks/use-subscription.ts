@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
 import { useToast } from "@/hooks/use-toast";
 import { startLogin, isNativeApp } from "@/lib/native";
+import { getOfferings, purchasePackage, getCustomerInfo, getEntitlementTier, restorePurchases } from "@/lib/revenuecat";
 
 interface SubscriptionStatus {
   hasSubscription: boolean;
@@ -26,6 +27,38 @@ export function useSubscription() {
 
   const checkoutMutation = useMutation({
     mutationFn: async (params?: { tier?: string; interval?: string }) => {
+      if (isNativeApp()) {
+        const offerings = await getOfferings();
+        if (!offerings?.offerings?.current?.availablePackages?.length) {
+          throw new Error("No packages available. Please try again later.");
+        }
+
+        const targetTier = params?.tier || 'basic';
+        const packages = offerings.offerings.current.availablePackages;
+
+        let targetPackage = packages.find((p: any) =>
+          p.identifier?.toLowerCase().includes(targetTier)
+        );
+        if (!targetPackage) {
+          targetPackage = packages[0];
+        }
+
+        const purchaseResult = await purchasePackage(targetPackage);
+        if (!purchaseResult) {
+          throw new Error("PURCHASE_CANCELLED");
+        }
+
+        const customerInfo = await getCustomerInfo();
+        const tier = getEntitlementTier(customerInfo);
+
+        await apiRequest("POST", "/api/subscription/native-verify", {
+          tier,
+          platform: "ios",
+        });
+
+        return { tier, success: true };
+      }
+
       const res = await apiRequest("POST", "/api/subscription/checkout", params || {});
       if (res.status === 401) {
         throw new Error("SESSION_EXPIRED");
@@ -34,8 +67,13 @@ export function useSubscription() {
     },
     onSuccess: (data) => {
       if (isNativeApp()) {
-        toast({ title: "Subscribe on the Web",
-          description: "Visit restaurantai.consulting to manage your subscription." });
+        if (data?.success) {
+          toast({
+            title: "Subscription Active",
+            description: `Your ${data.tier} plan is now active.`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+        }
         return;
       }
       if (data.url) {
@@ -50,6 +88,9 @@ export function useSubscription() {
     },
     onError: (error: Error) => {
       console.error("Checkout error:", error);
+      if (error.message === "PURCHASE_CANCELLED") {
+        return;
+      }
       if (error.message === "SESSION_EXPIRED") {
         toast({
           title: "Session Expired",
@@ -71,13 +112,24 @@ export function useSubscription() {
 
   const portalMutation = useMutation({
     mutationFn: async () => {
+      if (isNativeApp()) {
+        const restored = await restorePurchases();
+        const customerInfo = await getCustomerInfo();
+        const tier = getEntitlementTier(customerInfo);
+        return { tier, restored: true };
+      }
       const res = await apiRequest("POST", "/api/subscription/portal");
       return res.json();
     },
     onSuccess: (data) => {
       if (isNativeApp()) {
-        toast({ title: "Subscribe on the Web",
-          description: "Visit restaurantai.consulting to manage your subscription." });
+        toast({
+          title: "Purchases Restored",
+          description: data?.tier !== 'free'
+            ? `Your ${data.tier} plan has been restored.`
+            : "No active subscriptions found.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
         return;
       }
       if (data.url) {
