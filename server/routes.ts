@@ -252,6 +252,25 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/shorten-url", isAuthenticated, async (req: any, res) => {
+    try {
+      const { url } = req.body;
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: "url is required" });
+      }
+
+      const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+      if (!response.ok) {
+        throw new Error('TinyURL service unavailable');
+      }
+      const shortUrl = await response.text();
+      res.json({ shortUrl: shortUrl.trim() });
+    } catch (error: any) {
+      console.error("URL shortening error:", error);
+      res.status(500).json({ error: "Failed to shorten URL" });
+    }
+  });
+
   app.post("/api/ocr/extract-text", isAuthenticated, async (req: any, res) => {
     try {
       const { imageBase64 } = req.body;

@@ -138,6 +138,7 @@ export default function SocialPostBuilder() {
   const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isShorteningLinks, setIsShorteningLinks] = useState(false);
   const [generatingHolidayId, setGeneratingHolidayId] = useState<number | null>(null);
   const [imageKey, setImageKey] = useState("");
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
@@ -422,6 +423,39 @@ export default function SocialPostBuilder() {
     }
   };
 
+  const handleShortenLinks = async () => {
+    const urlRegex = /https?:\/\/[^\s)>\]]+/g;
+    const urls = caption.match(urlRegex);
+    if (!urls || urls.length === 0) {
+      toast({ title: "No links found", description: "No URLs were detected in your caption to shorten." });
+      return;
+    }
+    const longUrls = urls.filter(u => !u.includes('tinyurl.com') && u.length > 30);
+    if (longUrls.length === 0) {
+      toast({ title: "Already shortened", description: "All links in your caption are already short." });
+      return;
+    }
+    setIsShorteningLinks(true);
+    try {
+      let updatedCaption = caption;
+      for (const url of longUrls) {
+        const res = await apiRequest("POST", "/api/shorten-url", { url });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.shortUrl) {
+            updatedCaption = updatedCaption.replace(url, data.shortUrl);
+          }
+        }
+      }
+      setCaption(updatedCaption);
+      toast({ title: "Links shortened", description: `${longUrls.length} link${longUrls.length > 1 ? 's' : ''} shortened successfully.` });
+    } catch {
+      toast({ title: "Error", description: "Failed to shorten links. Please try again.", variant: "destructive" });
+    } finally {
+      setIsShorteningLinks(false);
+    }
+  };
+
   const handlePublish = () => {
     if (selectedAccountIds.length === 0) {
       toast({ title: "Select channels", description: "Please select at least one channel to publish to.", variant: "destructive" });
@@ -700,6 +734,19 @@ export default function SocialPostBuilder() {
                   {caption && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>{caption.length} characters</span>
+                      {/https?:\/\/[^\s)>\]]{30,}/.test(caption) && !caption.includes('tinyurl.com') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 px-2 text-xs text-primary hover:text-primary/80"
+                          onClick={handleShortenLinks}
+                          disabled={isShorteningLinks}
+                          data-testid="button-shorten-links"
+                        >
+                          {isShorteningLinks ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Link2 className="h-3 w-3 mr-1" />}
+                          {isShorteningLinks ? "Shortening..." : "Shorten Links"}
+                        </Button>
+                      )}
                       {(() => {
                         const selectedProviders = selectedAccountIds.map(id => {
                           const acct = activeAccounts.find(a => a.id === id);
