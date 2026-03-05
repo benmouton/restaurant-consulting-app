@@ -2096,6 +2096,173 @@ Provide actionable summary and follow-up plan.`;
   );
 }
 
+const HR_SEVERITY_DOTS: Record<string, string> = {
+  attendance: '#eab308',
+  ncns: '#eab308',
+  performance: '#f97316',
+  conduct: '#f97316',
+  'guest-incident': '#f97316',
+  safety: '#ef4444',
+  insubordination: '#ef4444',
+  'cash-handling': '#ef4444',
+};
+
+const HR_DISCIPLINE_BADGE_STYLES: Record<string, string> = {
+  first: 'bg-yellow-900/40 text-yellow-400 border border-yellow-600/30',
+  second: 'bg-amber-900/40 text-amber-400 border border-amber-600/30',
+  third: 'bg-red-900/40 text-red-400 border border-red-600/30',
+};
+
+function HRStatusStrip() {
+  const { data: documents } = useQuery<any[]>({
+    queryKey: ["/api/hr-documents"],
+  });
+  const totalRecords = documents?.length || 0;
+  const pendingCount = documents?.filter((d: any) => !d.scanFilename && !d.signedAt).length || 0;
+  const now = new Date();
+  const thisMonthCount = documents?.filter((d: any) => {
+    const created = new Date(d.createdAt);
+    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+  }).length || 0;
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="hr-status-strip">
+      <div className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Total HR Records</div>
+        <div className="text-xl font-bold text-white mt-1" data-testid="text-total-hr-records">{totalRecords}</div>
+      </div>
+      <div className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Pending Signatures</div>
+        <div className={`text-xl font-bold mt-1 ${pendingCount > 0 ? 'text-amber-400' : 'text-white'}`} data-testid="text-pending-sigs">{pendingCount}</div>
+      </div>
+      <div className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">This Month</div>
+        <div className="text-xl font-bold text-white mt-1" data-testid="text-this-month-hr">{thisMonthCount}</div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressiveDisciplineIndicator({ step }: { step: string }) {
+  const steps = [
+    { value: 'first', label: '1st', sublabel: 'Warning' },
+    { value: 'second', label: '2nd', sublabel: 'Suspension' },
+    { value: 'third', label: '3rd', sublabel: 'Term.' },
+  ];
+  const activeIdx = steps.findIndex(s => s.value === step);
+
+  return (
+    <div className="flex items-center gap-0 mt-2 px-1" data-testid="discipline-indicator">
+      {steps.map((s, i) => {
+        const isActive = i === activeIdx;
+        const isPast = i < activeIdx;
+        return (
+          <div key={s.value} className="flex items-center">
+            <div className="flex flex-col items-center">
+              <div
+                className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
+                style={{
+                  borderColor: isActive ? '#d4a017' : isPast ? '#b8860b' : 'rgba(255,255,255,0.15)',
+                  background: isActive ? '#d4a017' : isPast ? 'rgba(184,134,11,0.3)' : 'transparent',
+                  boxShadow: isActive ? '0 0 8px rgba(212,160,23,0.4)' : 'none',
+                }}
+              />
+              <span className="text-[10px] mt-1" style={{ color: isActive ? '#d4a017' : '#6b7280' }}>{s.label}</span>
+              <span className="text-[9px]" style={{ color: isActive ? '#d4a017' : '#4b5563' }}>{s.sublabel}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className="w-8 h-0.5 mx-0.5 -mt-5" style={{ background: isPast || isActive ? 'rgba(184,134,11,0.5)' : 'rgba(255,255,255,0.08)' }} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EmployeeDisciplineTrailModal({ open, onClose, employeeName, documents }: { open: boolean; onClose: () => void; employeeName: string; documents: any[] }) {
+  const employeeDocs = documents
+    .filter((d: any) => d.employeeName === employeeName)
+    .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const disciplineLevelLabels: Record<string, string> = {
+    first: 'Verbal/Written Warning',
+    second: '3 Shift Suspension',
+    third: '5 Shift Suspension/Termination',
+  };
+
+  const highestLevel = employeeDocs.reduce((max: string, d: any) => {
+    const order: Record<string, number> = { first: 1, second: 2, third: 3 };
+    return (order[d.disciplineLevel] || 0) > (order[max] || 0) ? d.disciplineLevel : max;
+  }, 'first');
+
+  const nextStep = highestLevel === 'first' ? '3 Shift Suspension' : highestLevel === 'second' ? '5 Shift Suspension or Termination' : 'Immediate Termination';
+
+  const issueTypeLabels: Record<string, string> = {
+    attendance: 'Attendance', ncns: 'No-Call/No-Show', performance: 'Performance',
+    conduct: 'Conduct', 'guest-incident': 'Guest Incident', safety: 'Safety',
+    insubordination: 'Insubordination', 'cash-handling': 'Cash Handling',
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" style={{ color: '#d4a017' }} />
+            Discipline Trail: {employeeName}
+          </DialogTitle>
+          <DialogDescription>
+            {employeeDocs.length} record{employeeDocs.length !== 1 ? 's' : ''} on file
+          </DialogDescription>
+        </DialogHeader>
+
+        {employeeDocs.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">No records found for this employee.</p>
+        ) : (
+          <div className="relative pl-6 space-y-4 py-2">
+            <div className="absolute left-[11px] top-4 bottom-4 w-0.5" style={{ background: 'rgba(184,134,11,0.3)' }} />
+            {employeeDocs.map((doc: any, i: number) => (
+              <div key={doc.id} className="relative" data-testid={`trail-entry-${doc.id}`}>
+                <div className="absolute -left-6 top-1 w-3 h-3 rounded-full border-2" style={{ borderColor: '#d4a017', background: i === employeeDocs.length - 1 ? '#d4a017' : '#1a1d2e' }} />
+                <div className="rounded-lg p-3 border" style={{ background: '#1a1d2e', borderColor: 'rgba(255,255,255,0.08)' }}>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-xs text-muted-foreground">
+                      {doc.incidentDate ? new Date(doc.incidentDate).toLocaleDateString() : new Date(doc.createdAt).toLocaleDateString()}
+                    </span>
+                    <Badge className={`text-[10px] px-1.5 py-0 ${HR_DISCIPLINE_BADGE_STYLES[doc.disciplineLevel] || ''}`}>
+                      {disciplineLevelLabels[doc.disciplineLevel] || doc.disciplineLevel}
+                    </Badge>
+                    {(doc.scanFilename || doc.signedAt) ? (
+                      <Badge className="text-[10px] px-1.5 py-0 bg-green-500/15 text-green-400 border-green-500/30">Signed</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-400 border-amber-500/30">Pending</Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-white/80">{issueTypeLabels[doc.issueType] || doc.issueType}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {employeeDocs.length > 0 && (
+          <div className="rounded-lg p-3 mt-2" style={{ background: 'rgba(184,134,11,0.08)', border: '1px solid rgba(184,134,11,0.25)' }} data-testid="next-step-callout">
+            <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#d4a017' }}>Next Step</div>
+            <p className="text-sm text-white/90">
+              If {employeeName} receives another notice, the next step is: <span className="font-semibold" style={{ color: '#d4a017' }}>{nextStep}</span>
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} data-testid="btn-close-trail">Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function HRComplianceEngine() {
   const { toast } = useToast();
   const [issueType, setIssueType] = useState<string>("");
@@ -2110,7 +2277,9 @@ function HRComplianceEngine() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [savedDocId, setSavedDocId] = useState<number | null>(null);
+  const [copiedState, setCopiedState] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
 
   const issueTypes = [
     { value: "attendance", label: "Attendance / Tardiness" },
@@ -2296,11 +2465,6 @@ Ensure all language is:
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(documentation);
-    toast({ title: "Copied to clipboard!" });
   };
 
   const getPdfFileName = () => `HR_Notice_${employeeName?.replace(/\s+/g, '_') || 'Employee'}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -2572,19 +2736,40 @@ Ensure all language is:
     }
   };
 
+  const copyToClipboardHR = () => {
+    navigator.clipboard.writeText(documentation);
+    setCopiedState(true);
+    setTimeout(() => setCopiedState(false), 2000);
+    toast({ title: "Copied to clipboard!" });
+  };
+
+  useEffect(() => {
+    if (documentation && outputRef.current) {
+      outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [documentation]);
+
   return (
-    <Card className="mb-8">
-      <CardHeader>
+    <Card className="mb-8 relative overflow-hidden">
+      <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent, rgba(184,134,11,0.08), transparent)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 3s ease-in-out infinite',
+      }} />
+      <CardHeader className="relative">
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Sparkles className="h-5 w-5" style={{ color: '#d4a017' }} />
           HR Documentation & Compliance Engine
         </CardTitle>
-        <CardDescription>
-          Generate Workforce Commission-compliant documentation. If it goes to a hearing, will this document stand?
-        </CardDescription>
+        <div className="flex items-start gap-0 mt-1">
+          <div className="w-[3px] rounded-full self-stretch mr-3 shrink-0" style={{ background: '#b8860b' }} />
+          <CardDescription>
+            Generate Workforce Commission-compliant documentation. If it goes to a hearing, will this document stand?
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <CardContent className="space-y-4 relative">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="issueType">Issue Type</Label>
             <Select value={issueType} onValueChange={setIssueType}>
@@ -2593,13 +2778,18 @@ Ensure all language is:
               </SelectTrigger>
               <SelectContent>
                 {issueTypes.map(type => (
-                  <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  <SelectItem key={type.value} value={type.value}>
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: HR_SEVERITY_DOTS[type.value] || '#6b7280' }} />
+                      {type.label}
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label htmlFor="priorIncidents">Prior Discipline History</Label>
+            <Label htmlFor="priorIncidents">Discipline Step</Label>
             <Select value={priorIncidents} onValueChange={setPriorIncidents}>
               <SelectTrigger id="priorIncidents" className="mt-1" data-testid="select-prior-incidents">
                 <SelectValue />
@@ -2610,16 +2800,18 @@ Ensure all language is:
                 ))}
               </SelectContent>
             </Select>
+            <ProgressiveDisciplineIndicator step={priorIncidents} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <div>
             <Label htmlFor="employeeName">Employee Name</Label>
             <Input
               id="employeeName"
               placeholder="e.g., John Smith"
-              className="mt-1"
+              className="mt-1 border-0 border-b-2 border-transparent rounded-none focus:border-amber-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+              style={{ background: '#1a1d2e' }}
               value={employeeName}
               onChange={(e) => setEmployeeName(e.target.value)}
               data-testid="input-employee-name"
@@ -2630,7 +2822,8 @@ Ensure all language is:
             <Input
               id="employeeRole"
               placeholder="e.g., Server"
-              className="mt-1"
+              className="mt-1 border-0 border-b-2 border-transparent rounded-none focus:border-amber-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+              style={{ background: '#1a1d2e' }}
               value={employeeRole}
               onChange={(e) => setEmployeeRole(e.target.value)}
               data-testid="input-employee-role"
@@ -2641,7 +2834,8 @@ Ensure all language is:
             <Input
               id="incidentDate"
               type="date"
-              className="mt-1"
+              className="mt-1 border-0 border-b-2 border-transparent rounded-none focus:border-amber-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+              style={{ background: '#1a1d2e' }}
               value={incidentDate}
               onChange={(e) => setIncidentDate(e.target.value)}
               data-testid="input-incident-date"
@@ -2658,39 +2852,45 @@ Ensure all language is:
             <SelectContent>
               <SelectItem value="yes">Yes - policy was clearly communicated</SelectItem>
               <SelectItem value="no">No / Unclear</SelectItem>
+              <SelectItem value="unclear">Unclear - policy exists but communication not documented</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div>
           <Label htmlFor="description">What Happened (Plain Language)</Label>
-          <Textarea
-            id="description"
-            placeholder="Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests. This will be formatted into objective, hearing-ready documentation."
-            className="mt-1 min-h-[120px]"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            data-testid="input-hr-description"
-          />
+          <div className="relative">
+            <Textarea
+              id="description"
+              placeholder="Describe what happened in plain language. Include: when, where, what occurred, who was involved, and any impact on operations or guests."
+              className="mt-1 min-h-[120px] focus:ring-1 focus:ring-amber-500/40"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              data-testid="input-hr-description"
+            />
+            <span className="absolute bottom-2 right-3 text-[10px] text-muted-foreground" data-testid="text-char-count">
+              {description.length} characters
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground mt-1">
-            No legal wording needed - just describe the facts
+            No legal wording needed — just describe the facts
+          </p>
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+            Emotional language will be removed. Objective documentation will be generated.
           </p>
         </div>
-
-        <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-          <span className="font-medium">Generates:</span> Written warning document with incident summary, policy reference, corrective action, and employee acknowledgment signature line
-        </p>
 
         <Button 
           onClick={generateDocumentation} 
           disabled={isGenerating || !issueType || !description}
           className="w-full"
+          style={{ background: '#b8860b' }}
           data-testid="btn-generate-hr-doc"
         >
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Building documentation...
+              Generating...
             </>
           ) : (
             <>
@@ -2701,13 +2901,16 @@ Ensure all language is:
         </Button>
 
         {documentation && (
-          <div className="mt-4 space-y-4">
-            <div className="p-4 bg-accent/50 rounded-lg border">
-              <div className="prose prose-sm dark:prose-invert max-w-none text-sm overflow-x-auto" style={{ overflowWrap: 'break-word', wordWrap: 'break-word' }}>
+          <div className="mt-4 space-y-4" ref={outputRef}>
+            <div className="rounded-lg border overflow-hidden" style={{ background: '#1e2035' }}>
+              <div className="p-4 overflow-x-auto" style={{ overflowWrap: 'break-word', wordWrap: 'break-word' }}>
                 {documentation.split('\n').map((line, i) => {
                   const trimmed = line.trim();
-                  if (/^\s*[=]{3,}\s*$/.test(line) || /^\s*[-]{3,}\s*$/.test(line)) {
-                    return <hr key={i} className="my-2 border-muted-foreground/30" />;
+                  if (/^\s*[=]{3,}\s*$/.test(line)) {
+                    return <hr key={i} className="my-3" style={{ borderColor: 'rgba(184,134,11,0.3)' }} />;
+                  }
+                  if (/^\s*[-]{3,}\s*$/.test(line)) {
+                    return <hr key={i} className="my-2" style={{ borderColor: 'rgba(184,134,11,0.15)' }} />;
                   }
                   if (!trimmed) return <div key={i} className="h-2" />;
                   const bold = (t: string) => t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -2718,20 +2921,26 @@ Ensure all language is:
                   const isLabelLine = /^[A-Z][A-Z\s\/]*:/.test(trimmed) && trimmed.indexOf(':') < 35;
 
                   if (isTitleLine) {
-                    return <h2 key={i} className="text-base font-bold text-center my-1">{trimmed.replace(/\*\*/g, '')}</h2>;
+                    return <h2 key={i} className="text-base font-bold text-center my-2 tracking-wide" style={{ color: '#d4a017' }}>{trimmed.replace(/\*\*/g, '')}</h2>;
                   }
                   if (isAllCaps) {
-                    return <h3 key={i} className="text-sm font-bold mt-3 mb-1">{trimmed}</h3>;
+                    return <h3 key={i} className="text-xs font-bold mt-4 mb-1 uppercase tracking-widest" style={{ color: '#d4a017' }}>{trimmed}</h3>;
                   }
                   if (isCheckbox) {
                     const checked = trimmed.startsWith('[X]') || trimmed.startsWith('[x]');
                     const label = trimmed.substring(3).trim().replace(/^-\s*/, '');
                     return (
-                      <div key={i} className="flex items-start gap-2 ml-1 my-0.5">
-                        <div className={`mt-0.5 w-4 h-4 border rounded flex-shrink-0 flex items-center justify-center ${checked ? 'bg-primary border-primary' : 'border-muted-foreground/50'}`}>
-                          {checked && <Check className="h-3 w-3 text-primary-foreground" />}
+                      <div key={i} className="flex items-start gap-2.5 ml-1 my-1">
+                        <div
+                          className="mt-0.5 w-4 h-4 rounded-sm flex-shrink-0 flex items-center justify-center border"
+                          style={{
+                            background: checked ? '#b8860b' : 'transparent',
+                            borderColor: checked ? '#b8860b' : 'rgba(255,255,255,0.2)',
+                          }}
+                        >
+                          {checked && <Check className="h-3 w-3 text-white" />}
                         </div>
-                        <span className="text-sm">{label}</span>
+                        <span className="text-sm text-white/90">{label}</span>
                       </div>
                     );
                   }
@@ -2740,22 +2949,23 @@ Ensure all language is:
                     const label = trimmed.substring(0, colonIdx + 1);
                     const value = trimmed.substring(colonIdx + 1).trim();
                     return (
-                      <p key={i} className="text-sm my-0.5">
-                        <span className="font-semibold">{label}</span>{value ? ` ${value}` : ''}
+                      <p key={i} className="text-sm my-0.5 text-white/90">
+                        <span className="font-semibold text-white">{label}</span>{value ? ` ${value}` : ''}
                       </p>
                     );
                   }
-                  return <p key={i} className="text-sm my-0.5" dangerouslySetInnerHTML={{ __html: bold(trimmed) }} />;
+                  return <p key={i} className="text-sm my-0.5 text-white/80" dangerouslySetInnerHTML={{ __html: bold(trimmed) }} />;
                 })}
               </div>
             </div>
+
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-hr-doc">
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
+              <Button variant="outline" size="sm" onClick={copyToClipboardHR} data-testid="btn-copy-hr-doc">
+                {copiedState ? <CheckCircle2 className="h-4 w-4 mr-2 text-green-400" /> : <Copy className="h-4 w-4 mr-2" />}
+                {copiedState ? 'Copied' : 'Copy'}
               </Button>
               <Button variant="outline" size="sm" onClick={printDocument} data-testid="btn-print-hr-doc">
-                <FileText className="h-4 w-4 mr-2" />
+                <Printer className="h-4 w-4 mr-2" />
                 Download PDF
               </Button>
               <Button variant="outline" size="sm" onClick={shareDocument} data-testid="btn-share-hr-doc">
@@ -2763,20 +2973,20 @@ Ensure all language is:
                 Share
               </Button>
               <Button 
-                variant="default" 
                 size="sm" 
                 onClick={saveDocument} 
                 disabled={isSaving || savedDocId !== null}
+                style={{ background: savedDocId ? '#22c55e' : '#b8860b' }}
                 data-testid="btn-save-hr-doc"
               >
-                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckSquare className="h-4 w-4 mr-2" />}
+                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : savedDocId ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                 {savedDocId ? "Saved" : "Save to HR Records"}
               </Button>
             </div>
             
             {savedDocId && (
-              <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
-                <p className="text-sm font-medium">Upload Signed Document</p>
+              <div className="p-4 rounded-lg space-y-3" style={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <p className="text-sm font-medium text-white">Upload Signed Document</p>
                 <p className="text-xs text-muted-foreground">
                   After printing and getting signatures, scan or photograph the signed document and upload it here.
                 </p>
@@ -2784,6 +2994,7 @@ Ensure all language is:
                   ref={fileInputRef}
                   type="file"
                   accept="image/*,.pdf"
+                  capture="environment"
                   onChange={handleScanUpload}
                   className="hidden"
                   id="scan-upload"
@@ -2796,7 +3007,7 @@ Ensure all language is:
                   data-testid="btn-upload-scan"
                 >
                   {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                  Upload Signed Scan
+                  Upload Signed Copy
                 </Button>
               </div>
             )}
@@ -2814,7 +3025,11 @@ function HRRecordsViewer() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name" | "severity">("date");
   const [filterEmployee, setFilterEmployee] = useState<string | null>(null);
-  
+  const [filterChip, setFilterChip] = useState<"all" | "pending" | "signed" | "month">("all");
+  const [trailEmployee, setTrailEmployee] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  const uploadRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
   const { data: documents, isLoading } = useQuery<any[]>({
     queryKey: ["/api/hr-documents"],
   });
@@ -2825,6 +3040,7 @@ function HRRecordsViewer() {
     },
     onSuccess: () => {
       toast({ title: "Document deleted" });
+      setShowDeleteConfirm(null);
       queryClient.invalidateQueries({ queryKey: ["/api/hr-documents"] });
     },
     onError: () => {
@@ -2849,12 +3065,41 @@ function HRRecordsViewer() {
     "cash-handling": "Cash Handling",
   };
 
+  const handleRecordScanUpload = async (docId: number, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append("scan", file);
+      const res = await fetch(`/api/hr-documents/${docId}/scan`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to upload scan");
+      toast({ title: "Signed document uploaded!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/hr-documents"] });
+    } catch {
+      toast({ title: "Failed to upload scan", variant: "destructive" });
+    }
+  };
+
   const filteredDocuments = useMemo(() => {
     if (!documents) return [];
     let filtered = [...documents];
     
     if (filterEmployee) {
       filtered = filtered.filter((d: any) => d.employeeName === filterEmployee);
+    }
+
+    if (filterChip === "pending") {
+      filtered = filtered.filter((d: any) => !d.scanFilename && !d.signedAt);
+    } else if (filterChip === "signed") {
+      filtered = filtered.filter((d: any) => d.scanFilename || d.signedAt);
+    } else if (filterChip === "month") {
+      const now = new Date();
+      filtered = filtered.filter((d: any) => {
+        const created = new Date(d.createdAt);
+        return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+      });
     }
     
     if (searchQuery.trim()) {
@@ -2876,7 +3121,14 @@ function HRRecordsViewer() {
     });
     
     return filtered;
-  }, [documents, searchQuery, sortBy, filterEmployee]);
+  }, [documents, searchQuery, sortBy, filterEmployee, filterChip]);
+
+  const filterChips: { value: typeof filterChip; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "pending", label: "Pending Signature" },
+    { value: "signed", label: "Signed" },
+    { value: "month", label: "This Month" },
+  ];
 
   if (isLoading) {
     return (
@@ -2933,11 +3185,30 @@ function HRRecordsViewer() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin" data-testid="filter-chips">
+                {filterChips.map(chip => (
+                  <button
+                    key={chip.value}
+                    onClick={() => setFilterChip(chip.value)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
+                      filterChip === chip.value
+                        ? 'text-white'
+                        : 'text-muted-foreground border-white/10'
+                    }`}
+                    style={filterChip === chip.value ? { background: '#b8860b', borderColor: '#b8860b' } : {}}
+                    data-testid={`chip-${chip.value}`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
               {filterEmployee && (
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="gap-1">
                     Showing history for: {filterEmployee}
-                    <button onClick={() => setFilterEmployee(null)} className="ml-1 hover:text-destructive">
+                    <button onClick={() => setFilterEmployee(null)} className="ml-1">
                       <XCircle className="h-3 w-3" />
                     </button>
                   </Badge>
@@ -2954,86 +3225,113 @@ function HRRecordsViewer() {
             </p>
           ) : (
             <div className="space-y-3">
-              {filteredDocuments.map((doc: any) => (
-                <div key={doc.id} className="p-4 border rounded-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="font-medium">{doc.employeeName}</span>
-                      {doc.employeePosition && (
-                        <Badge variant="secondary" className="text-xs">{doc.employeePosition}</Badge>
-                      )}
-                      <Badge variant={doc.disciplineLevel === "third" ? "destructive" : doc.disciplineLevel === "second" ? "default" : "outline"} className="text-xs">
-                        {disciplineLevelLabels[doc.disciplineLevel] || doc.disciplineLevel}
-                      </Badge>
-                      {doc.scanFilename || doc.signedAt ? (
-                        <Badge className="text-xs bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30">
-                          <CheckSquare className="h-3 w-3 mr-1" />
-                          Signed
+              {filteredDocuments.map((doc: any) => {
+                const isSigned = doc.scanFilename || doc.signedAt;
+                return (
+                  <div key={doc.id} className="p-4 rounded-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between" style={{ background: '#1a1d2e', border: '1px solid rgba(255,255,255,0.08)' }} data-testid={`hr-record-${doc.id}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="font-medium text-white">{doc.employeeName}</span>
+                        {doc.employeePosition && (
+                          <Badge variant="secondary" className="text-xs">{doc.employeePosition}</Badge>
+                        )}
+                        <Badge className={`text-xs ${HR_DISCIPLINE_BADGE_STYLES[doc.disciplineLevel] || ''}`}>
+                          {disciplineLevelLabels[doc.disciplineLevel] || doc.disciplineLevel}
                         </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Pending Signature
-                        </Badge>
+                        {isSigned ? (
+                          <Badge className="text-xs bg-green-500/15 text-green-400 border-green-500/30">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Signed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-amber-400 border-amber-500/30">
+                            <span className="relative flex h-2 w-2 mr-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                            Pending Signature
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {issueTypeLabels[doc.issueType] || doc.issueType}
+                        {doc.incidentDate && ` - ${new Date(doc.incidentDate).toLocaleDateString()}`}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Created: {new Date(doc.createdAt).toLocaleDateString()}
+                        {doc.signedAt && (
+                          <span className="ml-2 text-green-400">
+                            <CheckCircle2 className="h-3 w-3 inline mr-1" />
+                            Signed copy uploaded
+                          </span>
+                        )}
+                      </div>
+
+                      {!isSigned && (
+                        <div className="mt-2">
+                          <input
+                            ref={el => { uploadRefs.current[doc.id] = el; }}
+                            type="file"
+                            accept="image/*,.pdf"
+                            capture="environment"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleRecordScanUpload(doc.id, file);
+                            }}
+                            className="hidden"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => uploadRefs.current[doc.id]?.click()}
+                            data-testid={`btn-upload-signed-${doc.id}`}
+                          >
+                            <Upload className="h-3.5 w-3.5 mr-1.5" />
+                            Upload Signed Copy
+                          </Button>
+                        </div>
                       )}
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {issueTypeLabels[doc.issueType] || doc.issueType}
-                      {doc.incidentDate && ` - ${new Date(doc.incidentDate).toLocaleDateString()}`}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Created: {new Date(doc.createdAt).toLocaleDateString()}
-                      {doc.signedAt && (
-                        <span className="ml-2 text-green-600 dark:text-green-400">
-                          <CheckSquare className="h-3 w-3 inline mr-1" />
-                          Signed copy uploaded
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setFilterEmployee(doc.employeeName)}
-                      title={`View all records for ${doc.employeeName}`}
-                      data-testid={`btn-history-${doc.id}`}
-                    >
-                      <History className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { setSelectedDoc(doc); setShowPreview(true); }}
-                      data-testid={`btn-view-hr-doc-${doc.id}`}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    {doc.scanFilename && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => window.open(`/api/hr-documents/${doc.id}/scan`, "_blank")}
-                        data-testid={`btn-view-scan-${doc.id}`}
+                        onClick={() => setTrailEmployee(doc.employeeName)}
+                        title={`Discipline trail for ${doc.employeeName}`}
+                        data-testid={`btn-history-${doc.id}`}
                       >
-                        <FileText className="h-4 w-4" />
+                        <History className="h-4 w-4" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm("Are you sure you want to delete this HR document?")) {
-                          deleteMutation.mutate(doc.id);
-                        }
-                      }}
-                      data-testid={`btn-delete-hr-doc-${doc.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setSelectedDoc(doc); setShowPreview(true); }}
+                        data-testid={`btn-view-hr-doc-${doc.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {doc.scanFilename && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(`/api/hr-documents/${doc.id}/scan`, "_blank")}
+                          data-testid={`btn-view-scan-${doc.id}`}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowDeleteConfirm(doc.id)}
+                        data-testid={`btn-delete-hr-doc-${doc.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -3047,7 +3345,7 @@ function HRRecordsViewer() {
               {disciplineLevelLabels[selectedDoc?.disciplineLevel] || selectedDoc?.disciplineLevel}
             </DialogDescription>
           </DialogHeader>
-          <div className="p-4 bg-accent/30 rounded-lg border font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[50vh]">
+          <div className="p-4 rounded-lg border font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[50vh]" style={{ background: '#1a1d2e' }}>
             {selectedDoc?.documentContent || "No content available"}
           </div>
           <DialogFooter>
@@ -3055,6 +3353,38 @@ function HRRecordsViewer() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showDeleteConfirm !== null} onOpenChange={() => setShowDeleteConfirm(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete HR Record</DialogTitle>
+            <DialogDescription>
+              Delete this HR record? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(null)} data-testid="btn-cancel-delete">Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => showDeleteConfirm !== null && deleteMutation.mutate(showDeleteConfirm)}
+              disabled={deleteMutation.isPending}
+              data-testid="btn-confirm-delete"
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {trailEmployee && documents && (
+        <EmployeeDisciplineTrailModal
+          open={!!trailEmployee}
+          onClose={() => setTrailEmployee(null)}
+          employeeName={trailEmployee}
+          documents={documents}
+        />
+      )}
     </>
   );
 }
@@ -9133,7 +9463,8 @@ export default function DomainPage() {
         {slug === "staffing" && <StaffingMetricStrip />}
         {slug === "staffing" && <LaborDemandEngine />}
 
-        {/* HR Compliance Engine - only show for hr domain */}
+        {/* HR Status Strip + Compliance Engine + Records - only show for hr domain */}
+        {slug === "hr" && <HRStatusStrip />}
         {slug === "hr" && <HRComplianceEngine />}
         {slug === "hr" && <HRRecordsViewer />}
 
