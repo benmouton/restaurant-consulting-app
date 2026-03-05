@@ -1856,6 +1856,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/kitchen-shifts/latest", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const shifts = await storage.getKitchenShiftData(userId);
+      res.json(shifts.length > 0 ? shifts[0] : null);
+    } catch (error: any) {
+      console.error('Error fetching latest kitchen shift:', error);
+      res.status(500).json({ message: "Failed to fetch latest shift" });
+    }
+  });
+
   // Get kitchen shift by date and daypart
   app.get("/api/kitchen-shifts/:date/:daypart", isAuthenticated, async (req: any, res) => {
     try {

@@ -92,6 +92,9 @@ import {
   Sunrise,
   UtensilsCrossed,
   CloudSun,
+  ChevronDown,
+  Gauge,
+  Timer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -698,6 +701,92 @@ function FoodCostCalculator() {
   );
 }
 
+function KitchenStatusStrip() {
+  const { data: lastShift } = useQuery<any>({ queryKey: ["/api/kitchen-shifts/latest"] });
+  const { data: lastDebrief } = useQuery<any>({ queryKey: ["/api/kitchen-shifts/last-debrief"] });
+
+  const scoreVal = lastShift?.readinessScore ?? null;
+  const scoreLabel = scoreVal !== null
+    ? scoreVal >= 85 ? "Ready" : scoreVal >= 70 ? "Caution" : "At Risk"
+    : null;
+  const scoreColor = scoreVal !== null
+    ? scoreVal >= 85 ? "#22c55e" : scoreVal >= 70 ? "#f59e0b" : "#ef4444"
+    : "#9ca3af";
+
+  const eightySixText = lastShift?.readinessInputs?.eightyShortages
+    ? (Array.isArray(lastShift.readinessInputs.eightyShortages)
+        ? lastShift.readinessInputs.eightyShortages.join(", ")
+        : lastShift.readinessInputs.eightyShortages)
+    : null;
+
+  const hc = lastShift?.staffCount || lastShift?.readinessInputs?.headcount;
+  const covers = lastShift?.projectedCovers || lastShift?.readinessInputs?.forecastedCovers;
+
+  const debriefAge = lastDebrief?.createdAt
+    ? (() => {
+        const diff = Date.now() - new Date(lastDebrief.createdAt).getTime();
+        const hours = Math.floor(diff / 3600000);
+        if (hours < 1) return "Just now";
+        if (hours < 24) return `${hours}h ago`;
+        return `${Math.floor(hours / 24)}d ago`;
+      })()
+    : null;
+  const debriefNote = lastDebrief?.debriefStructured?.bottleneck || lastDebrief?.whatSucked;
+
+  const cards = [
+    {
+      label: "Tonight's Status",
+      value: scoreVal !== null ? `${scoreVal}/100` : "No check run yet",
+      sub: scoreLabel,
+      color: scoreColor,
+      muted: scoreVal === null,
+    },
+    {
+      label: "Last 86'd Items",
+      value: eightySixText || "No active 86 list",
+      sub: null,
+      color: eightySixText ? "#ef4444" : "#9ca3af",
+      muted: !eightySixText,
+    },
+    {
+      label: "BOH vs. Covers",
+      value: hc && covers ? `${hc} staff · ${covers} covers` : "--",
+      sub: hc && covers ? `${(parseInt(covers) / parseInt(hc)).toFixed(1)} covers/cook` : null,
+      color: "#d4a017",
+      muted: !hc || !covers,
+    },
+    {
+      label: "Last Debrief",
+      value: debriefAge || "No debrief logged",
+      sub: debriefNote ? (debriefNote.length > 40 ? debriefNote.slice(0, 40) + "..." : debriefNote) : null,
+      color: "#d4a017",
+      muted: !debriefAge,
+    },
+  ];
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="kitchen-status-strip">
+      {cards.map((card, i) => (
+        <div key={i} className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+          <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>{card.label}</p>
+          <p className={`text-sm font-semibold ${card.muted ? 'text-gray-500' : 'text-white'}`} style={!card.muted ? { color: card.color } : undefined} data-testid={`kitchen-strip-${i}`}>
+            {card.value}
+          </p>
+          {card.sub && <p className="text-xs mt-0.5" style={{ color: card.muted ? '#6b7280' : card.color }}>{card.sub}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const BOTTLENECK_INSIGHTS: Record<string, { issue: string; action: string }> = {
+  saute: { issue: "ticket backup when multiple saute dishes fire simultaneously", action: "Stagger fires, pre-portion proteins" },
+  grill: { issue: "long cook times creating window congestion", action: "Pre-mark proteins, communicate fire times to expo" },
+  fry: { issue: "oil temp drops on high-volume pushes", action: "Batch sizes, recovery time between drops" },
+  pantry: { issue: "cold app bottleneck delays first courses", action: "Pre-plate components, dedicated pantry runner" },
+  expo: { issue: "plating inconsistency and window congestion", action: "Standardize plate photos, call picks up sooner" },
+};
+
 function KitchenComplianceEngine() {
   const { toast } = useToast();
   const [mode, setMode] = useState<"readiness" | "alerts" | "debrief" | "coaching" | "quick-debrief">("readiness");
@@ -719,12 +808,13 @@ function KitchenComplianceEngine() {
     prepSignOffTime: "",
     stations: { saute: true, grill: true, fry: true, pantry: true, expo: true } as Record<string, boolean>,
     parShortages: [] as string[],
-    eightyShortages: "",
+    eightySixItems: [] as string[],
     headcount: "",
     forecastedCovers: "",
     largeParty: false,
     largePartySize: "",
     largePartyTime: "",
+    largePartySeating: "",
   });
 
   const [alertsInputs, setAlertsInputs] = useState({
@@ -761,6 +851,9 @@ function KitchenComplianceEngine() {
   });
 
   const [parShortageInput, setParShortageInput] = useState("");
+  const [eightySixInput, setEightySixInput] = useState("");
+  const [quickDebriefSaved, setQuickDebriefSaved] = useState(false);
+  const [kitchenCopied, setKitchenCopied] = useState(false);
 
   const today = new Date();
   const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
@@ -846,10 +939,8 @@ function KitchenComplianceEngine() {
     const stationsDown = Object.values(readinessInputs.stations).filter(v => !v).length;
     const ticketFlow = Math.max(0, 20 - stationsDown * 4);
 
-    const eightySixItems = readinessInputs.eightyShortages.trim()
-      ? readinessInputs.eightyShortages.split(",").map(s => s.trim()).filter(Boolean).length
-      : 0;
-    const lineSet = Math.max(0, 10 - eightySixItems * 2);
+    const eightySixCount = readinessInputs.eightySixItems.length;
+    const lineSet = Math.max(0, 10 - eightySixCount * 2);
 
     const total = prep + pars + staffing + ticketFlow + lineSet;
 
@@ -967,7 +1058,7 @@ function KitchenComplianceEngine() {
         projectedCovers: readinessInputs.forecastedCovers ? parseInt(readinessInputs.forecastedCovers) : null,
         staffCount: readinessInputs.headcount ? parseInt(readinessInputs.headcount) : null,
         prepCompletion: readinessInputs.prepSignedOff ? `Signed off at ${readinessInputs.prepSignOffTime || "on time"}` : "Not signed off",
-        wasteNotes: readinessInputs.eightyShortages ? `86'd: ${readinessInputs.eightyShortages}` : "",
+        wasteNotes: readinessInputs.eightySixItems.length > 0 ? `86'd: ${readinessInputs.eightySixItems.join(", ")}` : "",
         managerNotes: alertsInputs.managerNotes,
         readinessScore: scoreData.total,
         readinessInputs,
@@ -1005,7 +1096,10 @@ function KitchenComplianceEngine() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts/last-debrief"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kitchen-shifts/latest"] });
       toast({ title: "Debrief saved! Great work." });
+      setQuickDebriefSaved(true);
+      setTimeout(() => setQuickDebriefSaved(false), 2000);
       setDebriefInputs({
         bottleneck: "",
         rootCause: "",
@@ -1077,7 +1171,7 @@ STRUCTURED DATA:
 - Station Status: ${stationStatus}
 ${stationIssuesList ? `- Station Issues: ${stationIssuesList}` : ""}
 - Par shortages: ${readinessInputs.parShortages.length > 0 ? readinessInputs.parShortages.join(", ") : "None"}
-- 86'd items: ${readinessInputs.eightyShortages || "None"}
+- 86'd items: ${readinessInputs.eightySixItems.length > 0 ? readinessInputs.eightySixItems.join(", ") : "None"}
 - BOH headcount: ${readinessInputs.headcount || "Not set"}
 - Forecasted covers: ${readinessInputs.forecastedCovers || "Not set"}
 ${readinessInputs.largeParty ? `- Large party: ${readinessInputs.largePartySize} at ${readinessInputs.largePartyTime}` : ""}
@@ -1246,8 +1340,10 @@ Provide actionable summary and follow-up plan.`;
     }
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboardKitchen = () => {
     navigator.clipboard.writeText(analysis);
+    setKitchenCopied(true);
+    setTimeout(() => setKitchenCopied(false), 2000);
     toast({ title: "Copied to clipboard!" });
   };
 
@@ -1291,6 +1387,37 @@ Provide actionable summary and follow-up plan.`;
     }));
   };
 
+  const addEightySixItem = () => {
+    const items = eightySixInput.split(",").map(s => s.trim()).filter(Boolean);
+    if (items.length > 0) {
+      setReadinessInputs(prev => ({
+        ...prev,
+        eightySixItems: [...prev.eightySixItems, ...items],
+      }));
+      setEightySixInput("");
+    }
+  };
+
+  const removeEightySixItem = (idx: number) => {
+    setReadinessInputs(prev => ({
+      ...prev,
+      eightySixItems: prev.eightySixItems.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const coversPerCook = useMemo(() => {
+    const hc = parseInt(readinessInputs.headcount) || 0;
+    const covers = parseInt(readinessInputs.forecastedCovers) || 0;
+    if (hc === 0 || covers === 0) return null;
+    return covers / hc;
+  }, [readinessInputs.headcount, readinessInputs.forecastedCovers]);
+
+  const getCoversPerCookColor = (ratio: number) => {
+    if (ratio <= 15) return { color: "#22c55e", label: "On track" };
+    if (ratio <= 20) return { color: "#f59e0b", label: "Watch closely" };
+    return { color: "#ef4444", label: "Understaffed" };
+  };
+
   const getScoreBarColor = (score: number, max: number) => {
     const pct = (score / max) * 100;
     if (pct >= 80) return "bg-green-500";
@@ -1304,96 +1431,265 @@ Provide actionable summary and follow-up plan.`;
     return <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30" data-testid={`badge-${label}`}><AlertTriangle className="h-3 w-3 mr-1" />{label}: {value}m</Badge>;
   };
 
+  const renderStructuredKitchenOutput = () => {
+    if (!analysis) return null;
+
+    if (mode === "alerts") {
+      const alertBlocks: { severity: string; title: string; desc: string }[] = [];
+      const lines = analysis.split("\n");
+      let currentSeverity = "";
+      let currentTitle = "";
+      let currentDesc = "";
+      for (const line of lines) {
+        const critMatch = line.match(/\[CRITICAL\]\s*(.*)/i);
+        const warnMatch = line.match(/\[WARNING\]\s*(.*)/i);
+        const trackMatch = line.match(/\[ON\s*TRACK\]\s*(.*)/i);
+        const highMatch = line.match(/\[HIGH\]\s*(.*)/i);
+        const medMatch = line.match(/\[MEDIUM\]\s*(.*)/i);
+        const lowMatch = line.match(/\[LOW\]\s*(.*)/i);
+        const match = critMatch || highMatch || warnMatch || medMatch || trackMatch || lowMatch;
+        if (match) {
+          if (currentSeverity) alertBlocks.push({ severity: currentSeverity, title: currentTitle, desc: currentDesc.trim() });
+          currentSeverity = critMatch || highMatch ? "HIGH" : warnMatch || medMatch ? "MEDIUM" : "LOW";
+          currentTitle = match[1] || "";
+          currentDesc = "";
+        } else if (currentSeverity) {
+          currentDesc += line + "\n";
+        }
+      }
+      if (currentSeverity) alertBlocks.push({ severity: currentSeverity, title: currentTitle, desc: currentDesc.trim() });
+
+      if (alertBlocks.length > 0) {
+        return (
+          <div className="space-y-3">
+            {alertBlocks.map((alert, i) => (
+              <div key={i} className="rounded-lg p-4 border-l-[3px]" style={{
+                background: '#1a1d2e',
+                borderLeftColor: alert.severity === "HIGH" ? '#ef4444' : alert.severity === "MEDIUM" ? '#f59e0b' : '#3b82f6',
+              }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge className={`text-[10px] ${
+                    alert.severity === "HIGH" ? 'bg-red-900/50 text-red-400 border-red-600/30' :
+                    alert.severity === "MEDIUM" ? 'bg-amber-900/50 text-amber-400 border-amber-600/30' :
+                    'bg-blue-900/50 text-blue-400 border-blue-600/30'
+                  }`} data-testid={`alert-badge-${i}`}>{alert.severity}</Badge>
+                  <span className="text-sm font-semibold text-white">{alert.title}</span>
+                </div>
+                <p className="text-xs whitespace-pre-wrap" style={{ color: '#9ca3af' }}>{alert.desc}</p>
+              </div>
+            ))}
+          </div>
+        );
+      }
+    }
+
+    if (mode === "debrief") {
+      const sections: { title: string; items: string[]; type: "broke" | "cause" | "fix" }[] = [];
+      const brokeMatch = analysis.match(/WHAT BROKE[:\s]*\n([\s\S]*?)(?=(?:WHY IT BROKE|ROOT CAUSE|WHAT TO FIX|PATTERN|$))/i);
+      const causeMatch = analysis.match(/(?:WHY IT BROKE|ROOT CAUSE)[:\s]*\n([\s\S]*?)(?=(?:WHAT TO FIX|TOMORROW|PATTERN|$))/i);
+      const fixMatch = analysis.match(/(?:WHAT TO FIX|TOMORROW'?S? FIX)[:\s]*\n([\s\S]*?)(?=(?:PATTERN|$))/i);
+      const extractItems = (text: string) => text.split("\n").map(l => l.replace(/^[-\d.•*]+\s*/, "").trim()).filter(Boolean);
+      if (brokeMatch) sections.push({ title: "What Broke", items: extractItems(brokeMatch[1]), type: "broke" });
+      if (causeMatch) sections.push({ title: "Root Causes", items: extractItems(causeMatch[1]), type: "cause" });
+      if (fixMatch) sections.push({ title: "Tomorrow's Fixes", items: extractItems(fixMatch[1]), type: "fix" });
+
+      if (sections.length > 0) {
+        const colors = { broke: { bg: '#2d1b1b', border: '#ef4444', icon: '#ef4444' }, cause: { bg: '#2d2a1b', border: '#f59e0b', icon: '#f59e0b' }, fix: { bg: '#1b2d1b', border: '#22c55e', icon: '#22c55e' } };
+        return (
+          <div className="space-y-4">
+            {sections.map((section, i) => (
+              <div key={i} className="rounded-lg p-4 border-l-[3px]" style={{ background: colors[section.type].bg, borderLeftColor: colors[section.type].border }}>
+                <div className="flex items-center gap-2 mb-2">
+                  {section.type === "broke" ? <XCircle className="h-4 w-4" style={{ color: colors[section.type].icon }} /> :
+                   section.type === "cause" ? <AlertTriangle className="h-4 w-4" style={{ color: colors[section.type].icon }} /> :
+                   <Check className="h-4 w-4" style={{ color: colors[section.type].icon }} />}
+                  <span className="text-sm font-semibold" style={{ color: colors[section.type].icon }}>{section.title}</span>
+                </div>
+                <ul className="space-y-1">
+                  {section.items.map((item, j) => (
+                    <li key={j} className="text-xs flex items-start gap-2" style={{ color: '#d1d5db' }}>
+                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colors[section.type].icon }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <button onClick={() => window.print()} className="text-xs flex items-center gap-1" style={{ color: '#9ca3af' }} data-testid="btn-print-debrief">
+              <Printer className="h-3 w-3" /> Print Debrief
+            </button>
+          </div>
+        );
+      }
+    }
+
+    if (mode === "coaching") {
+      const focusMatch = analysis.match(/(?:THE FOCUS|BEHAVIOR TO COACH)[:\s]*\n?(.*?)(?:\n\n|\n(?=[A-Z]))/is);
+      const watchMatch = analysis.match(/(?:WHAT TO WATCH|OBSERVABLE)[:\s]*\n([\s\S]*?)(?=(?:WHAT TO SAY|TALK TRACK|$))/i);
+      const sayMatch = analysis.match(/(?:WHAT TO SAY|TALK TRACK)[:\s]*\n([\s\S]*?)(?=(?:WHAT GOOD|OBSERVABLE STANDARD|VERIFICATION|$))/i);
+      const goodMatch = analysis.match(/(?:WHAT GOOD LOOKS LIKE|OBSERVABLE STANDARD)[:\s]*\n([\s\S]*?)(?=(?:FOLLOW UP|VERIFICATION|$))/i);
+      const followMatch = analysis.match(/(?:FOLLOW UP|VERIFICATION)[:\s]*\n([\s\S]*?)$/i);
+      const hasStructure = focusMatch || watchMatch || sayMatch;
+
+      if (hasStructure) {
+        return (
+          <div className="space-y-4 rounded-lg p-5" style={{ background: '#1a1d2e' }}>
+            {focusMatch && (
+              <div>
+                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#d4a017' }}>The Focus</p>
+                <p className="text-lg font-bold text-white">{focusMatch[1].trim()}</p>
+              </div>
+            )}
+            {watchMatch && (
+              <div>
+                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017' }}>What to Watch</p>
+                <ul className="space-y-1.5">
+                  {watchMatch[1].split("\n").map(l => l.replace(/^[-\d.•*]+\s*/, "").trim()).filter(Boolean).map((item, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2 text-gray-300">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#d4a017' }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {sayMatch && (
+              <div className="border-l-[3px] pl-4 py-2" style={{ borderLeftColor: '#d4a017', background: 'rgba(212,160,23,0.05)' }}>
+                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#d4a017' }}>What to Say</p>
+                <p className="text-sm italic whitespace-pre-wrap" style={{ color: '#e5e7eb' }}>{sayMatch[1].trim()}</p>
+              </div>
+            )}
+            {goodMatch && (
+              <div className="rounded-lg p-3" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#22c55e' }}>What Good Looks Like</p>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: '#d1d5db' }}>{goodMatch[1].trim()}</p>
+              </div>
+            )}
+            {followMatch && (
+              <div className="flex items-start gap-2 pt-2" style={{ borderTop: '1px solid #2a2d3e' }}>
+                <Clock className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#f59e0b' }} />
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider" style={{ color: '#f59e0b' }}>Follow Up By</p>
+                  <p className="text-sm" style={{ color: '#d1d5db' }}>{followMatch[1].trim()}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+    }
+
+    return (
+      <div className="p-4 rounded-lg whitespace-pre-wrap text-sm" style={{ background: '#1a1d2e', color: '#d1d5db' }}>
+        {analysis}
+      </div>
+    );
+  };
+
+  const liveScoreLevel = scoreData.total >= 80 ? "Ready" : scoreData.total >= 60 ? "Caution" : "Not Ready";
+  const liveScoreColor = scoreData.total >= 80 ? "#22c55e" : scoreData.total >= 60 ? "#f59e0b" : "#ef4444";
+
   return (
-    <Card className="mb-8">
-      <CardHeader>
+    <Card className="mb-8 relative overflow-hidden" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
+      <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent 0%, rgba(212,160,23,0.08) 50%, transparent 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 3s linear infinite',
+      }} />
+      <CardHeader className="relative">
         <CardTitle className="flex flex-wrap items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Kitchen Command Center
+          <Sparkles className="h-5 w-5" style={{ color: '#d4a017' }} />
+          <span className="text-white">Kitchen Command Center</span>
           {mode === "readiness" && (
-            <Badge 
+            <Badge
               className={`text-xs ${
-                scoreData.total >= 80 ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30" :
-                scoreData.total >= 60 ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30" :
-                "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30"
-              }`}
+                scoreData.total >= 80 ? "bg-green-500/15 text-green-400 border-green-500/30" :
+                scoreData.total >= 60 ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" :
+                "bg-red-500/15 text-red-400 border-red-500/30"
+              } ${scoreData.total < 60 ? "animate-pulse" : ""}`}
               data-testid="badge-readiness-status"
             >
               {scoreData.total >= 80 ? "Ready" : scoreData.total >= 60 ? "Caution" : "Not Ready"}
             </Badge>
           )}
         </CardTitle>
-        <CardDescription>
-          Real-time kitchen readiness, service alerts, and post-shift debriefs. Data-driven decisions, not gut feelings.
-        </CardDescription>
+        <div className="flex items-center gap-2">
+          <div className="w-[3px] h-4 rounded-full" style={{ background: '#d4a017' }} />
+          <CardDescription style={{ color: '#9ca3af' }}>
+            Real-time kitchen readiness, service alerts, and post-shift debriefs. Data-driven decisions, not gut feelings.
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 relative">
         {readinessScore !== null && readinessLevel && mode === "readiness" && (
-          <div className={`p-4 rounded-lg border-2 ${
-            readinessLevel === "green" ? "border-green-500 bg-green-500/10" :
-            readinessLevel === "yellow" ? "border-yellow-500 bg-yellow-500/10" :
-            readinessLevel === "red" ? "border-red-500 bg-red-500/10" :
-            "border-red-700 bg-red-700/20"
-          }`}>
+          <div className="p-4 rounded-lg border-l-[3px]" style={{
+            background: readinessLevel === "green" ? 'rgba(34,197,94,0.08)' : readinessLevel === "yellow" ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)',
+            borderLeftColor: readinessLevel === "green" ? '#22c55e' : readinessLevel === "yellow" ? '#f59e0b' : '#ef4444',
+            border: `1px solid ${readinessLevel === "green" ? 'rgba(34,197,94,0.2)' : readinessLevel === "yellow" ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
+            borderLeft: `3px solid ${readinessLevel === "green" ? '#22c55e' : readinessLevel === "yellow" ? '#f59e0b' : '#ef4444'}`,
+          }}>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-3">
-                <div className={`text-4xl font-bold ${
-                  readinessLevel === "green" ? "text-green-600 dark:text-green-400" :
-                  readinessLevel === "yellow" ? "text-yellow-600 dark:text-yellow-400" :
-                  readinessLevel === "red" ? "text-red-600 dark:text-red-400" :
-                  "text-red-700 dark:text-red-300"
-                }`} data-testid="text-readiness-score">
+                <div className="text-4xl font-bold" style={{ color: readinessLevel === "green" ? '#22c55e' : readinessLevel === "yellow" ? '#f59e0b' : '#ef4444' }} data-testid="text-readiness-score">
                   {readinessScore}/100
                 </div>
                 <div>
-                  <div className={`text-lg font-semibold ${
-                    readinessLevel === "green" ? "text-green-700 dark:text-green-300" :
-                    readinessLevel === "yellow" ? "text-yellow-700 dark:text-yellow-300" :
-                    readinessLevel === "red" ? "text-red-700 dark:text-red-300" :
-                    "text-red-800 dark:text-red-200"
-                  }`} data-testid="text-readiness-level">
+                  <div className="text-lg font-semibold" style={{ color: readinessLevel === "green" ? '#22c55e' : readinessLevel === "yellow" ? '#f59e0b' : '#ef4444' }} data-testid="text-readiness-level">
                     {readinessLevel === "green" ? "Ready - Go crush it!" :
                      readinessLevel === "yellow" ? "Manageable - Address issues" :
                      readinessLevel === "red" ? "At Risk - Immediate action needed" :
                      "Critical - Escalate now"}
                   </div>
-                  <p className="text-sm text-muted-foreground">{dayOfWeek} {selectedDaypart}</p>
+                  <p className="text-sm" style={{ color: '#9ca3af' }}>{dayOfWeek} {selectedDaypart}</p>
                 </div>
               </div>
-              <div className="w-full md:w-48 h-3 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-500 ${
-                    readinessLevel === "green" ? "bg-green-500" :
-                    readinessLevel === "yellow" ? "bg-yellow-500" :
-                    readinessLevel === "red" ? "bg-red-500" :
-                    "bg-red-700"
-                  }`}
-                  style={{ width: `${readinessScore}%` }}
-                />
+              <div className="w-full md:w-48 h-3 rounded-full overflow-hidden" style={{ background: '#111827' }}>
+                <div className="h-full transition-all duration-500 rounded-full" style={{
+                  width: `${readinessScore}%`,
+                  background: readinessLevel === "green" ? '#22c55e' : readinessLevel === "yellow" ? '#f59e0b' : '#ef4444',
+                }} />
               </div>
             </div>
           </div>
         )}
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="readiness" data-testid="tab-readiness" className="text-xs sm:text-sm">Readiness</TabsTrigger>
-            <TabsTrigger value="alerts" data-testid="tab-alerts" className="text-xs sm:text-sm">Alerts</TabsTrigger>
-            <TabsTrigger value="quick-debrief" data-testid="tab-quick-debrief" className="text-xs sm:text-sm">Quick</TabsTrigger>
-            <TabsTrigger value="debrief" data-testid="tab-debrief" className="text-xs sm:text-sm">Debrief</TabsTrigger>
-            <TabsTrigger value="coaching" data-testid="tab-coaching" className="text-xs sm:text-sm">Coach</TabsTrigger>
-          </TabsList>
+          <div className="border-b" style={{ borderColor: '#2a2d3e' }}>
+            <TabsList className="grid w-full grid-cols-5 bg-transparent h-auto p-0">
+              {[
+                { value: "readiness", label: "Readiness", Icon: Gauge },
+                { value: "alerts", label: "Alerts", Icon: AlertTriangle },
+                { value: "quick-debrief", label: "Quick", Icon: Timer },
+                { value: "debrief", label: "Debrief", Icon: ClipboardList },
+                { value: "coaching", label: "Coach", Icon: Target },
+              ].map(tab => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  data-testid={`tab-${tab.value}`}
+                  className="text-xs sm:text-sm py-2.5 px-1 rounded-none border-b-2 border-transparent data-[state=active]:border-b-0 data-[state=active]:bg-transparent"
+                  style={{
+                    color: mode === tab.value ? '#ffffff' : '#9ca3af',
+                    borderBottomColor: mode === tab.value ? '#d4a017' : 'transparent',
+                  }}
+                >
+                  <tab.Icon className="h-3.5 w-3.5 mr-1 hidden sm:inline-block" />
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           <TabsContent value="readiness" className="space-y-4 mt-4">
             {lastDebrief && (lastDebrief.fixForTomorrow || lastDebrief.debriefStructured?.fixForTomorrow) && (
-              <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+              <div className="p-3 rounded-lg" style={{ background: 'rgba(212,160,23,0.06)', border: '1px solid rgba(212,160,23,0.2)' }}>
                 <div className="flex items-start gap-2">
-                  <ArrowRight className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                  <ArrowRight className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#d4a017' }} />
                   <div>
-                    <p className="text-sm font-medium text-primary">Last shift's fix</p>
-                    <p className="text-sm text-muted-foreground" data-testid="text-last-debrief-fix">
+                    <p className="text-sm font-medium" style={{ color: '#d4a017' }}>Last shift's fix</p>
+                    <p className="text-sm" style={{ color: '#9ca3af' }} data-testid="text-last-debrief-fix">
                       {lastDebrief.debriefStructured?.fixForTomorrow || lastDebrief.fixForTomorrow}
-                      {(lastDebrief.debriefStructured?.fixOwner) && <span> &mdash; Owner: {lastDebrief.debriefStructured.fixOwner}</span>}
+                      {(lastDebrief.debriefStructured?.fixOwner) && <span> — Owner: {lastDebrief.debriefStructured.fixOwner}</span>}
                     </p>
                   </div>
                 </div>
@@ -1401,10 +1697,10 @@ Provide actionable summary and follow-up plan.`;
             )}
 
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <p className="text-sm text-muted-foreground">Pre-service readiness check. Are we actually prepared?</p>
+              <p className="text-sm" style={{ color: '#9ca3af' }}>Pre-service readiness check. Are we actually prepared?</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <Select value={selectedDaypart} onValueChange={setSelectedDaypart}>
-                  <SelectTrigger className="w-28" data-testid="select-daypart">
+                  <SelectTrigger className="w-28" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-daypart">
                     <SelectValue placeholder="Daypart" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1425,9 +1721,9 @@ Provide actionable summary and follow-up plan.`;
             </div>
 
             <div>
-              <Label>Quick Preset</Label>
+              <Label className="text-white">Quick Preset</Label>
               <Select value={selectedPreset} onValueChange={applyPreset}>
-                <SelectTrigger className="mt-1" data-testid="select-preset">
+                <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-preset">
                   <SelectValue placeholder="Load a scenario preset..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1443,19 +1739,23 @@ Provide actionable summary and follow-up plan.`;
             </div>
 
             <div>
-              <Label className="mb-1 block">Prep Sign-Off</Label>
+              <Label className="mb-1 block text-white">Prep Sign-Off</Label>
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
-                  variant={readinessInputs.prepSignedOff ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
+                  className={readinessInputs.prepSignedOff ? "text-white border-green-600" : ""}
+                  style={readinessInputs.prepSignedOff ? { background: '#166534', borderColor: '#22c55e' } : {}}
                   onClick={() => setReadinessInputs(prev => ({ ...prev, prepSignedOff: true }))}
                   data-testid="btn-prep-yes"
                 >
                   <Check className="h-4 w-4 mr-1" /> Yes
                 </Button>
                 <Button
-                  variant={!readinessInputs.prepSignedOff ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
+                  className={!readinessInputs.prepSignedOff ? "text-white border-amber-600" : ""}
+                  style={!readinessInputs.prepSignedOff ? { background: '#92400e', borderColor: '#f59e0b' } : {}}
                   onClick={() => setReadinessInputs(prev => ({ ...prev, prepSignedOff: false, prepSignOffTime: "" }))}
                   data-testid="btn-prep-no"
                 >
@@ -1465,16 +1765,18 @@ Provide actionable summary and follow-up plan.`;
                   <Input
                     type="time"
                     className="w-36"
+                    style={{ background: '#111827', borderColor: '#374151' }}
                     value={readinessInputs.prepSignOffTime}
                     onChange={(e) => setReadinessInputs(prev => ({ ...prev, prepSignOffTime: e.target.value }))}
                     data-testid="input-prep-time"
                   />
                 )}
               </div>
+              <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Has the kitchen been formally signed off on prep?</p>
             </div>
 
             <div>
-              <Label className="mb-1 block">Station Status</Label>
+              <Label className="mb-1 block text-white">Station Status</Label>
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-2">
                   {stationList.map(station => {
@@ -1483,9 +1785,10 @@ Provide actionable summary and follow-up plan.`;
                     return (
                       <Button
                         key={station.key}
-                        variant={isReady ? "default" : "outline"}
+                        variant="outline"
                         size="sm"
-                        className={isReady ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                        className="text-white"
+                        style={isReady ? { background: '#166534', borderColor: '#22c55e' } : { background: '#7f1d1d', borderColor: '#ef4444' }}
                         onClick={() => {
                           setReadinessInputs(prev => ({
                             ...prev,
@@ -1505,28 +1808,33 @@ Provide actionable summary and follow-up plan.`;
                   })}
                 </div>
                 {stationList.some(s => !readinessInputs.stations[s.key]) && (
-                  <div className="space-y-2 pl-1">
-                    {stationList.filter(s => !readinessInputs.stations[s.key]).map(station => (
-                      <div key={station.key} className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs shrink-0">{station.label}</Badge>
-                        <Input
-                          placeholder={`What's the issue? (e.g., "${station.label === "Sauté" ? "Pilot light out" : "No cook until 5pm"}")`}
-                          value={stationIssues[station.key] || ""}
-                          onChange={(e) => setStationIssues(prev => ({ ...prev, [station.key]: e.target.value }))}
-                          data-testid={`input-station-issue-${station.key}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    <div style={{ borderTop: '1px solid #2a2d3e' }} className="pt-2" />
+                    <div className="space-y-2 pl-1" style={{ transition: 'max-height 300ms ease, opacity 300ms ease' }}>
+                      {stationList.filter(s => !readinessInputs.stations[s.key]).map(station => (
+                        <div key={station.key} className="flex items-center gap-2" style={{ animation: 'slideDown 200ms ease' }}>
+                          <Badge className="text-xs shrink-0 border" style={{ background: '#7f1d1d', color: '#fca5a5', borderColor: '#991b1b' }}>{station.label}</Badge>
+                          <Input
+                            placeholder={`What's the issue? (e.g., "${station.label === "Saut\u00e9" ? "Pilot light out" : "No cook until 5pm"}")`}
+                            style={{ background: '#111827', borderColor: '#374151' }}
+                            value={stationIssues[station.key] || ""}
+                            onChange={(e) => setStationIssues(prev => ({ ...prev, [station.key]: e.target.value }))}
+                            data-testid={`input-station-issue-${station.key}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
 
             <div>
-              <Label className="mb-1 block">Par Shortages</Label>
+              <Label className="mb-1 block text-white">Par Shortages</Label>
               <div className="flex items-center gap-2">
                 <Input
                   placeholder="Item(s) short, comma-separated"
+                  style={{ background: '#111827', borderColor: '#374151' }}
                   value={parShortageInput}
                   onChange={(e) => setParShortageInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addParShortage(); } }}
@@ -1539,9 +1847,9 @@ Provide actionable summary and follow-up plan.`;
               {readinessInputs.parShortages.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {readinessInputs.parShortages.map((item, idx) => (
-                    <Badge key={idx} variant="secondary" className="gap-1" data-testid={`badge-shortage-${idx}`}>
+                    <Badge key={idx} className="gap-1 border" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }} data-testid={`badge-shortage-${idx}`}>
                       {item}
-                      <button onClick={() => removeParShortage(idx)} className="ml-1 hover:text-destructive">
+                      <button onClick={() => removeParShortage(idx)} className="ml-1">
                         <XCircle className="h-3 w-3" />
                       </button>
                     </Badge>
@@ -1551,105 +1859,152 @@ Provide actionable summary and follow-up plan.`;
             </div>
 
             <div>
-              <Label htmlFor="eightySixList">86 List</Label>
-              <Input
-                id="eightySixList"
-                placeholder="Items currently 86'd, comma-separated"
-                className="mt-1"
-                value={readinessInputs.eightyShortages}
-                onChange={(e) => setReadinessInputs(prev => ({ ...prev, eightyShortages: e.target.value }))}
-                data-testid="input-86-list"
-              />
+              <Label className="mb-1 block text-white">86 List</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Items currently 86'd, comma-separated"
+                  style={{ background: '#111827', borderColor: '#374151' }}
+                  value={eightySixInput}
+                  onChange={(e) => setEightySixInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEightySixItem(); } }}
+                  data-testid="input-86-list"
+                />
+                <Button variant="outline" size="sm" onClick={addEightySixItem} data-testid="btn-add-86">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {readinessInputs.eightySixItems.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1 mt-2">
+                  {readinessInputs.eightySixItems.map((item, idx) => (
+                    <Badge key={idx} className="gap-1 border" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} data-testid={`badge-86-${idx}`}>
+                      {item}
+                      <button onClick={() => removeEightySixItem(idx)} className="ml-1">
+                        <XCircle className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <button onClick={() => setReadinessInputs(prev => ({ ...prev, eightySixItems: [] }))} className="text-xs ml-2" style={{ color: '#ef4444' }} data-testid="btn-clear-86">
+                    Clear All
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="headcount">BOH Headcount</Label>
+                <Label htmlFor="headcount" className="text-white">BOH Headcount</Label>
                 <Input
                   id="headcount"
                   type="number"
                   placeholder="Staff on shift"
                   className="mt-1"
+                  style={{ background: '#111827', borderColor: '#374151' }}
                   value={readinessInputs.headcount}
                   onChange={(e) => setReadinessInputs(prev => ({ ...prev, headcount: e.target.value }))}
                   data-testid="input-headcount"
                 />
               </div>
               <div>
-                <Label htmlFor="forecastedCovers">Forecasted Covers</Label>
+                <Label htmlFor="forecastedCovers" className="text-white">Forecasted Covers</Label>
                 <Input
                   id="forecastedCovers"
                   type="number"
                   placeholder="Expected covers"
                   className="mt-1"
+                  style={{ background: '#111827', borderColor: '#374151' }}
                   value={readinessInputs.forecastedCovers}
                   onChange={(e) => setReadinessInputs(prev => ({ ...prev, forecastedCovers: e.target.value }))}
                   data-testid="input-forecasted-covers"
                 />
               </div>
             </div>
+            {coversPerCook !== null && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: '#111827', border: '1px solid #2a2d3e' }} data-testid="covers-per-cook">
+                <Gauge className="h-4 w-4" style={{ color: getCoversPerCookColor(coversPerCook).color }} />
+                <span className="text-sm font-semibold" style={{ color: getCoversPerCookColor(coversPerCook).color }}>
+                  {coversPerCook.toFixed(1)} covers/cook
+                </span>
+                <span className="text-xs" style={{ color: '#9ca3af' }}>{getCoversPerCookColor(coversPerCook).label}</span>
+              </div>
+            )}
 
             <div>
-              <Label className="mb-1 block">Large Party</Label>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  variant={readinessInputs.largeParty ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setReadinessInputs(prev => ({ ...prev, largeParty: !prev.largeParty }))}
-                  data-testid="btn-large-party"
-                >
-                  {readinessInputs.largeParty ? <Check className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-                  Large Party
-                </Button>
-                {readinessInputs.largeParty && (
-                  <>
-                    <Input
-                      type="number"
-                      placeholder="Party size"
-                      className="w-28"
-                      value={readinessInputs.largePartySize}
-                      onChange={(e) => setReadinessInputs(prev => ({ ...prev, largePartySize: e.target.value }))}
-                      data-testid="input-large-party-size"
-                    />
-                    <Input
-                      type="time"
-                      className="w-36"
-                      value={readinessInputs.largePartyTime}
-                      onChange={(e) => setReadinessInputs(prev => ({ ...prev, largePartyTime: e.target.value }))}
-                      data-testid="input-large-party-time"
-                    />
-                  </>
-                )}
-              </div>
+              <Label className="mb-1 block text-white">Large Party</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReadinessInputs(prev => ({ ...prev, largeParty: !prev.largeParty }))}
+                data-testid="btn-large-party"
+              >
+                {readinessInputs.largeParty ? <ChevronDown className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                Large Party
+              </Button>
+              {readinessInputs.largeParty && (
+                <div className="mt-2 p-3 rounded-lg space-y-2" style={{ background: '#111827', border: '1px solid #2a2d3e', animation: 'slideDown 200ms ease' }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium" style={{ color: '#9ca3af' }}>Party Details</span>
+                    <button onClick={() => setReadinessInputs(prev => ({ ...prev, largeParty: false, largePartySize: "", largePartyTime: "", largePartySeating: "" }))} data-testid="btn-remove-large-party">
+                      <X className="h-3.5 w-3.5" style={{ color: '#9ca3af' }} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs" style={{ color: '#9ca3af' }}>Party Size</Label>
+                      <Input type="number" placeholder="e.g. 20" className="mt-0.5" style={{ background: '#1a1d2e', borderColor: '#374151' }} value={readinessInputs.largePartySize} onChange={(e) => setReadinessInputs(prev => ({ ...prev, largePartySize: e.target.value }))} data-testid="input-large-party-size" />
+                    </div>
+                    <div>
+                      <Label className="text-xs" style={{ color: '#9ca3af' }}>Arrival Time</Label>
+                      <Input placeholder="7:30 PM" className="mt-0.5" style={{ background: '#1a1d2e', borderColor: '#374151' }} value={readinessInputs.largePartyTime} onChange={(e) => setReadinessInputs(prev => ({ ...prev, largePartyTime: e.target.value }))} data-testid="input-large-party-time" />
+                    </div>
+                    <div>
+                      <Label className="text-xs" style={{ color: '#9ca3af' }}>Seated Where</Label>
+                      <Input placeholder="Patio" className="mt-0.5" style={{ background: '#1a1d2e', borderColor: '#374151' }} value={readinessInputs.largePartySeating} onChange={(e) => setReadinessInputs(prev => ({ ...prev, largePartySeating: e.target.value }))} data-testid="input-large-party-seating" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="p-4 rounded-lg border bg-accent/30 space-y-3">
-              <h4 className="text-sm font-semibold flex items-center gap-1">
-                <TrendingUp className="h-4 w-4" /> Score Breakdown
-              </h4>
+            <div className="p-4 rounded-lg space-y-3" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold flex items-center gap-1 text-white">
+                  <TrendingUp className="h-4 w-4" style={{ color: '#d4a017' }} /> Score Breakdown
+                </h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold" style={{ color: liveScoreColor }} data-testid="text-live-score">{scoreData.total}/100</span>
+                  <Badge className="text-[10px]" style={{
+                    background: scoreData.total >= 80 ? 'rgba(34,197,94,0.15)' : scoreData.total >= 60 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                    color: liveScoreColor,
+                    borderColor: scoreData.total >= 80 ? 'rgba(34,197,94,0.3)' : scoreData.total >= 60 ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)',
+                  }} data-testid="badge-live-score">{liveScoreLevel}</Badge>
+                </div>
+              </div>
               {scoreData.categories.map(cat => (
                 <div key={cat.label} className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium">{cat.label}</span>
-                    <span className="text-xs text-muted-foreground">{cat.score}/{cat.max}</span>
+                    <span className="text-xs font-medium text-white">{cat.label}</span>
+                    <span className="text-xs" style={{ color: '#9ca3af' }}>{cat.score}/{cat.max}</span>
                   </div>
-                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#1a1d2e' }}>
                     <div
-                      className={`h-full transition-all duration-300 ${getScoreBarColor(cat.score, cat.max)}`}
-                      style={{ width: `${(cat.score / cat.max) * 100}%` }}
+                      className="h-full transition-all duration-300 rounded-full"
+                      style={{
+                        width: `${(cat.score / cat.max) * 100}%`,
+                        background: (cat.score / cat.max) >= 0.8 ? '#22c55e' : (cat.score / cat.max) >= 0.5 ? '#f59e0b' : '#ef4444',
+                      }}
                     />
                   </div>
                 </div>
               ))}
               {scoreData.topFixes.length > 0 && (
-                <div className="pt-2 border-t space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Top improvements</p>
+                <div className="pt-2 space-y-1" style={{ borderTop: '1px solid #2a2d3e' }}>
+                  <p className="text-xs font-medium" style={{ color: '#9ca3af' }}>Top improvements</p>
                   {scoreData.topFixes.map((fix, i) => (
                     <div key={i} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="flex items-center gap-1">
-                        <ArrowRight className="h-3 w-3 text-primary" /> {fix.label}
+                      <span className="flex items-center gap-1 text-white">
+                        <ArrowRight className="h-3 w-3" style={{ color: '#d4a017' }} /> {fix.label}
                       </span>
-                      <span className="text-green-600 dark:text-green-400 font-medium">+{fix.points} pts</span>
+                      <span className="font-medium" style={{ color: '#22c55e' }}>+{fix.points} pts</span>
                     </div>
                   ))}
                 </div>
@@ -1658,83 +2013,84 @@ Provide actionable summary and follow-up plan.`;
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">During-service execution alerts. Is ticket flow breaking down?</p>
+            <p className="text-sm" style={{ color: '#9ca3af' }}>During-service execution alerts. Is ticket flow breaking down?</p>
 
-            <div className="flex flex-wrap gap-2">
-              {getAlertBadge(parseInt(alertsInputs.avgAppTime) || 0, 8, 10, "Apps")}
-              {getAlertBadge(parseInt(alertsInputs.avgEntreeTime) || 0, 15, 18, "Entr\u00e9es")}
-              <Badge
-                className={alertsInputs.windowHolding
-                  ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30"
-                  : "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"}
-                data-testid="badge-window"
-              >
-                {alertsInputs.windowHolding ? <AlertTriangle className="h-3 w-3 mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
-                Window: {alertsInputs.windowHolding ? "Holding" : "Clear"}
-              </Badge>
-              {alertsInputs.coverPace && (
-                <Badge
-                  className={
-                    alertsInputs.coverPace === "behind"
-                      ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30"
-                      : alertsInputs.coverPace === "ahead"
-                      ? "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30"
-                      : "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
-                  }
-                  data-testid="badge-pace"
-                >
-                  {alertsInputs.coverPace === "behind" ? <TrendingDown className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
-                  {alertsInputs.coverPace === "ahead" ? "Ahead" : alertsInputs.coverPace === "on-pace" ? "On Pace" : "Behind"}
-                </Badge>
-              )}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg p-2.5" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Apps</p>
+                {(() => {
+                  const v = parseInt(alertsInputs.avgAppTime) || 0;
+                  const inRange = v >= 8 && v <= 10;
+                  return <p className="text-sm font-semibold" style={{ color: v === 0 ? '#6b7280' : inRange ? '#22c55e' : '#ef4444' }}>{v > 0 ? `${v}m` : '--'}</p>;
+                })()}
+              </div>
+              <div className="rounded-lg p-2.5" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Entr\u00e9es</p>
+                {(() => {
+                  const v = parseInt(alertsInputs.avgEntreeTime) || 0;
+                  const inRange = v >= 15 && v <= 18;
+                  return <p className="text-sm font-semibold" style={{ color: v === 0 ? '#6b7280' : inRange ? '#22c55e' : '#ef4444' }}>{v > 0 ? `${v}m` : '--'}</p>;
+                })()}
+              </div>
+              <div className="rounded-lg p-2.5" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Window</p>
+                <p className={`text-sm font-semibold ${alertsInputs.windowHolding ? 'animate-pulse' : ''}`} style={{ color: alertsInputs.windowHolding ? '#ef4444' : '#22c55e' }}>
+                  {alertsInputs.windowHolding ? 'Holding' : 'Clear'}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="avgAppTime">Avg App Time (min)</Label>
+                <Label htmlFor="avgAppTime" className="text-white">Avg App Time (min)</Label>
                 <div className="flex items-center gap-2 mt-1">
                   <Input
                     id="avgAppTime"
                     type="number"
                     placeholder="e.g. 9"
+                    style={{ background: '#111827', borderColor: '#374151' }}
                     value={alertsInputs.avgAppTime}
                     onChange={(e) => setAlertsInputs(prev => ({ ...prev, avgAppTime: e.target.value }))}
                     data-testid="input-avg-app-time"
                   />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Std: 8-10</span>
+                  <Badge className="text-[10px] shrink-0" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>Std: 8-10</Badge>
                 </div>
               </div>
               <div>
-                <Label htmlFor="avgEntreeTime">Avg Entr\u00e9e Time (min)</Label>
+                <Label htmlFor="avgEntreeTime" className="text-white">Avg Entr\u00e9e Time (min)</Label>
                 <div className="flex items-center gap-2 mt-1">
                   <Input
                     id="avgEntreeTime"
                     type="number"
                     placeholder="e.g. 16"
+                    style={{ background: '#111827', borderColor: '#374151' }}
                     value={alertsInputs.avgEntreeTime}
                     onChange={(e) => setAlertsInputs(prev => ({ ...prev, avgEntreeTime: e.target.value }))}
                     data-testid="input-avg-entree-time"
                   />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Std: 15-18</span>
+                  <Badge className="text-[10px] shrink-0" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>Std: 15-18</Badge>
                 </div>
               </div>
             </div>
 
             <div>
-              <Label className="mb-1 block">Window Holding</Label>
+              <Label className="mb-1 block text-white">Window Holding</Label>
               <div className="flex gap-2">
                 <Button
-                  variant={alertsInputs.windowHolding ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
-                  className={alertsInputs.windowHolding ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+                  className="text-white"
+                  style={alertsInputs.windowHolding ? { background: '#7f1d1d', borderColor: '#ef4444' } : {}}
                   onClick={() => setAlertsInputs(prev => ({ ...prev, windowHolding: true }))}
                   data-testid="btn-window-yes"
                 >
                   <AlertTriangle className="h-4 w-4 mr-1" /> Yes
                 </Button>
                 <Button
-                  variant={!alertsInputs.windowHolding ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
+                  className="text-white"
+                  style={!alertsInputs.windowHolding ? { background: '#166534', borderColor: '#22c55e' } : {}}
                   onClick={() => setAlertsInputs(prev => ({ ...prev, windowHolding: false }))}
                   data-testid="btn-window-no"
                 >
@@ -1745,9 +2101,9 @@ Provide actionable summary and follow-up plan.`;
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Cover Pace</Label>
+                <Label className="text-white">Cover Pace</Label>
                 <Select value={alertsInputs.coverPace} onValueChange={(v) => setAlertsInputs(prev => ({ ...prev, coverPace: v }))}>
-                  <SelectTrigger className="mt-1" data-testid="select-cover-pace">
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-cover-pace">
                     <SelectValue placeholder="Select pace..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1758,9 +2114,9 @@ Provide actionable summary and follow-up plan.`;
                 </Select>
               </div>
               <div>
-                <Label>Bottleneck Station</Label>
+                <Label className="text-white">Bottleneck Station</Label>
                 <Select value={alertsInputs.bottleneckStation} onValueChange={(v) => setAlertsInputs(prev => ({ ...prev, bottleneckStation: v }))}>
-                  <SelectTrigger className="mt-1" data-testid="select-bottleneck-alerts">
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-bottleneck-alerts">
                     <SelectValue placeholder="Select station..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1774,16 +2130,27 @@ Provide actionable summary and follow-up plan.`;
                 </Select>
               </div>
             </div>
+            {alertsInputs.bottleneckStation && alertsInputs.bottleneckStation !== "none" && BOTTLENECK_INSIGHTS[alertsInputs.bottleneckStation] && (
+              <div className="rounded-lg p-3 border-l-[3px]" style={{ background: 'rgba(212,160,23,0.06)', borderLeftColor: '#d4a017' }} data-testid="bottleneck-insight">
+                <p className="text-xs" style={{ color: '#d4a017' }}>
+                  {stationList.find(s => s.key === alertsInputs.bottleneckStation)?.label} bottlenecks typically cause {BOTTLENECK_INSIGHTS[alertsInputs.bottleneckStation].issue}.
+                </p>
+                <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
+                  Coach action: {BOTTLENECK_INSIGHTS[alertsInputs.bottleneckStation].action}
+                </p>
+              </div>
+            )}
 
             <div>
               <div className="flex items-center">
-                <Label htmlFor="managerNotesAlerts">Manager Notes</Label>
+                <Label htmlFor="managerNotesAlerts" className="text-white">Manager Notes</Label>
                 <VoiceButton field="managerNotes" label="Dictate manager notes" />
               </div>
               <Textarea
                 id="managerNotesAlerts"
                 placeholder="Additional context about current service..."
                 className="mt-1 min-h-[60px]"
+                style={{ background: '#111827', borderColor: '#374151' }}
                 value={alertsInputs.managerNotes}
                 onChange={(e) => setAlertsInputs(prev => ({ ...prev, managerNotes: e.target.value }))}
                 data-testid="input-manager-notes-alerts"
@@ -1792,16 +2159,16 @@ Provide actionable summary and follow-up plan.`;
           </TabsContent>
 
           <TabsContent value="quick-debrief" className="space-y-4 mt-4">
-            <div className="text-center pb-4 border-b">
-              <h3 className="text-lg font-semibold">60-Second Post-Service Debrief</h3>
-              <p className="text-sm text-muted-foreground">Quick capture while it's fresh. Don't overthink it.</p>
+            <div className="text-center pb-4" style={{ borderBottom: '1px solid #2a2d3e' }}>
+              <h3 className="text-lg font-semibold text-white">60-Second Post-Service Debrief</h3>
+              <p className="text-sm" style={{ color: '#9ca3af' }}>Quick capture while it's fresh. Don't overthink it.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Bottleneck Station</Label>
+                <Label className="text-white">Bottleneck Station</Label>
                 <Select value={debriefInputs.bottleneck} onValueChange={(v) => setDebriefInputs(prev => ({ ...prev, bottleneck: v }))}>
-                  <SelectTrigger className="mt-1" data-testid="select-bottleneck-debrief">
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-bottleneck-debrief">
                     <SelectValue placeholder="Select station..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1815,9 +2182,9 @@ Provide actionable summary and follow-up plan.`;
                 </Select>
               </div>
               <div>
-                <Label>Root Cause</Label>
+                <Label className="text-white">Root Cause</Label>
                 <Select value={debriefInputs.rootCause} onValueChange={(v) => setDebriefInputs(prev => ({ ...prev, rootCause: v }))}>
-                  <SelectTrigger className="mt-1" data-testid="select-root-cause">
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-root-cause">
                     <SelectValue placeholder="Select root cause..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1831,20 +2198,21 @@ Provide actionable summary and follow-up plan.`;
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="fixOwner">Fix Owner</Label>
+                <Label htmlFor="fixOwner" className="text-white">Fix Owner</Label>
                 <Input
                   id="fixOwner"
                   placeholder="Who's responsible?"
                   className="mt-1"
+                  style={{ background: '#111827', borderColor: '#374151' }}
                   value={debriefInputs.fixOwner}
                   onChange={(e) => setDebriefInputs(prev => ({ ...prev, fixOwner: e.target.value }))}
                   data-testid="input-fix-owner"
                 />
               </div>
               <div>
-                <Label>Fix Due By</Label>
+                <Label className="text-white">Fix Due By</Label>
                 <Select value={debriefInputs.fixDueBy} onValueChange={(v) => setDebriefInputs(prev => ({ ...prev, fixDueBy: v }))}>
-                  <SelectTrigger className="mt-1" data-testid="select-fix-due-by">
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-fix-due-by">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1859,13 +2227,14 @@ Provide actionable summary and follow-up plan.`;
             <div className="space-y-4">
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="whatWentWell" className="text-green-600 dark:text-green-400 font-medium">What went well?</Label>
+                  <Label htmlFor="whatWentWell" className="text-lg font-semibold" style={{ color: '#22c55e' }}>What went well?</Label>
                   <VoiceButton field="wellDone" label="Dictate what went well" />
                 </div>
                 <Textarea
                   id="whatWentWell"
                   placeholder="One thing that worked tonight..."
-                  className="mt-1 min-h-[60px] border-green-500/30 focus:border-green-500"
+                  className="mt-1 min-h-[60px]"
+                  style={{ background: '#111827', borderColor: 'rgba(34,197,94,0.3)' }}
                   value={debriefInputs.whatWentWell}
                   onChange={(e) => setDebriefInputs(prev => ({ ...prev, whatWentWell: e.target.value }))}
                   data-testid="input-what-went-well"
@@ -1874,13 +2243,14 @@ Provide actionable summary and follow-up plan.`;
 
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="whatSucked" className="text-red-600 dark:text-red-400 font-medium">What sucked?</Label>
+                  <Label htmlFor="whatSucked" className="text-lg font-semibold" style={{ color: '#ef4444' }}>What sucked?</Label>
                   <VoiceButton field="sucked" label="Dictate what went wrong" />
                 </div>
                 <Textarea
                   id="whatSucked"
                   placeholder="One thing that broke down..."
-                  className="mt-1 min-h-[60px] border-red-500/30 focus:border-red-500"
+                  className="mt-1 min-h-[60px]"
+                  style={{ background: '#111827', borderColor: 'rgba(239,68,68,0.3)' }}
                   value={debriefInputs.whatSucked}
                   onChange={(e) => setDebriefInputs(prev => ({ ...prev, whatSucked: e.target.value }))}
                   data-testid="input-what-sucked"
@@ -1889,13 +2259,14 @@ Provide actionable summary and follow-up plan.`;
 
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="fixForTomorrow" className="text-primary font-medium">One fix for tomorrow</Label>
+                  <Label htmlFor="fixForTomorrow" className="text-lg font-semibold" style={{ color: '#d4a017' }}>One fix for tomorrow</Label>
                   <VoiceButton field="fix" label="Dictate tomorrow's fix" />
                 </div>
                 <Textarea
                   id="fixForTomorrow"
                   placeholder="The one thing we're changing..."
-                  className="mt-1 min-h-[60px] border-blue-500/30 focus:border-blue-500"
+                  className="mt-1 min-h-[60px]"
+                  style={{ background: '#111827', borderColor: 'rgba(212,160,23,0.3)' }}
                   value={debriefInputs.fixForTomorrow}
                   onChange={(e) => setDebriefInputs(prev => ({ ...prev, fixForTomorrow: e.target.value }))}
                   data-testid="input-fix-tomorrow"
@@ -1905,13 +2276,19 @@ Provide actionable summary and follow-up plan.`;
               <Button
                 onClick={saveQuickDebrief}
                 disabled={isSaving || (!debriefInputs.whatWentWell && !debriefInputs.whatSucked && !debriefInputs.fixForTomorrow)}
-                className="w-full"
+                className="w-full text-white"
+                style={quickDebriefSaved ? { background: '#166534' } : {}}
                 data-testid="btn-save-quick-debrief"
               >
                 {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Saving...
+                  </>
+                ) : quickDebriefSaved ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Debrief Logged
                   </>
                 ) : (
                   <>
@@ -1924,108 +2301,128 @@ Provide actionable summary and follow-up plan.`;
           </TabsContent>
 
           <TabsContent value="debrief" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">Post-shift analysis. What broke, why, and what to fix tomorrow.</p>
+            <p className="text-sm" style={{ color: '#9ca3af' }}>Post-shift analysis. What broke, why, and what to fix tomorrow.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="ticketTimesDebrief">Ticket Timing Issues</Label>
+                  <Label htmlFor="ticketTimesDebrief" className="text-white">Ticket Timing Issues</Label>
                   <VoiceButton field="fullTickets" label="Dictate ticket times" />
                 </div>
-                <Textarea
-                  id="ticketTimesDebrief"
-                  placeholder="e.g., Entr\u00e9es averaged 22 min during 7-8pm push..."
-                  className="mt-1 min-h-[80px]"
-                  value={fullDebriefInputs.ticketTimes}
-                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, ticketTimes: e.target.value }))}
-                  data-testid="input-ticket-times-debrief"
-                />
+                <div className="relative">
+                  <Textarea
+                    id="ticketTimesDebrief"
+                    placeholder="e.g., Entr\u00e9es averaged 22 min during 7-8pm push..."
+                    className="mt-1 min-h-[100px]"
+                    style={{ background: '#111827', borderColor: '#374151' }}
+                    value={fullDebriefInputs.ticketTimes}
+                    onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, ticketTimes: e.target.value }))}
+                    data-testid="input-ticket-times-debrief"
+                  />
+                  <span className="absolute bottom-2 right-2 text-[10px]" style={{ color: '#6b7280' }}>{fullDebriefInputs.ticketTimes.length} / 300</span>
+                </div>
               </div>
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="windowDelaysDebrief">Window Problems</Label>
+                  <Label htmlFor="windowDelaysDebrief" className="text-white">Window Problems</Label>
                   <VoiceButton field="fullWindow" label="Dictate window issues" />
                 </div>
-                <Textarea
-                  id="windowDelaysDebrief"
-                  placeholder="e.g., Window congestion 7:15-8:00, 6 instances of food dying..."
-                  className="mt-1 min-h-[80px]"
-                  value={fullDebriefInputs.windowDelays}
-                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, windowDelays: e.target.value }))}
-                  data-testid="input-window-delays-debrief"
-                />
+                <div className="relative">
+                  <Textarea
+                    id="windowDelaysDebrief"
+                    placeholder="e.g., Window congestion 7:15-8:00, 6 instances of food dying..."
+                    className="mt-1 min-h-[100px]"
+                    style={{ background: '#111827', borderColor: '#374151' }}
+                    value={fullDebriefInputs.windowDelays}
+                    onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, windowDelays: e.target.value }))}
+                    data-testid="input-window-delays-debrief"
+                  />
+                  <span className="absolute bottom-2 right-2 text-[10px]" style={{ color: '#6b7280' }}>{fullDebriefInputs.windowDelays.length} / 300</span>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="prepIssuesDebrief">Prep Issues Discovered</Label>
+                  <Label htmlFor="prepIssuesDebrief" className="text-white">Prep Issues Discovered</Label>
                   <VoiceButton field="fullPrep" label="Dictate prep issues" />
                 </div>
-                <Textarea
-                  id="prepIssuesDebrief"
-                  placeholder="e.g., Ran out of compound butter, mislabeled containers..."
-                  className="mt-1 min-h-[60px]"
-                  value={fullDebriefInputs.prepIssues}
-                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, prepIssues: e.target.value }))}
-                  data-testid="input-prep-issues-debrief"
-                />
+                <div className="relative">
+                  <Textarea
+                    id="prepIssuesDebrief"
+                    placeholder="e.g., Ran out of compound butter, mislabeled containers..."
+                    className="mt-1 min-h-[80px]"
+                    style={{ background: '#111827', borderColor: '#374151' }}
+                    value={fullDebriefInputs.prepIssues}
+                    onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, prepIssues: e.target.value }))}
+                    data-testid="input-prep-issues-debrief"
+                  />
+                  <span className="absolute bottom-2 right-2 text-[10px]" style={{ color: '#6b7280' }}>{fullDebriefInputs.prepIssues.length} / 300</span>
+                </div>
               </div>
               <div>
                 <div className="flex items-center">
-                  <Label htmlFor="wasteDebrief">Service Waste</Label>
+                  <Label htmlFor="wasteDebrief" className="text-white">Service Waste</Label>
                   <VoiceButton field="fullWaste" label="Dictate waste notes" />
                 </div>
-                <Textarea
-                  id="wasteDebrief"
-                  placeholder="e.g., 4 remakes on grill, 2 wrong-plate fires..."
-                  className="mt-1 min-h-[60px]"
-                  value={fullDebriefInputs.serviceWaste}
-                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, serviceWaste: e.target.value }))}
-                  data-testid="input-waste-debrief"
-                />
+                <div className="relative">
+                  <Textarea
+                    id="wasteDebrief"
+                    placeholder="e.g., 4 remakes on grill, 2 wrong-plate fires..."
+                    className="mt-1 min-h-[80px]"
+                    style={{ background: '#111827', borderColor: '#374151' }}
+                    value={fullDebriefInputs.serviceWaste}
+                    onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, serviceWaste: e.target.value }))}
+                    data-testid="input-waste-debrief"
+                  />
+                  <span className="absolute bottom-2 right-2 text-[10px]" style={{ color: '#6b7280' }}>{fullDebriefInputs.serviceWaste.length} / 300</span>
+                </div>
               </div>
             </div>
             <div>
               <div className="flex items-center">
-                <Label htmlFor="managerNotesDebrief">Manager Notes</Label>
+                <Label htmlFor="managerNotesDebrief" className="text-white">Manager Notes</Label>
                 <VoiceButton field="fullManager" label="Dictate manager notes" />
               </div>
-              <Textarea
-                id="managerNotesDebrief"
-                placeholder="e.g., Runner coverage insufficient, new cook struggled on grill..."
-                className="mt-1 min-h-[60px]"
-                value={fullDebriefInputs.managerNotes}
-                onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, managerNotes: e.target.value }))}
-                data-testid="input-manager-notes-debrief"
-              />
+              <div className="relative">
+                <Textarea
+                  id="managerNotesDebrief"
+                  placeholder="e.g., Runner coverage insufficient, new cook struggled on grill..."
+                  className="mt-1 min-h-[80px]"
+                  style={{ background: '#111827', borderColor: '#374151' }}
+                  value={fullDebriefInputs.managerNotes}
+                  onChange={(e) => setFullDebriefInputs(prev => ({ ...prev, managerNotes: e.target.value }))}
+                  data-testid="input-manager-notes-debrief"
+                />
+                <span className="absolute bottom-2 right-2 text-[10px]" style={{ color: '#6b7280' }}>{fullDebriefInputs.managerNotes.length} / 300</span>
+              </div>
             </div>
           </TabsContent>
 
           <TabsContent value="coaching" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">Identify ONE behavior to coach. Prevents scattershot corrections.</p>
+            <p className="text-sm" style={{ color: '#9ca3af' }}>Identify ONE behavior to coach. Prevents scattershot corrections.</p>
 
             <div>
-              <Label>Target Station</Label>
+              <Label className="text-white">Target Station</Label>
               <Select value={coachingInputs.targetStation} onValueChange={(v) => setCoachingInputs(prev => ({ ...prev, targetStation: v }))}>
-                <SelectTrigger className="mt-1" data-testid="select-coaching-station">
+                <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-coaching-station">
                   <SelectValue placeholder="Select station..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="saute">Saut\u00e9</SelectItem>
-                  <SelectItem value="grill">Grill</SelectItem>
-                  <SelectItem value="fry">Fry</SelectItem>
-                  <SelectItem value="pantry">Pantry</SelectItem>
-                  <SelectItem value="expo">Expo</SelectItem>
-                  <SelectItem value="dish">Dish</SelectItem>
-                  <SelectItem value="foh-support">FOH Support</SelectItem>
+                  <SelectItem value="saute"><span className="flex items-center gap-2"><Flame className="h-3.5 w-3.5" style={{ color: '#ef4444' }} /> Saut\u00e9</span></SelectItem>
+                  <SelectItem value="grill"><span className="flex items-center gap-2"><ThermometerSun className="h-3.5 w-3.5" style={{ color: '#f59e0b' }} /> Grill</span></SelectItem>
+                  <SelectItem value="fry"><span className="flex items-center gap-2"><Utensils className="h-3.5 w-3.5" style={{ color: '#d4a017' }} /> Fry</span></SelectItem>
+                  <SelectItem value="pantry"><span className="flex items-center gap-2"><Package className="h-3.5 w-3.5" style={{ color: '#22c55e' }} /> Pantry</span></SelectItem>
+                  <SelectItem value="expo"><span className="flex items-center gap-2"><ClipboardList className="h-3.5 w-3.5" style={{ color: '#3b82f6' }} /> Expo</span></SelectItem>
+                  <SelectItem value="dish"><span className="flex items-center gap-2"><UtensilsCrossed className="h-3.5 w-3.5" style={{ color: '#9ca3af' }} /> Dish</span></SelectItem>
+                  <SelectItem value="foh-support"><span className="flex items-center gap-2"><Users className="h-3.5 w-3.5" style={{ color: '#a78bfa' }} /> FOH Support</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label>Behavior to Coach</Label>
+              <Label className="text-white text-base font-semibold">Behavior to Coach</Label>
               <Select value={coachingInputs.behavior} onValueChange={(v) => setCoachingInputs(prev => ({ ...prev, behavior: v }))}>
-                <SelectTrigger className="mt-1" data-testid="select-coaching-behavior">
+                <SelectTrigger className="mt-1 text-base py-3" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-coaching-behavior">
                   <SelectValue placeholder="Select behavior..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -2036,13 +2433,22 @@ Provide actionable summary and follow-up plan.`;
               </Select>
             </div>
 
+            {coachingInputs.behavior && coachingInputs.behavior !== "custom" && (
+              <div className="p-3 border-l-[3px] rounded-r-lg" style={{ borderLeftColor: '#d4a017', background: 'rgba(212,160,23,0.06)' }} data-testid="coaching-preview">
+                <p className="text-sm italic" style={{ color: '#9ca3af' }}>
+                  This coaching session will focus on: <span className="font-medium text-white">{coachingInputs.behavior}</span>
+                </p>
+              </div>
+            )}
+
             {coachingInputs.behavior === "custom" && (
               <div>
-                <Label htmlFor="customBehavior">Describe the behavior</Label>
+                <Label htmlFor="customBehavior" className="text-white">Describe the behavior</Label>
                 <Input
                   id="customBehavior"
                   placeholder="Specific observable behavior..."
                   className="mt-1"
+                  style={{ background: '#111827', borderColor: '#374151' }}
                   value={coachingInputs.customBehavior}
                   onChange={(e) => setCoachingInputs(prev => ({ ...prev, customBehavior: e.target.value }))}
                   data-testid="input-custom-behavior"
@@ -2053,11 +2459,12 @@ Provide actionable summary and follow-up plan.`;
         </Tabs>
 
         {mode !== "quick-debrief" && (
-          <div className="sticky bottom-0 z-50 pt-3 pb-[env(safe-area-inset-bottom)] bg-card -mx-6 px-6 border-t">
+          <div className="sticky bottom-0 z-50 pt-3 pb-[env(safe-area-inset-bottom)] -mx-6 px-6 border-t" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
             <Button
               onClick={generateAnalysis}
               disabled={isGenerating}
-              className="w-full"
+              className="w-full text-white"
+              style={{ background: '#b8860b' }}
               data-testid="btn-generate-kitchen"
             >
               {isGenerating ? (
@@ -2079,16 +2486,14 @@ Provide actionable summary and follow-up plan.`;
         )}
 
         {analysis && (
-          <div className="mt-4 space-y-4">
-            <div className="p-4 bg-accent/50 rounded-lg">
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                {analysis}
-              </div>
+          <div className="mt-4 space-y-3">
+            {renderStructuredKitchenOutput()}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={copyToClipboardKitchen} data-testid="btn-copy-kitchen">
+                {kitchenCopied ? <Check className="h-4 w-4 mr-2" style={{ color: '#22c55e' }} /> : <Copy className="h-4 w-4 mr-2" />}
+                {kitchenCopied ? "Copied" : "Copy to Clipboard"}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-kitchen">
-              <Copy className="h-4 w-4 mr-2" />
-              Copy to Clipboard
-            </Button>
           </div>
         )}
       </CardContent>
@@ -9468,7 +9873,8 @@ export default function DomainPage() {
         {slug === "hr" && <HRComplianceEngine />}
         {slug === "hr" && <HRRecordsViewer />}
 
-        {/* Kitchen Compliance Engine - only show for kitchen domain */}
+        {/* Kitchen Status Strip + Command Center - only show for kitchen domain */}
+        {slug === "kitchen" && <KitchenStatusStrip />}
         {slug === "kitchen" && <KitchenComplianceEngine />}
 
         {/* SOP Capture Engine - only show for sops domain */}

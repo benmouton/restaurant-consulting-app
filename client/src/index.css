@@ -244,3 +244,13 @@
     background-clip: text;
   }
 }
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; transform: translateY(-4px); }
+  to { opacity: 1; max-height: 100px; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%, 100% { background-position: 200% 0; }
+  50% { background-position: -200% 0; }
+}
