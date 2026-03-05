@@ -95,6 +95,7 @@ import {
   ChevronDown,
   Gauge,
   Timer,
+  BookOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -7087,19 +7088,102 @@ function RestaurantProfileForm({
   );
 }
 
+const REVIEW_TYPES = [
+  { value: "negative", label: "Negative Review", color: '#ef4444', icon: Star },
+  { value: "positive", label: "Positive Review", color: '#d4a017', icon: Star },
+  { value: "mixed", label: "Mixed Review", color: '#f59e0b', icon: Star },
+  { value: "fake", label: "Fake/Defamatory Review", color: '#ef4444', icon: AlertTriangle },
+];
+
+const RESPONSE_TONES = [
+  { value: "professional", label: "Professional & Empathetic" },
+  { value: "brief", label: "Brief & Direct" },
+  { value: "recovery", label: "Recovery-Focused" },
+  { value: "factual", label: "Factual Correction" },
+  { value: "warm", label: "Warm & Personal" },
+  { value: "firm", label: "Firm but Fair" },
+];
+
+const TONE_INSTRUCTIONS: Record<string, string> = {
+  professional: "Professional and empathetic — warm but polished",
+  brief: "Brief and direct — short, sincere, no fluff",
+  recovery: "Recovery-focused — invite them back, offer to make it right",
+  factual: "Factual correction — politely and professionally address inaccuracies while remaining respectful",
+  warm: "Warm and personal — write like a caring host who remembers their regulars, friendly and heartfelt",
+  firm: "Firm but fair — professionally push back on unfair claims without being defensive, stand by your team while remaining respectful",
+};
+
+const REVIEW_BEST_PRACTICES = [
+  { title: "Respond within 24 hours", body: "Platforms surface recent responses. Speed signals you care." },
+  { title: "Never argue publicly", body: "Take heated disputes offline. \"Please reach out to us directly at [contact info].\"" },
+  { title: "Thank every reviewer", body: "Even negative ones. It shows professionalism to all future readers." },
+  { title: "Don't offer compensation publicly", body: "It invites gaming the system. Offer privately if warranted." },
+  { title: "Use the reviewer's name if known", body: "Personalizes the response. Avoid \"Dear Customer.\"" },
+  { title: "Keep it under 150 words", body: "Long responses look defensive. Short ones look confident." },
+];
+
+function ReputationStatusStrip({ responseCount, lastType, lastTone }: { responseCount: number; lastType: string; lastTone: string }) {
+  const lastTypeLabel = REVIEW_TYPES.find(t => t.value === lastType)?.label || "--";
+  const lastToneLabel = RESPONSE_TONES.find(t => t.value === lastTone)?.label || "--";
+  const cards = [
+    { label: "Responses Generated", value: responseCount > 0 ? `${responseCount} responses` : "0 responses", muted: responseCount === 0 },
+    { label: "Last Response Type", value: responseCount > 0 ? `${lastTypeLabel} · ${lastToneLabel}` : "--", muted: responseCount === 0 },
+    { label: "Templates Available", value: "6 templates ready", muted: false },
+    { label: "Response Streak", value: "Start your streak", muted: true, amber: true },
+  ];
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="reputation-status-strip">
+      {cards.map((card, i) => (
+        <div key={i} className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+          <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>{card.label}</p>
+          <p className={`text-sm font-semibold truncate`} style={{ color: card.muted ? (card.amber ? '#d4a017' : '#6b7280') : '#ffffff' }} data-testid={`rep-strip-${i}`}>{card.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ReviewResponseGenerator() {
   const { toast } = useToast();
   const [review, setReview] = useState<string>("");
   const [reviewType, setReviewType] = useState<string>("negative");
-  const [restaurantName, setRestaurantName] = useState<string>("");
-  const [yourName, setYourName] = useState<string>("");
-  const [yourTitle, setYourTitle] = useState<string>("Manager");
+  const [responseTone, setResponseTone] = useState<string>("professional");
   const [response, setResponse] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [screenshotBase64, setScreenshotBase64] = useState<string | null>(null);
-  const [responseTone, setResponseTone] = useState<string>("professional");
+  const [ocrSuccess, setOcrSuccess] = useState(false);
+  const [copyState, setCopyState] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedResponse, setEditedResponse] = useState("");
+  const [responseCount, setResponseCount] = useState(0);
+  const [showRegenTone, setShowRegenTone] = useState(false);
+  const [expandedPractice, setExpandedPractice] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [restaurantName, setRestaurantName] = useState<string>(() => {
+    try { if (typeof window !== 'undefined') return localStorage.getItem('trc_review_restaurant') || ''; } catch {} return '';
+  });
+  const [yourName, setYourName] = useState<string>(() => {
+    try { if (typeof window !== 'undefined') return localStorage.getItem('trc_review_name') || ''; } catch {} return '';
+  });
+  const [yourTitle, setYourTitle] = useState<string>(() => {
+    try { if (typeof window !== 'undefined') return localStorage.getItem('trc_review_title') || 'Manager'; } catch {} return 'Manager';
+  });
+  const [savedFields, setSavedFields] = useState<Record<string, boolean>>({});
+
+  const persistField = (key: string, value: string, fieldKey: string) => {
+    try { localStorage.setItem(key, value); } catch {}
+    setSavedFields(prev => ({ ...prev, [fieldKey]: true }));
+    setTimeout(() => setSavedFields(prev => ({ ...prev, [fieldKey]: false })), 2000);
+  };
+
+  const isNative = useMemo(() => {
+    try {
+      const { Capacitor } = (window as any);
+      return Capacitor?.isNativePlatform?.() === true;
+    } catch { return false; }
+  }, []);
 
   const handleImageUpload = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -7110,19 +7194,21 @@ function ReviewResponseGenerator() {
       toast({ title: "Image must be less than 10MB", variant: "destructive" });
       return;
     }
-    
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       const result = e.target?.result as string;
       setScreenshotPreview(result);
       setScreenshotBase64(result.split(',')[1]);
-      
-      // Try on-device Vision OCR first (free, instant)
+
       const ocrText = await extractTextFromImage(result);
       if (ocrText && ocrText.trim().length > 0) {
         setReview(ocrText.trim());
-        setScreenshotBase64(null); // Don't send image to server — we have the text
-        toast({ title: "Text extracted from screenshot", description: "Review text auto-filled below" });
+        setScreenshotBase64(null);
+        setOcrSuccess(true);
+        toast({ title: "Review text extracted — review and edit if needed" });
+      } else {
+        toast({ title: "Couldn't extract text — please paste the review manually" });
       }
     };
     reader.readAsDataURL(file);
@@ -7155,26 +7241,41 @@ function ReviewResponseGenerator() {
   const removeScreenshot = () => {
     setScreenshotPreview(null);
     setScreenshotBase64(null);
+    setOcrSuccess(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const generateResponse = async () => {
+  const getReviewTypeInstruction = () => {
+    switch (reviewType) {
+      case "negative": return "Acknowledge their concern without being defensive or making excuses. Offer to make it right and invite them to reach out directly.";
+      case "positive": return "Express genuine appreciation for their kind words. Invite them to visit again.";
+      case "mixed": return "Thank them for the positive aspects they mentioned. Address the concerns they raised without being defensive. Balance acknowledgment with commitment to improve.";
+      case "fake": return "Politely and professionally note that you have no record matching this description. Stick to facts. Invite them to contact you directly to resolve any genuine concerns. Do not accuse them directly of lying.";
+      default: return "";
+    }
+  };
+
+  const generateResponse = async (overrideTone?: string) => {
     if (!review.trim() && !screenshotBase64) {
       toast({ title: "Please paste a review or upload a screenshot", variant: "destructive" });
       return;
     }
 
+    const toneToUse = overrideTone || responseTone;
+    if (overrideTone) setResponseTone(overrideTone);
     setIsGenerating(true);
     setResponse("");
+    setIsEditing(false);
+    setShowRegenTone(false);
 
     try {
-      const imageInstruction = screenshotBase64 
+      const imageInstruction = screenshotBase64
         ? "I have attached a screenshot of the review. Please analyze the image to understand the customer's feedback and generate an appropriate response."
         : "";
-      
-      const textInstruction = review.trim() 
+
+      const textInstruction = review.trim()
         ? `CUSTOMER REVIEW TEXT:\n"${review}"`
         : "Please extract the review text from the attached screenshot.";
 
@@ -7182,22 +7283,18 @@ function ReviewResponseGenerator() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: `Generate a professional, polite, and friendly response to this ${reviewType} customer review for my restaurant${restaurantName ? ` called "${restaurantName}"` : ""}. 
+          question: `Generate a professional, polite, and friendly response to this ${reviewType} customer review for my restaurant${restaurantName ? ` called "${restaurantName}"` : ""}.
 
 ${imageInstruction}
+
+IMPORTANT NAME EXTRACTION RULE: Read the review text carefully. If the reviewer's name is visible (commonly shown as "- John" at the end, or the review is signed, or the platform shows it like "Bobby D." or "Sarah M."), extract the first name only and use it in the greeting (e.g., "Hi Bobby,"). If no name can be identified, use "Hi there," instead. Never output a literal bracket placeholder like [Customer's Name].
 
 The response should:
 - Be warm and genuine, not corporate or robotic
 - Thank them for their feedback
-- ${reviewType === "negative" ? "Acknowledge their concern without being defensive or making excuses" : "Express genuine appreciation for their kind words"}
-- ${reviewType === "negative" ? "Offer to make it right and invite them to reach out directly" : "Invite them to visit again"}
+- ${getReviewTypeInstruction()}
 - Sign off with ${yourName || "[Your Name]"}, ${yourTitle || "Manager"}
-- Response tone: ${
-  responseTone === "professional" ? "Professional and empathetic — warm but polished" :
-  responseTone === "brief" ? "Brief and direct — short, sincere, no fluff" :
-  responseTone === "recovery" ? "Recovery-focused — invite them back, offer to make it right" :
-  "Factual correction — politely and professionally address inaccuracies while remaining respectful"
-}
+- Response tone: ${TONE_INSTRUCTIONS[toneToUse] || TONE_INSTRUCTIONS.professional}
 - Keep it concise (3-4 sentences max)
 - Never argue with the customer or blame staff
 
@@ -7222,7 +7319,7 @@ Generate ONLY the response text, nothing else.`,
 
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
+
           for (const line of lines) {
             try {
               const data = JSON.parse(line.slice(6));
@@ -7234,6 +7331,7 @@ Generate ONLY the response text, nothing else.`,
           }
         }
       }
+      setResponseCount(prev => prev + 1);
     } catch (err) {
       toast({ title: "Failed to generate response", variant: "destructive" });
     } finally {
@@ -7242,180 +7340,203 @@ Generate ONLY the response text, nothing else.`,
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(response);
-    toast({ title: "Copied to clipboard!" });
+    const text = isEditing ? editedResponse : response;
+    navigator.clipboard.writeText(text);
+    setCopyState(true);
+    setTimeout(() => setCopyState(false), 2000);
   };
+
+  const displayResponse = isEditing ? editedResponse : response;
+  const toneLabel = RESPONSE_TONES.find(t => t.value === responseTone)?.label || responseTone;
+  const typeLabel = REVIEW_TYPES.find(t => t.value === reviewType)?.label || reviewType;
+
+  const TEMPLATES = [
+    { title: "Thank You for Positive Review", type: "Positive", color: '#22c55e', template: `Thank you so much for taking the time to share your experience! We're thrilled to hear you enjoyed your visit. Our team works hard to make every guest feel welcome, and feedback like yours makes it all worthwhile. We can't wait to see you again soon!\n\nWarm regards,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}` },
+    { title: "Apologize and Invite Back", type: "Negative", color: '#ef4444', template: `Thank you for sharing your feedback — we sincerely apologize that your experience didn't meet the standard we hold ourselves to. This isn't reflective of what we strive to deliver, and we'd love the opportunity to make it right. Please reach out to us directly so we can ensure your next visit is the experience you deserve.\n\nSincerely,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}` },
+    { title: "Address Specific Complaint", type: "Negative", color: '#ef4444', template: `Thank you for bringing this to our attention. We take all feedback seriously and have shared your concerns with our team. We're committed to improving and would appreciate the chance to speak with you directly about your experience. Please don't hesitate to contact us.\n\nBest regards,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}` },
+    { title: "Correct Misinformation Professionally", type: "Correction", color: '#f59e0b', template: `Thank you for your review. We appreciate all feedback and want to ensure accurate information is shared. We'd like to clarify a few points and would welcome the opportunity to discuss your experience directly. Please feel free to reach out to us — we value every guest and want to make sure things are right.\n\nRespectfully,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}` },
+    { title: "Thank Customer for Return Visit", type: "Positive", color: '#22c55e', template: `We love seeing familiar faces! Thank you for coming back and for taking the time to share your experience. It means the world to us that you continue to choose us, and we'll keep working to earn that loyalty every time. See you again soon!\n\nCheers,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}` },
+    { title: "Respond to Fake/Defamatory Review", type: "Correction", color: '#ef4444', template: `We take all feedback seriously. However, we have no record of a visit matching this description on the date mentioned. We pride ourselves on transparency and accountability, and we'd genuinely like to understand your experience better. Please contact us directly so we can look into this further.\n\nRespectfully,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}` },
+  ];
 
   return (
     <>
-    <Card className="mb-8">
-      <CardHeader>
+    <ReputationStatusStrip responseCount={responseCount} lastType={reviewType} lastTone={responseTone} />
+
+    <Card className="mb-8 relative overflow-hidden" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
+      <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent 0%, rgba(212,160,23,0.08) 50%, transparent 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 3s linear infinite',
+      }} />
+      <CardHeader className="relative">
         <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-primary" />
-          Review Response Generator
+          <MessageSquare className="h-5 w-5" style={{ color: '#d4a017' }} />
+          <span className="text-white">Review Response Generator</span>
         </CardTitle>
-        <CardDescription>
-          Paste a customer review and get a professional, friendly response
-        </CardDescription>
+        <div className="flex items-center gap-2">
+          <div className="w-[3px] h-4 rounded-full" style={{ background: '#d4a017' }} />
+          <CardDescription style={{ color: '#9ca3af' }}>
+            Paste a customer review and get a professional, friendly response
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 relative">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="reviewType">Review Type</Label>
+            <Label htmlFor="reviewType" className="text-white">Review Type</Label>
             <Select value={reviewType} onValueChange={setReviewType}>
-              <SelectTrigger className="mt-1" data-testid="select-review-type">
+              <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-review-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="negative">
-                  <span className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-destructive" />
-                    Negative Review
-                  </span>
-                </SelectItem>
-                <SelectItem value="positive">
-                  <span className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-yellow-500" />
-                    Positive Review
-                  </span>
-                </SelectItem>
+                {REVIEW_TYPES.map(rt => (
+                  <SelectItem key={rt.value} value={rt.value}>
+                    <span className="flex items-center gap-2">
+                      <rt.icon className="h-4 w-4" style={{ color: rt.color }} />
+                      {rt.label}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label htmlFor="restaurantName">Restaurant Name (optional)</Label>
-            <Input
-              id="restaurantName"
-              placeholder="Your Restaurant"
-              className="mt-1"
-              value={restaurantName}
-              onChange={(e) => setRestaurantName(e.target.value)}
-              data-testid="input-restaurant-name"
-            />
+            <Label htmlFor="restaurantName" className="text-white">Restaurant Name (optional)</Label>
+            <div className="relative">
+              <Input
+                id="restaurantName"
+                placeholder="Your Restaurant"
+                className="mt-1"
+                style={{ background: '#111827', borderColor: '#374151' }}
+                value={restaurantName}
+                onChange={(e) => { setRestaurantName(e.target.value); persistField('trc_review_restaurant', e.target.value, 'restaurant'); }}
+                data-testid="input-restaurant-name"
+              />
+              {savedFields.restaurant && <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#d4a017' }} />}
+            </div>
           </div>
         </div>
 
         <div>
-          <Label>Response Tone</Label>
+          <Label className="text-white">Response Tone</Label>
           <Select value={responseTone} onValueChange={setResponseTone}>
-            <SelectTrigger className="mt-1" data-testid="select-response-tone">
+            <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-response-tone">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="professional">Professional & Empathetic</SelectItem>
-              <SelectItem value="brief">Brief & Direct</SelectItem>
-              <SelectItem value="recovery">Recovery-Focused</SelectItem>
-              <SelectItem value="factual">Factual Correction</SelectItem>
+              {RESPONSE_TONES.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="yourName">Your Name</Label>
+            <Label htmlFor="yourName" className="text-white">Your Name</Label>
             <Input
               id="yourName"
               placeholder="John"
               className="mt-1"
+              style={{ background: '#111827', borderColor: '#374151' }}
               value={yourName}
-              onChange={(e) => setYourName(e.target.value)}
+              onChange={(e) => { setYourName(e.target.value); persistField('trc_review_name', e.target.value, 'name'); }}
               data-testid="input-your-name"
             />
+            {yourName && <p className="text-[10px] mt-0.5" style={{ color: '#6b7280' }}>Saved for next time</p>}
           </div>
           <div>
-            <Label htmlFor="yourTitle">Your Title</Label>
+            <Label htmlFor="yourTitle" className="text-white">Your Title</Label>
             <Input
               id="yourTitle"
               placeholder="Manager"
               className="mt-1"
+              style={{ background: '#111827', borderColor: '#374151' }}
               value={yourTitle}
-              onChange={(e) => setYourTitle(e.target.value)}
+              onChange={(e) => { setYourTitle(e.target.value); persistField('trc_review_title', e.target.value, 'title'); }}
               data-testid="input-your-title"
             />
+            {yourTitle && yourTitle !== "Manager" && <p className="text-[10px] mt-0.5" style={{ color: '#6b7280' }}>Saved for next time</p>}
           </div>
         </div>
 
         <div>
-          <Label htmlFor="review">Paste the Customer Review</Label>
-          <Textarea
-            id="review"
-            placeholder="Paste the customer's review here..."
-            className="mt-1 min-h-[120px]"
-            value={review}
-            onChange={(e) => setReview(e.target.value)}
-            onPaste={handlePaste}
-            data-testid="textarea-review"
-          />
-        </div>
-
-        <div>
-          <Label>Or Upload a Screenshot of the Review</Label>
-          <div 
-            className="mt-1 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/30"
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => fileInputRef.current?.click()}
-            data-testid="screenshot-drop-zone"
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImageUpload(file);
-              }}
-              data-testid="input-screenshot"
+          <Label htmlFor="review" className="text-white">Paste the Customer Review</Label>
+          <div className="relative">
+            <Textarea
+              id="review"
+              placeholder="Paste the customer's review here... or upload a screenshot below to extract the text automatically"
+              className="mt-1 min-h-[120px] focus:ring-1"
+              style={{ background: '#111827', borderColor: '#374151' }}
+              value={review}
+              onChange={(e) => setReview(e.target.value)}
+              onPaste={handlePaste}
+              data-testid="textarea-review"
             />
-            {screenshotPreview ? (
-              <div className="relative inline-block">
-                <img 
-                  src={screenshotPreview} 
-                  alt="Review screenshot" 
-                  className="max-h-48 mx-auto rounded-md"
-                />
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeScreenshot();
-                  }}
-                  data-testid="btn-remove-screenshot"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : (
-              <div className="py-4">
-                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Drag & drop a screenshot here, or click to upload
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  You can also paste (Ctrl+V) directly into the text area above
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Works best with Google, Yelp, and TripAdvisor review screenshots
-                </p>
-              </div>
-            )}
+            <span className="absolute bottom-2 right-3 text-[10px]" style={{ color: '#6b7280' }}>{review.length} chars</span>
           </div>
         </div>
 
-        <Button 
-          onClick={generateResponse} 
+        {ocrSuccess && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+            <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#22c55e' }} />
+            <p className="text-xs" style={{ color: '#22c55e' }}>Text extracted from screenshot — review before generating</p>
+            <button onClick={() => setOcrSuccess(false)} className="ml-auto"><X className="h-3 w-3" style={{ color: '#22c55e' }} /></button>
+          </div>
+        )}
+
+        <div>
+          {isNative ? (
+            <>
+              <Label className="text-white">Or Upload a Screenshot of the Review</Label>
+              <div
+                className="mt-1 rounded-lg p-4 text-center cursor-pointer transition-colors"
+                style={{ border: '2px dashed rgba(212,160,23,0.4)', background: screenshotPreview ? '#111827' : 'transparent' }}
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="screenshot-drop-zone"
+              >
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImageUpload(file); }} data-testid="input-screenshot" />
+                {screenshotPreview ? (
+                  <div className="relative inline-block">
+                    <img src={screenshotPreview} alt="Review screenshot" className="max-h-48 mx-auto rounded-md" />
+                    <button onClick={(e) => { e.stopPropagation(); removeScreenshot(); }} className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: '#ef4444' }} data-testid="btn-remove-screenshot">
+                      <X className="h-3 w-3 text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="py-4">
+                    <Upload className="h-8 w-8 mx-auto mb-2" style={{ color: '#d4a017' }} />
+                    <p className="text-sm" style={{ color: '#9ca3af' }}>Drag & drop a screenshot here, or click to upload</p>
+                    <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Works best with Google, Yelp, and TripAdvisor review screenshots</p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-lg p-3 mt-1" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+              <div className="flex items-center gap-2">
+                <Upload className="h-4 w-4 shrink-0" style={{ color: '#6b7280' }} />
+                <p className="text-xs" style={{ color: '#6b7280' }}>Screenshot upload and OCR available in the iOS app. On web, paste the review text directly above.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <Button
+          onClick={() => generateResponse()}
           disabled={isGenerating || (!review.trim() && !screenshotBase64)}
-          className="w-full"
+          className="w-full h-[52px] text-white"
+          style={{ background: isGenerating ? '#374151' : '#b8860b' }}
           data-testid="btn-generate-response"
         >
           {isGenerating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Crafting response...
-            </>
+            <span className="flex items-center gap-2 italic" style={{ color: '#d4a017' }}>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Crafting your response...
+            </span>
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
@@ -7424,55 +7545,77 @@ Generate ONLY the response text, nothing else.`,
           )}
         </Button>
 
-        {response && (
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Generated Response</Label>
-              <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-response">
-                <Copy className="h-4 w-4 mr-2" />
-                Copy to Clipboard
-              </Button>
+        {displayResponse && (
+          <div className="mt-4 rounded-xl p-5 border-l-[3px]" style={{ background: '#111827', borderLeftColor: '#d4a017', border: '1px solid #2a2d3e', borderLeft: '3px solid #d4a017' }} data-testid="response-output-card">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-white">Generated Response</p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-7 text-xs" style={{ borderColor: copyState ? '#22c55e' : '#d4a017', color: copyState ? '#22c55e' : '#d4a017' }} data-testid="btn-copy-response">
+                  {copyState ? <><Check className="h-3 w-3 mr-1" /> Copied!</> : <><Copy className="h-3 w-3 mr-1" /> Copy</>}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => { if (!isEditing) setEditedResponse(response); setIsEditing(!isEditing); }} className="h-7 text-xs" style={{ borderColor: isEditing ? '#22c55e' : '#9ca3af', color: isEditing ? '#22c55e' : '#9ca3af' }} data-testid="btn-edit-response">
+                  {isEditing ? "Done" : "Edit"}
+                </Button>
+              </div>
             </div>
-            <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm">
-              {response}
+
+            {isEditing ? (
+              <Textarea
+                value={editedResponse}
+                onChange={(e) => setEditedResponse(e.target.value)}
+                className="min-h-[150px] text-sm"
+                style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }}
+                data-testid="textarea-edit-response"
+              />
+            ) : (
+              <div className="whitespace-pre-wrap text-sm text-white leading-relaxed">{displayResponse}</div>
+            )}
+
+            <div className="mt-4 pt-3 flex items-center justify-between flex-wrap gap-2" style={{ borderTop: '1px solid #2a2d3e' }}>
+              <div className="flex items-center gap-3 text-[11px]" style={{ color: '#6b7280' }}>
+                <span>Tone: {toneLabel}</span>
+                <span>Type: {typeLabel}</span>
+                <span>{displayResponse.length} chars</span>
+              </div>
+              <div className="relative">
+                <button onClick={() => setShowRegenTone(!showRegenTone)} className="text-xs flex items-center gap-1" style={{ color: '#d4a017' }} data-testid="btn-regen-tone">
+                  <RefreshCw className="h-3 w-3" /> Regenerate with different tone
+                </button>
+                {showRegenTone && (
+                  <div className="absolute right-0 bottom-full mb-1 rounded-lg p-1 z-10 min-w-[200px]" style={{ background: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+                    {RESPONSE_TONES.filter(t => t.value !== responseTone).map(t => (
+                      <button key={t.value} onClick={() => generateResponse(t.value)} className="w-full text-left px-3 py-1.5 text-xs rounded" style={{ color: '#9ca3af' }} data-testid={`regen-tone-${t.value}`}>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
       </CardContent>
     </Card>
 
-    <Card className="mb-8">
+    <Card className="mb-8" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <FileText className="h-5 w-5" />
-          Response Templates
+          <FileText className="h-5 w-5" style={{ color: '#d4a017' }} />
+          <span className="text-white">Response Templates</span>
         </CardTitle>
-        <CardDescription>
+        <CardDescription style={{ color: '#9ca3af' }}>
           Quick-start templates you can customize
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {[
-          {
-            title: "Thank You for Positive Review",
-            template: `Thank you so much for taking the time to share your experience! We're thrilled to hear you enjoyed your visit. Our team works hard to make every guest feel welcome, and feedback like yours makes it all worthwhile. We can't wait to see you again soon!\n\nWarm regards,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
-          },
-          {
-            title: "Apologize and Invite Back",
-            template: `Thank you for sharing your feedback — we sincerely apologize that your experience didn't meet the standard we hold ourselves to. This isn't reflective of what we strive to deliver, and we'd love the opportunity to make it right. Please reach out to us directly so we can ensure your next visit is the experience you deserve.\n\nSincerely,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
-          },
-          {
-            title: "Address Specific Complaint",
-            template: `Thank you for bringing this to our attention. We take all feedback seriously and have shared your concerns with our team. We're committed to improving and would appreciate the chance to speak with you directly about your experience. Please don't hesitate to contact us.\n\nBest regards,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
-          },
-          {
-            title: "Correct Misinformation Professionally",
-            template: `Thank you for your review. We appreciate all feedback and want to ensure accurate information is shared. We'd like to clarify a few points and would welcome the opportunity to discuss your experience directly. Please feel free to reach out to us — we value every guest and want to make sure things are right.\n\nRespectfully,\n${yourName || "[Your Name]"}, ${yourTitle || "Manager"}`,
-          },
-        ].map((tmpl, idx) => (
-          <div key={idx} className="p-3 border rounded-lg space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{tmpl.title}</span>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {TEMPLATES.map((tmpl, idx) => (
+            <div key={idx} className="p-3 rounded-lg space-y-2 relative" style={{ background: '#111827', border: '1px solid #2a2d3e' }} data-testid={`template-card-${idx}`}>
+              <div className="absolute top-2 right-2">
+                <Badge className="text-[9px]" style={{ background: `${tmpl.color}20`, color: tmpl.color, borderColor: `${tmpl.color}40` }}>{tmpl.type}</Badge>
+              </div>
+              <p className="text-sm font-medium text-white pr-16">{tmpl.title}</p>
+              <p className="text-xs line-clamp-2" style={{ color: '#9ca3af' }}>{tmpl.template}</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -7480,12 +7623,42 @@ Generate ONLY the response text, nothing else.`,
                   setResponse(tmpl.template);
                   toast({ title: "Template loaded — customize it before sending!" });
                 }}
+                className="h-7 text-xs"
+                style={{ borderColor: '#d4a017', color: '#d4a017' }}
                 data-testid={`btn-template-${idx}`}
               >
                 Use Template
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground line-clamp-2">{tmpl.template}</p>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card className="mb-8" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BookOpen className="h-5 w-5" style={{ color: '#d4a017' }} />
+          <span className="text-white">Review Response Best Practices</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1">
+        {REVIEW_BEST_PRACTICES.map((bp, idx) => (
+          <div key={idx} className="rounded-lg overflow-hidden" style={{ border: '1px solid #2a2d3e' }}>
+            <button
+              className="w-full flex items-center justify-between px-4 py-3 text-left"
+              style={{ background: '#111827' }}
+              onClick={() => setExpandedPractice(expandedPractice === idx ? null : idx)}
+              data-testid={`practice-${idx}`}
+            >
+              <span className="text-sm font-medium text-white">{bp.title}</span>
+              <ChevronDown className="h-4 w-4 transition-transform duration-300" style={{ color: '#d4a017', transform: expandedPractice === idx ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+            </button>
+            <div className="overflow-hidden transition-all duration-300" style={{ maxHeight: expandedPractice === idx ? '200px' : '0px' }}>
+              <div className="px-4 py-3 border-l-[3px]" style={{ borderLeftColor: '#d4a017', background: 'rgba(184,134,11,0.04)' }}>
+                <p className="text-sm" style={{ color: '#9ca3af' }}>{bp.body}</p>
+              </div>
+            </div>
           </div>
         ))}
       </CardContent>

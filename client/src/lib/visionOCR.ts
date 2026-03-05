@@ -1,10 +1,27 @@
-export async function extractTextFromImage(imageBase64: string): Promise<string | null> {
+import { isNativeApp } from './native';
+
+export async function extractTextFromImage(imageDataUrl: string): Promise<string | null> {
+  if (isNativeApp()) {
+    try {
+      const { TextRecognition } = await import('@capacitor-mlkit/text-recognition');
+      const base64 = imageDataUrl.includes(',') ? imageDataUrl.split(',')[1] : imageDataUrl;
+      const result = await TextRecognition.recognize({
+        base64,
+        language: 'latin',
+      });
+      return result.text || null;
+    } catch (e) {
+      console.log('ML Kit OCR not available, falling back to server:', e);
+    }
+  }
+
   try {
+    const base64 = imageDataUrl.includes(',') ? imageDataUrl.split(',')[1] : imageDataUrl;
     const res = await fetch('/api/ocr/extract-text', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ imageBase64 })
+      body: JSON.stringify({ imageBase64: base64 })
     });
     if (!res.ok) return null;
     const data = await res.json();
