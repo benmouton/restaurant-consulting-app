@@ -49,7 +49,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { SiLinkedin, SiX, SiNextdoor } from "react-icons/si";
+import { SiLinkedin, SiX, SiNextdoor, SiFacebook, SiInstagram, SiGoogle } from "react-icons/si";
 import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
 import { getCuratedPost } from "@/data/curatedHolidayPosts";
 
@@ -551,6 +551,18 @@ export default function SocialPostBuilder() {
     }
   };
 
+  const getProviderFallbackIcon = (provider: string) => {
+    switch (provider) {
+      case 'facebook': return <SiFacebook className="h-5 w-5 text-blue-600" />;
+      case 'instagram': return <SiInstagram className="h-5 w-5 text-pink-500" />;
+      case 'google_business': return <SiGoogle className="h-5 w-5 text-red-500" />;
+      case 'linkedin': return <SiLinkedin className="h-5 w-5 text-blue-700" />;
+      case 'x': return <SiX className="h-5 w-5" />;
+      case 'nextdoor': return <SiNextdoor className="h-5 w-5 text-green-600" />;
+      default: return null;
+    }
+  };
+
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
@@ -686,8 +698,8 @@ export default function SocialPostBuilder() {
                                 {account.profilePictureUrl ? (
                                   <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
                                 ) : null}
-                                <AvatarFallback className="text-xs font-medium">
-                                  {account.displayName.charAt(0).toUpperCase()}
+                                <AvatarFallback className="text-xs font-medium flex items-center justify-center">
+                                  {getProviderFallbackIcon(account.provider) || account.displayName.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
                               <span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center text-white ${getProviderBadgeColor(account.provider)}`}>
@@ -1274,7 +1286,9 @@ export default function SocialPostBuilder() {
                             {account.profilePictureUrl ? (
                               <AvatarImage src={account.profilePictureUrl} alt={account.displayName} />
                             ) : null}
-                            <AvatarFallback>{account.displayName.charAt(0)}</AvatarFallback>
+                            <AvatarFallback className="flex items-center justify-center">
+                              {getProviderFallbackIcon(account.provider) || account.displayName.charAt(0)}
+                            </AvatarFallback>
                           </Avatar>
                           <span className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full flex items-center justify-center text-white ${getProviderBadgeColor(account.provider)}`}>
                             {account.provider === 'facebook' && <Facebook className="h-2.5 w-2.5" />}
