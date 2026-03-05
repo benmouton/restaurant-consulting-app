@@ -2647,13 +2647,45 @@ Generate JSON with:
     try {
       const userId = req.user.claims.sub;
       const accounts = await storage.getConnectedAccounts(userId);
-      const safeAccounts = accounts.map(a => ({
-        id: a.id,
-        provider: a.provider,
-        displayName: a.displayName,
-        profilePictureUrl: a.profilePictureUrl,
-        status: a.status,
-        createdAt: a.createdAt,
+      const safeAccounts = await Promise.all(accounts.map(async (a) => {
+        let profilePictureUrl = a.profilePictureUrl;
+
+        if (!profilePictureUrl && a.status === 'active') {
+          try {
+            const token = socialMediaService.getDecryptedToken(a);
+            if (a.provider === 'facebook') {
+              const meta = a.meta as any;
+              const pageId = meta?.pageId || a.providerAccountId;
+              const picRes = await fetch(`https://graph.facebook.com/v21.0/${pageId}/picture?redirect=false&type=small&access_token=${token}`);
+              if (picRes.ok) {
+                const picData = await picRes.json();
+                profilePictureUrl = picData?.data?.url || null;
+              }
+            } else if (a.provider === 'instagram') {
+              const meta = a.meta as any;
+              const igId = meta?.igUserId || a.providerAccountId;
+              const picRes = await fetch(`https://graph.facebook.com/v21.0/${igId}?fields=profile_picture_url&access_token=${token}`);
+              if (picRes.ok) {
+                const picData = await picRes.json();
+                profilePictureUrl = picData?.profile_picture_url || null;
+              }
+            }
+            if (profilePictureUrl) {
+              await storage.updateConnectedAccount(a.id, { profilePictureUrl });
+            }
+          } catch (e) {
+            // Silently skip — don't block account listing
+          }
+        }
+
+        return {
+          id: a.id,
+          provider: a.provider,
+          displayName: a.displayName,
+          profilePictureUrl,
+          status: a.status,
+          createdAt: a.createdAt,
+        };
       }));
       res.json(safeAccounts);
     } catch (error) {
