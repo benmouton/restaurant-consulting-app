@@ -3290,9 +3290,26 @@ Generate JSON with:
         } else if (account.provider === 'google_business') {
           const meta = account.meta as any;
           if (!meta?.locationName) throw new Error('Google Business account missing locationName in metadata');
+          let currentToken = token;
+          if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) < new Date()) {
+            const refreshToken = socialMediaService.getDecryptedRefreshToken(account);
+            if (refreshToken) {
+              try {
+                const refreshed = await socialMediaService.refreshGoogleToken(refreshToken);
+                currentToken = refreshed.accessToken;
+                await storage.updateConnectedAccount(account.id, {
+                  accessTokenEncrypted: encrypt(refreshed.accessToken),
+                  tokenExpiresAt: refreshed.expiresIn ? new Date(Date.now() + refreshed.expiresIn * 1000) : account.tokenExpiresAt,
+                });
+                console.log(`[EXEC_POST] Refreshed Google token for account ${accountId}`);
+              } catch (refreshErr: any) {
+                console.error(`[EXEC_POST] Google token refresh failed:`, refreshErr.message);
+              }
+            }
+          }
           result = await socialMediaService.postToGoogleBusiness(
             meta.locationName,
-            token,
+            currentToken,
             post.caption
           );
         } else if (account.provider === 'linkedin') {

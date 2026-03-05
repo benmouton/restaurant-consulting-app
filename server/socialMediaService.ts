@@ -504,7 +504,7 @@ export const socialMediaService = {
     callToAction?: { actionType: string; url: string }
   ): Promise<{ name: string }> {
     const postBody: any = {
-      languageCode: 'en',
+      languageCode: 'en-US',
       summary,
       topicType: 'STANDARD',
     };
@@ -512,25 +512,40 @@ export const socialMediaService = {
     if (callToAction) {
       postBody.callToAction = callToAction;
     }
+
+    const postUrl = `https://mybusiness.googleapis.com/v4/${locationName}/localPosts`;
+    console.log(`[POST_GBP] Posting to: ${postUrl}`);
+    console.log(`[POST_GBP] Location name: ${locationName}`);
+    console.log(`[POST_GBP] Body:`, JSON.stringify(postBody));
     
-    const response = await fetch(
-      `https://mybusiness.googleapis.com/v4/${locationName}/localPosts`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(postBody),
-      }
-    );
+    const response = await fetch(postUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(postBody),
+    });
+
+    const rawText = await response.text();
+    console.log(`[POST_GBP] Response status: ${response.status}, body: ${rawText.substring(0, 500)}`);
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Failed to post to Google Business');
+      let errMsg = 'Failed to post to Google Business';
+      try {
+        const parsed = JSON.parse(rawText);
+        errMsg = parsed?.error?.message || errMsg;
+      } catch {
+        errMsg = `Google Business API returned status ${response.status}: ${rawText.substring(0, 200)}`;
+      }
+      throw new Error(errMsg);
     }
     
-    return response.json();
+    try {
+      return JSON.parse(rawText);
+    } catch {
+      return { name: 'post-created' };
+    }
   },
 
   async generatePostContent(data: any, brandSettings?: any) {
