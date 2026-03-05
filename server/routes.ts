@@ -2656,10 +2656,13 @@ Generate JSON with:
             if (a.provider === 'facebook') {
               const meta = a.meta as any;
               const pageId = meta?.pageId || a.providerAccountId;
-              const picRes = await fetch(`https://graph.facebook.com/v21.0/${pageId}/picture?redirect=false&type=small&access_token=${token}`);
+              const picRes = await fetch(`https://graph.facebook.com/v21.0/${pageId}?fields=picture.type(small)&access_token=${token}`);
               if (picRes.ok) {
                 const picData = await picRes.json();
-                profilePictureUrl = picData?.data?.url || null;
+                profilePictureUrl = picData?.picture?.data?.url || null;
+                console.log(`[BACKFILL] Facebook ${pageId} picture:`, profilePictureUrl ? 'found' : 'not found');
+              } else {
+                console.log(`[BACKFILL] Facebook picture fetch failed: ${picRes.status}`);
               }
             } else if (a.provider === 'instagram') {
               const meta = a.meta as any;
@@ -2668,13 +2671,18 @@ Generate JSON with:
               if (picRes.ok) {
                 const picData = await picRes.json();
                 profilePictureUrl = picData?.profile_picture_url || null;
+                console.log(`[BACKFILL] Instagram ${igId} picture:`, profilePictureUrl ? 'found' : 'not found');
+              } else {
+                console.log(`[BACKFILL] Instagram picture fetch failed: ${picRes.status}`);
               }
+            } else if (a.provider === 'google_business') {
+              profilePictureUrl = null;
             }
             if (profilePictureUrl) {
               await storage.updateConnectedAccount(a.id, { profilePictureUrl });
             }
-          } catch (e) {
-            // Silently skip — don't block account listing
+          } catch (e: any) {
+            console.log(`[BACKFILL] ${a.provider} picture backfill error:`, e?.message);
           }
         }
 
