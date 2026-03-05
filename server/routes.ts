@@ -1066,6 +1066,146 @@ export async function registerRoutes(
     cacheMaxAge: 86400000,
   });
 
+  // Apple Sign In for WEB (OAuth redirect flow)
+  app.get("/api/auth/apple/web", (req: any, res) => {
+    try {
+      const state = crypto.randomBytes(32).toString('hex');
+      req.session.appleOAuthState = state;
+      const redirectUri = `https://${req.hostname}/api/auth/apple/callback`;
+      const params = new URLSearchParams({
+        client_id: process.env.APPLE_CLIENT_ID!,
+        redirect_uri: redirectUri,
+        response_type: 'code id_token',
+        response_mode: 'form_post',
+        scope: 'name email',
+        state,
+      });
+      res.redirect(`https://appleid.apple.com/auth/authorize?${params.toString()}`);
+    } catch (error: any) {
+      console.error("[APPLE_WEB] Failed to start OAuth:", error);
+      res.redirect("/?error=apple_auth_failed");
+    }
+  });
+
+  app.post("/api/auth/apple/callback", express.urlencoded({ extended: true }), async (req: any, res) => {
+    try {
+      const { code, id_token, state, user: userJson } = req.body;
+      console.log("[APPLE_WEB] Callback received, has code:", !!code, "has id_token:", !!id_token);
+
+      if (!state || state !== req.session?.appleOAuthState) {
+        console.error("[APPLE_WEB] State mismatch");
+        return res.redirect("/?error=apple_invalid_state");
+      }
+      delete req.session.appleOAuthState;
+
+      if (!id_token && !code) {
+        return res.redirect("/?error=apple_missing_token");
+      }
+
+      let appleUserId: string | null = null;
+      let userEmail: string | null = null;
+      let firstName: string | null = null;
+      let lastName: string | null = null;
+
+      if (id_token) {
+        const decoded = jwt.decode(id_token, { complete: true });
+        if (!decoded || !decoded.header.kid) {
+          return res.redirect("/?error=apple_invalid_token");
+        }
+        const key = await appleJwksClient.getSigningKey(decoded.header.kid);
+        const signingKey = key.getPublicKey();
+        const verified = jwt.verify(id_token, signingKey, {
+          algorithms: ["RS256"],
+          issuer: "https://appleid.apple.com",
+          audience: process.env.APPLE_CLIENT_ID!,
+        }) as any;
+        appleUserId = verified.sub;
+        userEmail = verified.email || null;
+      }
+
+      if (code && !appleUserId) {
+        const clientSecret = generateAppleClientSecret();
+        const redirectUri = `https://${req.hostname}/api/auth/apple/callback`;
+        const tokenRes = await fetch("https://appleid.apple.com/auth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: process.env.APPLE_CLIENT_ID!,
+            client_secret: clientSecret,
+            code,
+            grant_type: "authorization_code",
+            redirect_uri: redirectUri,
+          }),
+        });
+        const tokenData = await tokenRes.json();
+        if (tokenData.id_token) {
+          const decoded = jwt.decode(tokenData.id_token) as any;
+          appleUserId = decoded?.sub;
+          userEmail = decoded?.email || null;
+        }
+        if (!appleUserId) {
+          console.error("[APPLE_WEB] Token exchange failed:", tokenData);
+          return res.redirect("/?error=apple_token_failed");
+        }
+      }
+
+      if (userJson) {
+        try {
+          const parsed = typeof userJson === 'string' ? JSON.parse(userJson) : userJson;
+          firstName = parsed?.name?.firstName || null;
+          lastName = parsed?.name?.lastName || null;
+          if (!userEmail && parsed?.email) userEmail = parsed.email;
+        } catch {}
+      }
+
+      const finalUserId = `apple_${appleUserId}`;
+      console.log("[APPLE_WEB] Creating/updating user:", finalUserId, userEmail);
+
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      await authStorage.upsertUser({
+        id: finalUserId,
+        email: userEmail,
+        firstName,
+        lastName,
+        profileImageUrl: null,
+      });
+
+      const sessionUser: any = {
+        claims: { sub: finalUserId },
+        expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(sessionUser, (err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      res.redirect("/dashboard");
+    } catch (error: any) {
+      console.error("[APPLE_WEB] Callback error:", error);
+      res.redirect("/?error=apple_auth_failed");
+    }
+  });
+
+  function generateAppleClientSecret(): string {
+    const privateKey = process.env.APPLE_PRIVATE_KEY!.replace(/\\n/g, '\n');
+    const now = Math.floor(Date.now() / 1000);
+    return jwt.sign({}, privateKey, {
+      algorithm: 'ES256',
+      expiresIn: '5m',
+      audience: 'https://appleid.apple.com',
+      issuer: process.env.APPLE_TEAM_ID!,
+      subject: process.env.APPLE_CLIENT_ID!,
+      keyid: process.env.APPLE_KEY_ID!,
+      header: {
+        alg: 'ES256',
+        kid: process.env.APPLE_KEY_ID!,
+      },
+    } as any);
+  }
+
   app.post("/api/auth/apple", async (req: any, res) => {
     try {
       const { identityToken, email, givenName, familyName } = req.body;
