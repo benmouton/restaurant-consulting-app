@@ -382,8 +382,13 @@ export const socialMediaService = {
         const locData = await locResponse.json();
         console.log(`[GOOGLE_API] Locations response for ${account.name}:`, JSON.stringify(locData).substring(0, 500));
         for (const loc of locData.locations || []) {
+          let fullName = loc.name || '';
+          if (fullName && !fullName.startsWith('accounts/')) {
+            fullName = `${account.name}/${fullName}`;
+          }
+          console.log(`[GOOGLE_API] Location raw name: "${loc.name}", full name: "${fullName}"`);
           locations.push({
-            name: loc.name,
+            name: fullName,
             title: loc.title || loc.storefrontAddress?.locality || 'Unknown Location',
           });
         }
@@ -513,9 +518,13 @@ export const socialMediaService = {
       postBody.callToAction = callToAction;
     }
 
-    const postUrl = `https://mybusiness.googleapis.com/v4/${locationName}/localPosts`;
-    console.log(`[POST_GBP] Posting to: ${postUrl}`);
-    console.log(`[POST_GBP] Location name: ${locationName}`);
+    let cleanLocation = locationName.replace(/^\/+/, '');
+    if (!cleanLocation.startsWith('accounts/') && cleanLocation.startsWith('locations/')) {
+      console.warn(`[POST_GBP] locationName missing accounts/ prefix: "${cleanLocation}"`);
+    }
+    const postUrl = `https://mybusiness.googleapis.com/v4/${cleanLocation}/localPosts`;
+    console.log(`[POST_GBP] Raw locationName: "${locationName}"`);
+    console.log(`[POST_GBP] Resolved URL: ${postUrl}`);
     console.log(`[POST_GBP] Body:`, JSON.stringify(postBody));
     
     const response = await fetch(postUrl, {
