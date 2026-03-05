@@ -82,6 +82,7 @@ import {
   ArrowRight,
   Search,
   Lock,
+  Zap,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -3755,6 +3756,28 @@ function SkillsCertificationEngine() {
   );
 }
 
+function ServiceMetricStrip({ contentCount }: { contentCount: number }) {
+  return (
+    <div className="grid grid-cols-3 gap-4 mb-8 overflow-x-auto">
+      {[
+        { label: "COMP BUDGET THIS WEEK", value: "Set comp budget \u2192", accent: true },
+        { label: "ACTIVE SERVICE STANDARDS", value: `${contentCount} configured` },
+        { label: "RECOVERY PROTOCOLS", value: "9 issue types covered" },
+      ].map((m) => (
+        <div
+          key={m.label}
+          className="border-l-2 border-primary rounded-lg p-3"
+          style={{ background: "#111827", borderColor: m.accent ? "#d97706" : undefined }}
+          data-testid={`metric-${m.label.toLowerCase().replace(/\s+/g, '-')}`}
+        >
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1">{m.label}</div>
+          <div className="text-sm font-bold text-foreground">{m.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function GuestRecoveryAdvisor() {
   const { toast } = useToast();
   const [showSample, setShowSample] = useState(false);
@@ -3871,22 +3894,32 @@ Keep the response practical and immediately actionable. This is real-time guidan
   };
 
   return (
-    <Card className="mb-8">
+    <Card className="mb-8 border-t-2 border-t-primary">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Guest Recovery Decision Advisor
-        </CardTitle>
-        <CardDescription>
-          Get real-time guidance on how to recover a service failure—within your comp limits
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Guest Recovery Decision Advisor
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Get real-time guidance on how to recover a service failure—within your comp limits
+            </CardDescription>
+          </div>
+          <span className="text-[10px] font-semibold tracking-wider text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-full whitespace-nowrap">
+            Real-time guidance
+          </span>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="issueType">Issue Type</Label>
+            <Label htmlFor="issueType" className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+              Issue Type
+            </Label>
             <Select value={issueType} onValueChange={setIssueType}>
-              <SelectTrigger id="issueType" className="mt-1" data-testid="select-issue-type">
+              <SelectTrigger id="issueType" className="mt-1 py-3 focus:ring-2 focus:ring-primary/50" data-testid="select-issue-type">
                 <SelectValue placeholder="Select issue type..." />
               </SelectTrigger>
               <SelectContent>
@@ -3897,9 +3930,12 @@ Keep the response practical and immediately actionable. This is real-time guidan
             </Select>
           </div>
           <div>
-            <Label htmlFor="responderRole">Who is Responding?</Label>
+            <Label htmlFor="responderRole" className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-blue-400" />
+              Who is Responding?
+            </Label>
             <Select value={responderRole} onValueChange={setResponderRole}>
-              <SelectTrigger id="responderRole" className="mt-1" data-testid="select-responder-role">
+              <SelectTrigger id="responderRole" className="mt-1 py-3 focus:ring-2 focus:ring-primary/50" data-testid="select-responder-role">
                 <SelectValue placeholder="Select role..." />
               </SelectTrigger>
               <SelectContent>
@@ -3911,18 +3947,19 @@ Keep the response practical and immediately actionable. This is real-time guidan
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="timeDelay">Time Delay (minutes over expected)</Label>
             <Input
               id="timeDelay"
               type="number"
               placeholder="e.g., 18"
-              className="mt-1"
+              className="mt-1 py-3 focus:ring-2 focus:ring-primary/50"
               value={timeDelay}
               onChange={(e) => setTimeDelay(e.target.value)}
               data-testid="input-time-delay"
             />
+            <p className="text-xs text-muted-foreground mt-1">How many minutes past the expected time?</p>
           </div>
           <div>
             <Label htmlFor="checkValue">Check Value ($)</Label>
@@ -3932,12 +3969,13 @@ Keep the response practical and immediately actionable. This is real-time guidan
                 id="checkValue"
                 type="number"
                 placeholder="e.g., 96"
-                className="pl-9"
+                className="pl-9 py-3 focus:ring-2 focus:ring-primary/50"
                 value={checkValue}
                 onChange={(e) => setCheckValue(e.target.value)}
                 data-testid="input-check-value"
               />
             </div>
+            <p className="text-xs text-muted-foreground mt-1">Total check value helps calibrate comp recommendation</p>
           </div>
         </div>
 
@@ -3946,7 +3984,7 @@ Keep the response practical and immediately actionable. This is real-time guidan
           <Textarea
             id="additionalContext"
             placeholder="e.g., Server already apologized, guest is a regular, celebrating anniversary..."
-            className="mt-1 min-h-[80px]"
+            className="mt-1 min-h-[120px] focus:ring-2 focus:ring-primary/50"
             value={additionalContext}
             onChange={(e) => setAdditionalContext(e.target.value)}
             data-testid="input-additional-context"
@@ -3956,7 +3994,7 @@ Keep the response practical and immediately actionable. This is real-time guidan
         <Button 
           onClick={generateRecovery} 
           disabled={isGenerating || !issueType}
-          className="w-full"
+          className="w-full hover:brightness-110 transition-all"
           data-testid="btn-generate-recovery"
         >
           {isGenerating ? (
@@ -3967,7 +4005,7 @@ Keep the response practical and immediately actionable. This is real-time guidan
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
-              Get Recovery Advice
+              Get Recovery Advice <span className="ml-1">&rarr;</span>
             </>
           )}
         </Button>
@@ -3975,18 +4013,31 @@ Keep the response practical and immediately actionable. This is real-time guidan
         {!response && !isGenerating && (
           <button
             onClick={() => setShowSample(!showSample)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 flex items-center gap-1"
+            className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors mt-2 flex items-center gap-1"
             data-testid="btn-toggle-sample-recovery"
           >
-            {showSample ? "Hide example output" : "See example output \u2192"}
+            {showSample ? "Hide example output" : (<><span>&darr;</span> See example output</>)}
           </button>
         )}
         {showSample && !response && (
-          <div className="mt-2 p-3 bg-muted/50 rounded-md border border-dashed text-xs text-muted-foreground space-y-1">
-            <p className="font-medium">RECOVERY SCRIPT:</p>
-            <p className="pl-3 italic">"I sincerely apologize for the wait. Let me get that corrected right away and I'd like to offer a complimentary dessert for the trouble."</p>
-            <p className="font-medium mt-1">APPROVED COMP: Free dessert + comped appetizer (~$18)</p>
-            <p className="font-medium">FOLLOW-UP: Check back within 5 minutes, alert manager on duty</p>
+          <div className="mt-2 rounded-lg border border-primary/20 overflow-hidden" data-testid="sample-recovery-output">
+            <div className="px-3 py-2 bg-primary/5 border-b border-primary/10">
+              <span className="text-xs font-semibold text-primary tracking-wide">EXAMPLE OUTPUT</span>
+            </div>
+            <div className="p-3 text-xs text-muted-foreground space-y-2">
+              <div>
+                <span className="font-semibold text-foreground">RECOVERY SCRIPT:</span>
+                <p className="pl-3 italic mt-0.5">"I sincerely apologize for the wait. Let me get that corrected right away and I'd like to offer a complimentary dessert for the trouble."</p>
+              </div>
+              <div>
+                <span className="font-semibold text-foreground">APPROVED COMP:</span>
+                <span className="ml-1">Free dessert + comped appetizer (~$18)</span>
+              </div>
+              <div>
+                <span className="font-semibold text-foreground">FOLLOW-UP:</span>
+                <span className="ml-1">Check back within 5 minutes, alert manager on duty</span>
+              </div>
+            </div>
           </div>
         )}
 
@@ -8007,6 +8058,340 @@ Emergency After-Hours:
   );
 }
 
+function renderChecklistContent(text: string) {
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-2">
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        if (!trimmed) return null;
+        if (trimmed.startsWith('#') || trimmed.endsWith(':')) {
+          return <div key={i} className="font-semibold text-sm text-foreground mt-3 mb-1">{trimmed.replace(/^#+\s*/, '')}</div>;
+        }
+        const isCheckItem = trimmed.match(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i);
+        const cleanText = trimmed.replace(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i, '').trim();
+        if (isCheckItem || trimmed.length > 5) {
+          return (
+            <label key={i} className="flex items-start gap-3 cursor-pointer group py-1" data-testid={`checklist-item-${i}`}>
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-2 border-muted-foreground/30 accent-primary cursor-pointer shrink-0"
+                onChange={() => {}}
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors leading-relaxed">
+                {cleanText || trimmed}
+              </span>
+            </label>
+          );
+        }
+        return <div key={i} className="text-sm text-muted-foreground leading-relaxed">{trimmed}</div>;
+      })}
+    </div>
+  );
+}
+
+function renderScriptContent(text: string) {
+  const lines = text.split('\n').filter(l => l.trim());
+  const steps: { num: string; text: string }[] = [];
+  let currentStep: { num: string; text: string } | null = null;
+
+  for (const line of lines) {
+    const stepMatch = line.trim().match(/^(\d+)[\.\)]\s*(.+)/);
+    if (stepMatch) {
+      if (currentStep) steps.push(currentStep);
+      currentStep = { num: stepMatch[1], text: stepMatch[2].replace(/\*\*/g, '') };
+    } else if (currentStep) {
+      currentStep.text += ' ' + line.trim().replace(/\*\*/g, '');
+    } else {
+      steps.push({ num: '', text: line.trim().replace(/\*\*/g, '') });
+    }
+  }
+  if (currentStep) steps.push(currentStep);
+
+  if (steps.filter(s => s.num).length === 0) {
+    return <div className="whitespace-pre-wrap text-sm leading-relaxed border-l-4 border-purple-500/30 pl-4">{text}</div>;
+  }
+
+  return (
+    <div className="space-y-1">
+      {steps.map((step, i) => (
+        <div key={i} className="flex items-start gap-3" data-testid={`script-step-${i}`}>
+          {step.num ? (
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              <div className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold">
+                {step.num}
+              </div>
+              {i < steps.filter(s => s.num).length - 1 && step.num && (
+                <span className="text-muted-foreground/30 text-xs hidden">→</span>
+              )}
+            </div>
+          ) : (
+            <div className="w-6 shrink-0" />
+          )}
+          <p className="text-sm text-muted-foreground leading-relaxed pt-0.5">{step.text}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function renderFrameworkContent(text: string) {
+  const rolePattern = /\b(SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)\b/g;
+  const sections = text.split(/\n(?=(?:SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)[:\s])/i);
+
+  if (sections.length <= 1) {
+    const lines = text.split('\n');
+    return (
+      <div className="space-y-1">
+        {lines.map((line, i) => {
+          const trimmed = line.trim();
+          if (!trimmed) return null;
+          const roleMatch = trimmed.match(/^(SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)[:\s]/i);
+          if (roleMatch) {
+            return (
+              <div key={i} className="mt-3 first:mt-0">
+                <span className="inline-block text-[10px] font-bold tracking-wider bg-blue-500/15 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded mr-2">
+                  {roleMatch[1].toUpperCase()}
+                </span>
+                <span className="text-sm text-muted-foreground">{trimmed.slice(roleMatch[0].length).trim()}</span>
+              </div>
+            );
+          }
+          return <div key={i} className="text-sm text-muted-foreground leading-relaxed">{trimmed}</div>;
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {sections.map((section, i) => {
+        const firstLine = section.trim().split('\n')[0];
+        const roleMatch = firstLine.match(/^(SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)[:\s]/i);
+        const roleName = roleMatch ? roleMatch[1].toUpperCase() : null;
+        const sectionContent = roleMatch
+          ? section.trim().split('\n').map((l, li) => li === 0 ? l.slice(roleMatch[0].length).trim() : l.trim()).filter(Boolean).join('\n')
+          : section.trim();
+
+        return (
+          <div key={i} className="rounded-lg border border-border/50 p-3" data-testid={`framework-role-${roleName?.toLowerCase() || i}`}>
+            {roleName && (
+              <span className="inline-block text-[10px] font-bold tracking-wider bg-blue-500/15 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded mb-2">
+                {roleName}
+              </span>
+            )}
+            <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{sectionContent}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ServiceQuickReference({ content }: { content: any[] }) {
+  const quickRecoveryProtocols = [
+    { issue: "Late Food", recovery: "Free dessert or comp drink", authority: "Server authority up to $20" },
+    { issue: "Wrong Item", recovery: "Replace immediately + comp item", authority: "Server authority" },
+    { issue: "Guest Complaint", recovery: "Manager visit + appropriate comp", authority: "Manager up to $100" },
+  ];
+
+  const checklistItems = content.filter(c => c.contentType === 'checklist');
+  const timingLines: string[] = [];
+  for (const item of checklistItems) {
+    const lines = (item.content || '').split('\n');
+    for (const line of lines) {
+      if (line.toLowerCase().includes('minute') || line.toLowerCase().includes('second') || line.toLowerCase().includes('timing')) {
+        timingLines.push(line.trim().replace(/^[-•□]\s*/, ''));
+        if (timingLines.length >= 4) break;
+      }
+    }
+    if (timingLines.length >= 4) break;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-primary/20 p-4" style={{ background: "#111827" }}>
+        <h4 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+          <Shield className="h-4 w-4 text-primary" />
+          Top Recovery Protocols
+        </h4>
+        <div className="space-y-2">
+          {quickRecoveryProtocols.map((p, i) => (
+            <div key={i} className="flex items-start gap-3 text-sm" data-testid={`quick-ref-protocol-${i}`}>
+              <div className="w-5 h-5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">{i + 1}</div>
+              <div>
+                <span className="font-semibold text-foreground">{p.issue}:</span>{' '}
+                <span className="text-muted-foreground">{p.recovery}</span>
+                <span className="text-xs text-primary/70 ml-2">({p.authority})</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {timingLines.length > 0 && (
+        <div className="rounded-lg border border-primary/20 p-4" style={{ background: "#111827" }}>
+          <h4 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            Non-Negotiable Timing Standards
+          </h4>
+          <div className="space-y-1.5">
+            {timingLines.map((line, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                {line}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {timingLines.length === 0 && (
+        <div className="rounded-lg border border-dashed border-muted-foreground/30 p-4 text-center">
+          <p className="text-sm text-muted-foreground">Timing standards will appear here once configured in your checklists.</p>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-primary/20 p-4" style={{ background: "#111827" }}>
+        <h4 className="text-sm font-bold text-foreground mb-3">Comp Authority Limits</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {[
+            { role: "Server", limit: "Dessert / non-alc drink" },
+            { role: "Bartender", limit: "One round / appetizer" },
+            { role: "Shift Lead", limit: "Up to $25" },
+            { role: "Manager", limit: "Up to $100" },
+          ].map((r) => (
+            <div key={r.role} className="flex items-center gap-2 p-2 rounded bg-muted/30">
+              <span className="font-semibold text-foreground">{r.role}:</span>
+              <span className="text-muted-foreground">{r.limit}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ServiceContentAccordion({ content, slug }: { content: any[]; slug: string }) {
+  const [viewMode, setViewMode] = useState<'full' | 'quick'>('full');
+  const typeOrder = ["principle", "output", "checklist", "script"] as const;
+  const grouped = typeOrder
+    .map(type => ({
+      type,
+      config: contentTypeConfig[type],
+      items: content.filter(c => c.contentType === type),
+    }));
+  const populatedGroups = grouped.filter(g => g.items.length > 0);
+  const emptyGroups = grouped.filter(g => g.items.length === 0);
+
+  return (
+    <div>
+      {slug === "service" && (
+        <div className="flex items-center gap-2 mb-4">
+          <Button
+            variant={viewMode === 'full' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('full')}
+            data-testid="btn-view-full-standards"
+          >
+            Full Standards
+          </Button>
+          <Button
+            variant={viewMode === 'quick' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('quick')}
+            data-testid="btn-view-quick-reference"
+          >
+            <Zap className="h-3.5 w-3.5 mr-1.5" />
+            Quick Reference
+          </Button>
+        </div>
+      )}
+
+      {viewMode === 'quick' && slug === "service" ? (
+        <ServiceQuickReference content={content} />
+      ) : (
+        <>
+          <Accordion type="multiple" className="space-y-4" defaultValue={populatedGroups.length > 0 ? [`group-${populatedGroups[0].type}`] : []}>
+            {populatedGroups.map(({ type, config, items }) => {
+              const IconComponent = config.icon;
+              const preview = items[0]?.content?.slice(0, 100).replace(/\n/g, " ").trim();
+
+              return (
+                <AccordionItem
+                  key={type}
+                  value={`group-${type}`}
+                  className="border rounded-lg px-4 transition-all duration-200"
+                  data-testid={`accordion-group-${type}`}
+                >
+                  <AccordionTrigger className="hover:no-underline py-4 [&[data-state=open]>div>div>svg]:rotate-0 [&>svg]:transition-transform [&>svg]:duration-200">
+                    <div className="flex flex-col gap-1 text-left w-full mr-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Badge variant="secondary" className={config.color}>
+                          <IconComponent className="h-3 w-3 mr-1" />
+                          {config.label} ({items.length})
+                        </Badge>
+                      </div>
+                      {preview && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 max-w-prose pl-0.5">
+                          {preview}{items[0]?.content && items[0].content.length > 100 ? "..." : ""}
+                        </p>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-4 space-y-4">
+                    {items.map((item) => (
+                      <div key={item.id} className="border-l-2 border-primary/30 pl-4" data-testid={`accordion-item-${item.id}`}>
+                        <h4 className="font-medium text-sm mb-3">{item.title}</h4>
+                        {type === 'checklist' ? (
+                          renderChecklistContent(item.content || '')
+                        ) : type === 'script' ? (
+                          renderScriptContent(item.content || '')
+                        ) : type === 'output' ? (
+                          renderFrameworkContent(item.content || '')
+                        ) : type === 'principle' ? (
+                          <div className="border-l-4 border-primary pl-4 italic text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+                            {item.content}
+                          </div>
+                        ) : (
+                          <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                            {item.content}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+
+          {emptyGroups.length > 0 && slug === "service" && (
+            <div className="mt-4 space-y-3">
+              {emptyGroups.map(({ type, config }) => {
+                const IconComponent = config.icon;
+                return (
+                  <div key={type} className="border border-dashed border-muted-foreground/20 rounded-lg p-4" data-testid={`empty-section-${type}`}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <Badge variant="secondary" className={`${config.color} opacity-60`}>
+                        <IconComponent className="h-3 w-3 mr-1" />
+                        {config.label} (0)
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Add your standards here. They'll appear on the Quick Reference view.
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const contentTypeConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   principle: { icon: Lightbulb, label: "Principle", color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
   output: { icon: FileOutput, label: "Framework", color: "bg-primary/10 text-primary" },
@@ -8104,77 +8489,7 @@ export default function DomainPage() {
         </div>
         {domainLocked ? (
           <UpgradeGate domain={slug || ""}>
-            {(() => {
-              const typeOrder = ["principle", "output", "checklist", "script"] as const;
-              const grouped = typeOrder
-                .map(type => ({
-                  type,
-                  config: contentTypeConfig[type],
-                  items: content.filter(c => c.contentType === type),
-                }))
-                .filter(g => g.items.length > 0);
-
-              if (grouped.length === 0) {
-                return (
-                  <div className="space-y-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <Card key={i}>
-                        <CardContent className="p-6">
-                          <div className="h-5 w-2/3 bg-muted rounded mb-3" />
-                          <div className="h-3 w-full bg-muted/60 rounded mb-2" />
-                          <div className="h-3 w-5/6 bg-muted/60 rounded mb-2" />
-                          <div className="h-3 w-3/4 bg-muted/60 rounded" />
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                );
-              }
-
-              return (
-                <Accordion type="multiple" className="space-y-4" defaultValue={[`group-${grouped[0].type}`]}>
-                  {grouped.map(({ type, config, items }) => {
-                    const IconComponent = config.icon;
-                    const preview = items[0]?.content?.slice(0, 100).replace(/\n/g, " ").trim();
-                    return (
-                      <AccordionItem key={type} value={`group-${type}`} className="border rounded-lg px-4">
-                        <AccordionTrigger className="hover:no-underline py-4">
-                          <div className="flex flex-col gap-1 text-left w-full mr-2">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <Badge variant="secondary" className={config.color}>
-                                <IconComponent className="h-3 w-3 mr-1" />
-                                {config.label} ({items.length})
-                              </Badge>
-                            </div>
-                            {preview && (
-                              <p className="text-xs text-muted-foreground line-clamp-1 pl-0.5">
-                                {preview}{items[0]?.content && items[0].content.length > 100 ? "..." : ""}
-                              </p>
-                            )}
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pb-4 space-y-4">
-                          {items.map((item) => (
-                            <div key={item.id}>
-                              <h4 className="font-medium text-sm mb-2">{item.title}</h4>
-                              <div className={`whitespace-pre-wrap text-sm leading-relaxed ${
-                                item.contentType === 'script' || item.contentType === 'checklist'
-                                  ? 'font-mono bg-muted p-4 rounded-md'
-                                  : item.contentType === 'principle'
-                                  ? 'border-l-4 border-primary pl-4 italic text-muted-foreground'
-                                  : ''
-                              }`}>
-                                {item.content}
-                              </div>
-                            </div>
-                          ))}
-                        </AccordionContent>
-                      </AccordionItem>
-                    );
-                  })}
-                </Accordion>
-              );
-            })()}
+            <ServiceContentAccordion content={content} slug={slug || ""} />
           </UpgradeGate>
         ) : (
         <>
@@ -8182,7 +8497,8 @@ export default function DomainPage() {
         {/* Daily Task Reminder - only show for leadership domain */}
         {slug === "leadership" && <DailyTaskReminder />}
 
-        {/* Guest Recovery Advisor - only show for service domain */}
+        {/* Service Metric Strip + Guest Recovery Advisor - only show for service domain */}
+        {slug === "service" && <ServiceMetricStrip contentCount={content.length} />}
         {slug === "service" && <GuestRecoveryAdvisor />}
 
         {/* Food Cost Calculator - only show for costs domain */}
@@ -8217,66 +8533,7 @@ export default function DomainPage() {
         {slug === "social-media" && <SocialPostBuilder />}
 
         {/* Content Accordion - Grouped by type */}
-        {(() => {
-          const typeOrder = ["principle", "output", "checklist", "script"] as const;
-          const grouped = typeOrder
-            .map(type => ({
-              type,
-              config: contentTypeConfig[type],
-              items: content.filter(c => c.contentType === type),
-            }))
-            .filter(g => g.items.length > 0);
-
-          return (
-            <Accordion type="multiple" className="space-y-4" defaultValue={grouped.length > 0 ? [`group-${grouped[0].type}`] : []}>
-              {grouped.map(({ type, config, items }) => {
-                const IconComponent = config.icon;
-                const preview = items[0]?.content?.slice(0, 100).replace(/\n/g, " ").trim();
-
-                return (
-                  <AccordionItem
-                    key={type}
-                    value={`group-${type}`}
-                    className="border rounded-lg px-4"
-                    data-testid={`accordion-group-${type}`}
-                  >
-                    <AccordionTrigger className="hover:no-underline py-4">
-                      <div className="flex flex-col gap-1 text-left w-full mr-2">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <Badge variant="secondary" className={config.color}>
-                            <IconComponent className="h-3 w-3 mr-1" />
-                            {config.label} ({items.length})
-                          </Badge>
-                        </div>
-                        {preview && (
-                          <p className="text-xs text-muted-foreground line-clamp-1 pl-0.5">
-                            {preview}{items[0]?.content && items[0].content.length > 100 ? "..." : ""}
-                          </p>
-                        )}
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-4 space-y-4">
-                      {items.map((item) => (
-                        <div key={item.id} data-testid={`accordion-item-${item.id}`}>
-                          <h4 className="font-medium text-sm mb-2">{item.title}</h4>
-                          <div className={`whitespace-pre-wrap text-sm leading-relaxed ${
-                            item.contentType === 'script' || item.contentType === 'checklist'
-                              ? 'font-mono bg-muted p-4 rounded-md'
-                              : item.contentType === 'principle'
-                              ? 'border-l-4 border-primary pl-4 italic text-muted-foreground'
-                              : ''
-                          }`}>
-                            {item.content}
-                          </div>
-                        </div>
-                      ))}
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          );
-        })()}
+        <ServiceContentAccordion content={content} slug={slug || ""} />
 
         {/* Back Link */}
         <div className="mt-8 pt-8 border-t border-border">
