@@ -28,7 +28,7 @@ export default function LoginPage() {
       return;
     }
     if (user) {
-      setLocation("/dashboard");
+      setLocation("/");
     }
   }, [user, setLocation]);
 

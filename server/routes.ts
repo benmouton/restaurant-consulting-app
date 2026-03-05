@@ -1210,8 +1210,8 @@ export async function registerRoutes(
         });
       });
 
-      console.log("[APPLE_WEB] Login successful, redirecting to /dashboard");
-      res.redirect("/dashboard");
+      console.log("[APPLE_WEB] Login successful, redirecting to /");
+      res.redirect("/");
     } catch (error: any) {
       console.error("[APPLE_WEB] Callback error:", error.message, error.stack);
       res.redirect("/login?error=apple_auth_failed");
