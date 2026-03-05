@@ -366,23 +366,30 @@ export const socialMediaService = {
     }
     
     const accountsData = await accountsResponse.json();
+    console.log(`[GOOGLE_API] Accounts response:`, JSON.stringify(accountsData).substring(0, 500));
     const accounts = accountsData.accounts || [];
     
     const locations: GoogleLocation[] = [];
     for (const account of accounts) {
+      const locUrl = `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title,storefrontAddress,websiteUri`;
+      console.log(`[GOOGLE_API] Fetching locations from: ${locUrl}`);
       const locResponse = await fetchWithRetry(
-        `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations`,
+        locUrl,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       
       if (locResponse.ok) {
         const locData = await locResponse.json();
+        console.log(`[GOOGLE_API] Locations response for ${account.name}:`, JSON.stringify(locData).substring(0, 500));
         for (const loc of locData.locations || []) {
           locations.push({
             name: loc.name,
             title: loc.title || loc.storefrontAddress?.locality || 'Unknown Location',
           });
         }
+      } else {
+        const errText = await locResponse.text();
+        console.error(`[GOOGLE_API] Failed to fetch locations for ${account.name}: ${locResponse.status} ${errText}`);
       }
     }
     
