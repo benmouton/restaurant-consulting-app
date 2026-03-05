@@ -57,11 +57,7 @@ import {
   Eye,
   Trash2,
   Settings,
-  UserMinus,
-  Timer,
-  MessageCircleWarning,
   Package,
-  ShieldAlert,
   Bell,
   BellRing,
   Save,
@@ -4029,41 +4025,673 @@ interface RestaurantProfile {
   averageFoodCostPercent?: number;
 }
 
-// Quick-fix crisis types for leadership command center
-const QUICK_CRISIS_TYPES = [
-  { id: 'no_show', label: 'Staff No-Show', Icon: UserMinus },
-  { id: 'equipment', label: 'Equipment Failure', Icon: Wrench },
-  { id: 'rush', label: 'Unexpected Rush', Icon: Timer },
-  { id: 'complaint', label: 'Guest Complaint', Icon: MessageCircleWarning },
-  { id: 'delivery', label: 'Delivery Problem', Icon: Package },
-  { id: 'health', label: 'Health/Safety Issue', Icon: ShieldAlert },
+const LCC_CRISIS_TYPES = [
+  { id: "no-show", label: "Staff No-Show", icon: "👤", urgent: true },
+  { id: "equipment", label: "Equipment Failure", icon: "🔧", urgent: true },
+  { id: "rush", label: "Unexpected Rush", icon: "⚡", urgent: false },
+  { id: "complaint", label: "Guest Complaint", icon: "💬", urgent: false },
+  { id: "delivery", label: "Delivery Problem", icon: "📦", urgent: false },
+  { id: "health", label: "Health/Safety Issue", icon: "🛡️", urgent: true },
+];
+
+const TAG_COLORS: Record<string, string> = {
+  Operations: "#f59e0b",
+  Inventory: "#3b82f6",
+  Leadership: "#8b5cf6",
+  Revenue: "#10b981",
+  Training: "#f97316",
+  Staffing: "#ec4899",
+  Service: "#06b6d4",
+  Finance: "#ef4444",
+  Admin: "#6b7280",
+};
+
+const URGENCY_STYLES: Record<string, { dot: string; label: string }> = {
+  high: { dot: "#ef4444", label: "High Priority" },
+  medium: { dot: "#f59e0b", label: "Medium Priority" },
+  low: { dot: "#6b7280", label: "Low Priority" },
+};
+
+interface PriorityTask {
+  id: number;
+  title: string;
+  why: string;
+  action: string;
+  tag: string;
+  urgency: string;
+}
+
+function parsePrioritiesFromText(text: string): PriorityTask[] {
+  const tasks: PriorityTask[] = [];
+  const lines = text.split('\n').filter(l => l.trim());
+  
+  let currentTask: Partial<PriorityTask> | null = null;
+  let taskId = 1;
+  
+  for (const line of lines) {
+    const numberedMatch = line.match(/^\*?\*?\d+[\.\)]\s*\*?\*?\s*(.+)/);
+    if (numberedMatch) {
+      if (currentTask?.title) {
+        tasks.push({
+          id: taskId++,
+          title: currentTask.title,
+          why: currentTask.why || '',
+          action: currentTask.action || currentTask.title,
+          tag: currentTask.tag || 'Operations',
+          urgency: currentTask.urgency || (taskId <= 3 ? 'high' : taskId <= 5 ? 'medium' : 'low'),
+        });
+      }
+      let title = numberedMatch[1].replace(/\*\*/g, '').trim();
+      const colonIdx = title.indexOf(':');
+      let tag = 'Operations';
+      if (colonIdx > 0 && colonIdx < 30) {
+        const possibleTag = title.substring(0, colonIdx).trim();
+        if (TAG_COLORS[possibleTag]) {
+          tag = possibleTag;
+          title = title.substring(colonIdx + 1).trim();
+        }
+      }
+      currentTask = { title, tag, why: '', action: '' };
+    } else if (currentTask) {
+      const lowerLine = line.toLowerCase().trim();
+      if (lowerLine.startsWith('why') || lowerLine.includes('why it matters') || lowerLine.includes('because')) {
+        currentTask.why = line.replace(/^\*?\*?why[:\s]*/i, '').replace(/\*\*/g, '').replace(/^[-–•]\s*/, '').trim();
+      } else if (lowerLine.startsWith('action') || lowerLine.startsWith('do this') || lowerLine.startsWith('step')) {
+        currentTask.action = line.replace(/^\*?\*?action[:\s]*/i, '').replace(/\*\*/g, '').replace(/^[-–•]\s*/, '').trim();
+      } else if (!currentTask.action && !currentTask.why) {
+        currentTask.action = (currentTask.action ? currentTask.action + ' ' : '') + line.replace(/^[-–•]\s*/, '').replace(/\*\*/g, '').trim();
+      } else if (currentTask.why && !line.match(/^\d+[\.\)]/)) {
+        currentTask.why = (currentTask.why ? currentTask.why + ' ' : '') + line.replace(/^[-–•]\s*/, '').replace(/\*\*/g, '').trim();
+      }
+    }
+  }
+  
+  if (currentTask?.title) {
+    tasks.push({
+      id: taskId,
+      title: currentTask.title,
+      why: currentTask.why || '',
+      action: currentTask.action || currentTask.title,
+      tag: currentTask.tag || 'Operations',
+      urgency: taskId <= 2 ? 'high' : taskId <= 4 ? 'medium' : 'low',
+    });
+  }
+  
+  return tasks;
+}
+
+function CCPrioritiesTab({ profile, buildPersonalizedPrompt, onRawTextChange }: { profile: RestaurantProfile | null; buildPersonalizedPrompt: () => string; onRawTextChange?: (text: string) => void }) {
+  const { toast } = useToast();
+  const [state, setState] = useState<"idle" | "loading" | "done">("idle");
+  const [priorities, setPriorities] = useState<PriorityTask[]>([]);
+  const [rawText, setRawText] = useState("");
+  const [completed, setCompleted] = useState<Record<number, boolean>>({});
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  
+  const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+  const handleGenerate = async () => {
+    setState("loading");
+    setRawText("");
+    setPriorities([]);
+    setCompleted({});
+
+    const personalContext = buildPersonalizedPrompt();
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `As an experienced restaurant consultant, provide today's priority tasks for a restaurant owner/operator. Today is ${dayOfWeek}.
+${personalContext}
+Based on typical restaurant operations, provide specific, actionable tasks that should be prioritized on ${dayOfWeek}. Consider:
+
+MONDAY: Week setup, reviewing weekend performance, scheduling adjustments, inventory orders, staff meetings, P&L review from prior week
+TUESDAY: Training focus, vendor deliveries, prep for mid-week, checking reservations, marketing planning
+WEDNESDAY: Mid-week check-in, labor review, guest feedback review, equipment checks, menu adjustments
+THURSDAY: Weekend prep begins, confirming staffing, inventory check, reservations review, pre-weekend briefing prep
+FRIDAY: Peak service prep, final staffing confirmation, quality checks, team briefing, ensuring weekend readiness
+SATURDAY: Full service mode, floor presence, guest engagement, real-time problem solving, team support
+SUNDAY: Wrap-up day, week review, staff appreciation, next week planning, reset and recovery
+
+Format EXACTLY 5 tasks as a numbered list. For each task, include:
+- The task title on the numbered line
+- "Action:" followed by the specific steps to take
+- "Why:" followed by the reason it matters
+
+Be specific to restaurant operations.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate tasks");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setRawText(content);
+              }
+            } catch {}
+          }
+        }
+        onRawTextChange?.(content);
+        const parsed = parsePrioritiesFromText(content);
+        if (parsed.length === 0 && content.trim()) {
+          setPriorities([{
+            id: 1,
+            title: content.split('\n').find(l => l.trim())?.replace(/^\*?\*?\d+[\.\)]\s*/, '').replace(/\*\*/g, '').trim() || "Review today's priorities",
+            why: '',
+            action: content.trim(),
+            tag: 'Operations',
+            urgency: 'medium',
+          }]);
+        } else {
+          setPriorities(parsed);
+        }
+        setState("done");
+      } else {
+        toast({ title: "Failed to generate tasks", variant: "destructive" });
+        setState("idle");
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate tasks", variant: "destructive" });
+      setState("idle");
+    }
+  };
+
+  const toggleComplete = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCompleted((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  if (state === "idle") {
+    return (
+      <div style={{ padding: "8px 0 4px" }}>
+        <p style={{ color: "#9ca3af", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+          Get personalized task recommendations for your restaurant today.
+        </p>
+        <button
+          onClick={handleGenerate}
+          data-testid="btn-generate-daily-tasks"
+          style={{
+            width: "100%",
+            padding: "14px 20px",
+            background: "linear-gradient(135deg, #d97706, #b45309)",
+            border: "none",
+            borderRadius: 10,
+            color: "#fff",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            letterSpacing: "0.01em",
+          }}
+        >
+          <span>✦</span> Get Today's Priorities
+        </button>
+      </div>
+    );
+  }
+
+  if (state === "loading") {
+    return (
+      <div style={{ padding: "24px 0", textAlign: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: "#d97706", marginBottom: 12 }}>
+          <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#d97706" }} />
+          <span style={{ fontSize: 14, fontWeight: 500 }}>Generating your {dayOfWeek} priorities…</span>
+        </div>
+        <div style={{ height: 3, background: "#1f2937", borderRadius: 99, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: "60%", background: "linear-gradient(90deg, #d97706, #f59e0b)", borderRadius: 99, animation: "lcc-progress 2s ease-in-out forwards" }} />
+        </div>
+        {rawText && (
+          <div style={{ marginTop: 16, padding: "12px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 10, textAlign: "left" }}>
+            <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{rawText}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const completedCount = Object.values(completed).filter(Boolean).length;
+  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
+  return (
+    <div style={{ paddingTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: "#6b7280" }}>
+          {todayLabel} · {priorities.length} priorities
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "#d97706", fontWeight: 600 }}>
+            {completedCount}/{priorities.length} done
+          </div>
+          <button
+            onClick={handleGenerate}
+            data-testid="btn-refresh-priorities"
+            style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 14, padding: 2 }}
+            title="Refresh priorities"
+          >
+            ↻
+          </button>
+        </div>
+      </div>
+
+      <div style={{ height: 3, background: "#1f2937", borderRadius: 99, marginBottom: 16, overflow: "hidden" }}>
+        <div style={{
+          height: "100%",
+          width: priorities.length > 0 ? `${(completedCount / priorities.length) * 100}%` : "0%",
+          background: "linear-gradient(90deg, #d97706, #f59e0b)",
+          borderRadius: 99,
+          transition: "width 0.4s ease",
+        }} />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {priorities.map((task, i) => {
+          const isExpanded = expandedId === task.id;
+          const isDone = completed[task.id];
+          return (
+            <div
+              key={task.id}
+              onClick={() => setExpandedId(isExpanded ? null : task.id)}
+              data-testid={`priority-card-${task.id}`}
+              style={{
+                background: isDone ? "rgba(16,185,129,0.06)" : "#111827",
+                border: `1px solid ${isDone ? "rgba(16,185,129,0.2)" : isExpanded ? "rgba(217,119,6,0.4)" : "#1f2937"}`,
+                borderRadius: 10,
+                padding: "12px 14px",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                opacity: isDone ? 0.65 : 1,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <button
+                  onClick={(e) => toggleComplete(task.id, e)}
+                  data-testid={`priority-check-${task.id}`}
+                  style={{
+                    width: 20, height: 20, borderRadius: 6,
+                    border: `2px solid ${isDone ? "#10b981" : "#374151"}`,
+                    background: isDone ? "#10b981" : "transparent",
+                    color: "#fff", fontSize: 11, display: "flex",
+                    alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", flexShrink: 0, marginTop: 1,
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {isDone && "✓"}
+                </button>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <div style={{
+                      width: 6, height: 6, borderRadius: "50%",
+                      background: URGENCY_STYLES[task.urgency]?.dot || "#6b7280", flexShrink: 0,
+                    }} />
+                    <span style={{
+                      fontSize: 13, fontWeight: 600, color: isDone ? "#6b7280" : "#f3f4f6",
+                      textDecoration: isDone ? "line-through" : "none",
+                      lineHeight: 1.3,
+                    }}>
+                      {i + 1}. {task.title}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, color: TAG_COLORS[task.tag] || "#9ca3af",
+                      background: `${TAG_COLORS[task.tag] || "#9ca3af"}18`,
+                      padding: "2px 7px", borderRadius: 99, letterSpacing: "0.04em",
+                    }}>
+                      {task.tag.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {isExpanded && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1f2937" }}>
+                      {task.action && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.08em", marginBottom: 4 }}>ACTION</div>
+                          <p style={{ fontSize: 13, color: "#d1d5db", lineHeight: 1.6, margin: 0 }}>{task.action}</p>
+                        </div>
+                      )}
+                      {task.why && (
+                        <div style={{ borderLeft: "3px solid #d97706", paddingLeft: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.08em", marginBottom: 4 }}>WHY IT MATTERS</div>
+                          <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>{task.why}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <span style={{ color: "#374151", fontSize: 12, flexShrink: 0, marginTop: 2 }}>
+                  {isExpanded ? "▲" : "▼"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CCCrisisTab({ buildPersonalizedPrompt }: { buildPersonalizedPrompt: () => string }) {
+  const { toast } = useToast();
+  const [selected, setSelected] = useState<typeof LCC_CRISIS_TYPES[0] | null>(null);
+  const [response, setResponse] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleCrisis = async (crisis: typeof LCC_CRISIS_TYPES[0]) => {
+    setSelected(crisis);
+    setLoading(true);
+    setResponse("");
+
+    const personalContext = buildPersonalizedPrompt();
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `URGENT: I'm dealing with a ${crisis.label} right now and need immediate help.
+${personalContext}
+Provide a 5-step crisis response plan that I can execute RIGHT NOW:
+1. Immediate action (what to do in the next 5 minutes)
+2. Short-term fix (next 30 minutes)
+3. Communication plan (who to notify and what to say)
+4. Guest impact mitigation
+5. Follow-up action (within 24 hours)
+
+Keep it practical, actionable, and specific to restaurant operations. No fluff - I need real solutions fast.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to generate crisis response");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+                setResponse(content);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      toast({ title: "Failed to generate crisis response", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatResponse = (text: string) => {
+    return text.split("\n").map((line, i) => {
+      if (line.startsWith("**") && line.endsWith("**")) {
+        return <div key={i} style={{ fontWeight: 700, color: "#f3f4f6", marginTop: i > 0 ? 12 : 0, marginBottom: 6, fontSize: 13 }}>{line.replace(/\*\*/g, "")}</div>;
+      }
+      if (line.match(/^\d+\./)) {
+        const numMatch = line.match(/^\d+/);
+        return <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+          <span style={{ color: "#d97706", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>{numMatch?.[0]}.</span>
+          <span style={{ color: "#d1d5db", fontSize: 13, lineHeight: 1.5 }}>{line.replace(/^\d+\.\s/, "").replace(/\*\*/g, "")}</span>
+        </div>;
+      }
+      if (line.trim() === "") return <div key={i} style={{ height: 4 }} />;
+      return <div key={i} style={{ color: "#d1d5db", fontSize: 13, lineHeight: 1.5 }}>{line.replace(/\*\*/g, "")}</div>;
+    });
+  };
+
+  if (selected) {
+    return (
+      <div>
+        <button
+          onClick={() => { setSelected(null); setResponse(""); }}
+          data-testid="btn-crisis-back"
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#6b7280", fontSize: 13, cursor: "pointer", marginBottom: 14, padding: 0 }}
+        >
+          ← Back to Crisis Menu
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 20 }}>{selected.icon}</span>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#f3f4f6" }}>{selected.label}</div>
+            {selected.urgent && <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, letterSpacing: "0.05em" }}>HIGH URGENCY</div>}
+          </div>
+        </div>
+        <div style={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 10, padding: "14px 16px", minHeight: 120 }}>
+          {loading && !response ? (
+            <div style={{ color: "#d97706", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+              <Loader2 className="h-4 w-4 animate-spin" style={{ color: "#d97706" }} />
+              Getting guidance…
+            </div>
+          ) : response ? (
+            <div>{formatResponse(response)}</div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ color: "#ef4444", fontSize: 16 }}>⚠</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#fca5a5" }}>Quick Fix Mode</div>
+          <div style={{ fontSize: 12, color: "#9ca3af" }}>Immediate step-by-step guidance for common emergencies.</div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {LCC_CRISIS_TYPES.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => handleCrisis(c)}
+            data-testid={`btn-crisis-${c.id}`}
+            style={{
+              background: "#111827",
+              border: `1px solid ${c.urgent ? "rgba(239,68,68,0.2)" : "#1f2937"}`,
+              borderRadius: 10,
+              padding: "14px 12px",
+              cursor: "pointer",
+              textAlign: "left" as const,
+              transition: "all 0.15s",
+              position: "relative" as const,
+            }}
+          >
+            {c.urgent && (
+              <div style={{ position: "absolute" as const, top: 8, right: 8, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }} />
+            )}
+            <div style={{ fontSize: 20, marginBottom: 6 }}>{c.icon}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#f3f4f6" }}>{c.label}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CCFollowUpTab({ buildPersonalizedPrompt, rawPrioritiesText }: { buildPersonalizedPrompt: () => string; rawPrioritiesText: string }) {
+  const { toast } = useToast();
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const handleAsk = async () => {
+    if (!question.trim()) return;
+    const q = question;
+    setQuestion("");
+    setMessages((prev) => [...prev, { role: "user", text: q }]);
+    setLoading(true);
+
+    const personalContext = buildPersonalizedPrompt();
+    const previousContext = rawPrioritiesText ? `\n\nPrevious priorities generated:\n${rawPrioritiesText}` : '';
+    const chatContext = messages.length > 0
+      ? `\n\nPrevious conversation:\n${messages.map(m => `${m.role}: ${m.text}`).join('\n')}`
+      : '';
+
+    try {
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `You are helping a restaurant owner/operator with their daily operations.
+${personalContext}${previousContext}${chatContext}
+
+User's follow-up question: ${q}
+
+Provide a helpful, specific response. Be concise but thorough.`,
+        }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed to get response");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                content += data.content;
+              }
+            } catch {}
+          }
+        }
+        setMessages((prev) => [...prev, { role: "assistant", text: content }]);
+      }
+    } catch (err) {
+      toast({ title: "Failed to get response", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <p style={{ color: "#9ca3af", fontSize: 13, marginBottom: 12, lineHeight: 1.5 }}>
+        Ask follow-up questions about your priorities or get deeper guidance on any topic.
+      </p>
+
+      {messages.length > 0 && (
+        <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+          {messages.map((m, i) => (
+            <div key={i} style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: m.role === "user" ? "rgba(217,119,6,0.1)" : "#111827",
+              border: `1px solid ${m.role === "user" ? "rgba(217,119,6,0.2)" : "#1f2937"}`,
+              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+              maxWidth: "92%",
+            }}>
+              <div style={{ fontSize: 13, color: m.role === "user" ? "#fcd34d" : "#d1d5db", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.text}</div>
+            </div>
+          ))}
+          {loading && (
+            <div style={{ padding: "10px 14px", background: "#111827", border: "1px solid #1f2937", borderRadius: 10, alignSelf: "flex-start" }}>
+              <Loader2 className="h-4 w-4 animate-spin" style={{ color: "#d97706" }} />
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAsk(); }}}
+          placeholder="e.g., 'How should I handle labor assessment for my 20-person team?'"
+          rows={3}
+          data-testid="input-followup"
+          style={{
+            width: "100%", padding: "12px 14px",
+            background: "#111827", border: "1px solid #1f2937",
+            borderRadius: 10, color: "#f3f4f6", fontSize: 13,
+            resize: "none", fontFamily: "inherit", outline: "none",
+            lineHeight: 1.5, boxSizing: "border-box" as const,
+          }}
+        />
+        <button
+          onClick={handleAsk}
+          disabled={!question.trim() || loading}
+          data-testid="btn-send-followup"
+          style={{
+            padding: "12px 20px",
+            background: question.trim() && !loading ? "linear-gradient(135deg, #d97706, #b45309)" : "#1f2937",
+            border: "none", borderRadius: 10,
+            color: question.trim() && !loading ? "#fff" : "#4b5563",
+            fontSize: 14, fontWeight: 600, cursor: question.trim() && !loading ? "pointer" : "not-allowed",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          }}
+        >
+          ✦ Ask Question
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const LCC_TABS = [
+  { id: "priorities", label: "Priorities", icon: "✦" },
+  { id: "crisis", label: "Crisis", icon: "⚠" },
+  { id: "followup", label: "Follow-up", icon: "💬" },
+  { id: "progress", label: "Progress", icon: "✓" },
+  { id: "reminders", label: "Reminders", icon: "🔔" },
 ];
 
 function DailyTaskReminder() {
   const { toast } = useToast();
-  const { permissions } = useRole();
-  const [tasks, setTasks] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastGenerated, setLastGenerated] = useState<string>("");
-  const [staffMessage, setStaffMessage] = useState<string>("");
-  const [isGeneratingStaffMessage, setIsGeneratingStaffMessage] = useState(false);
-  
-  // New states for enhanced features
+  const [activeTab, setActiveTab] = useState("priorities");
   const [profile, setProfile] = useState<RestaurantProfile | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [activeTab, setActiveTab] = useState<'priorities' | 'crisis' | 'chat' | 'progress' | 'reminders'>('priorities');
-  const [crisisType, setCrisisType] = useState<string>('');
-  const [crisisResponse, setCrisisResponse] = useState<string>('');
-  const [isGeneratingCrisis, setIsGeneratingCrisis] = useState(false);
-  const [followUpQuestion, setFollowUpQuestion] = useState('');
-  const [chatHistory, setChatHistory] = useState<{role: string; content: string}[]>([]);
-  const [isChattingLoading, setIsChattingLoading] = useState(false);
+  const [rawPrioritiesText, setRawPrioritiesText] = useState("");
 
   const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-  const todayDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  // Load restaurant profile on mount
   useEffect(() => {
     loadProfile();
   }, []);
@@ -4074,9 +4702,7 @@ function DailyTaskReminder() {
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
-        if (!data) {
-          setShowProfileSetup(true);
-        }
+        if (!data) setShowProfileSetup(true);
       } else {
         setShowProfileSetup(true);
       }
@@ -4110,7 +4736,7 @@ function DailyTaskReminder() {
   const buildPersonalizedPrompt = () => {
     let contextBlock = '';
     if (profile) {
-      const parts = [];
+      const parts: string[] = [];
       if (profile.restaurantName) parts.push(`Restaurant: ${profile.restaurantName}`);
       if (profile.restaurantType) parts.push(`Type: ${profile.restaurantType.replace('_', ' ')}`);
       if (profile.seatCount) parts.push(`Seats: ${profile.seatCount}`);
@@ -4122,7 +4748,6 @@ function DailyTaskReminder() {
       if (profile.keyChallenge2) parts.push(`Secondary challenge: ${profile.keyChallenge2.replace('_', ' ')}`);
       if (profile.averageLaborPercent) parts.push(`Target labor: ${profile.averageLaborPercent}%`);
       if (profile.averageFoodCostPercent) parts.push(`Target food cost: ${profile.averageFoodCostPercent}%`);
-      
       if (parts.length > 0) {
         contextBlock = `\n\nRESTAURANT CONTEXT:\n${parts.join('\n')}\n\nPersonalize your recommendations based on this specific restaurant's profile, challenges, and operation style.`;
       }
@@ -4130,275 +4755,24 @@ function DailyTaskReminder() {
     return contextBlock;
   };
 
-  const generateDailyTasks = async () => {
-    setIsLoading(true);
-    setTasks("");
-
-    const personalContext = buildPersonalizedPrompt();
-
-    try {
-      const res = await fetch("/api/consultant/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: `As an experienced restaurant consultant, provide today's priority tasks for a restaurant owner/operator. Today is ${dayOfWeek}.
-${personalContext}
-Based on typical restaurant operations, provide specific, actionable tasks that should be prioritized on ${dayOfWeek}. Consider:
-
-MONDAY: Week setup, reviewing weekend performance, scheduling adjustments, inventory orders, staff meetings, P&L review from prior week
-TUESDAY: Training focus, vendor deliveries, prep for mid-week, checking reservations, marketing planning
-WEDNESDAY: Mid-week check-in, labor review, guest feedback review, equipment checks, menu adjustments
-THURSDAY: Weekend prep begins, confirming staffing, inventory check, reservations review, pre-weekend briefing prep
-FRIDAY: Peak service prep, final staffing confirmation, quality checks, team briefing, ensuring weekend readiness
-SATURDAY: Full service mode, floor presence, guest engagement, real-time problem solving, team support
-SUNDAY: Wrap-up day, week review, staff appreciation, next week planning, reset and recovery
-
-Format as a clear, prioritized list with 5-7 specific tasks for TODAY (${dayOfWeek}). Each task should be actionable and include the "why" behind it. Be specific to restaurant operations.`,
-        }),
-        credentials: "include",
-      });
-
-      if (!res.ok) throw new Error("Failed to generate tasks");
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let content = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                content += data.content;
-                setTasks(content);
-              }
-            } catch {}
-          }
-        }
-        setLastGenerated(new Date().toLocaleTimeString());
-      }
-    } catch (err) {
-      toast({ title: "Failed to generate tasks", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCrisisMode = async (type: string) => {
-    setCrisisType(type);
-    setIsGeneratingCrisis(true);
-    setCrisisResponse("");
-
-    const crisisLabel = QUICK_CRISIS_TYPES.find(c => c.id === type)?.label || type;
-    const personalContext = buildPersonalizedPrompt();
-
-    try {
-      const res = await fetch("/api/consultant/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: `URGENT: I'm dealing with a ${crisisLabel} right now and need immediate help.
-${personalContext}
-Provide a 5-step crisis response plan that I can execute RIGHT NOW:
-1. Immediate action (what to do in the next 5 minutes)
-2. Short-term fix (next 30 minutes)
-3. Communication plan (who to notify and what to say)
-4. Guest impact mitigation
-5. Follow-up action (within 24 hours)
-
-Keep it practical, actionable, and specific to restaurant operations. No fluff - I need real solutions fast.`,
-        }),
-        credentials: "include",
-      });
-
-      if (!res.ok) throw new Error("Failed to generate crisis response");
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let content = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                content += data.content;
-                setCrisisResponse(content);
-              }
-            } catch {}
-          }
-        }
-      }
-    } catch (err) {
-      toast({ title: "Failed to generate crisis response", variant: "destructive" });
-    } finally {
-      setIsGeneratingCrisis(false);
-    }
-  };
-
-  const handleFollowUp = async () => {
-    if (!followUpQuestion.trim()) return;
-    
-    const userMessage = followUpQuestion.trim();
-    setFollowUpQuestion('');
-    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
-    setIsChattingLoading(true);
-
-    const personalContext = buildPersonalizedPrompt();
-    const previousContext = tasks ? `\n\nPrevious priorities generated:\n${tasks}` : '';
-    const chatContext = chatHistory.length > 0 
-      ? `\n\nPrevious conversation:\n${chatHistory.map(m => `${m.role}: ${m.content}`).join('\n')}`
-      : '';
-
-    try {
-      const res = await fetch("/api/consultant/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: `You are helping a restaurant owner/operator with their daily operations.
-${personalContext}${previousContext}${chatContext}
-
-User's follow-up question: ${userMessage}
-
-Provide a helpful, specific response. Be concise but thorough.`,
-        }),
-        credentials: "include",
-      });
-
-      if (!res.ok) throw new Error("Failed to get response");
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let content = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                content += data.content;
-              }
-            } catch {}
-          }
-        }
-        setChatHistory(prev => [...prev, { role: 'assistant', content }]);
-      }
-    } catch (err) {
-      toast({ title: "Failed to get response", variant: "destructive" });
-    } finally {
-      setIsChattingLoading(false);
-    }
-  };
-
-  const generateStaffMessage = async () => {
-    if (!tasks) return;
-    
-    setIsGeneratingStaffMessage(true);
-    setStaffMessage("");
-
-    try {
-      const res = await fetch("/api/consultant/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: `Convert the following operator priorities into a friendly, motivational message for restaurant staff. 
-
-The message should:
-- Be warm and encouraging in tone
-- Focus on what the TEAM needs to accomplish today
-- Remove any management-only details (like P&L review, vendor negotiations, etc.)
-- Be concise and easy to read on a phone
-- Start with a greeting like "Hey team!" or "Good morning team!"
-- End with something motivational
-- Use simple bullet points for key priorities
-- Keep it under 200 words
-
-Here are today's operator priorities to convert:
-
-${tasks}
-
-Generate ONLY the staff message, nothing else.`,
-        }),
-        credentials: "include",
-      });
-
-      if (!res.ok) throw new Error("Failed to generate staff message");
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let content = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                content += data.content;
-                setStaffMessage(content);
-              }
-            } catch {}
-          }
-        }
-      }
-    } catch (err) {
-      toast({ title: "Failed to generate staff message", variant: "destructive" });
-    } finally {
-      setIsGeneratingStaffMessage(false);
-    }
-  };
-
-  const copyStaffMessageToClipboard = async () => {
-    if (!staffMessage) return;
-    
-    try {
-      await navigator.clipboard.writeText(staffMessage);
-      toast({ title: "Copied to clipboard!", description: "Ready to paste into your staff messaging app" });
-    } catch (err) {
-      toast({ title: "Failed to copy", variant: "destructive" });
-    }
-  };
-
   if (isLoadingProfile) {
     return (
-      <Card className="mb-8">
-        <CardContent className="py-8 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <div className="mb-8" style={{ background: "#0f172a", border: "1px solid #1f2937", borderRadius: 16, padding: "32px", display: "flex", justifyContent: "center" }}>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
+  const tabContent: Record<string, JSX.Element> = {
+    priorities: <CCPrioritiesTab profile={profile} buildPersonalizedPrompt={buildPersonalizedPrompt} onRawTextChange={setRawPrioritiesText} />,
+    crisis: <CCCrisisTab buildPersonalizedPrompt={buildPersonalizedPrompt} />,
+    followup: <CCFollowUpTab buildPersonalizedPrompt={buildPersonalizedPrompt} rawPrioritiesText={rawPrioritiesText} />,
+    progress: <TaskProgressDashboard />,
+    reminders: <NotificationReminders />,
+  };
+
   return (
     <>
-      {/* Profile Setup Dialog */}
       <Dialog open={showProfileSetup} onOpenChange={setShowProfileSetup}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -4418,275 +4792,71 @@ Generate ONLY the staff message, nothing else.`,
         </DialogContent>
       </Dialog>
 
-      <Card className="mb-8">
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
+      <style>{`
+        @keyframes lcc-progress { from { width: 0%; } to { width: 80%; } }
+      `}</style>
+
+      <div className="mb-8" style={{ background: "#0f172a", border: "1px solid #1f2937", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px 0", borderBottom: "1px solid #1f2937" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                Leadership Command Center
-              </CardTitle>
-              <CardDescription className="mt-1">
-                <span className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  {dayOfWeek}, {todayDate}
-                  {profile?.restaurantName && (
-                    <Badge variant="secondary" className="ml-2">{profile.restaurantName}</Badge>
-                  )}
-                </span>
-              </CardDescription>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ color: "#d97706", fontSize: 16 }}>📅</span>
+                <span style={{ fontSize: 17, fontWeight: 700, color: "#f3f4f6" }}>Leadership Command Center</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 24, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>🕐 {todayDate}</span>
+                {profile?.restaurantName && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#d97706", background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.2)", padding: "2px 8px", borderRadius: 99 }}>
+                    {profile.restaurantName}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {lastGenerated && (
-                <span className="text-xs text-muted-foreground">
-                  Last: {lastGenerated}
-                </span>
-              )}
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => setShowProfileSetup(true)}
-                data-testid="btn-edit-profile"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
+            <button
+              onClick={() => setShowProfileSetup(true)}
+              data-testid="btn-edit-profile"
+              style={{ background: "none", border: "none", color: "#4b5563", cursor: "pointer", fontSize: 18, padding: 4 }}
+            >
+              ⚙
+            </button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Tab Navigation */}
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="priorities" data-testid="tab-priorities">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Priorities
-              </TabsTrigger>
-              <TabsTrigger value="crisis" data-testid="tab-crisis">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Crisis
-              </TabsTrigger>
-              <TabsTrigger value="chat" data-testid="tab-chat">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Follow-up
-              </TabsTrigger>
-              <TabsTrigger value="progress" data-testid="tab-progress">
-                <CheckSquare className="h-4 w-4 mr-2" />
-                Progress
-              </TabsTrigger>
-              <TabsTrigger value="reminders" data-testid="tab-reminders">
-                <Bell className="h-4 w-4 mr-2" />
-                Reminders
-              </TabsTrigger>
-            </TabsList>
 
-            {/* Priorities Tab */}
-            <TabsContent value="priorities" className="space-y-4 mt-4">
-              <p className="text-sm text-muted-foreground">
-                Get task recommendations personalized for your restaurant on {dayOfWeek}s.
-              </p>
-
-              <Button 
-                onClick={generateDailyTasks} 
-                disabled={isLoading}
-                className="w-full"
-                data-testid="btn-generate-daily-tasks"
+          <div style={{ display: "flex", gap: 0, marginBottom: "-1px" }}>
+            {LCC_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                data-testid={`tab-${tab.id}`}
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  background: "none",
+                  border: "none",
+                  borderBottom: `2px solid ${activeTab === tab.id ? "#d97706" : "transparent"}`,
+                  color: activeTab === tab.id ? "#d97706" : "#4b5563",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  letterSpacing: "0.03em",
+                  transition: "all 0.15s",
+                  display: "flex",
+                  flexDirection: "column" as const,
+                  alignItems: "center",
+                  gap: 3,
+                }}
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating your {dayOfWeek} priorities...
-                  </>
-                ) : tasks ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Today's Priorities
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Get Today's Priorities
-                  </>
-                )}
-              </Button>
+                <span style={{ fontSize: tab.id === "reminders" ? 13 : 14 }}>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-              {tasks && (
-                <div className="mt-4 p-4 bg-accent/50 rounded-lg">
-                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                    {tasks}
-                  </div>
-                </div>
-              )}
-
-              {tasks && permissions.canSendToStaff && (
-                <div className="mt-6 pt-4 border-t border-border">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Send to Staff</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Convert today's priorities into a friendly team message ready to share.
-                  </p>
-                  
-                  {!staffMessage ? (
-                    <Button 
-                      onClick={generateStaffMessage} 
-                      disabled={isGeneratingStaffMessage}
-                      variant="outline"
-                      className="w-full"
-                      data-testid="btn-generate-staff-message"
-                    >
-                      {isGeneratingStaffMessage ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Creating team message...
-                        </>
-                      ) : (
-                        <>
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Generate Staff Message
-                        </>
-                      )}
-                    </Button>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                        <div className="text-sm whitespace-pre-wrap">
-                          {staffMessage}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          onClick={copyStaffMessageToClipboard}
-                          className="flex-1"
-                          data-testid="btn-copy-staff-message"
-                        >
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy to Clipboard
-                        </Button>
-                        <Button 
-                          onClick={generateStaffMessage} 
-                          disabled={isGeneratingStaffMessage}
-                          variant="outline"
-                          data-testid="btn-regenerate-staff-message"
-                        >
-                          {isGeneratingStaffMessage ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Crisis Mode Tab */}
-            <TabsContent value="crisis" className="space-y-4 mt-4">
-              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <p className="text-sm font-medium text-destructive flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  Quick Fix Mode
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Get immediate step-by-step guidance for common restaurant emergencies.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {QUICK_CRISIS_TYPES.map((crisis) => (
-                  <Button
-                    key={crisis.id}
-                    variant={crisisType === crisis.id ? "default" : "outline"}
-                    className="h-auto py-3 flex flex-col items-center gap-1"
-                    onClick={() => handleCrisisMode(crisis.id)}
-                    disabled={isGeneratingCrisis}
-                    data-testid={`btn-crisis-${crisis.id}`}
-                  >
-                    <crisis.Icon className="h-5 w-5" />
-                    <span className="text-xs">{crisis.label}</span>
-                  </Button>
-                ))}
-              </div>
-
-              {isGeneratingCrisis && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="ml-2 text-sm">Generating crisis response...</span>
-                </div>
-              )}
-
-              {crisisResponse && !isGeneratingCrisis && (
-                <div className="p-4 bg-accent/50 rounded-lg">
-                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                    {crisisResponse}
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Chat/Follow-up Tab */}
-            <TabsContent value="chat" className="space-y-4 mt-4">
-              <p className="text-sm text-muted-foreground">
-                Ask follow-up questions about your priorities or get deeper guidance on any topic.
-              </p>
-
-              {/* Chat History */}
-              {chatHistory.length > 0 && (
-                <div className="space-y-3 max-h-64 overflow-y-auto p-2 bg-muted/30 rounded-lg">
-                  {chatHistory.map((msg, idx) => (
-                    <div key={idx} className={`p-3 rounded-lg ${msg.role === 'user' ? 'bg-primary/10 ml-8' : 'bg-accent mr-8'}`}>
-                      <p className="text-xs font-medium mb-1 text-muted-foreground">
-                        {msg.role === 'user' ? 'You' : 'Consultant'}
-                      </p>
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Ask a follow-up question... e.g., 'How should I handle labor assessment for my 20-person team?'"
-                  value={followUpQuestion}
-                  onChange={(e) => setFollowUpQuestion(e.target.value)}
-                  className="flex-1 min-h-[80px]"
-                  data-testid="input-followup"
-                />
-              </div>
-              <Button 
-                onClick={handleFollowUp}
-                disabled={isChattingLoading || !followUpQuestion.trim()}
-                className="w-full"
-                data-testid="btn-send-followup"
-              >
-                {isChattingLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Getting response...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Ask Question
-                  </>
-                )}
-              </Button>
-            </TabsContent>
-
-            {/* Progress Tracking Tab */}
-            <TabsContent value="progress" className="space-y-4 mt-4">
-              <TaskProgressDashboard />
-            </TabsContent>
-
-            {/* Reminders Tab */}
-            <TabsContent value="reminders" className="space-y-4 mt-4">
-              <NotificationReminders />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        <div style={{ padding: "18px 20px" }}>
+          {tabContent[activeTab]}
+        </div>
+      </div>
     </>
   );
 }
