@@ -137,15 +137,76 @@ const FOOD_COST_PRESETS = [
   { label: "Quick Service", value: "25" },
 ];
 
+const CATEGORY_DOTS: Record<string, string> = {
+  protein: '#f59e0b',
+  produce: '#f97316',
+  dairy: '#3b82f6',
+  dry_goods: '#9ca3af',
+  other: '#ffffff',
+};
+
+function MarginStatusStrip() {
+  const { data: savedPlates } = useQuery<any[]>({ queryKey: ["/api/plates"] });
+  const { data: foodCostPeriods } = useQuery<any[]>({ queryKey: ["/api/food-cost-periods"] });
+
+  const plateCount = savedPlates?.length || 0;
+  const highestCost = savedPlates && savedPlates.length > 0
+    ? savedPlates.reduce((max: any, p: any) => parseFloat(p.totalCost) > parseFloat(max.totalCost) ? p : max, savedPlates[0])
+    : null;
+
+  const avgFC = foodCostPeriods && foodCostPeriods.length > 0
+    ? foodCostPeriods.reduce((sum: number, p: any) => sum + parseFloat(p.actualFoodCostPercent || "0"), 0) / foodCostPeriods.length
+    : null;
+  const avgTarget = foodCostPeriods && foodCostPeriods.length > 0
+    ? parseFloat(foodCostPeriods[0].targetFoodCostPercent || "28")
+    : 28;
+  const avgFCColor = avgFC !== null
+    ? avgFC <= avgTarget ? '#22c55e' : avgFC <= avgTarget + 3 ? '#f59e0b' : '#ef4444'
+    : '#9ca3af';
+
+  const lastPeriod = foodCostPeriods && foodCostPeriods.length > 0 ? foodCostPeriods[0] : null;
+  const lastPeriodStatus = lastPeriod
+    ? parseFloat(lastPeriod.actualFoodCostPercent) <= parseFloat(lastPeriod.targetFoodCostPercent)
+      ? `On target · ${lastPeriod.actualFoodCostPercent}%`
+      : `Over target · ${lastPeriod.actualFoodCostPercent}%`
+    : null;
+  const lastPeriodColor = lastPeriod
+    ? parseFloat(lastPeriod.actualFoodCostPercent) <= parseFloat(lastPeriod.targetFoodCostPercent) ? '#22c55e' : '#f59e0b'
+    : '#9ca3af';
+
+  const cards = [
+    { label: "Average Food Cost %", value: avgFC !== null ? `${avgFC.toFixed(1)}%` : "No data yet", color: avgFCColor, muted: avgFC === null },
+    { label: "Plates Costed", value: plateCount > 0 ? `${plateCount} plates saved` : "0 plates saved", color: '#d4a017', muted: plateCount === 0 },
+    { label: "Highest Cost Plate", value: highestCost ? `${highestCost.name} · $${highestCost.totalCost}` : "--", color: '#d4a017', muted: !highestCost },
+    { label: "Last Weekly Check", value: lastPeriod ? new Date(lastPeriod.periodEnd).toLocaleDateString() : "No check saved", sub: lastPeriodStatus, color: lastPeriodColor, muted: !lastPeriod },
+  ];
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="margin-status-strip">
+      {cards.map((card: any, i: number) => (
+        <div key={i} className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+          <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>{card.label}</p>
+          <p className={`text-sm font-semibold truncate ${card.muted ? 'text-gray-500' : ''}`} style={!card.muted ? { color: card.color } : undefined} data-testid={`margin-strip-${i}`}>{card.value}</p>
+          {card.sub && <p className="text-xs mt-0.5" style={{ color: card.color }}>{card.sub}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FoodCostCalculator() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("plate-builder");
-  
+  const [showIngredientLibrary, setShowIngredientLibrary] = useState(false);
+  const [plateSaved, setPlateSaved] = useState(false);
+  const [weeklySaved, setWeeklySaved] = useState(false);
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+
   const [plateName, setPlateName] = useState("");
   const [plateIngredients, setPlateIngredients] = useState<PlateIngredient[]>([]);
   const [targetFoodCost, setTargetFoodCost] = useState("28");
   const [menuPrice, setMenuPrice] = useState("");
-  
+
   const [newIngredient, setNewIngredient] = useState({
     name: "",
     quantity: "",
@@ -153,11 +214,38 @@ function FoodCostCalculator() {
     costPerUnit: "",
     category: "other",
   });
-  
+
   const [weeklyPurchases, setWeeklyPurchases] = useState("");
   const [weeklySales, setWeeklySales] = useState("");
   const [targetWeeklyFC, setTargetWeeklyFC] = useState("28");
-  
+
+  const [localLibrary, setLocalLibrary] = useState<any[]>(() => {
+    try {
+      if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('trc_ingredient_library') || '[]');
+      return [];
+    } catch { return []; }
+  });
+
+  const saveToLocalLibrary = (ing: PlateIngredient) => {
+    const entry = { name: ing.name, quantity: ing.quantity, unit: ing.unit, costPerUnit: ing.costPerUnit, category: ing.category };
+    const exists = localLibrary.some((l: any) => l.name === ing.name && l.unit === ing.unit);
+    if (exists) { toast({ title: `${ing.name} is already in your library` }); return; }
+    const updated = [...localLibrary, entry];
+    setLocalLibrary(updated);
+    localStorage.setItem('trc_ingredient_library', JSON.stringify(updated));
+    toast({ title: `${ing.name} saved to your ingredient library!` });
+  };
+
+  const removeFromLocalLibrary = (idx: number) => {
+    const updated = localLibrary.filter((_: any, i: number) => i !== idx);
+    setLocalLibrary(updated);
+    localStorage.setItem('trc_ingredient_library', JSON.stringify(updated));
+  };
+
+  const loadFromLibrary = (lib: any) => {
+    setNewIngredient({ name: lib.name, quantity: lib.quantity || "", unit: lib.unit, costPerUnit: lib.costPerUnit, category: lib.category });
+  };
+
   const { data: savedIngredients } = useQuery<any[]>({
     queryKey: ["/api/ingredients"],
   });
@@ -178,6 +266,15 @@ function FoodCostCalculator() {
     return qty * cost * wasteMultiplier;
   };
 
+  const liveCostPreview = useMemo(() => {
+    if (!newIngredient.name || !newIngredient.quantity || !newIngredient.costPerUnit) return null;
+    const cost = calculateIngredientCost(newIngredient);
+    if (cost <= 0) return null;
+    const waste = CATEGORY_WASTE_DEFAULTS[newIngredient.category] || "0";
+    const catLabel = newIngredient.category === "dry_goods" ? "Dry Goods" : newIngredient.category.charAt(0).toUpperCase() + newIngredient.category.slice(1);
+    return { cost, waste, catLabel };
+  }, [newIngredient]);
+
   const addIngredient = () => {
     if (!newIngredient.name || !newIngredient.quantity || !newIngredient.costPerUnit) {
       toast({ title: "Fill in ingredient name, amount, and cost", variant: "destructive" });
@@ -185,8 +282,9 @@ function FoodCostCalculator() {
     }
 
     const calculatedCost = calculateIngredientCost(newIngredient);
+    const id = Date.now().toString();
     const ingredient: PlateIngredient = {
-      id: Date.now().toString(),
+      id,
       ...newIngredient,
       wasteBuffer: CATEGORY_WASTE_DEFAULTS[newIngredient.category] || "0",
       calculatedCost,
@@ -194,6 +292,8 @@ function FoodCostCalculator() {
 
     setPlateIngredients([...plateIngredients, ingredient]);
     setNewIngredient({ name: "", quantity: "", unit: "oz", costPerUnit: "", category: "other" });
+    setJustAddedId(id);
+    setTimeout(() => setJustAddedId(null), 600);
   };
 
   const removeIngredient = (id: string) => {
@@ -215,6 +315,8 @@ function FoodCostCalculator() {
   const suggestedPrice = totalPlateCost > 0 ? totalPlateCost / (targetFoodCostNum / 100) : 0;
   const menuPriceNum = parseFloat(menuPrice) || 0;
   const actualFoodCostPercent = menuPriceNum > 0 ? (totalPlateCost / menuPriceNum) * 100 : 0;
+  const marginDollar = menuPriceNum > 0 ? menuPriceNum - totalPlateCost : 0;
+  const marginPercent = menuPriceNum > 0 ? (marginDollar / menuPriceNum) * 100 : 0;
 
   const getMarginStatus = () => {
     if (totalPlateCost === 0) return null;
@@ -263,7 +365,7 @@ function FoodCostCalculator() {
         wasteBuffer: ing.wasteBuffer,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
-      toast({ title: `${ing.name} saved to your ingredient library!` });
+      saveToLocalLibrary(ing);
     } catch (err) {
       toast({ title: "Failed to save ingredient", variant: "destructive" });
     }
@@ -285,9 +387,8 @@ function FoodCostCalculator() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/plates"] });
       toast({ title: "Plate saved!" });
-      setPlateName("");
-      setPlateIngredients([]);
-      setMenuPrice("");
+      setPlateSaved(true);
+      setTimeout(() => setPlateSaved(false), 2000);
     } catch (err) {
       toast({ title: "Failed to save plate", variant: "destructive" });
     }
@@ -301,7 +402,7 @@ function FoodCostCalculator() {
     const today = new Date();
     const weekAgo = new Date(today);
     weekAgo.setDate(weekAgo.getDate() - 7);
-    
+
     try {
       await apiRequest("POST", "/api/food-cost-periods", {
         periodType: "week",
@@ -313,6 +414,8 @@ function FoodCostCalculator() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/food-cost-periods"] });
       toast({ title: "Week saved!" });
+      setWeeklySaved(true);
+      setTimeout(() => setWeeklySaved(false), 2000);
       setWeeklyPurchases("");
       setWeeklySales("");
     } catch (err) {
@@ -320,32 +423,81 @@ function FoodCostCalculator() {
     }
   };
 
+  const startNewPlate = () => {
+    setPlateName("");
+    setPlateIngredients([]);
+    setMenuPrice("");
+    setPlateSaved(false);
+  };
+
+  const loadPlateForEditing = (plate: any) => {
+    setPlateName(plate.name);
+    setPlateIngredients(plate.ingredients || []);
+    setMenuPrice(plate.menuPrice || "");
+    setTargetFoodCost(plate.targetFoodCost || "28");
+    setActiveTab("plate-builder");
+    toast({ title: `Loaded "${plate.name}" for editing` });
+  };
+
+  const fcStatusColor = (fc: number, target: number) => {
+    if (fc <= target) return '#22c55e';
+    if (fc <= target + 3) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  const displayFCPct = menuPriceNum > 0 ? actualFoodCostPercent : (suggestedPrice > 0 ? targetFoodCostNum : 0);
+  const displayPrice = menuPriceNum > 0 ? menuPriceNum : suggestedPrice;
+
   return (
-    <Card className="mb-8">
-      <CardHeader>
+    <Card className="mb-8 relative overflow-hidden" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
+      <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent 0%, rgba(212,160,23,0.08) 50%, transparent 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 3s linear infinite',
+      }} />
+      <CardHeader className="relative">
         <CardTitle className="flex items-center gap-2">
-          <Calculator className="h-5 w-5 text-primary" />
-          Food Cost Tools
+          <Calculator className="h-5 w-5" style={{ color: '#d4a017' }} />
+          <span className="text-white">Food Cost Tools</span>
         </CardTitle>
-        <CardDescription>
-          Build plates, track costs, know if you're making money
-        </CardDescription>
+        <div className="flex items-center gap-2">
+          <div className="w-[3px] h-4 rounded-full" style={{ background: '#d4a017' }} />
+          <CardDescription style={{ color: '#9ca3af' }}>
+            Build plates, track costs, know if you're making money
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3 h-auto">
-            <TabsTrigger value="plate-builder" className="text-xs sm:text-sm py-2" data-testid="tab-plate-builder">New Plate</TabsTrigger>
-            <TabsTrigger value="weekly-check" className="text-xs sm:text-sm py-2" data-testid="tab-weekly-check">Weekly Check</TabsTrigger>
-            <TabsTrigger value="saved" className="text-xs sm:text-sm py-2" data-testid="tab-saved">Saved</TabsTrigger>
-          </TabsList>
+          <div className="border-b" style={{ borderColor: '#2a2d3e' }}>
+            <TabsList className="grid w-full grid-cols-3 bg-transparent h-auto p-0">
+              {[
+                { value: "plate-builder", label: "New Plate", Icon: ChefHat },
+                { value: "weekly-check", label: "Weekly Check", Icon: Calendar },
+                { value: "saved", label: "Saved", Icon: Star },
+              ].map(tab => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  data-testid={`tab-${tab.value}`}
+                  className="text-xs sm:text-sm py-2.5 px-1 rounded-none border-b-2 border-transparent data-[state=active]:border-b-0 data-[state=active]:bg-transparent"
+                  style={{ color: activeTab === tab.value ? '#ffffff' : '#9ca3af', borderBottomColor: activeTab === tab.value ? '#d4a017' : 'transparent' }}
+                >
+                  <tab.Icon className="h-3.5 w-3.5 mr-1 hidden sm:inline-block" />
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           <TabsContent value="plate-builder" className="space-y-6">
             <div>
-              <Label htmlFor="plateName" className="text-base">What are you costing?</Label>
+              <Label htmlFor="plateName" className="text-base text-white">What are you costing?</Label>
               <Input
                 id="plateName"
                 placeholder="e.g., 8oz Ribeye with sides"
-                className="mt-2 text-lg h-12"
+                className="mt-2 text-lg h-12 border-b-2 border-t-0 border-x-0 rounded-none focus:border-b-2"
+                style={{ background: '#111827', borderBottomColor: '#374151' }}
                 value={plateName}
                 onChange={(e) => setPlateName(e.target.value)}
                 data-testid="input-plate-name"
@@ -353,29 +505,55 @@ function FoodCostCalculator() {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-base">Ingredients</Label>
-                {savedIngredients && savedIngredients.length > 0 && (
-                  <Select onValueChange={(id) => {
-                    const saved = savedIngredients.find((s: any) => s.id.toString() === id);
-                    if (saved) selectSavedIngredient(saved);
-                  }}>
-                    <SelectTrigger className="w-48" data-testid="select-saved-ingredient">
-                      <SelectValue placeholder="Use saved..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {savedIngredients.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id.toString()}>{s.name} (${s.costPerUnit}/{s.unit})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <Label className="text-base text-white">Ingredients</Label>
+                <div className="flex items-center gap-2">
+                  {savedIngredients && savedIngredients.length > 0 && (
+                    <Select onValueChange={(id) => {
+                      const saved = savedIngredients.find((s: any) => s.id.toString() === id);
+                      if (saved) selectSavedIngredient(saved);
+                    }}>
+                      <SelectTrigger className="w-40" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-saved-ingredient">
+                        <SelectValue placeholder="Use saved..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {savedIngredients.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>{s.name} (${s.costPerUnit}/{s.unit})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <button onClick={() => setShowIngredientLibrary(!showIngredientLibrary)} className="text-xs px-2 py-1 rounded" style={{ color: '#d4a017', border: '1px solid rgba(212,160,23,0.3)' }} data-testid="btn-my-ingredients">
+                    My Ingredients
+                  </button>
+                </div>
               </div>
+
+              {showIngredientLibrary && (
+                <div className="rounded-lg p-3 space-y-2" style={{ background: '#111827', border: '1px solid #2a2d3e', animation: 'slideDown 200ms ease' }}>
+                  <p className="text-xs font-medium" style={{ color: '#d4a017' }}>Ingredient Library</p>
+                  {localLibrary.length === 0 ? (
+                    <p className="text-xs" style={{ color: '#6b7280' }}>No saved ingredients yet. Star any ingredient to save it here.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {localLibrary.map((lib: any, idx: number) => (
+                        <button key={idx} onClick={() => loadFromLibrary(lib)} className="flex items-center gap-1 px-2 py-1 rounded-full text-xs" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', border: '1px solid rgba(212,160,23,0.25)' }} data-testid={`lib-chip-${idx}`}>
+                          {lib.name} ({lib.quantity ? `${lib.quantity}${lib.unit}` : lib.unit} · ${lib.costPerUnit}/{lib.unit})
+                          <span onClick={(e) => { e.stopPropagation(); removeFromLocalLibrary(idx); }} className="ml-1">
+                            <X className="h-3 w-3" />
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <Input
                   placeholder="Ingredient name"
                   className="col-span-2 sm:col-span-1 h-12"
+                  style={{ background: '#111827', borderColor: '#374151' }}
                   value={newIngredient.name}
                   onChange={(e) => setNewIngredient({ ...newIngredient, name: e.target.value })}
                   data-testid="input-new-ingredient-name"
@@ -384,12 +562,13 @@ function FoodCostCalculator() {
                   type="number"
                   placeholder="Amount"
                   className="h-12"
+                  style={{ background: '#111827', borderColor: '#374151' }}
                   value={newIngredient.quantity}
                   onChange={(e) => setNewIngredient({ ...newIngredient, quantity: e.target.value })}
                   data-testid="input-new-ingredient-qty"
                 />
                 <Select value={newIngredient.unit} onValueChange={(v) => setNewIngredient({ ...newIngredient, unit: v })}>
-                  <SelectTrigger className="h-12" data-testid="select-new-ingredient-unit">
+                  <SelectTrigger className="h-12" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-new-ingredient-unit">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -401,53 +580,68 @@ function FoodCostCalculator() {
                   </SelectContent>
                 </Select>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9ca3af' }} />
                   <Input
                     type="number"
                     step="0.01"
                     placeholder="Cost/unit"
                     className="pl-8 h-12"
+                    style={{ background: '#111827', borderColor: '#374151' }}
                     value={newIngredient.costPerUnit}
                     onChange={(e) => setNewIngredient({ ...newIngredient, costPerUnit: e.target.value })}
                     data-testid="input-new-ingredient-cost"
                   />
                 </div>
                 <Select value={newIngredient.category} onValueChange={(v) => setNewIngredient({ ...newIngredient, category: v })}>
-                  <SelectTrigger className="h-12" data-testid="select-new-ingredient-category">
+                  <SelectTrigger className="h-12" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-new-ingredient-category">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="protein">Protein (+5%)</SelectItem>
-                    <SelectItem value="produce">Produce (+10%)</SelectItem>
-                    <SelectItem value="dairy">Dairy (+3%)</SelectItem>
-                    <SelectItem value="dry_goods">Dry Goods (+2%)</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {Object.entries(CATEGORY_DOTS).map(([key, dotColor]) => (
+                      <SelectItem key={key} value={key}>
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
+                          {key === 'dry_goods' ? 'Dry Goods' : key.charAt(0).toUpperCase() + key.slice(1)} (+{CATEGORY_WASTE_DEFAULTS[key] || '0'}%)
+                        </span>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={addIngredient} className="w-full h-12 text-base" data-testid="btn-add-ingredient">
+
+              {liveCostPreview && (
+                <div className="flex items-center gap-1.5 text-xs px-1 transition-opacity duration-150" style={{ color: '#b8860b', opacity: liveCostPreview ? 1 : 0 }} data-testid="live-cost-preview">
+                  <ArrowRight className="h-3 w-3 shrink-0" />
+                  <span>{newIngredient.name} · {newIngredient.quantity} {newIngredient.unit} @ ${newIngredient.costPerUnit}/{newIngredient.unit} · {liveCostPreview.catLabel} waste applied · Est. cost: ${liveCostPreview.cost.toFixed(2)}</span>
+                </div>
+              )}
+
+              <Button onClick={addIngredient} className="w-full h-12 text-base text-white" style={{ background: '#b8860b' }} data-testid="btn-add-ingredient">
                 Add Ingredient
               </Button>
             </div>
 
             {plateIngredients.length > 0 && (
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-muted/50 px-4 py-2 font-medium text-sm flex justify-between">
+              <div className="rounded-lg overflow-hidden" style={{ border: '1px solid #2a2d3e' }}>
+                <div className="px-4 py-2 font-medium text-sm flex justify-between" style={{ background: '#111827', color: '#9ca3af' }}>
                   <span>Ingredients on this plate</span>
                   <span>Cost</span>
                 </div>
                 {plateIngredients.map((ing) => (
-                  <div key={ing.id} className="px-4 py-3 border-t flex items-center justify-between gap-2">
+                  <div key={ing.id} className="px-4 py-3 flex items-center justify-between gap-2 transition-colors duration-300" style={{
+                    borderTop: '1px solid #2a2d3e',
+                    background: justAddedId === ing.id ? 'rgba(34,197,94,0.08)' : '#111827',
+                  }}>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{ing.name}</div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="font-medium text-white truncate">{ing.name}</div>
+                      <div className="text-sm" style={{ color: '#9ca3af' }}>
                         {ing.quantity} {ing.unit} @ ${ing.costPerUnit}/{ing.unit}
-                        {parseFloat(ing.wasteBuffer) > 0 && <span className="ml-1">(+{ing.wasteBuffer}% waste)</span>}
+                        {parseFloat(ing.wasteBuffer) > 0 && <span className="ml-1">(+{ing.wasteBuffer}% waste applied)</span>}
                       </div>
                       {(() => {
                         const warning = getPortionCostWarning(ing);
                         return warning ? (
-                          <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1 mt-0.5">
+                          <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: '#f59e0b' }}>
                             <AlertTriangle className="h-3 w-3 shrink-0" />
                             {warning}
                           </p>
@@ -455,19 +649,19 @@ function FoodCostCalculator() {
                       })()}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">${ing.calculatedCost.toFixed(2)}</span>
+                      <span className="font-semibold" style={{ color: '#d4a017' }}>${ing.calculatedCost.toFixed(2)}</span>
                       <Button variant="ghost" size="icon" onClick={() => saveIngredientToLibrary(ing)} title="Save to library" data-testid={`btn-save-ingredient-${ing.id}`}>
-                        <Star className="h-4 w-4" />
+                        <Star className="h-4 w-4" style={{ color: localLibrary.some((l: any) => l.name === ing.name) ? '#d4a017' : '#9ca3af' }} />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => removeIngredient(ing.id)} data-testid={`btn-remove-ingredient-${ing.id}`}>
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" style={{ color: '#9ca3af' }} />
                       </Button>
                     </div>
                   </div>
                 ))}
-                <div className="px-4 py-3 border-t bg-accent/30 flex justify-between items-center">
-                  <span className="font-semibold text-lg">Total Plate Cost</span>
-                  <span className="font-bold text-xl text-primary">${totalPlateCost.toFixed(2)}</span>
+                <div className="px-4 py-3 flex justify-between items-center" style={{ borderTop: '1px solid #2a2d3e', background: 'rgba(212,160,23,0.06)' }}>
+                  <span className="font-semibold text-lg text-white">Total Plate Cost</span>
+                  <span className="font-bold text-xl" style={{ color: '#d4a017' }} data-testid="text-total-plate-cost">${totalPlateCost.toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -476,73 +670,122 @@ function FoodCostCalculator() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-base">Target Food Cost</Label>
+                    <Label className="text-base text-white">Target Food Cost</Label>
                     <Select value={targetFoodCost} onValueChange={setTargetFoodCost}>
-                      <SelectTrigger className="mt-2 h-12" data-testid="select-target-fc">
+                      <SelectTrigger className="mt-2 h-12" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-target-fc">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {FOOD_COST_PRESETS.map((p) => (
-                          <SelectItem key={p.value} value={p.value}>{p.label} ({p.value}%)</SelectItem>
+                          <SelectItem key={p.value} value={p.value}>
+                            <span className="flex items-center gap-2">{p.label} <Badge className="text-[10px]" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>{p.value}%</Badge></span>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-base">Your Menu Price (optional)</Label>
+                    <Label className="text-base text-white">Your Menu Price (optional)</Label>
                     <div className="relative mt-2">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#9ca3af' }} />
                       <Input
                         type="number"
                         step="0.50"
                         placeholder="Leave blank for suggestion"
                         className="pl-8 h-12"
+                        style={{ background: '#111827', borderColor: '#374151' }}
                         value={menuPrice}
                         onChange={(e) => setMenuPrice(e.target.value)}
                         data-testid="input-menu-price"
                       />
                     </div>
+                    {!menuPrice && suggestedPrice > 0 && (
+                      <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>Suggested price: ${suggestedPrice.toFixed(2)} (at {targetFoodCost}% food cost)</p>
+                    )}
                   </div>
                 </div>
 
-                {marginStatus && (
-                  <div className={`p-4 rounded-lg ${marginStatus.bg}`}>
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className={`h-5 w-5 mt-0.5 ${marginStatus.color}`} />
-                      <div>
-                        <p className={`font-semibold ${marginStatus.color}`}>
-                          {menuPriceNum > 0 ? `${actualFoodCostPercent.toFixed(1)}% food cost` : "Reality Check"}
-                        </p>
-                        <p className="text-sm mt-1">{marginStatus.message}</p>
+                {(marginStatus || (totalPlateCost > 0 && displayPrice > 0)) && (
+                  <div className="rounded-lg p-5 border-l-[3px]" style={{
+                    background: '#111827',
+                    borderLeftColor: displayFCPct <= targetFoodCostNum ? '#22c55e' : displayFCPct <= targetFoodCostNum + 3 ? '#f59e0b' : '#ef4444',
+                    border: '1px solid #2a2d3e',
+                    borderLeft: `3px solid ${displayFCPct <= targetFoodCostNum ? '#22c55e' : displayFCPct <= targetFoodCostNum + 3 ? '#f59e0b' : '#ef4444'}`,
+                  }} data-testid="margin-result-banner">
+                    <p className="text-lg font-bold text-white mb-3">{plateName || "Plate"}</p>
+                    <div className="flex items-center gap-3 mb-3 text-sm" style={{ color: '#9ca3af' }}>
+                      <span>Plate Cost: <strong className="text-white">${totalPlateCost.toFixed(2)}</strong></span>
+                      <span>Menu Price: <strong className="text-white">${displayPrice.toFixed(2)}</strong></span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 py-3 mb-3" style={{ borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
+                      <div className="text-center">
+                        <p className="text-[11px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Food Cost %</p>
+                        <p className="text-xl font-bold" style={{ color: fcStatusColor(displayFCPct, targetFoodCostNum) }}>{displayFCPct.toFixed(1)}%</p>
                       </div>
+                      <div className="text-center">
+                        <p className="text-[11px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Margin $</p>
+                        <p className="text-xl font-bold text-white">${(displayPrice - totalPlateCost).toFixed(2)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[11px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Margin %</p>
+                        <p className="text-xl font-bold text-white">{displayPrice > 0 ? ((displayPrice - totalPlateCost) / displayPrice * 100).toFixed(1) : '0.0'}%</p>
+                      </div>
+                    </div>
+                    {displayFCPct <= targetFoodCostNum ? (
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#22c55e' }} />
+                        <p className="text-sm" style={{ color: '#22c55e' }}>On target for {FOOD_COST_PRESETS.find(p => p.value === targetFoodCost)?.label || 'your category'}</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: '#f59e0b' }} />
+                        <p className="text-sm" style={{ color: '#f59e0b' }}>
+                          {(displayFCPct - targetFoodCostNum).toFixed(1)}% over your target — reprice or respec to reclaim ${((displayFCPct - targetFoodCostNum) / 100 * displayPrice).toFixed(2)}/plate
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      <Button onClick={savePlate} disabled={!plateName} size="sm" className="text-white" style={plateSaved ? { background: '#166534' } : { background: '#b8860b' }} data-testid="btn-save-plate">
+                        {plateSaved ? <><Check className="h-4 w-4 mr-1" /> Saved</> : <><Star className="h-4 w-4 mr-1" /> Save Plate</>}
+                      </Button>
+                      <Button onClick={startNewPlate} variant="outline" size="sm" data-testid="btn-new-plate">
+                        <Plus className="h-4 w-4 mr-1" /> New Plate
+                      </Button>
                     </div>
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={savePlate} disabled={!plateName} className="flex-1 h-12" data-testid="btn-save-plate">
-                    Save This Plate
-                  </Button>
-                </div>
+                {marginStatus && !displayPrice && (
+                  <div className="p-4 rounded-lg" style={{ background: 'rgba(212,160,23,0.06)', border: '1px solid rgba(212,160,23,0.2)' }}>
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 mt-0.5" style={{ color: '#d4a017' }} />
+                      <div>
+                        <p className="font-semibold" style={{ color: '#d4a017' }}>Reality Check</p>
+                        <p className="text-sm mt-1" style={{ color: '#9ca3af' }}>{marginStatus.message}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="weekly-check" className="space-y-6">
-            <div className="text-center py-4">
-              <h3 className="text-lg font-semibold">Did you make money on food this week?</h3>
-              <p className="text-muted-foreground mt-1">Just two numbers. That's it.</p>
+            <div className="text-center py-4" style={{ borderBottom: '1px solid #2a2d3e' }}>
+              <h3 className="text-lg font-semibold text-white">Did you make money on food this week?</h3>
+              <p className="text-sm mt-1" style={{ color: '#9ca3af' }}>Just two numbers. That's it.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label className="text-base">What you paid for food</Label>
+                <Label className="text-base text-white">What you paid for food</Label>
                 <div className="relative mt-2">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: '#9ca3af' }} />
                   <Input
                     type="number"
                     placeholder="Total food purchases"
                     className="pl-10 h-14 text-lg"
+                    style={{ background: '#111827', borderColor: '#374151' }}
                     value={weeklyPurchases}
                     onChange={(e) => setWeeklyPurchases(e.target.value)}
                     data-testid="input-weekly-purchases"
@@ -550,13 +793,14 @@ function FoodCostCalculator() {
                 </div>
               </div>
               <div>
-                <Label className="text-base">What you sold in food</Label>
+                <Label className="text-base text-white">What you sold in food</Label>
                 <div className="relative mt-2">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: '#9ca3af' }} />
                   <Input
                     type="number"
                     placeholder="Total food sales"
                     className="pl-10 h-14 text-lg"
+                    style={{ background: '#111827', borderColor: '#374151' }}
                     value={weeklySales}
                     onChange={(e) => setWeeklySales(e.target.value)}
                     data-testid="input-weekly-sales"
@@ -566,43 +810,77 @@ function FoodCostCalculator() {
             </div>
 
             <div>
-              <Label className="text-base">Your target</Label>
+              <Label className="text-base text-white">Your target</Label>
               <Select value={targetWeeklyFC} onValueChange={setTargetWeeklyFC}>
-                <SelectTrigger className="mt-2 h-12" data-testid="select-weekly-target">
+                <SelectTrigger className="mt-2 h-12" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-weekly-target">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {FOOD_COST_PRESETS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>{p.label} ({p.value}%)</SelectItem>
+                    <SelectItem key={p.value} value={p.value}>
+                      <span className="flex items-center gap-2">{p.label} <Badge className="text-[10px]" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>{p.value}%</Badge></span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             {weeklySalesNum > 0 && weeklyPurchasesNum > 0 && (
-              <div className={`p-6 rounded-lg ${weeklyVariance <= 0 ? "bg-green-50 dark:bg-green-950" : weeklyVariance <= 3 ? "bg-yellow-50 dark:bg-yellow-950" : "bg-red-50 dark:bg-red-950"}`}>
+              <div className="rounded-lg p-6 border-l-[3px]" style={{
+                background: '#111827',
+                borderLeftColor: weeklyVariance <= 0 ? '#22c55e' : weeklyVariance <= 3 ? '#f59e0b' : '#ef4444',
+                border: '1px solid #2a2d3e',
+                borderLeft: `3px solid ${weeklyVariance <= 0 ? '#22c55e' : weeklyVariance <= 3 ? '#f59e0b' : '#ef4444'}`,
+              }} data-testid="weekly-result-banner">
                 <div className="text-center">
-                  <div className={`text-4xl font-bold ${weeklyVariance <= 0 ? "text-green-600" : weeklyVariance <= 3 ? "text-yellow-600" : "text-red-600"}`}>
+                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>Week of {new Date().toLocaleDateString()}</p>
+                  <div className="text-5xl font-bold" style={{ color: weeklyVariance <= 0 ? '#22c55e' : weeklyVariance <= 3 ? '#f59e0b' : '#ef4444' }}>
                     {actualWeeklyFC.toFixed(1)}%
                   </div>
-                  <p className="text-lg mt-1">Your actual food cost</p>
-                  
-                  <div className="mt-4 pt-4 border-t border-current/20">
+                  <p className="text-sm mt-1" style={{ color: '#9ca3af' }}>Your actual food cost</p>
+
+                  <div className="flex justify-center gap-6 mt-4 pt-4" style={{ borderTop: '1px solid #2a2d3e' }}>
+                    <div className="text-center">
+                      <p className="text-[11px] uppercase" style={{ color: '#9ca3af' }}>Food Spend</p>
+                      <p className="text-sm font-semibold text-white">${weeklyPurchasesNum.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[11px] uppercase" style={{ color: '#9ca3af' }}>Food Sales</p>
+                      <p className="text-sm font-semibold text-white">${weeklySalesNum.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[11px] uppercase" style={{ color: '#9ca3af' }}>Target</p>
+                      <p className="text-sm font-semibold text-white">{targetWeeklyFC}%</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid #2a2d3e' }}>
                     {weeklyVariance <= 0 ? (
-                      <p className="text-green-700 dark:text-green-400">
-                        You're {Math.abs(weeklyVariance).toFixed(1)}% under target. That's ${Math.abs(dollarVariance).toFixed(0)} extra profit this week!
-                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <CheckCircle2 className="h-5 w-5" style={{ color: '#22c55e' }} />
+                        <p className="text-sm" style={{ color: '#22c55e' }}>
+                          You're {Math.abs(weeklyVariance).toFixed(1)}% under target. That's ${Math.abs(dollarVariance).toFixed(0)} extra profit this week!
+                        </p>
+                      </div>
                     ) : (
-                      <p className={weeklyVariance <= 3 ? "text-yellow-700 dark:text-yellow-400" : "text-red-700 dark:text-red-400"}>
-                        You're {weeklyVariance.toFixed(1)}% over target. That's ${dollarVariance.toFixed(0)} that leaked somewhere.
-                      </p>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <AlertTriangle className="h-5 w-5" style={{ color: '#f59e0b' }} />
+                          <p className="text-sm" style={{ color: weeklyVariance <= 3 ? '#f59e0b' : '#ef4444' }}>
+                            You're {weeklyVariance.toFixed(1)}% over target.
+                          </p>
+                        </div>
+                        <p className="text-lg font-bold" style={{ color: '#d4a017' }} data-testid="text-dollar-leak">
+                          That's ${dollarVariance.toFixed(0)} that leaked somewhere.
+                        </p>
+                      </div>
                     )}
                   </div>
 
                   {weeklyVariance > 2 && (
-                    <div className="mt-4 text-left bg-background/50 p-3 rounded text-sm">
-                      <p className="font-medium mb-1">Where money leaks:</p>
-                      <ul className="text-muted-foreground space-y-1">
+                    <div className="mt-4 text-left p-3 rounded text-sm" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                      <p className="font-medium mb-1" style={{ color: '#f59e0b' }}>Where money leaks:</p>
+                      <ul className="space-y-1" style={{ color: '#9ca3af' }}>
                         <li>- Portions bigger than spec</li>
                         <li>- Waste not tracked</li>
                         <li>- Supplier prices increased</li>
@@ -614,25 +892,51 @@ function FoodCostCalculator() {
               </div>
             )}
 
-            <Button onClick={saveWeeklyData} disabled={!weeklyPurchases || !weeklySales} className="w-full h-12" data-testid="btn-save-weekly">
-              Save This Week
+            <Button onClick={saveWeeklyData} disabled={!weeklyPurchases || !weeklySales} className="w-full h-12 text-white" style={weeklySaved ? { background: '#166534' } : { background: '#b8860b' }} data-testid="btn-save-weekly">
+              {weeklySaved ? <><Check className="h-4 w-4 mr-2" /> Week Saved</> : "Save This Week"}
             </Button>
 
-            {foodCostPeriods && foodCostPeriods.length > 0 && (
-              <div className="mt-6">
-                <h4 className="font-medium mb-3">Recent Weeks</h4>
-                <div className="space-y-2">
-                  {foodCostPeriods.slice(0, 5).map((p: any) => (
-                    <div key={p.id} className="flex justify-between items-center p-3 bg-muted/30 rounded">
-                      <span className="text-sm">{new Date(p.periodEnd).toLocaleDateString()}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-muted-foreground">${parseFloat(p.totalPurchases).toLocaleString()} / ${parseFloat(p.totalSales).toLocaleString()}</span>
-                        <Badge variant={parseFloat(p.actualFoodCostPercent) <= parseFloat(p.targetFoodCostPercent) ? "default" : "destructive"}>
-                          {p.actualFoodCostPercent}%
-                        </Badge>
+            {foodCostPeriods && foodCostPeriods.length >= 2 && (
+              <div className="mt-4" data-testid="trend-chart">
+                <p className="text-xs mb-2" style={{ color: '#9ca3af' }}>Recent trend</p>
+                <div className="flex items-end gap-1 h-[60px]">
+                  {foodCostPeriods.slice(0, 8).reverse().map((p: any, i: number) => {
+                    const fc = parseFloat(p.actualFoodCostPercent) || 0;
+                    const target = parseFloat(p.targetFoodCostPercent) || 28;
+                    const maxFC = Math.max(...foodCostPeriods.slice(0, 8).map((pp: any) => parseFloat(pp.actualFoodCostPercent) || 0), 35);
+                    const height = Math.max(8, (fc / maxFC) * 52);
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-0.5" title={`${fc.toFixed(1)}% · ${new Date(p.periodEnd).toLocaleDateString()}`}>
+                        <div className="w-full rounded-t" style={{ height: `${height}px`, background: fc <= target ? '#22c55e' : fc <= target + 3 ? '#f59e0b' : '#ef4444' }} />
+                        <span className="text-[8px]" style={{ color: '#6b7280' }}>{fc.toFixed(0)}%</span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {foodCostPeriods && foodCostPeriods.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium mb-3 text-white">Recent Weeks</h4>
+                <div className="space-y-2">
+                  {foodCostPeriods.slice(0, 5).map((p: any) => {
+                    const fc = parseFloat(p.actualFoodCostPercent);
+                    const target = parseFloat(p.targetFoodCostPercent);
+                    return (
+                      <div key={p.id} className="flex justify-between items-center p-3 rounded" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                        <span className="text-sm text-white">{new Date(p.periodEnd).toLocaleDateString()}</span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm" style={{ color: '#9ca3af' }}>${parseFloat(p.totalPurchases).toLocaleString()} / ${parseFloat(p.totalSales).toLocaleString()}</span>
+                          <Badge className="text-[10px]" style={{
+                            background: fc <= target ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                            color: fc <= target ? '#22c55e' : '#ef4444',
+                            borderColor: fc <= target ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+                          }}>{p.actualFoodCostPercent}%</Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -641,20 +945,24 @@ function FoodCostCalculator() {
           <TabsContent value="saved" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <Star className="h-4 w-4" /> Saved Ingredients
+                <h4 className="font-semibold mb-3 flex items-center gap-2 text-white">
+                  <Star className="h-4 w-4" style={{ color: '#d4a017' }} /> Saved Ingredients
                 </h4>
                 {!savedIngredients || savedIngredients.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No saved ingredients yet. Add ingredients to plates and save them!</p>
+                  <div className="py-8 text-center rounded-lg" style={{ background: '#111827', border: '1px dashed #2a2d3e' }}>
+                    <Star className="h-8 w-8 mx-auto mb-2" style={{ color: '#374151' }} />
+                    <p className="text-sm" style={{ color: '#6b7280' }}>No saved ingredients yet.</p>
+                    <p className="text-xs mt-1" style={{ color: '#4b5563' }}>Add ingredients to plates and star them to save here.</p>
+                  </div>
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-auto">
                     {savedIngredients.map((ing: any) => (
-                      <div key={ing.id} className="flex justify-between items-center p-3 border rounded">
+                      <div key={ing.id} className="flex justify-between items-center p-3 rounded" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
                         <div>
-                          <div className="font-medium">{ing.name}</div>
-                          <div className="text-sm text-muted-foreground">${ing.costPerUnit}/{ing.unit}</div>
+                          <div className="font-medium text-white">{ing.name}</div>
+                          <div className="text-sm" style={{ color: '#9ca3af' }}>${ing.costPerUnit}/{ing.unit}</div>
                         </div>
-                        <Badge variant="secondary">{ing.category}</Badge>
+                        <Badge className="text-[10px]" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>{ing.category}</Badge>
                       </div>
                     ))}
                   </div>
@@ -662,38 +970,84 @@ function FoodCostCalculator() {
               </div>
 
               <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <ChefHat className="h-4 w-4" /> Saved Plates
+                <h4 className="font-semibold mb-3 flex items-center gap-2 text-white">
+                  <ChefHat className="h-4 w-4" style={{ color: '#d4a017' }} /> Saved Plates
                 </h4>
                 {!savedPlates || savedPlates.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No saved plates yet. Build and save your first plate!</p>
+                  <div className="py-8 text-center rounded-lg" style={{ background: '#111827', border: '1px dashed #2a2d3e' }}>
+                    <ChefHat className="h-8 w-8 mx-auto mb-2" style={{ color: '#374151' }} />
+                    <p className="text-sm" style={{ color: '#6b7280' }}>No saved plates yet.</p>
+                    <p className="text-xs mt-1" style={{ color: '#4b5563' }}>Cost your first plate to see it here.</p>
+                    <Button onClick={() => setActiveTab("plate-builder")} size="sm" className="mt-3 text-white" style={{ background: '#b8860b' }}>Cost a Plate</Button>
+                  </div>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-auto">
-                    {savedPlates.map((plate: any) => (
-                      <div key={plate.id} className="p-3 border rounded space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium truncate">{plate.name}</span>
-                          <Badge variant={
-                            plate.foodCostPercent && parseFloat(plate.foodCostPercent) <= (parseFloat(plate.targetFoodCost) || 28) 
-                              ? "default" : plate.foodCostPercent ? "destructive" : "secondary"
-                          }>
-                            {plate.foodCostPercent ? `${plate.foodCostPercent}%` : "No price set"}
-                          </Badge>
+                  <div className="space-y-2 max-h-80 overflow-auto">
+                    {savedPlates.map((plate: any) => {
+                      const fc = plate.foodCostPercent ? parseFloat(plate.foodCostPercent) : null;
+                      const target = parseFloat(plate.targetFoodCost) || 28;
+                      return (
+                        <div key={plate.id} className="p-3 rounded space-y-2" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-white truncate">{plate.name}</span>
+                            <Badge className="text-[10px] shrink-0" style={{
+                              background: fc !== null ? (fc <= target ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)') : 'rgba(156,163,175,0.15)',
+                              color: fc !== null ? (fc <= target ? '#22c55e' : '#ef4444') : '#9ca3af',
+                              borderColor: fc !== null ? (fc <= target ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)') : 'rgba(156,163,175,0.3)',
+                            }}>
+                              {fc !== null ? `${plate.foodCostPercent}%` : "No price set"}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm" style={{ color: '#9ca3af' }}>
+                            <span>Cost: ${plate.totalCost}</span>
+                            {plate.menuPrice && <span>Price: ${plate.menuPrice}</span>}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs" style={{ color: '#6b7280' }}>
+                              Saved {plate.createdAt ? new Date(plate.createdAt).toLocaleDateString() : "recently"}
+                            </p>
+                            <Button onClick={() => loadPlateForEditing(plate)} variant="outline" size="sm" className="text-xs h-7" style={{ borderColor: '#d4a017', color: '#d4a017' }} data-testid={`btn-load-plate-${plate.id}`}>
+                              Load
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span>Cost: ${plate.totalCost}</span>
-                          {plate.menuPrice && <span>Price: ${plate.menuPrice}</span>}
-                          {plate.foodCostPercent && <span>FC: {plate.foodCostPercent}%</span>}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Saved {plate.createdAt ? new Date(plate.createdAt).toLocaleDateString() : "recently"}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
+
+            {foodCostPeriods && foodCostPeriods.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2 text-white">
+                  <Calendar className="h-4 w-4" style={{ color: '#d4a017' }} /> Saved Weekly Checks
+                </h4>
+                <div className="space-y-2">
+                  {foodCostPeriods.map((p: any) => {
+                    const fc = parseFloat(p.actualFoodCostPercent);
+                    const target = parseFloat(p.targetFoodCostPercent);
+                    return (
+                      <div key={p.id} className="flex justify-between items-center p-3 rounded" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                        <div>
+                          <p className="text-sm text-white">Week of {new Date(p.periodStart).toLocaleDateString()}</p>
+                          <p className="text-xs" style={{ color: '#9ca3af' }}>${parseFloat(p.totalPurchases).toLocaleString()} spend / ${parseFloat(p.totalSales).toLocaleString()} sales</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className="text-[10px]" style={{
+                            background: fc <= target ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                            color: fc <= target ? '#22c55e' : '#ef4444',
+                            borderColor: fc <= target ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)',
+                          }}>{p.actualFoodCostPercent}%</Badge>
+                          <span className="text-xs" style={{ color: fc <= target ? '#22c55e' : '#ef4444' }}>
+                            {fc <= target ? 'On target' : `Over by ${(fc - target).toFixed(1)}%`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -9855,6 +10209,7 @@ export default function DomainPage() {
         {slug === "service" && <GuestRecoveryAdvisor />}
 
         {/* Food Cost Calculator - only show for costs domain */}
+        {slug === "costs" && <MarginStatusStrip />}
         {slug === "costs" && <FoodCostCalculator />}
 
         {/* Review Response Generator - only show for reviews domain */}
