@@ -85,6 +85,13 @@ import {
   Zap,
   GraduationCap,
   ClipboardList,
+  ClipboardCheck,
+  Coffee,
+  Moon,
+  Sun,
+  Sunrise,
+  UtensilsCrossed,
+  CloudSun,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -3052,6 +3059,142 @@ function HRRecordsViewer() {
   );
 }
 
+function StaffingMetricStrip() {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="staffing-metric-strip">
+      <div className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Labor % This Week</div>
+        <div className="text-xl font-bold text-white mt-1" data-testid="text-labor-week">-- %</div>
+        <div className="text-[10px] text-muted-foreground">Connect your POS</div>
+      </div>
+      <div className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Scheduled Hours</div>
+        <div className="text-xl font-bold text-white mt-1" data-testid="text-scheduled-hours">0 hrs</div>
+        <div className="text-[10px] text-muted-foreground">This week</div>
+      </div>
+      <div className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Staff on Floor Now</div>
+        <div className="text-xl font-bold text-white mt-1 flex items-center gap-2" data-testid="text-staff-now">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+          </span>
+          -- on floor
+        </div>
+      </div>
+      <div className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Next Scheduled Cut</div>
+        <div className="text-xl font-bold mt-1" style={{ color: '#d4a017' }} data-testid="text-next-cut">No cut scheduled</div>
+      </div>
+    </div>
+  );
+}
+
+const PRESET_ICONS: Record<string, typeof Coffee> = {
+  "quiet-monday": Coffee,
+  "normal-weekday": UtensilsCrossed,
+  "busy-friday": Flame,
+  "busy-saturday": Moon,
+  "sunday-brunch": Sunrise,
+  "slow-tuesday": CloudSun,
+};
+
+function parseStaffBreakdown(text: string): { role: string; count: number }[] {
+  if (!text.trim()) return [];
+  const chips: { role: string; count: number }[] = [];
+  const parts = text.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+  for (const part of parts) {
+    const match = part.match(/^(\d+)\s+(.+)$/);
+    if (match) {
+      chips.push({ count: parseInt(match[1]), role: match[2].trim() });
+    } else {
+      const match2 = part.match(/^(.+?)\s*[:=]\s*(\d+)$/);
+      if (match2) {
+        chips.push({ count: parseInt(match2[2]), role: match2[1].trim() });
+      }
+    }
+  }
+  return chips;
+}
+
+function parseStructuredOutput(text: string): { section: string; type: string; content: string }[] {
+  const sections: { section: string; type: string; content: string }[] = [];
+  const sectionPatterns = [
+    { pattern: /(?:^|\n)(PROJECTED SALES|Projected Sales)[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}|\n\n[A-Z]|$)/i, type: "info" },
+    { pattern: /(?:^|\n)(RECOMMENDED STAFFING|Staffing Recommendation)[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "staffing" },
+    { pattern: /(?:^|\n)(CUT (?:EVALUATION WINDOW|TIMELINE|RECOMMENDATION))[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "cut" },
+    { pattern: /(?:^|\n)(LABOR (?:RISK ASSESSMENT|COST BREAKDOWN))[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "risk" },
+    { pattern: /(?:^|\n)(HOLD INSTRUCTIONS|MANAGER (?:ACTIONS|NOTES))[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "action" },
+    { pattern: /(?:^|\n)(PRE-SHIFT BRIEFING NOTES|REMAINING SHIFT GUIDANCE)[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "briefing" },
+    { pattern: /(?:^|\n)(RISK FLAGS?|WARNING)[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "warning" },
+    { pattern: /(?:^|\n)(VARIANCE)[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "info" },
+    { pattern: /(?:^|\n)(DECISION)[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "action" },
+    { pattern: /(?:^|\n)(NEXT EVALUATION)[:\s]*([\s\S]*?)(?=\n[A-Z]{2,}[:\s]|\n\n[A-Z]|$)/i, type: "info" },
+  ];
+
+  for (const { pattern, type } of sectionPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      sections.push({ section: match[1].trim(), type, content: match[2].trim() });
+    }
+  }
+  return sections;
+}
+
+function StructuredOutputRenderer({ text }: { text: string }) {
+  const sections = parseStructuredOutput(text);
+
+  if (sections.length < 2) {
+    return (
+      <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+        {text}
+      </div>
+    );
+  }
+
+  const sectionStyles: Record<string, { border: string; icon: typeof DollarSign }> = {
+    info: { border: 'border-l-blue-500/50', icon: Info },
+    staffing: { border: 'border-l-[#b8860b]', icon: Users },
+    cut: { border: 'border-l-amber-500/50', icon: Clock },
+    risk: { border: 'border-l-red-500/50', icon: AlertTriangle },
+    action: { border: 'border-l-green-500/50', icon: ClipboardCheck },
+    briefing: { border: 'border-l-purple-500/50', icon: MessageSquare },
+    warning: { border: 'border-l-amber-500/50', icon: AlertTriangle },
+  };
+
+  return (
+    <div className="space-y-3">
+      {sections.map((s, i) => {
+        const style = sectionStyles[s.type] || sectionStyles.info;
+        const Icon = style.icon;
+        const lines = s.content.split('\n').filter(l => l.trim());
+        const isChecklist = s.type === 'action' && lines.every(l => l.trim().startsWith('-') || l.trim().startsWith('*'));
+
+        return (
+          <div key={i} className={`rounded-lg border-l-[3px] p-3 ${style.border}`} style={{ background: '#1a1d2e' }} data-testid={`output-section-${i}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Icon className="h-4 w-4 shrink-0" style={{ color: '#d4a017' }} />
+              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#d4a017' }}>{s.section}</span>
+            </div>
+            {isChecklist ? (
+              <div className="space-y-1.5">
+                {lines.map((line, li) => (
+                  <label key={li} className="flex items-start gap-2 text-sm text-white/90 cursor-pointer">
+                    <input type="checkbox" className="mt-1 rounded border-gray-600" />
+                    <span>{line.replace(/^[-*]\s*/, '')}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-white/90 whitespace-pre-wrap leading-relaxed">{s.content}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function LaborDemandEngine() {
   const { toast } = useToast();
   const [showSample, setShowSample] = useState(false);
@@ -3070,6 +3213,7 @@ function LaborDemandEngine() {
   const [serviceNotes, setServiceNotes] = useState<string>("");
   const [recommendation, setRecommendation] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showSuccessFlash, setShowSuccessFlash] = useState(false);
   const [mode, setMode] = useState<"preshift" | "midshift">("preshift");
 
   const dayparts = [
@@ -3090,12 +3234,12 @@ function LaborDemandEngine() {
   ];
 
   const quickPresets = [
-    { value: "quiet-monday", label: "Quiet Monday Lunch", covers: "45", avgCheck: "32", positions: "4" },
-    { value: "normal-weekday", label: "Normal Weekday Dinner", covers: "75", avgCheck: "48", positions: "6" },
-    { value: "busy-friday", label: "Busy Friday Dinner", covers: "140", avgCheck: "55", positions: "10" },
-    { value: "busy-saturday", label: "Busy Saturday Night", covers: "165", avgCheck: "58", positions: "12" },
-    { value: "sunday-brunch", label: "Sunday Brunch Rush", covers: "120", avgCheck: "35", positions: "8" },
-    { value: "slow-tuesday", label: "Slow Tuesday Evening", covers: "55", avgCheck: "42", positions: "5" },
+    { value: "quiet-monday", label: "Quiet Monday Lunch", covers: "35", avgCheck: "22", positions: "5", laborTarget: "30", wage: "17", hours: "5", day: "monday", daypart: "lunch" },
+    { value: "normal-weekday", label: "Normal Weekday Dinner", covers: "75", avgCheck: "38", positions: "8", laborTarget: "28", wage: "18", hours: "6", day: "wednesday", daypart: "dinner" },
+    { value: "busy-friday", label: "Busy Friday Dinner", covers: "140", avgCheck: "45", positions: "13", laborTarget: "26", wage: "19", hours: "6", day: "friday", daypart: "dinner" },
+    { value: "busy-saturday", label: "Busy Saturday Night", covers: "165", avgCheck: "48", positions: "15", laborTarget: "25", wage: "19", hours: "7", day: "saturday", daypart: "dinner" },
+    { value: "sunday-brunch", label: "Sunday Brunch Rush", covers: "120", avgCheck: "32", positions: "11", laborTarget: "30", wage: "17", hours: "5", day: "sunday", daypart: "brunch" },
+    { value: "slow-tuesday", label: "Slow Tuesday Evening", covers: "45", avgCheck: "35", positions: "6", laborTarget: "32", wage: "17", hours: "6", day: "tuesday", daypart: "dinner" },
   ];
 
   const calculateLaborMetrics = () => {
@@ -3112,6 +3256,8 @@ function LaborDemandEngine() {
     const actualLaborPercent = projectedSales > 0 ? (maxLaborCost / projectedSales) * 100 : 0;
     const neededPositions = wage > 0 && hours > 0 ? laborBudget / (wage * hours) : 0;
     const positionGap = neededPositions - scheduled;
+    const costPerCover = covers > 0 ? maxLaborCost / covers : 0;
+    const variance = laborBudget - maxLaborCost;
 
     return {
       projectedSales,
@@ -3120,7 +3266,9 @@ function LaborDemandEngine() {
       actualLaborPercent,
       neededPositions,
       positionGap,
-      scheduled
+      scheduled,
+      costPerCover,
+      variance,
     };
   };
 
@@ -3176,11 +3324,19 @@ function LaborDemandEngine() {
 
   const applyPreset = (presetValue: string) => {
     const preset = quickPresets.find(p => p.value === presetValue);
-    if (preset && preset.covers) {
+    if (preset) {
       setProjectedCovers(preset.covers);
-      setAvgCheck(preset.avgCheck || "45");
-      setScheduledPositions(preset.positions || "");
-      toast({ title: `Applied "${preset.label}" preset` });
+      setAvgCheck(preset.avgCheck);
+      setScheduledPositions(preset.positions);
+      setLaborTarget(preset.laborTarget);
+      setAvgHourlyWage(preset.wage);
+      setHoursPerShift(preset.hours);
+      setDayOfWeek(preset.day);
+      setDaypart(preset.daypart);
+      toast({
+        title: `Preset loaded: ${preset.label}`,
+        className: "border-[#b8860b]/50",
+      });
     }
   };
 
@@ -3213,6 +3369,20 @@ function LaborDemandEngine() {
   };
 
   const quickRec = getQuickRecommendation();
+
+  const staffChips = parseStaffBreakdown(currentStaff);
+  const staffChipTotal = staffChips.reduce((sum, c) => sum + c.count, 0);
+  const scheduledNum = parseInt(scheduledPositions) || 0;
+  const staffMismatch = staffChips.length > 0 && scheduledNum > 0 && staffChipTotal !== scheduledNum;
+
+  const midshiftHasData = actualCovers || currentTime || serviceNotes;
+
+  const getVarianceBadge = () => {
+    const v = metrics.variance;
+    if (v >= 0) return { label: "On Target", className: "bg-green-500/20 text-green-400 border-green-500/30" };
+    if (v >= -50) return { label: "Watch", className: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" };
+    return { label: "Over Budget", className: "bg-red-500/20 text-red-400 border-red-500/30" };
+  };
 
   const generateRecommendation = async () => {
     if (!projectedCovers) {
@@ -3336,6 +3506,9 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
           }
         }
       }
+
+      setShowSuccessFlash(true);
+      setTimeout(() => setShowSuccessFlash(false), 1500);
     } catch (err) {
       toast({ title: "Failed to generate recommendation", variant: "destructive" });
     } finally {
@@ -3348,19 +3521,31 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
     toast({ title: "Copied to clipboard!" });
   };
 
+  const hasFormData = parseFloat(projectedCovers) > 0 && parseFloat(scheduledPositions) > 0;
+
   return (
-    <Card className="mb-8">
-      <CardHeader>
+    <Card className="mb-8 relative overflow-hidden" style={{
+      boxShadow: showSuccessFlash
+        ? '0 0 20px rgba(184, 134, 11, 0.4)'
+        : undefined,
+      transition: 'box-shadow 0.5s ease',
+    }}>
+      <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent, rgba(184,134,11,0.08), transparent)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 3s ease-in-out infinite',
+      }} />
+      <style>{`@keyframes shimmer { 0%, 100% { background-position: 200% 0; } 50% { background-position: -200% 0; } }`}</style>
+      <CardHeader className="relative">
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Sparkles className="h-5 w-5" style={{ color: '#d4a017' }} />
           Labor Demand & Cut-Decision Engine
         </CardTitle>
         <CardDescription>
-          Cover-driven staffing decisions. No guessing, no hoping—just data-driven labor actions.
+          Cover-driven staffing decisions. No guessing, no hoping — just data-driven labor actions.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Quick Actions Bar */}
+      <CardContent className="space-y-4 relative">
         <div className="flex flex-wrap items-center gap-2 pb-2 border-b">
           <div className="flex-1 min-w-[200px]">
             <Select onValueChange={applyPreset}>
@@ -3368,9 +3553,17 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
                 <SelectValue placeholder="Quick Presets..." />
               </SelectTrigger>
               <SelectContent>
-                {quickPresets.map(p => (
-                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                ))}
+                {quickPresets.map(p => {
+                  const Icon = PRESET_ICONS[p.value] || Coffee;
+                  return (
+                    <SelectItem key={p.value} value={p.value}>
+                      <span className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 shrink-0" style={{ color: '#d4a017' }} />
+                        {p.label}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -3384,7 +3577,6 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
           </Button>
         </div>
 
-        {/* Real-time Metrics Dashboard */}
         {projectedCovers && parseFloat(projectedCovers) > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-accent/30 text-center">
@@ -3416,7 +3608,6 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
           </div>
         )}
 
-        {/* Quick Recommendation */}
         {quickRec && (
           <div className={`p-3 rounded-lg border flex items-start gap-2 ${
             quickRec.type === "warning" ? "bg-yellow-500/10 border-yellow-500/30" :
@@ -3430,15 +3621,36 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
           </div>
         )}
 
-        {/* Mode Toggle */}
         <Tabs value={mode} onValueChange={(v) => setMode(v as "preshift" | "midshift")} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="preshift" data-testid="tab-preshift">Pre-Shift Planning</TabsTrigger>
-            <TabsTrigger value="midshift" data-testid="tab-midshift">Mid-Shift Decision</TabsTrigger>
+            <TabsTrigger
+              value="preshift"
+              data-testid="tab-preshift"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-[#b8860b]"
+            >
+              <ClipboardList className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Pre-Shift Planning</span>
+              <span className="sm:hidden">Pre-Shift</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="midshift"
+              data-testid="tab-midshift"
+              className="relative data-[state=active]:border-b-2 data-[state=active]:border-[#b8860b]"
+            >
+              <Zap className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Mid-Shift Decision</span>
+              <span className="sm:hidden">Mid-Shift</span>
+              {midshiftHasData && mode !== "midshift" && (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="preshift" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="dayOfWeek">Day</Label>
                 <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
@@ -3479,7 +3691,7 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="reservations">Reservations on Books</Label>
                 <Input
@@ -3524,8 +3736,7 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
               </div>
             </div>
 
-            {/* New: Scheduled Positions Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="scheduledPositions">Scheduled Positions (Total)</Label>
                 <Input
@@ -3577,11 +3788,29 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
                 onChange={(e) => setCurrentStaff(e.target.value)}
                 data-testid="input-current-staff"
               />
+              {staffChips.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  <div className="flex flex-wrap gap-1.5" data-testid="staff-chips">
+                    {staffChips.map((chip, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: '#1a1d2e', color: '#d4a017', border: '1px solid rgba(184,134,11,0.3)' }}>
+                        <span className="font-bold">{chip.count}</span>
+                        <span className="text-white/80 capitalize">{chip.role}</span>
+                      </span>
+                    ))}
+                  </div>
+                  {staffMismatch && (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-500" data-testid="staff-mismatch-warning">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      Staff breakdown ({staffChipTotal}) doesn't match scheduled positions ({scheduledNum})
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="midshift" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="projectedCoversMid">Projected Covers</Label>
                 <Input
@@ -3619,7 +3848,7 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="avgCheckMid">Average Check ($)</Label>
                 <div className="relative mt-1">
@@ -3662,6 +3891,16 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
                 onChange={(e) => setCurrentStaff(e.target.value)}
                 data-testid="input-current-staff-mid"
               />
+              {staffChips.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {staffChips.map((chip, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium" style={{ background: '#1a1d2e', color: '#d4a017', border: '1px solid rgba(184,134,11,0.3)' }}>
+                      <span className="font-bold">{chip.count}</span>
+                      <span className="text-white/80 capitalize">{chip.role}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
@@ -3678,16 +3917,55 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
           </TabsContent>
         </Tabs>
 
+        {hasFormData && (
+          <div className="rounded-lg border-t-[3px] p-4 space-y-3" style={{ background: '#1a1d2e', borderTopColor: '#b8860b' }} data-testid="labor-math-preview">
+            <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#d4a017' }}>
+              <Calculator className="h-3.5 w-3.5 inline mr-1.5" />
+              Labor Math Preview
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                <span className="text-muted-foreground">Projected Revenue</span>
+                <span className="font-semibold text-white">${metrics.projectedSales.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                <span className="text-muted-foreground">Labor Budget</span>
+                <span className="font-semibold text-white">${metrics.laborBudget.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                <span className="text-muted-foreground">Scheduled Labor Cost</span>
+                <span className="font-semibold text-white">${metrics.maxLaborCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                <span className="text-muted-foreground">Cost Per Cover</span>
+                <span className="font-semibold text-white">${metrics.costPerCover.toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+              <span className="text-sm font-medium text-white">Variance</span>
+              <div className="flex items-center gap-2">
+                <span className={`font-bold text-lg ${metrics.variance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {metrics.variance >= 0 ? '+' : ''}${metrics.variance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </span>
+                <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${getVarianceBadge().className}`} data-testid="badge-variance">
+                  {getVarianceBadge().label}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Button 
           onClick={generateRecommendation} 
           disabled={isGenerating || !projectedCovers}
           className="w-full"
+          style={{ background: '#b8860b' }}
           data-testid="btn-generate-labor"
         >
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Building your plan...
+              Analyzing labor demand...
             </>
           ) : (
             <>
@@ -3698,31 +3976,60 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
         </Button>
 
         {!recommendation && !isGenerating && (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowSample(!showSample)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 flex items-center gap-1"
+            className="text-xs text-muted-foreground mt-2"
             data-testid="btn-toggle-sample-labor"
           >
-            {showSample ? "Hide example output" : "See example output \u2192"}
-          </button>
+            {showSample ? "Hide example output" : "See example output"}
+            <ArrowRight className="h-3 w-3 ml-1" />
+          </Button>
         )}
         {showSample && !recommendation && (
-          <div className="mt-2 p-3 bg-muted/50 rounded-md border border-dashed text-xs text-muted-foreground space-y-1">
-            <p className="font-medium">PROJECTED SALES: $6,750</p>
-            <p>RECOMMENDED STAFFING:</p>
-            <p className="pl-3">Servers: 5 | Bartenders: 2 | Hosts: 1 | Cooks: 4</p>
-            <p>LABOR BUDGET: $1,890 (28% target)</p>
-            <p>DECISION: Hold current levels. Consider cutting 1 server after 8:30pm if pace drops.</p>
+          <div className="mt-2 rounded-lg p-4 space-y-3" style={{ border: '1px dashed rgba(184,134,11,0.4)', background: 'rgba(26,29,46,0.5)' }} data-testid="sample-output-panel">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">This is an example</div>
+            <div className="rounded-lg border-l-[3px] p-3 border-l-blue-500/50" style={{ background: '#1a1d2e' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-4 w-4" style={{ color: '#d4a017' }} />
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#d4a017' }}>Projected Sales</span>
+              </div>
+              <div className="text-sm text-white/90">$6,750 (150 covers x $45 avg check)</div>
+            </div>
+            <div className="rounded-lg border-l-[3px] p-3 border-l-[#b8860b]" style={{ background: '#1a1d2e' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <Users className="h-4 w-4" style={{ color: '#d4a017' }} />
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#d4a017' }}>Recommended Staffing</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {[{r:'Servers',c:5},{r:'Bartenders',c:2},{r:'Hosts',c:1},{r:'Cooks',c:4},{r:'Expo',c:1}].map((s,i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs" style={{ background: 'rgba(184,134,11,0.15)', color: '#d4a017' }}>
+                    <span className="font-bold">{s.c}</span> {s.r}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg border-l-[3px] p-3 border-l-amber-500/50" style={{ background: '#1a1d2e' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <Clock className="h-4 w-4" style={{ color: '#d4a017' }} />
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#d4a017' }}>Cut Evaluation Window</span>
+              </div>
+              <div className="text-sm text-white/90">8:30 PM — if covers &lt; 100 by then, cut 1 server and 1 cook</div>
+            </div>
+            <div className="rounded-lg border-l-[3px] p-3 border-l-green-500/50" style={{ background: '#1a1d2e' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <ClipboardCheck className="h-4 w-4" style={{ color: '#d4a017' }} />
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#d4a017' }}>Hold Instructions</span>
+              </div>
+              <div className="text-sm text-white/90">Hold current levels through peak. Labor budget: $1,890 (28% target).</div>
+            </div>
           </div>
         )}
 
         {recommendation && (
-          <div className="mt-4 space-y-4">
-            <div className="p-4 bg-accent/50 rounded-lg">
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                {recommendation}
-              </div>
-            </div>
+          <div className="mt-4 space-y-4" data-testid="labor-output">
+            <StructuredOutputRenderer text={recommendation} />
             <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-labor">
               <Copy className="h-4 w-4 mr-2" />
               Copy to Clipboard
@@ -8661,7 +8968,7 @@ function ServiceContentAccordion({ content, slug }: { content: any[]; slug: stri
                         ) : type === 'output' ? (
                           renderFrameworkContent(item.content || '')
                         ) : type === 'principle' ? (
-                          <div className="border-l-4 border-primary pl-4 italic text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+                          <div className="border-l-4 pl-4 py-2 rounded-r italic text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap" style={{ borderLeftColor: '#b8860b', background: 'rgba(184,134,11,0.04)' }}>
                             {item.content}
                           </div>
                         ) : (
@@ -8822,7 +9129,8 @@ export default function DomainPage() {
         {slug === "training" && <TrainingMetricStrip content={content} />}
         {slug === "training" && <SkillsCertificationEngine />}
 
-        {/* Labor Demand Engine - only show for staffing domain */}
+        {/* Staffing Metric Strip + Labor Demand Engine - only show for staffing domain */}
+        {slug === "staffing" && <StaffingMetricStrip />}
         {slug === "staffing" && <LaborDemandEngine />}
 
         {/* HR Compliance Engine - only show for hr domain */}
