@@ -604,7 +604,7 @@ export const socialMediaService = {
     const state = crypto.randomBytes(32).toString('hex');
     await db.insert(oauthStates).values({ state, userId, provider: 'linkedin' });
     const redirectUri = `${getBaseUrl()}/api/oauth/linkedin/callback`;
-    const scopes = 'openid profile w_member_social';
+    const scopes = 'openid profile email w_member_social';
     const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` +
       `response_type=code` +
       `&client_id=${LINKEDIN_CLIENT_ID}` +
