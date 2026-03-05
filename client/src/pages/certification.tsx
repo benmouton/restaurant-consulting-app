@@ -59,6 +59,11 @@ import {
   BookOpen,
   CircleDot,
   ChevronDown,
+  Utensils,
+  Wine,
+  DoorOpen,
+  ChefHat,
+  Star,
 } from "lucide-react";
 import type { RestaurantStandards, CertificationAttempt } from "@shared/schema";
 
@@ -113,6 +118,18 @@ const DEFAULT_STANDARDS = {
     policyCompliance: 20,
     professionalism: 10,
   },
+};
+
+const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  server: Utensils,
+  bartender: Wine,
+  host: DoorOpen,
+  "food-runner": Zap,
+  busser: Sparkles,
+  "line-cook": ChefHat,
+  "prep-cook": ChefHat,
+  "kitchen-manager": Award,
+  "shift-lead": Star,
 };
 
 const ROLES = [
@@ -561,9 +578,20 @@ function StandardsEditor() {
             </Button>
           )}
           {activeStandards && <RubricPreviewDialog standards={activeStandards} />}
-          <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="btn-save-standards">
-            {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Standards
+          <Button
+            size="sm"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className={`transition-all duration-300 ${saveMutation.isSuccess ? 'bg-green-600 hover:bg-green-600' : ''}`}
+            data-testid="btn-save-standards"
+          >
+            {saveMutation.isPending ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+            ) : saveMutation.isSuccess ? (
+              <><CheckCircle2 className="h-4 w-4 mr-2" />Saved</>
+            ) : (
+              <><Save className="h-4 w-4 mr-2" />Save Standards</>
+            )}
           </Button>
         </div>
       </div>
@@ -588,7 +616,7 @@ function StandardsEditor() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2" style={{ borderColor: '#b8860b' }}>
           <CardTitle className="text-base">Service Philosophy</CardTitle>
           <CardDescription>Your restaurant's core service values in one or two sentences</CardDescription>
         </CardHeader>
@@ -598,7 +626,7 @@ function StandardsEditor() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2" style={{ borderColor: '#b8860b' }}>
           <CardTitle className="text-base">Steps of Service</CardTitle>
           <CardDescription>Define your expected service timing and flow</CardDescription>
         </CardHeader>
@@ -625,7 +653,7 @@ function StandardsEditor() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2" style={{ borderColor: '#b8860b' }}>
           <CardTitle className="text-base">Speed Targets</CardTitle>
           <CardDescription>Maximum time from order to delivery</CardDescription>
         </CardHeader>
@@ -648,7 +676,7 @@ function StandardsEditor() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2" style={{ borderColor: '#b8860b' }}>
           <CardTitle className="text-base">Recovery Framework</CardTitle>
           <CardDescription>How staff should handle guest complaints and service failures</CardDescription>
         </CardHeader>
@@ -665,7 +693,7 @@ function StandardsEditor() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2" style={{ borderColor: '#b8860b' }}>
           <CardTitle className="text-base">Alcohol Policy</CardTitle>
           <CardDescription>ID requirements, serving limits, and cut-off procedures</CardDescription>
         </CardHeader>
@@ -692,7 +720,7 @@ function StandardsEditor() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2" style={{ borderColor: '#b8860b' }}>
           <CardTitle className="text-base">Safety & Sanitation Rules</CardTitle>
           <CardDescription>One rule per line - your top enforced safety standards</CardDescription>
         </CardHeader>
@@ -702,7 +730,7 @@ function StandardsEditor() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2 border-destructive">
           <CardTitle className="text-base flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-destructive" />
             Critical Errors (Auto-Fail)
@@ -715,7 +743,7 @@ function StandardsEditor() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="border-l-2" style={{ borderColor: '#b8860b' }}>
           <CardTitle className="text-base">Scoring Rubric Weights</CardTitle>
           <CardDescription>
             Adjust how much each category counts toward the total score (must total 100). 
@@ -724,40 +752,50 @@ function StandardsEditor() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <Label>Prioritization & Triage</Label>
-              <Input type="number" min={0} max={100} value={prioritizationWeight} onChange={(e) => setPrioritizationWeight(Number(e.target.value))} className="mt-1" data-testid="input-weight-prioritization" />
-            </div>
-            <div>
-              <Label>Guest Communication</Label>
-              <Input type="number" min={0} max={100} value={communicationWeight} onChange={(e) => setCommunicationWeight(Number(e.target.value))} className="mt-1" data-testid="input-weight-communication" />
-            </div>
-            <div>
-              <Label>Recovery & Escalation</Label>
-              <Input type="number" min={0} max={100} value={recoveryWeight} onChange={(e) => setRecoveryWeight(Number(e.target.value))} className="mt-1" data-testid="input-weight-recovery" />
-            </div>
-            <div>
-              <Label>Policy & Safety Compliance</Label>
-              <Input type="number" min={0} max={100} value={complianceWeight} onChange={(e) => setComplianceWeight(Number(e.target.value))} className="mt-1" data-testid="input-weight-compliance" />
-            </div>
-            <div>
-              <Label>Professionalism & Brand Fit</Label>
-              <Input type="number" min={0} max={100} value={professionalismWeight} onChange={(e) => setProfessionalismWeight(Number(e.target.value))} className="mt-1" data-testid="input-weight-professionalism" />
-            </div>
+            {[
+              { label: "Prioritization & Triage", value: prioritizationWeight, setter: setPrioritizationWeight, testId: "input-weight-prioritization" },
+              { label: "Guest Communication", value: communicationWeight, setter: setCommunicationWeight, testId: "input-weight-communication" },
+              { label: "Recovery & Escalation", value: recoveryWeight, setter: setRecoveryWeight, testId: "input-weight-recovery" },
+              { label: "Policy & Safety Compliance", value: complianceWeight, setter: setComplianceWeight, testId: "input-weight-compliance" },
+              { label: "Professionalism & Brand Fit", value: professionalismWeight, setter: setProfessionalismWeight, testId: "input-weight-professionalism" },
+            ].map((field) => (
+              <div key={field.testId}>
+                <Label>{field.label}</Label>
+                <Input type="number" min={0} max={100} value={field.value} onChange={(e) => field.setter(Number(e.target.value))} className="mt-1 focus:ring-1" style={{ '--tw-ring-color': '#b8860b' } as any} data-testid={field.testId} />
+                <div className="h-1.5 rounded-full bg-muted mt-1.5 overflow-hidden" data-testid={`bar-${field.testId}`}>
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(field.value, 100)}%`, background: totalWeight === 100 ? '#b8860b' : '#ef4444' }}
+                  />
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">{field.value}/100</div>
+              </div>
+            ))}
           </div>
           <div>
             <Label>Pass Threshold (score needed to pass)</Label>
             <div className="flex items-center gap-3 mt-1">
               <Input type="number" min={0} max={100} value={passThreshold} onChange={(e) => setPassThreshold(Number(e.target.value))} className="w-24" data-testid="input-pass-threshold" />
               <span className="text-sm text-muted-foreground">out of 100</span>
+              <div className={`w-3 h-3 rounded-full ${passThreshold >= 80 ? 'bg-green-500' : passThreshold >= 70 ? 'bg-amber-500' : 'bg-red-500'}`} data-testid="indicator-pass-threshold" />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || totalWeight !== 100} className="w-full" data-testid="btn-save-standards-bottom">
-        {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-        {totalWeight !== 100 ? `Weights must total 100 (currently ${totalWeight})` : "Save Standards"}
+      <Button
+        onClick={() => saveMutation.mutate()}
+        disabled={saveMutation.isPending || totalWeight !== 100}
+        className={`w-full transition-all duration-300 ${saveMutation.isSuccess ? 'bg-green-600 hover:bg-green-600' : ''}`}
+        data-testid="btn-save-standards-bottom"
+      >
+        {saveMutation.isPending ? (
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+        ) : saveMutation.isSuccess ? (
+          <><CheckCircle2 className="h-4 w-4 mr-2" />Standards Saved</>
+        ) : (
+          <><Save className="h-4 w-4 mr-2" />{totalWeight !== 100 ? `Weights must total 100 (currently ${totalWeight})` : "Save Standards"}</>
+        )}
       </Button>
     </div>
   );
@@ -979,9 +1017,17 @@ function CertificationTest({ onGoToStandards }: { onGoToStandards: () => void })
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map(r => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
+                  {ROLES.map(r => {
+                    const RoleIcon = ROLE_ICONS[r.value];
+                    return (
+                      <SelectItem key={r.value} value={r.value}>
+                        <span className="flex items-center gap-2">
+                          {RoleIcon && <RoleIcon className="h-3.5 w-3.5 text-muted-foreground" />}
+                          {r.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -1018,7 +1064,7 @@ function CertificationTest({ onGoToStandards }: { onGoToStandards: () => void })
         <Button
           onClick={generateScenario}
           disabled={isGenerating || !traineeName.trim()}
-          className="w-full"
+          className={`w-full transition-all duration-200 ${traineeName.trim() && !isGenerating ? 'animate-pulse-subtle hover:brightness-110' : ''}`}
           data-testid="btn-generate-scenario"
         >
           {isGenerating ? (
@@ -1034,6 +1080,13 @@ function CertificationTest({ onGoToStandards }: { onGoToStandards: () => void })
           )}
         </Button>
       )}
+      <style>{`
+        @keyframes pulse-subtle {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(184,134,11,0.4); }
+          50% { box-shadow: 0 0 0 4px rgba(184,134,11,0); }
+        }
+        .animate-pulse-subtle { animation: pulse-subtle 2s ease-in-out infinite; }
+      `}</style>
 
       {scenario && (
         <Card>
@@ -1191,11 +1244,15 @@ function AttemptHistory({ onGoToCertify }: { onGoToCertify: () => void }) {
   if (!attempts || attempts.length === 0) {
     return (
       <div className="space-y-6">
-        <Card>
-          <CardContent className="pt-8 pb-8">
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.03]" style={{
+            backgroundImage: `linear-gradient(rgba(184,134,11,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(184,134,11,0.3) 1px, transparent 1px)`,
+            backgroundSize: '20px 20px',
+          }} />
+          <CardContent className="pt-8 pb-8 relative">
             <div className="text-center space-y-4">
-              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-muted-foreground" />
+              <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'rgba(184,134,11,0.1)', border: '2px solid rgba(184,134,11,0.3)' }}>
+                <BarChart3 className="h-7 w-7" style={{ color: '#d4a017' }} />
               </div>
               <div>
                 <h3 className="font-semibold text-lg" data-testid="text-empty-dashboard">No Certification Data Yet</h3>
@@ -1203,7 +1260,7 @@ function AttemptHistory({ onGoToCertify }: { onGoToCertify: () => void }) {
                   Run your first certification test to start tracking trainee performance, pass rates, and role-specific trends.
                 </p>
               </div>
-              <Button onClick={onGoToCertify} data-testid="btn-start-first-test">
+              <Button onClick={onGoToCertify} style={{ background: '#b8860b' }} data-testid="btn-start-first-test">
                 <ClipboardCheck className="h-4 w-4 mr-2" />
                 Run First Certification Test
               </Button>
@@ -1218,14 +1275,19 @@ function AttemptHistory({ onGoToCertify }: { onGoToCertify: () => void }) {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { icon: Target, label: "Pass/fail rates per trainee" },
-                { icon: Users, label: "Performance breakdown by role" },
-                { icon: TrendingUp, label: "Score trends over time" },
-                { icon: Award, label: "Phase completion tracking" },
+                { icon: Target, label: "Pass/fail rates per trainee", desc: "Track individual progress" },
+                { icon: Users, label: "Performance breakdown by role", desc: "Compare across positions" },
+                { icon: TrendingUp, label: "Score trends over time", desc: "Spot improvement patterns" },
+                { icon: Award, label: "Phase completion tracking", desc: "Shadow → Perform → Certify" },
               ].map((item) => (
-                <div key={item.label} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <item.icon className="h-4 w-4 flex-shrink-0" />
-                  {item.label}
+                <div key={item.label} className="flex items-start gap-3 p-3 rounded-lg border border-border/50" style={{ background: '#111827' }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(184,134,11,0.1)' }}>
+                    <item.icon className="h-4 w-4" style={{ color: '#d4a017' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground">{item.label}</div>
+                    <div className="text-xs text-muted-foreground">{item.desc}</div>
+                  </div>
                 </div>
               ))}
             </div>

@@ -83,6 +83,8 @@ import {
   Search,
   Lock,
   Zap,
+  GraduationCap,
+  ClipboardList,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import SocialPostBuilder from "@/components/social-media/SocialPostBuilder";
@@ -3732,22 +3734,81 @@ This is a directive, not a suggestion. Hope is not a staffing strategy.`;
   );
 }
 
+function TrainingMetricStrip({ content }: { content: any[] }) {
+  const checklistCount = content.filter(c => c.contentType === 'checklist').length;
+  const scriptCount = content.filter(c => c.contentType === 'script').length;
+  const frameworkCount = content.filter(c => c.contentType === 'output').length;
+  const allConfigured = checklistCount > 0 && scriptCount > 0 && frameworkCount > 0;
+
+  return (
+    <div className="flex gap-4 mb-8 overflow-x-auto pb-2 scrollbar-thin">
+      {[
+        { label: "ACTIVE TRAINEES", value: "0 active", sub: "Manage in Scheduling", link: "/scheduling" },
+        { label: "CERTIFICATIONS THIS MONTH", value: "0", sub: "Run tests to track" },
+        { label: "STANDARDS CONFIGURED", value: allConfigured ? "Complete" : "Incomplete", color: allConfigured ? "text-green-400" : "text-amber-400" },
+      ].map((m) => (
+        <div
+          key={m.label}
+          className="border-l-2 border-primary rounded-lg p-3 min-w-[160px] flex-shrink-0"
+          style={{ background: "#111827" }}
+          data-testid={`training-metric-${m.label.toLowerCase().replace(/\s+/g, '-')}`}
+        >
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1">{m.label}</div>
+          <div className={`text-sm font-bold ${m.color || 'text-foreground'}`}>{m.value}</div>
+          {m.sub && <div className="text-[10px] text-muted-foreground mt-0.5">{m.sub}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SkillsCertificationEngine() {
   return (
-    <Card className="mb-8">
+    <Card className="mb-8 relative overflow-hidden certification-shimmer" data-testid="card-certification-engine">
+      <div className="absolute inset-0 pointer-events-none rounded-lg" style={{
+        background: 'linear-gradient(135deg, transparent 40%, rgba(184,134,11,0.08) 50%, transparent 60%)',
+        backgroundSize: '200% 200%',
+        animation: 'shimmer 4s ease-in-out infinite',
+      }} />
+      <style>{`
+        @keyframes shimmer {
+          0%, 100% { background-position: 200% 200%; }
+          50% { background-position: 0% 0%; }
+        }
+        .certification-shimmer { border: 1px solid rgba(184,134,11,0.2); }
+        .certification-shimmer:hover { border-color: rgba(184,134,11,0.4); }
+      `}</style>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <GraduationCap className="h-5 w-5 text-primary" />
           Skills Certification Engine
         </CardTitle>
         <CardDescription>
           Certify readiness based on behavior, not completion. Configure your restaurant's standards, generate scenarios, and evaluate with a transparent rubric.
         </CardDescription>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {[
+            { Icon: Zap, text: "Role-specific scenarios" },
+            { Icon: Target, text: "Transparent rubric scoring" },
+            { Icon: Check, text: "Behavior-based pass/fail" },
+          ].map((pill) => (
+            <span
+              key={pill.text}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border"
+              style={{ borderColor: 'rgba(184,134,11,0.3)', color: '#d4a017', background: 'rgba(184,134,11,0.08)' }}
+            >
+              <pill.Icon className="h-3 w-3" /> {pill.text}
+            </span>
+          ))}
+        </div>
       </CardHeader>
       <CardContent>
         <Link href="/certification">
-          <Button className="w-full" data-testid="btn-open-certification">
-            <Sparkles className="h-4 w-4 mr-2" />
+          <Button
+            className="w-full"
+            data-testid="btn-open-certification"
+          >
+            <GraduationCap className="h-4 w-4 mr-2" />
             Open Certification Engine
           </Button>
         </Link>
@@ -8058,77 +8119,161 @@ Emergency After-Hours:
   );
 }
 
-function renderChecklistContent(text: string) {
+function ChecklistRenderer({ text }: { text: string }) {
   const lines = text.split('\n');
+  const checkableItems: number[] = [];
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    if (trimmed.startsWith('#') || trimmed.endsWith(':')) return;
+    const isCheckItem = trimmed.match(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i);
+    if (isCheckItem || trimmed.length > 5) checkableItems.push(i);
+  });
+
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const toggleCheck = (idx: number) => {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+
   return (
-    <div className="space-y-2">
-      {lines.map((line, i) => {
-        const trimmed = line.trim();
-        if (!trimmed) return null;
-        if (trimmed.startsWith('#') || trimmed.endsWith(':')) {
-          return <div key={i} className="font-semibold text-sm text-foreground mt-3 mb-1">{trimmed.replace(/^#+\s*/, '')}</div>;
-        }
-        const isCheckItem = trimmed.match(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i);
-        const cleanText = trimmed.replace(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i, '').trim();
-        if (isCheckItem || trimmed.length > 5) {
-          return (
-            <label key={i} className="flex items-start gap-3 cursor-pointer group py-1" data-testid={`checklist-item-${i}`}>
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-2 border-muted-foreground/30 accent-primary cursor-pointer shrink-0"
-                onChange={() => {}}
-              />
-              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors leading-relaxed">
-                {cleanText || trimmed}
-              </span>
-            </label>
-          );
-        }
-        return <div key={i} className="text-sm text-muted-foreground leading-relaxed">{trimmed}</div>;
-      })}
+    <div>
+      {checkableItems.length > 0 && (
+        <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground" data-testid="checklist-progress">
+          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${(checked.size / checkableItems.length) * 100}%`, background: '#b8860b' }}
+            />
+          </div>
+          <span className="font-medium" style={{ color: checked.size === checkableItems.length ? '#22c55e' : '#d4a017' }}>
+            {checked.size} of {checkableItems.length} completed
+          </span>
+        </div>
+      )}
+      <div className="space-y-2">
+        {lines.map((line, i) => {
+          const trimmed = line.trim();
+          if (!trimmed) return null;
+          if (trimmed.startsWith('#') || trimmed.endsWith(':')) {
+            return (
+              <div key={i} className="mt-4 mb-1">
+                <div className="text-[10px] font-bold tracking-wider uppercase" style={{ color: '#d4a017' }}>
+                  {trimmed.replace(/^#+\s*/, '').replace(/:$/, '')}
+                </div>
+                <div className="h-px mt-1" style={{ background: 'rgba(212,160,23,0.2)' }} />
+              </div>
+            );
+          }
+          const isCheckItem = trimmed.match(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i);
+          const cleanText = trimmed.replace(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i, '').trim();
+          if (isCheckItem || trimmed.length > 5) {
+            const isChecked = checked.has(i);
+            return (
+              <label key={i} className="flex items-start gap-3 cursor-pointer group py-1" data-testid={`checklist-item-${i}`}>
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  className="mt-0.5 h-4 w-4 rounded border-2 cursor-pointer shrink-0 accent-primary"
+                  style={{ accentColor: '#b8860b' }}
+                  onChange={() => toggleCheck(i)}
+                />
+                <span className={`text-sm leading-relaxed transition-colors ${isChecked ? 'line-through text-muted-foreground/50' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                  {cleanText || trimmed}
+                </span>
+              </label>
+            );
+          }
+          return <div key={i} className="text-sm text-muted-foreground leading-relaxed">{trimmed}</div>;
+        })}
+      </div>
     </div>
   );
 }
 
-function renderScriptContent(text: string) {
-  const lines = text.split('\n').filter(l => l.trim());
-  const steps: { num: string; text: string }[] = [];
-  let currentStep: { num: string; text: string } | null = null;
+function renderChecklistContent(text: string) {
+  return <ChecklistRenderer text={text} />;
+}
 
-  for (const line of lines) {
-    const stepMatch = line.trim().match(/^(\d+)[\.\)]\s*(.+)/);
+function renderScriptContent(text: string) {
+  const allLines = text.split('\n');
+  const sections: { header: string | null; steps: { num: string; text: string; isQuote: boolean }[] }[] = [];
+  let currentSection: { header: string | null; steps: { num: string; text: string; isQuote: boolean }[] } = { header: null, steps: [] };
+  let currentStep: { num: string; text: string; isQuote: boolean } | null = null;
+
+  for (const line of allLines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const headerMatch = trimmed.match(/^(?:WHEN\s|IF\s|AFTER\s|BEFORE\s|DURING\s).{10,}/i) || 
+                         (trimmed === trimmed.toUpperCase() && trimmed.length > 10 && !trimmed.match(/^\d/));
+    if (headerMatch && currentSection.steps.length > 0) {
+      if (currentStep) { currentSection.steps.push(currentStep); currentStep = null; }
+      sections.push(currentSection);
+      currentSection = { header: trimmed, steps: [] };
+      continue;
+    }
+    if (headerMatch && currentSection.steps.length === 0 && !currentSection.header) {
+      currentSection.header = trimmed;
+      continue;
+    }
+
+    const stepMatch = trimmed.match(/^(\d+)[\.\)]\s*(.+)/);
     if (stepMatch) {
-      if (currentStep) steps.push(currentStep);
-      currentStep = { num: stepMatch[1], text: stepMatch[2].replace(/\*\*/g, '') };
+      if (currentStep) currentSection.steps.push(currentStep);
+      const isQuote = stepMatch[2].includes('"') || stepMatch[2].includes('"') || stepMatch[2].includes('"');
+      currentStep = { num: stepMatch[1], text: stepMatch[2].replace(/\*\*/g, ''), isQuote };
     } else if (currentStep) {
-      currentStep.text += ' ' + line.trim().replace(/\*\*/g, '');
+      currentStep.text += ' ' + trimmed.replace(/\*\*/g, '');
+      if (trimmed.includes('"') || trimmed.includes('"')) currentStep.isQuote = true;
     } else {
-      steps.push({ num: '', text: line.trim().replace(/\*\*/g, '') });
+      currentSection.steps.push({ num: '', text: trimmed.replace(/\*\*/g, ''), isQuote: false });
     }
   }
-  if (currentStep) steps.push(currentStep);
+  if (currentStep) currentSection.steps.push(currentStep);
+  if (currentSection.steps.length > 0 || currentSection.header) sections.push(currentSection);
 
-  if (steps.filter(s => s.num).length === 0) {
-    return <div className="whitespace-pre-wrap text-sm leading-relaxed border-l-4 border-purple-500/30 pl-4">{text}</div>;
+  const numberedStepsExist = sections.some(s => s.steps.some(st => st.num));
+  if (!numberedStepsExist) {
+    return <div className="whitespace-pre-wrap text-sm leading-relaxed border-l-4 pl-4" style={{ borderColor: 'rgba(184,134,11,0.3)' }}>{text}</div>;
   }
 
   return (
-    <div className="space-y-1">
-      {steps.map((step, i) => (
-        <div key={i} className="flex items-start gap-3" data-testid={`script-step-${i}`}>
-          {step.num ? (
-            <div className="flex items-center gap-2 shrink-0 mt-0.5">
-              <div className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold">
-                {step.num}
-              </div>
-              {i < steps.filter(s => s.num).length - 1 && step.num && (
-                <span className="text-muted-foreground/30 text-xs hidden">→</span>
-              )}
-            </div>
-          ) : (
-            <div className="w-6 shrink-0" />
+    <div className="space-y-4">
+      {sections.map((section, si) => (
+        <div key={si}>
+          {section.header && (
+            <div className="font-bold text-sm text-foreground mb-3">{section.header}</div>
           )}
-          <p className="text-sm text-muted-foreground leading-relaxed pt-0.5">{step.text}</p>
+          <div className="relative">
+            {section.steps.filter(s => s.num).length > 1 && (
+              <div className="absolute left-[11px] top-7 bottom-3 w-px" style={{ background: 'rgba(184,134,11,0.2)' }} />
+            )}
+            <div className="space-y-3">
+              {section.steps.map((step, i) => (
+                <div key={i} className="flex items-start gap-3 relative" data-testid={`script-step-${si}-${i}`}>
+                  {step.num ? (
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 z-10"
+                      style={{ background: 'rgba(184,134,11,0.15)', color: '#d4a017', border: '1.5px solid rgba(184,134,11,0.4)' }}>
+                      {step.num}
+                    </div>
+                  ) : (
+                    <div className="w-6 shrink-0" />
+                  )}
+                  {step.isQuote ? (
+                    <div className="flex-1 rounded-lg p-2.5 text-sm text-muted-foreground leading-relaxed" style={{ background: '#1a1d2e' }}>
+                      <span className="text-primary/50 mr-1">"</span>{step.text}<span className="text-primary/50 ml-1">"</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground leading-relaxed pt-0.5 flex-1">{step.text}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       ))}
     </div>
@@ -8136,27 +8281,90 @@ function renderScriptContent(text: string) {
 }
 
 function renderFrameworkContent(text: string) {
-  const rolePattern = /\b(SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)\b/g;
+  const phasePattern = /^(?:PHASE\s+(\d+))[:\s—–-]*(.*)$/im;
+  const phaseSections = text.split(/\n(?=PHASE\s+\d)/i);
+
+  if (phaseSections.length > 1) {
+    const phases: { num: string; title: string; items: string[] }[] = [];
+    for (const section of phaseSections) {
+      const lines = section.trim().split('\n');
+      const headerMatch = lines[0]?.match(/^PHASE\s+(\d+)[:\s—–-]*(.*)/i);
+      if (headerMatch) {
+        const items = lines.slice(1).map(l => l.trim()).filter(Boolean).map(l => l.replace(/^[-•]\s*/, ''));
+        phases.push({ num: headerMatch[1], title: headerMatch[2].trim() || `Phase ${headerMatch[1]}`, items });
+      } else {
+        const items = lines.map(l => l.trim()).filter(Boolean).map(l => l.replace(/^[-•]\s*/, ''));
+        phases.push({ num: '', title: '', items });
+      }
+    }
+
+    return (
+      <div className="space-y-3">
+        {phases.map((phase, i) => (
+          <div key={i} className="rounded-lg border border-border/50 p-4" data-testid={`framework-phase-${phase.num || i}`}>
+            <div className="flex items-start gap-3 mb-2">
+              {phase.num && (
+                <div className="w-7 h-7 rounded-full border-2 border-primary flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                  {phase.num}
+                </div>
+              )}
+              <div className="font-semibold text-sm text-foreground pt-0.5">{phase.title}</div>
+            </div>
+            {phase.items.length > 0 && (
+              <ul className="space-y-1 ml-10">
+                {phase.items.map((item, j) => (
+                  <li key={j} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const sections = text.split(/\n(?=(?:SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)[:\s])/i);
 
   if (sections.length <= 1) {
     const lines = text.split('\n');
+    const bulletLines = lines.filter(l => l.trim()).map(l => l.trim());
+    const hasBullets = bulletLines.some(l => /^[-•*]\s/.test(l));
+
+    if (hasBullets || bulletLines.length > 2) {
+      return (
+        <ul className="space-y-1.5">
+          {bulletLines.map((line, i) => {
+            const cleaned = line.replace(/^[-•*]\s*/, '');
+            const roleMatch = cleaned.match(/^(SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)[:\s]/i);
+            if (roleMatch) {
+              return (
+                <li key={i} className="mt-3 first:mt-0">
+                  <span className="inline-block text-[10px] font-bold tracking-wider bg-blue-500/15 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded mr-2">
+                    {roleMatch[1].toUpperCase()}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{cleaned.slice(roleMatch[0].length).trim()}</span>
+                </li>
+              );
+            }
+            return (
+              <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 mt-1.5 shrink-0" />
+                {cleaned}
+              </li>
+            );
+          })}
+        </ul>
+      );
+    }
+
     return (
       <div className="space-y-1">
         {lines.map((line, i) => {
           const trimmed = line.trim();
           if (!trimmed) return null;
-          const roleMatch = trimmed.match(/^(SERVER|BARTENDER|HOST|MANAGER|SHIFT LEAD|BOH|FOH|KITCHEN|BAR)[:\s]/i);
-          if (roleMatch) {
-            return (
-              <div key={i} className="mt-3 first:mt-0">
-                <span className="inline-block text-[10px] font-bold tracking-wider bg-blue-500/15 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded mr-2">
-                  {roleMatch[1].toUpperCase()}
-                </span>
-                <span className="text-sm text-muted-foreground">{trimmed.slice(roleMatch[0].length).trim()}</span>
-              </div>
-            );
-          }
           return <div key={i} className="text-sm text-muted-foreground leading-relaxed">{trimmed}</div>;
         })}
       </div>
@@ -8272,8 +8480,109 @@ function ServiceQuickReference({ content }: { content: any[] }) {
   );
 }
 
+function TrainingQuickReference({ content }: { content: any[] }) {
+  const checklistItems = content.filter(c => c.contentType === 'checklist');
+  const scriptItems = content.filter(c => c.contentType === 'script');
+
+  const firstFiveChecklist: string[] = [];
+  for (const item of checklistItems) {
+    const lines = (item.content || '').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#') && !trimmed.endsWith(':') && trimmed.length > 5) {
+        firstFiveChecklist.push(trimmed.replace(/^[-•□✓✔☐☑]\s|^\[\s?\]\s|^\[x\]\s/i, '').trim());
+        if (firstFiveChecklist.length >= 5) break;
+      }
+    }
+    if (firstFiveChecklist.length >= 5) break;
+  }
+
+  const firstThreeSteps: { num: string; text: string }[] = [];
+  for (const item of scriptItems) {
+    const lines = (item.content || '').split('\n');
+    for (const line of lines) {
+      const match = line.trim().match(/^(\d+)[\.\)]\s*(.+)/);
+      if (match) {
+        firstThreeSteps.push({ num: match[1], text: match[2].replace(/\*\*/g, '') });
+        if (firstThreeSteps.length >= 3) break;
+      }
+    }
+    if (firstThreeSteps.length >= 3) break;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-primary/20 p-4" style={{ background: "#111827" }}>
+        <h4 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-primary" />
+          Training Phases at a Glance
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { name: "Shadow Phase", desc: "Observe and narrate. Walk-through with guidance." },
+            { name: "Perform Phase", desc: "Handle scenarios with less guidance, more complexity." },
+            { name: "Certify Phase", desc: "Randomized high-pressure test. Must pass to certify." },
+          ].map((phase, i) => (
+            <div key={i} className="p-3 rounded-lg border border-border/50" data-testid={`training-phase-card-${i}`}>
+              <div className="text-[10px] font-bold tracking-wider uppercase mb-1" style={{ color: '#d4a017' }}>{phase.name}</div>
+              <div className="text-xs text-muted-foreground">{phase.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {firstFiveChecklist.length > 0 && (
+        <div className="rounded-lg border border-primary/20 p-4" style={{ background: "#111827" }}>
+          <div className="text-[10px] font-bold tracking-wider uppercase mb-3" style={{ color: '#d4a017' }}>
+            BEFORE FIRST SOLO SHIFT
+          </div>
+          <div className="space-y-2">
+            {firstFiveChecklist.map((item, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#d4a017' }} />
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {firstThreeSteps.length > 0 && (
+        <div className="rounded-lg border border-primary/20 p-4" style={{ background: "#111827" }}>
+          <div className="text-[10px] font-bold tracking-wider uppercase mb-3" style={{ color: '#d4a017' }}>
+            PERFORMANCE CONVERSATION FLOW
+          </div>
+          <div className="relative">
+            {firstThreeSteps.length > 1 && (
+              <div className="absolute left-[11px] top-6 bottom-1 w-px" style={{ background: 'rgba(184,134,11,0.2)' }} />
+            )}
+            <div className="space-y-2">
+              {firstThreeSteps.map((step, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 z-10"
+                    style={{ background: 'rgba(184,134,11,0.15)', color: '#d4a017', border: '1.5px solid rgba(184,134,11,0.4)' }}>
+                    {step.num}
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed pt-0.5">{step.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {firstFiveChecklist.length === 0 && firstThreeSteps.length === 0 && (
+        <div className="rounded-lg border border-dashed border-muted-foreground/30 p-4 text-center">
+          <p className="text-sm text-muted-foreground">Add checklists and scripts to see a condensed reference view here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ServiceContentAccordion({ content, slug }: { content: any[]; slug: string }) {
   const [viewMode, setViewMode] = useState<'full' | 'quick'>('full');
+  const hasQuickRef = slug === "service" || slug === "training";
   const typeOrder = ["principle", "output", "checklist", "script"] as const;
   const grouped = typeOrder
     .map(type => ({
@@ -8286,7 +8595,7 @@ function ServiceContentAccordion({ content, slug }: { content: any[]; slug: stri
 
   return (
     <div>
-      {slug === "service" && (
+      {hasQuickRef && (
         <div className="flex items-center gap-2 mb-4">
           <Button
             variant={viewMode === 'full' ? 'default' : 'outline'}
@@ -8302,7 +8611,7 @@ function ServiceContentAccordion({ content, slug }: { content: any[]; slug: stri
             onClick={() => setViewMode('quick')}
             data-testid="btn-view-quick-reference"
           >
-            <Zap className="h-3.5 w-3.5 mr-1.5" />
+            <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
             Quick Reference
           </Button>
         </div>
@@ -8310,6 +8619,8 @@ function ServiceContentAccordion({ content, slug }: { content: any[]; slug: stri
 
       {viewMode === 'quick' && slug === "service" ? (
         <ServiceQuickReference content={content} />
+      ) : viewMode === 'quick' && slug === "training" ? (
+        <TrainingQuickReference content={content} />
       ) : (
         <>
           <Accordion type="multiple" className="space-y-4" defaultValue={populatedGroups.length > 0 ? [`group-${populatedGroups[0].type}`] : []}>
@@ -8507,7 +8818,8 @@ export default function DomainPage() {
         {/* Review Response Generator - only show for reviews domain */}
         {slug === "reviews" && <ReviewResponseGenerator />}
 
-        {/* Skills Certification Engine - only show for training domain */}
+        {/* Training Metric Strip + Skills Certification Engine - only show for training domain */}
+        {slug === "training" && <TrainingMetricStrip content={content} />}
         {slug === "training" && <SkillsCertificationEngine />}
 
         {/* Labor Demand Engine - only show for staffing domain */}
