@@ -1348,8 +1348,13 @@ export default function SocialPostBuilder() {
                       key={holiday.id}
                       className="p-3 border rounded-md hover-elevate cursor-pointer"
                       onClick={() => {
-                        setAiFormData({ ...aiFormData, postType: "holiday", selectedHoliday: holiday.name });
-                        setShowAiPanel(true);
+                        const curated = getCuratedPost(
+                          holiday.name,
+                          holiday.category,
+                          holiday.suggestedAngle ?? undefined,
+                          holiday.suggestedTags ?? undefined
+                        );
+                        setCaption(curated.caption);
                         setActiveTab("create");
                       }}
                     >
