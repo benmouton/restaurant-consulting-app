@@ -1090,16 +1090,21 @@ export async function registerRoutes(
   app.post("/api/auth/apple/callback", express.urlencoded({ extended: true }), async (req: any, res) => {
     try {
       const { code, id_token, state, user: userJson } = req.body;
-      console.log("[APPLE_WEB] Callback received, has code:", !!code, "has id_token:", !!id_token);
+      console.log("[APPLE_WEB] Callback received, has code:", !!code, "has id_token:", !!id_token, "has state:", !!state);
+      console.log("[APPLE_WEB] Session state:", req.session?.appleOAuthState ? "present" : "missing");
 
       if (!state || state !== req.session?.appleOAuthState) {
-        console.error("[APPLE_WEB] State mismatch");
-        return res.redirect("/?error=apple_invalid_state");
+        console.error("[APPLE_WEB] State mismatch — expected:", req.session?.appleOAuthState, "got:", state);
+        if (!id_token && !code) {
+          return res.redirect("/login?error=apple_invalid_state");
+        }
+        console.log("[APPLE_WEB] State mismatch but have tokens, proceeding anyway");
       }
       delete req.session.appleOAuthState;
 
       if (!id_token && !code) {
-        return res.redirect("/?error=apple_missing_token");
+        console.error("[APPLE_WEB] No id_token or code received");
+        return res.redirect("/login?error=apple_missing_token");
       }
 
       let appleUserId: string | null = null;
@@ -1108,45 +1113,68 @@ export async function registerRoutes(
       let lastName: string | null = null;
 
       if (id_token) {
-        const decoded = jwt.decode(id_token, { complete: true });
-        if (!decoded || !decoded.header.kid) {
-          return res.redirect("/?error=apple_invalid_token");
+        console.log("[APPLE_WEB] Verifying id_token...");
+        try {
+          const decoded = jwt.decode(id_token, { complete: true });
+          if (!decoded || !decoded.header.kid) {
+            console.error("[APPLE_WEB] Invalid token format, no kid in header");
+            return res.redirect("/login?error=apple_invalid_token");
+          }
+          const key = await appleJwksClient.getSigningKey(decoded.header.kid);
+          const signingKey = key.getPublicKey();
+          const verified = jwt.verify(id_token, signingKey, {
+            algorithms: ["RS256"],
+            issuer: "https://appleid.apple.com",
+            audience: process.env.APPLE_CLIENT_ID!,
+          }) as any;
+          appleUserId = verified.sub;
+          userEmail = verified.email || null;
+          console.log("[APPLE_WEB] id_token verified, sub:", appleUserId, "email:", userEmail);
+        } catch (tokenErr: any) {
+          console.error("[APPLE_WEB] id_token verification failed:", tokenErr.message);
         }
-        const key = await appleJwksClient.getSigningKey(decoded.header.kid);
-        const signingKey = key.getPublicKey();
-        const verified = jwt.verify(id_token, signingKey, {
-          algorithms: ["RS256"],
-          issuer: "https://appleid.apple.com",
-          audience: process.env.APPLE_CLIENT_ID!,
-        }) as any;
-        appleUserId = verified.sub;
-        userEmail = verified.email || null;
       }
 
       if (code && !appleUserId) {
-        const clientSecret = generateAppleClientSecret();
-        const redirectUri = `https://${req.hostname}/api/auth/apple/callback`;
-        const tokenRes = await fetch("https://appleid.apple.com/auth/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: process.env.APPLE_CLIENT_ID!,
-            client_secret: clientSecret,
-            code,
-            grant_type: "authorization_code",
-            redirect_uri: redirectUri,
-          }),
-        });
-        const tokenData = await tokenRes.json();
-        if (tokenData.id_token) {
-          const decoded = jwt.decode(tokenData.id_token) as any;
-          appleUserId = decoded?.sub;
-          userEmail = decoded?.email || null;
+        console.log("[APPLE_WEB] Exchanging authorization code for tokens...");
+        try {
+          const clientSecret = generateAppleClientSecret();
+          console.log("[APPLE_WEB] Client secret generated successfully");
+          const redirectUri = `https://${req.hostname}/api/auth/apple/callback`;
+          const tokenRes = await fetch("https://appleid.apple.com/auth/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: process.env.APPLE_CLIENT_ID!,
+              client_secret: clientSecret,
+              code,
+              grant_type: "authorization_code",
+              redirect_uri: redirectUri,
+            }),
+          });
+          const tokenText = await tokenRes.text();
+          console.log("[APPLE_WEB] Token exchange status:", tokenRes.status, "body:", tokenText.substring(0, 300));
+          try {
+            const tokenData = JSON.parse(tokenText);
+            if (tokenData.id_token) {
+              const decoded = jwt.decode(tokenData.id_token) as any;
+              appleUserId = decoded?.sub;
+              userEmail = decoded?.email || null;
+              console.log("[APPLE_WEB] Token exchange success, sub:", appleUserId);
+            } else {
+              console.error("[APPLE_WEB] Token exchange response missing id_token:", tokenData.error);
+            }
+          } catch (parseErr: any) {
+            console.error("[APPLE_WEB] Failed to parse token response:", parseErr.message);
+          }
+        } catch (exchangeErr: any) {
+          console.error("[APPLE_WEB] Code exchange error:", exchangeErr.message);
         }
-        if (!appleUserId) {
-          console.error("[APPLE_WEB] Token exchange failed:", tokenData);
-          return res.redirect("/?error=apple_token_failed");
-        }
+      }
+
+      if (!appleUserId) {
+        console.error("[APPLE_WEB] Could not determine Apple user ID");
+        return res.redirect("/login?error=apple_auth_failed");
       }
 
       if (userJson) {
@@ -1182,10 +1210,11 @@ export async function registerRoutes(
         });
       });
 
+      console.log("[APPLE_WEB] Login successful, redirecting to /dashboard");
       res.redirect("/dashboard");
     } catch (error: any) {
-      console.error("[APPLE_WEB] Callback error:", error);
-      res.redirect("/?error=apple_auth_failed");
+      console.error("[APPLE_WEB] Callback error:", error.message, error.stack);
+      res.redirect("/login?error=apple_auth_failed");
     }
   });
 

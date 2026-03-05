@@ -13,7 +13,7 @@ export function startLogin() {
   if (isNativeApp()) {
     window.location.href = "/native-login";
   } else {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
   }
 }
 
@@ -21,7 +21,7 @@ export function startLoginWithReturn(returnTo: string) {
   if (isNativeApp()) {
     window.location.href = `/native-login?returnTo=${encodeURIComponent(returnTo)}`;
   } else {
-    window.location.href = `/api/login?returnTo=${encodeURIComponent(returnTo)}`;
+    window.location.href = `/login?returnTo=${encodeURIComponent(returnTo)}`;
   }
 }
 

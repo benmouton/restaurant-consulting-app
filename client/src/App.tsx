@@ -39,6 +39,7 @@ import TermsOfService from "@/pages/terms";
 import CertificationPage from "@/pages/certification";
 import TestAccessPage from "@/pages/test-access";
 import ReviewLoginPage from "@/pages/review-login";
+import LoginPage from "@/pages/login";
 import NativeLoginPage from "@/pages/native-login";
 import PricingPage from "@/pages/pricing";
 import NotFound from "@/pages/not-found";
@@ -183,6 +184,7 @@ function Router() {
           {user ? <ProtectedPage component={CertificationPage} /> : <Landing />}
         </Route>
         {/* Public Pages */}
+        <Route path="/login" component={LoginPage} />
         <Route path="/native-login" component={NativeLoginPage} />
         <Route path="/review-login" component={ReviewLoginPage} />
         <Route path="/test-access/:token" component={TestAccessPage} />

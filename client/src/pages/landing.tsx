@@ -193,7 +193,7 @@ export default function Landing() {
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <BrandLogoNav linkTo="/" />
-          <Button onClick={startLogin} data-testid="button-login-header">
+          <Button onClick={() => { window.location.href = "/login"; }} data-testid="button-login-header">
             Sign In
           </Button>
         </div>
@@ -214,22 +214,10 @@ export default function Landing() {
             Used by independent restaurant owners to cut labor costs, protect margins, and stop firefighting every shift.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={startLogin} data-testid="button-get-started">
+            <Button size="lg" onClick={() => { window.location.href = "/login"; }} data-testid="button-get-started">
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-          </div>
-          <div className="flex justify-center mt-4">
-            <button
-              onClick={() => { window.location.href = "/api/auth/apple/web"; }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-black/90 transition-colors"
-              data-testid="button-apple-signin"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-              </svg>
-              Sign in with Apple
-            </button>
           </div>
           <p className="text-sm text-primary font-medium italic mt-4" data-testid="text-tagline">
             Systems that work on your worst night.
@@ -277,7 +265,7 @@ export default function Landing() {
                 ))}
               </div>
               <div className="mt-6">
-                <Button variant="outline" onClick={startLogin} data-testid="btn-try-consultant">
+                <Button variant="outline" onClick={() => { window.location.href = "/login"; }} data-testid="btn-try-consultant">
                   Try it yourself
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -482,7 +470,7 @@ export default function Landing() {
               <p className="text-sm text-muted-foreground">
                 No credit card required. No contracts. Cancel anytime.
               </p>
-              <Button size="lg" onClick={startLogin} className="mt-4" data-testid="button-pricing-cta">
+              <Button size="lg" onClick={() => { window.location.href = "/login"; }} className="mt-4" data-testid="button-pricing-cta">
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -546,7 +534,7 @@ export default function Landing() {
               <p className="text-sm text-muted-foreground mb-3">
                 Be one of our founding members.
               </p>
-              <Button variant="outline" onClick={startLogin} data-testid="btn-founding-member">
+              <Button variant="outline" onClick={() => { window.location.href = "/login"; }} data-testid="btn-founding-member">
                 Join as a Founding Member
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -567,7 +555,7 @@ export default function Landing() {
           <p className="text-primary-foreground/70 mb-8 text-sm">
             {TOTAL_DOMAIN_COUNT} operational domains. Expert consultant included. If it wouldn't hold up during a slammed dinner rush, it's not in here.
           </p>
-          <Button size="lg" variant="secondary" onClick={startLogin} data-testid="button-cta-bottom">
+          <Button size="lg" variant="secondary" onClick={() => { window.location.href = "/login"; }} data-testid="button-cta-bottom">
             Get Started Free
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
