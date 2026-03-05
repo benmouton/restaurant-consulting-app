@@ -1236,10 +1236,9 @@ export default function SocialPostBuilder() {
                     <MapPin className="h-4 w-4 mr-2 text-red-500" />
                     Google Business
                   </Button>
-                  <Button variant="outline" size="sm" disabled className="opacity-60" data-testid="button-connect-linkedin">
+                  <Button onClick={handleConnectLinkedIn} variant="outline" size="sm" data-testid="button-connect-linkedin">
                     <SiLinkedin className="h-4 w-4 mr-2 text-blue-700" />
-                    LinkedIn
-                    <span className="ml-2 text-[10px] uppercase font-semibold bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
+                    Connect LinkedIn
                   </Button>
                   <Button onClick={handleConnectX} variant="outline" size="sm" data-testid="button-connect-x">
                     <SiX className="h-4 w-4 mr-2" />
