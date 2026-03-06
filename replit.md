@@ -1,7 +1,7 @@
 # The Restaurant Consultant
 
 ## Overview
-The Restaurant Consultant is a full-stack web application designed to empower independent restaurant owners and operators with robust operational systems. It offers an expert operations consultant, a comprehensive framework of content, training templates, and staff management tools. The project's core vision is to provide repeatable systems to address operational challenges, foster discipline, and enhance efficiency. Key capabilities include advanced staff scheduling, employee portal access, labor demand analysis, food costing, and an expert-driven leadership command center. The application aims to be an invisible expert, focusing on delivering solutions without exposing its underlying technology.
+The Restaurant Consultant is a full-stack web application designed to provide independent restaurant owners and operators with robust operational systems. It offers an expert operations consultant, a comprehensive framework of content, training templates, and staff management tools. The project aims to deliver repeatable systems to address operational challenges, foster discipline, enhance efficiency, and act as an invisible expert. Key capabilities include advanced staff scheduling, employee portal access, labor demand analysis, food costing, and an expert-driven leadership command center.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -12,10 +12,10 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: React 18 with TypeScript
 - **Routing**: Wouter
 - **State Management**: TanStack React Query
-- **Styling**: Tailwind CSS with shadcn/ui (New York style)
+- **Styling**: Tailwind CSS with shadcn/ui (New York style), Radix UI-based components
 - **Animations**: Framer Motion
 - **Build Tool**: Vite
-- **Key Design Decisions**: Path aliases, Replit Auth integration, streaming chat with markdown, Radix UI-based components.
+- **Key Design Decisions**: Path aliases, Replit Auth integration, streaming chat with markdown.
 
 ### Backend
 - **Runtime**: Node.js with Express
@@ -27,25 +27,25 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
-- **Schema**: Defined in `shared/schema.ts` and `shared/models/`. Core tables cover users, sessions, conversations, operational data, and various restaurant management entities.
+- **Schema**: Defined in `shared/schema.ts` and `shared/models/`, covering users, sessions, conversations, and restaurant management entities.
 
 ### Core Features & Implementations
-- **Staff Management**: Comprehensive scheduling system (Sling-style), employee portal, labor demand analysis with real-time calculations and recommendations.
-- **Financial Management**: Food costing system with plate costing, ingredient memory, and historical tracking. `MarginStatusStrip` (4 gold-bordered cards: Average Food Cost %, Plates Costed, Highest Cost Plate, Last Weekly Check). `FoodCostCalculator` with shimmer border, 3 tabs (New Plate / Weekly Check / Saved) with icons and gold active border. New Plate tab: gold-underline focus inputs, category colored dots in dropdown (amber/orange/blue/gray/white), live cost preview before adding (muted gold inline), ingredient library panel (localStorage key `trc_ingredient_library`) with star-to-save chips, ingredient cards with star/remove, `Margin Result Banner` (FC %, Margin $, Margin %, status callout, save/new plate actions). Weekly Check tab: result banner with large animated percentage, bold amber dollar leak callout, trend sparkline (bar chart of last 8 weeks, color-coded vs target). Saved tab: load-for-editing button on plates, designed empty states with icons and action buttons, weekly check history with status badges.
+- **Staff Management**: Comprehensive scheduling, employee portal, labor demand analysis.
+- **Financial Management**: Food costing system with plate costing, ingredient memory, and historical tracking. Includes `MarginStatusStrip` and `FoodCostCalculator` with detailed input and output views.
 - **Subscription & Access Control**: Freemium tiers (Free/Basic/Pro) with domain-based feature gating and Role-Based Access Control (Owner, General Manager, Manager).
-- **Consulting Engine**: OpenAI-powered operational consultant with persistent conversation history, context-aware suggestions, formatted responses, and support for image/social media post generation.
+- **Consulting Engine**: OpenAI-powered operational consultant with persistent conversation history, context-aware suggestions, and formatted responses.
 - **Operational Command Centers**:
-    - **Leadership**: Daily task management, crisis guidance, progress tracking, and reminders.
-    - **Crisis Management**: `CrisisReadinessStrip` (4 gold-bordered cards: Crisis Sessions Run, Most Common Crisis, Average Session Length, Last Crisis with severity/age). `CrisisResponseEngine` with red gradient header, animated pulse border during active sessions, 8 color-coded scenario types (amber/orange/yellow/red/blue/purple/teal/red), pre-session Quick Context step (cover count, staff on floor, time of service — injected into all AI prompts, skippable), 3-level severity triage with colored left borders and glow effects (Critical gets pulse animation). 4-stage Crisis Phase Tracker (Onset/Active/Stabilizing/Recovery) with connected node progress bar, "Advance Phase" button that silently updates AI system prompt tone per phase. First 60 Seconds tap-to-complete steps (circle number badges, checkmark + strikethrough on tap). Dynamic scenario-specific + phase-aware quick-reply pill buttons (fully mapped for all 8 scenarios). Chat with markdown parsing (bold headers in accent color, numbered step cards, bullet sub-items), typing indicator (3 animated dots), phase system notes (centered muted text). "Share Briefing" button generates plain-text handoff summary from completed steps + tapped replies, copies to clipboard. "Owner Overwhelmed" special mode: skips context step, single free-text prompt ("What's the one thing that absolutely cannot wait?"), purple accent throughout, hidden phase tracker, simplified single-step AI responses (OVERWHELMED_SYSTEM_PROMPT), unique quick replies. Session Summary Modal (scenario/severity/duration/phase/messages, Save & Run Debrief / Save Only / Close). Post-Crisis Debrief (4 sequential questions → After Action Report via API, styled card with gold left border, Copy Report / Save to Session). Session History Log (collapsible, up to 10 sessions in localStorage `trc_crisis_sessions`, scenario/severity/date/duration badges, Debrief Done tag, Run Debrief / View Report links). `crisisPulse` CSS animation in index.css.
-    - **Facility**: Equipment issue triage, preventive maintenance, equipment log, and vendor directory.
-    - **Kitchen**: Real-time readiness and execution engine with structured inputs, deterministic scoring, alerts, and structured debriefs. `KitchenStatusStrip` (4 gold-bordered cards: Tonight's Status with score/color, Last 86'd Items, BOH vs. Covers ratio, Last Debrief age). `KitchenComplianceEngine` with shimmer border, 5 tabs with icons (Gauge/AlertTriangle/Timer/ClipboardList/Target) and gold active border. Readiness tab: prep sign-off green/amber buttons with helper text, station status with slide-down note inputs for not-ready stations, par shortage amber chips, 86 list red chips with Clear All, live covers/cook ratio (green <=15, amber 16-20, red 21+), large party expanded section (Party Size/Arrival Time/Seated Where), live Score Breakdown with color-coded badge and progress bars. Alerts tab: 3 micro-cards (Apps/Entrees/Window) with live updates, badge-styled timing standards, bottleneck insights callout, structured alert output cards (HIGH/MEDIUM/LOW severity badges). Quick tab: 18px bold colored labels, log success green state. Debrief tab: char counters on all 5 textareas, structured output with What Broke (red)/Root Causes (amber)/Tomorrow's Fixes (green) color-coded cards, Print Debrief button. Coach tab: station icons in dropdown, behavior preview callout with gold left border, structured coaching card (The Focus/What to Watch/What to Say blockquote/What Good Looks Like/Follow Up By).
-- **Content & Training**: Enhanced content accordions for operational frameworks (Principles, Frameworks, Checklists, Scripts), including interactive elements and metric displays.
-- **Labor Demand Engine** (`domain.tsx`): `StaffingMetricStrip` (4 gold-bordered cards: labor %, scheduled hours, staff on floor, next cut), `LaborDemandEngine` with shimmer border, 6 quick presets with icons and full auto-fill (day, daypart, covers, check, labor target, positions, wage, hours), live `Labor Math Preview` panel (projected revenue, labor budget, scheduled cost, cost per cover, variance with On Target/Watch/Over Budget badge), smart staff breakdown parsing into chips with mismatch warning, `StructuredOutputRenderer` for parsed AI output (sections: Staffing Recommendation, Cut Timeline, Labor Cost Breakdown, Manager Actions, Risk Flags rendered as cards with gold headers and left borders, manager actions as checkable items), inline example preview with dashed gold border, tab icons (ClipboardList pre-shift, Zap mid-shift) with gold active border and amber pulse badge on mid-shift when data entered.
-- **HR Documentation Engine** (`domain.tsx`): `HRStatusStrip` (3 gold-bordered cards: total records, pending signatures in amber, this month), `HRComplianceEngine` with shimmer border, severity dots on issue types (yellow/orange/red), `ProgressiveDisciplineIndicator` (3-dot visual strip below Discipline Step dropdown, gold-highlighted active step), bottom-border-only focus inputs, 3 policy awareness options, character count on description textarea, styled document output (gold section headers, amber custom checkboxes, divider lines), action bar (Copy with checkmark state, Download PDF with print-white styling, Share, Save to HR Records with gold/green state). `HRRecordsViewer` with 4 filter chips (All/Pending Signature/Signed/This Month), color-coded discipline badges (yellow/amber/orange/red), pending signature pulse indicator, per-record Upload Signed Copy button with Capacitor camera support, proper delete confirmation dialog. `EmployeeDisciplineTrailModal` (vertical timeline with amber connecting line, gold dots, discipline level badges, next-step callout card).
-- **Living Playbooks**: SOP management system with various creation modes (Quick Checklist, Step-by-Step, Deep Procedure), mobile checklist view, audit capabilities, and acknowledgment tracking.
-- **Employee Handbook Builder**: Customizable handbook generation tool with policy configuration and print-ready output.
-- **Reviews & Reputation** (`domain.tsx`): `ReputationStatusStrip` (4 gold-bordered cards: Responses Generated, Last Response Type, Templates Available, Response Streak). `ReviewResponseGenerator` with shimmer border, auto-extract customer name from review text (never bracket placeholders), Apple Vision OCR via `@capacitor-mlkit/text-recognition` (iOS native, falls back to server OCR), web shows "available in iOS app" note for upload. localStorage persistence for restaurant name/your name/your title (keys: `trc_review_restaurant`, `trc_review_name`, `trc_review_title`). 4 review types (Negative/Positive/Mixed/Fake-Defamatory), 6 response tones (Professional/Brief/Recovery/Factual/Warm & Personal/Firm but Fair). Structured response output card with Copy (checkmark state), inline Edit toggle, Regenerate-with-different-tone dropdown. 6 response templates in 2-column grid with type badges. Review Response Best Practices accordion (6 items, gold chevron, gold left border).
-- **Marketing & Onboarding**: Conversion-optimized landing page with interactive previews, product screenshots, and a multi-step onboarding wizard for new users.
+    - **Leadership**: Daily task management, crisis guidance, progress tracking.
+    - **Crisis Management**: `CrisisReadinessStrip` and `CrisisResponseEngine` with scenario selection, severity triage, phase tracking, and post-crisis debriefing. Includes an "Owner Overwhelmed" mode.
+    - **Facility**: `AssetHealthStrip` and `FacilityCommandCenter` for breakdown logging, PM scheduling, equipment management, and vendor tracking.
+    - **Kitchen**: `KitchenStatusStrip` and `KitchenComplianceEngine` for real-time readiness, alerts, quick logging, debriefing, and coaching.
+- **Content & Training**: Enhanced content accordions for operational frameworks (Principles, Frameworks, Checklists, Scripts).
+- **Labor Demand Engine**: `StaffingMetricStrip` and `LaborDemandEngine` for labor forecasting, staffing recommendations, and cost analysis.
+- **HR Documentation Engine**: `HRStatusStrip` and `HRComplianceEngine` for progressive discipline tracking, policy management, and HR records viewing.
+- **Living Playbooks**: SOP management system with various creation modes, mobile checklist view, audit capabilities.
+- **Employee Handbook Builder**: Customizable handbook generation.
+- **Reviews & Reputation**: `ReputationStatusStrip` and `ReviewResponseGenerator` for AI-powered review responses, including OCR for review text.
+- **Marketing & Onboarding**: Conversion-optimized landing page and multi-step onboarding wizard.
 
 ## External Dependencies
 
@@ -57,24 +57,5 @@ Preferred communication style: Simple, everyday language.
 - **Meta (Facebook/Instagram) API**: Direct social media posting.
 - **Google Business Profile API**: Direct social media posting.
 
-### Required Environment Variables
-- `DATABASE_URL`
-- `SESSION_SECRET`
-- `AI_INTEGRATIONS_OPENAI_API_KEY`
-- `AI_INTEGRATIONS_OPENAI_BASE_URL`
-- `ISSUER_URL`
-- `REPL_ID`
-- `ENCRYPTION_KEY`
-- `META_APP_ID`, `META_APP_SECRET`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-
 ### Capacitor (iOS Native)
-- **App ID**: `com.alstiginc.restaurantconsultant`
-- **Native Plugins**: @capacitor/browser, @capacitor/preferences, @capacitor/push-notifications, @capacitor/camera, @capacitor/haptics, @capacitor/share, @capacitor/network, @capacitor-community/apple-sign-in, capacitor-native-biometric
-
-### Key NPM Packages
-- **UI**: Radix UI primitives, shadcn/ui, Framer Motion, react-markdown
-- **Data**: Drizzle ORM, drizzle-zod, @tanstack/react-query
-- **Auth**: passport, openid-client, express-session
-- **Build**: Vite, esbuild, tsx
-- **Native**: @capacitor/core, @capacitor/cli, @capacitor/ios
+- **Native Plugins**: @capacitor/browser, @capacitor/preferences, @capacitor/push-notifications, @capacitor/camera, @capacitor/haptics, @capacitor/share, @capacitor/network, @capacitor-community/apple-sign-in, capacitor-native-biometric, @capacitor-mlkit/text-recognition.

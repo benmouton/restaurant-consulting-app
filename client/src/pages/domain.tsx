@@ -9692,6 +9692,88 @@ Be honest. If it's not scalable, say so. The scalability_score should be 0-100.`
   );
 }
 
+interface SavedEquipment { id: string; name: string; type: string; criticality: string; serialNumber: string; purchaseDate: string; warrantyExpiration: string; lastServiceDate: string; notes: string; aiProfile: string; savedAt: string; }
+interface SavedPMSchedule { id: string; equipmentType: string; equipmentName: string; frequency: string; content: string; savedAt: string; }
+interface FacilityIssueLocal { id: string; equipmentType: string; equipmentName: string; description: string; priority: string; status: string; triageResponse: string; vendorCalled: boolean; repairCost: string; resolutionNotes: string; createdAt: string; resolvedAt: string; }
+
+const FACILITY_LS_KEYS = { equipment: 'trc_facility_equipment', pmSchedules: 'trc_facility_pm_schedules', issues: 'trc_facility_issues' };
+
+function AssetHealthStrip() {
+  const [equipment] = useState<SavedEquipment[]>(() => { try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem(FACILITY_LS_KEYS.equipment) || '[]'); } catch {} return []; });
+  const [pmSchedules] = useState<SavedPMSchedule[]>(() => { try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem(FACILITY_LS_KEYS.pmSchedules) || '[]'); } catch {} return []; });
+  const [localIssues] = useState<FacilityIssueLocal[]>(() => { try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem(FACILITY_LS_KEYS.issues) || '[]'); } catch {} return []; });
+
+  const { data: dbIssues = [] } = useQuery<any[]>({ queryKey: ["/api/facility-issues"] });
+
+  const openCount = (dbIssues.filter((i: any) => i.status === 'open' || i.status === 'in_progress').length) + localIssues.filter(i => i.status === 'open' || i.status === 'in_progress').length;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const resolvedThisMonth = dbIssues.filter((i: any) => i.status === 'resolved' && new Date(i.resolvedAt || i.reportedAt) >= monthStart).length + localIssues.filter(i => i.status === 'resolved' && new Date(i.resolvedAt) >= monthStart).length;
+
+  const nextPM = pmSchedules.length > 0 ? pmSchedules[pmSchedules.length - 1] : null;
+
+  const cards = [
+    { label: "Open Issues", value: openCount > 0 ? `${openCount} open` : "0 open", color: openCount > 0 ? '#f59e0b' : '#22c55e', muted: openCount === 0 },
+    { label: "Resolved This Month", value: `${resolvedThisMonth} this month`, muted: resolvedThisMonth === 0 },
+    { label: "Equipment Logged", value: equipment.length > 0 ? `${equipment.length} assets tracked` : "0 assets tracked", muted: equipment.length === 0 },
+    { label: "Next PM Due", value: nextPM ? `${nextPM.equipmentName || nextPM.equipmentType}` : "No PM scheduled", muted: !nextPM },
+  ];
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="asset-health-strip">
+      {cards.map((card, i) => (
+        <div key={i} className="flex-shrink-0 min-w-[180px] rounded-xl p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+          <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>{card.label}</p>
+          <p className="text-sm font-semibold truncate" style={{ color: card.color || (card.muted ? '#6b7280' : '#ffffff') }} data-testid={`asset-strip-${i}`}>{card.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function parseFacilityTriageOutput(text: string): { situation: string; priority: string; priorityTier: string; serviceImpact: string; actions: string[]; vendorScript: { whoToCall: string; whatToSay: string; authLimit: string; questions: string[] }; docChecklist: string[] } | null {
+  if (!text) return null;
+  try {
+    const sitMatch = text.match(/A\)\s*SITUATION SUMMARY[:\s]*\n?([\s\S]*?)(?=\n\s*B\))/i);
+    const priMatch = text.match(/B\)\s*PRIORITY LEVEL[:\s]*\n?([\s\S]*?)(?=\n\s*C\))/i);
+    const actMatch = text.match(/C\)\s*IMMEDIATE ACTIONS[:\s]*\n?([\s\S]*?)(?=\n\s*D\))/i);
+    const venMatch = text.match(/D\)\s*VENDOR\s*\/?\s*REPAIR SCRIPT[:\s]*\n?([\s\S]*?)(?=\n\s*E\))/i);
+    const logMatch = text.match(/E\)\s*(?:LOG ENTRY|DOCUMENTATION)[:\s]*\n?([\s\S]*?)$/i);
+
+    const situation = sitMatch?.[1]?.trim() || '';
+    const priBlock = priMatch?.[1]?.trim() || '';
+    const tierMatch = priBlock.match(/Tier\s*(\d)/i);
+    const impactMatch = priBlock.match(/Service Impact:\s*(.*)/i);
+    const priorityTier = tierMatch ? `Tier ${tierMatch[1]}` : '';
+    const serviceImpact = impactMatch?.[1]?.trim() || priBlock.split('\n')[0] || '';
+
+    const actBlock = actMatch?.[1]?.trim() || '';
+    const actions = actBlock.split('\n').filter(l => l.trim().match(/^\d+[\.\)]/)).map(l => l.trim().replace(/^\d+[\.\)]\s*/, ''));
+
+    const venBlock = venMatch?.[1]?.trim() || '';
+    const whoMatch = venBlock.match(/Who to call[:\s]*(.*)/i);
+    const whatMatch = venBlock.match(/What to say[:\s]*([\s\S]*?)(?=\n\s*[-•]?\s*Authorization|$)/i);
+    const authMatch = venBlock.match(/Authorization[^:]*[:\s]*(.*)/i);
+    const qLines = venBlock.split('\n').filter(l => l.trim().match(/^\d+[\.\)]|^[-•]\s*(?:What|How|When|Ask|Do|Is|Can|Will)/i)).map(l => l.trim().replace(/^[-•\d\.\)]\s*/, ''));
+
+    const logBlock = logMatch?.[1]?.trim() || '';
+    const docItems = logBlock.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).map(l => l.trim().replace(/^[-•☐□]\s*/, '')).slice(0, 5);
+    if (docItems.length === 0) {
+      docItems.push('Time and date of issue logged', 'Vendor contacted — name and ETA', 'ETA confirmed for repair', 'Repair completed and verified', 'Invoice filed');
+    }
+
+    return {
+      situation,
+      priority: priBlock,
+      priorityTier,
+      serviceImpact,
+      actions: actions.length > 0 ? actions : actBlock.split('\n').filter(l => l.trim()).map(l => l.trim()),
+      vendorScript: { whoToCall: whoMatch?.[1]?.trim() || '', whatToSay: whatMatch?.[1]?.trim() || '', authLimit: authMatch?.[1]?.trim() || '', questions: qLines.length > 0 ? qLines : ['What is your estimated arrival time?', 'Will you need to order parts?', 'What is the estimated repair cost?'] },
+      docChecklist: docItems,
+    };
+  } catch { return null; }
+}
+
 function FacilityCommandCenter() {
   const { toast } = useToast();
   const [mode, setMode] = useState<"breakdown" | "pm" | "log" | "vendors" | "dashboard">("breakdown");
@@ -9705,152 +9787,81 @@ function FacilityCommandCenter() {
   const [failSilentMonitors, setFailSilentMonitors] = useState<string[]>([]);
   const [response, setResponse] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
-  
-  // Vendor state
+  const [estimatedDowntime, setEstimatedDowntime] = useState<string>("");
+  const [discoveredBy, setDiscoveredBy] = useState<string>("");
+  const [serviceFrequency, setServiceFrequency] = useState<string>("");
+  const [lastPMCompleted, setLastPMCompleted] = useState<string>("");
+  const [purchaseDate, setPurchaseDate] = useState<string>("");
+  const [warrantyExpiration, setWarrantyExpiration] = useState<string>("");
+  const [equipmentCriticality, setEquipmentCriticality] = useState<string>("revenue-critical");
+  const [serialNumber, setSerialNumber] = useState<string>("");
+  const [afterHoursPhone, setAfterHoursPhone] = useState<string>("");
+  const [authorizationLimit, setAuthorizationLimit] = useState<string>("");
+  const [vendorEquipmentTypes, setVendorEquipmentTypes] = useState<string[]>([]);
+  const [avgResponseTime, setAvgResponseTime] = useState<string>("");
+  const [emergencyAvailable, setEmergencyAvailable] = useState<string>("unsure");
+  const [checkedTriageActions, setCheckedTriageActions] = useState<Set<number>>(new Set());
+  const [checkedDocItems, setCheckedDocItems] = useState<Set<number>>(new Set());
+  const [dashboardView, setDashboardView] = useState<"list" | "pipeline">("pipeline");
+  const [expandedIssueId, setExpandedIssueId] = useState<number | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [showPMSchedules, setShowPMSchedules] = useState(false);
+
+  const [savedEquipment, setSavedEquipment] = useState<SavedEquipment[]>(() => { try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem(FACILITY_LS_KEYS.equipment) || '[]'); } catch {} return []; });
+  const [savedPMSchedules, setSavedPMSchedules] = useState<SavedPMSchedule[]>(() => { try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem(FACILITY_LS_KEYS.pmSchedules) || '[]'); } catch {} return []; });
+
   const [showVendorForm, setShowVendorForm] = useState(false);
   const [editingVendor, setEditingVendor] = useState<any>(null);
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [vendorSearch, setVendorSearch] = useState<string>("");
-  
-  // Issue logging state
   const [showIssueForm, setShowIssueForm] = useState(false);
-  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
 
-  // Fetch vendors
-  const { data: vendors = [], refetch: refetchVendors } = useQuery<any[]>({
-    queryKey: ["/api/vendors"],
-    enabled: mode === "vendors" || mode === "breakdown" || mode === "dashboard",
-  });
+  const { data: vendors = [] } = useQuery<any[]>({ queryKey: ["/api/vendors"] });
+  const { data: issues = [], refetch: refetchIssues } = useQuery<any[]>({ queryKey: ["/api/facility-issues"] });
+  const { data: issueStats } = useQuery<{ open: number; inProgress: number; resolved: number; avgResolutionDays: number }>({ queryKey: ["/api/facility-issues/stats"] });
 
-  // Fetch facility issues
-  const { data: issues = [], refetch: refetchIssues } = useQuery<any[]>({
-    queryKey: ["/api/facility-issues"],
-    enabled: mode === "dashboard",
-  });
-
-  // Fetch issue stats
-  const { data: issueStats } = useQuery<{ open: number; inProgress: number; resolved: number; avgResolutionDays: number }>({
-    queryKey: ["/api/facility-issues/stats"],
-    enabled: mode === "dashboard",
-  });
-
-  // Create vendor mutation
   const createVendorMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/vendors", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
-      setShowVendorForm(false);
-      setEditingVendor(null);
-      toast({ title: "Vendor added successfully!" });
-    },
-    onError: () => {
-      toast({ title: "Failed to add vendor", variant: "destructive" });
-    },
+    mutationFn: async (data: any) => apiRequest("POST", "/api/vendors", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vendors"] }); setShowVendorForm(false); setEditingVendor(null); toast({ title: "Vendor added" }); },
+    onError: () => { toast({ title: "Failed to add vendor", variant: "destructive" }); },
   });
-
-  // Update vendor mutation
   const updateVendorMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return await apiRequest("PUT", `/api/vendors/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
-      setShowVendorForm(false);
-      setEditingVendor(null);
-      toast({ title: "Vendor updated successfully!" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update vendor", variant: "destructive" });
-    },
+    mutationFn: async ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/vendors/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vendors"] }); setShowVendorForm(false); setEditingVendor(null); toast({ title: "Vendor updated" }); },
+    onError: () => { toast({ title: "Failed to update vendor", variant: "destructive" }); },
   });
-
-  // Delete vendor mutation
   const deleteVendorMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/vendors/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
-      toast({ title: "Vendor deleted" });
-    },
-    onError: () => {
-      toast({ title: "Failed to delete vendor", variant: "destructive" });
-    },
+    mutationFn: async (id: number) => apiRequest("DELETE", `/api/vendors/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vendors"] }); toast({ title: "Vendor deleted" }); },
+    onError: () => { toast({ title: "Failed to delete vendor", variant: "destructive" }); },
   });
-
-  // Toggle vendor favorite
   const toggleFavoriteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return await apiRequest("PATCH", `/api/vendors/${id}/favorite`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
-    },
+    mutationFn: async (id: number) => apiRequest("PATCH", `/api/vendors/${id}/favorite`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vendors"] }); },
   });
-
-  // Create facility issue mutation  
   const createIssueMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/facility-issues", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] });
-      setShowIssueForm(false);
-      toast({ title: "Issue logged successfully!" });
-    },
-    onError: () => {
-      toast({ title: "Failed to log issue", variant: "destructive" });
-    },
+    mutationFn: async (data: any) => apiRequest("POST", "/api/facility-issues", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] }); queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] }); setShowIssueForm(false); toast({ title: "Issue saved to Dashboard" }); },
+    onError: () => { toast({ title: "Failed to log issue", variant: "destructive" }); },
   });
-
-  // Update issue status mutation
   const updateIssueMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return await apiRequest("PUT", `/api/facility-issues/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] });
-      toast({ title: "Issue updated" });
-    },
+    mutationFn: async ({ id, data }: { id: number; data: any }) => apiRequest("PUT", `/api/facility-issues/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] }); queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] }); toast({ title: "Issue updated" }); },
   });
-
-  // Resolve issue mutation
   const resolveIssueMutation = useMutation({
-    mutationFn: async ({ id, repairNotes, repairCost }: { id: number; repairNotes?: string; repairCost?: string }) => {
-      return await apiRequest("PATCH", `/api/facility-issues/${id}/resolve`, { repairNotes, repairCost });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] });
-      toast({ title: "Issue resolved!" });
-    },
+    mutationFn: async ({ id, repairNotes, repairCost }: { id: number; repairNotes?: string; repairCost?: string }) => apiRequest("PATCH", `/api/facility-issues/${id}/resolve`, { repairNotes, repairCost }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/facility-issues"] }); queryClient.invalidateQueries({ queryKey: ["/api/facility-issues/stats"] }); toast({ title: "Issue resolved" }); },
   });
 
-  // Filter vendors
-  const filteredVendors = vendors.filter(v => {
+  const filteredVendors = vendors.filter((v: any) => {
     const matchesFilter = vendorFilter === "all" || v.specialty === vendorFilter || (vendorFilter === "favorite" && v.isFavorite);
     const matchesSearch = !vendorSearch || v.name.toLowerCase().includes(vendorSearch.toLowerCase()) || v.notes?.toLowerCase().includes(vendorSearch.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
-  // Get suggested vendors based on equipment type
   const getSuggestedVendors = () => {
     if (!equipmentType) return [];
-    const specialtyMap: Record<string, string> = {
-      refrigeration: "refrigeration",
-      cooking: "cooking",
-      dish: "dish",
-      hvac: "hvac",
-      plumbing: "plumbing",
-      electrical: "electrical",
-      pos: "pos",
-    };
-    const specialty = specialtyMap[equipmentType] || "general";
-    return vendors.filter(v => v.specialty === specialty || v.specialty === "general").slice(0, 3);
+    return vendors.filter((v: any) => v.specialty === equipmentType || v.specialty === "general").slice(0, 3);
   };
 
   const equipmentTypes = [
@@ -9864,20 +9875,18 @@ function FacilityCommandCenter() {
     { value: "other", label: "Other" },
   ];
 
+  const EQUIP_TYPE_COLORS: Record<string, string> = { refrigeration: '#3b82f6', cooking: '#d4a017', dish: '#6366f1', hvac: '#22c55e', plumbing: '#06b6d4', electrical: '#f59e0b', pos: '#8b5cf6', other: '#6b7280' };
+
   const failSilentOptions = [
-    { value: "temps", label: "Temps (walk-in, reach-in)" },
-    { value: "ice-sanitation", label: "Ice machine sanitation interval" },
-    { value: "hood-ansul", label: "Hood/ANSUL checks" },
-    { value: "hvac-filters", label: "HVAC filter cadence" },
-    { value: "dish-sanitizer", label: "Dish machine sanitizer ppm/temp log" },
+    { value: "temps", label: "Temps (walk-in, reach-in)", tip: "Walk-in and reach-in units can rise above safe temps without alarm" },
+    { value: "ice-sanitation", label: "Ice machine sanitation", tip: "Ice machines need regular sanitation to prevent biofilm buildup" },
+    { value: "hood-ansul", label: "Hood/ANSUL checks", tip: "Fire suppression systems require periodic visual and functional checks" },
+    { value: "hvac-filters", label: "HVAC filter cadence", tip: "Dirty filters reduce efficiency and can cause equipment failure" },
+    { value: "dish-sanitizer", label: "Dish sanitizer ppm/temp", tip: "Sanitizer concentration and water temperature must be verified per shift" },
   ];
 
   const toggleFailSilent = (value: string) => {
-    setFailSilentMonitors(prev => 
-      prev.includes(value) 
-        ? prev.filter(v => v !== value)
-        : [...prev, value]
-    );
+    setFailSilentMonitors(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
   };
 
   const QUICK_TROUBLESHOOT: Record<string, string[]> = {
@@ -9896,38 +9905,27 @@ function FacilityCommandCenter() {
   const getBreakdownPriority = () => {
     const isDuringService = inActiveService === "yes";
     const isSafetyRisk = safetyRisk === "yes";
-    if (isDuringService && isSafetyRisk) return { level: "CRITICAL", text: "Act now — safety risk during active service", color: "text-red-700 dark:text-red-400 bg-red-500/10 border-red-500/30" };
-    if (isDuringService && !isSafetyRisk) return { level: "HIGH", text: "Workaround needed — service is active", color: "text-orange-700 dark:text-orange-400 bg-orange-500/10 border-orange-500/30" };
-    if (!isDuringService && isSafetyRisk) return { level: "HIGH", text: "Fix before opening — safety risk", color: "text-orange-700 dark:text-orange-400 bg-orange-500/10 border-orange-500/30" };
-    return { level: "STANDARD", text: "Schedule repair — no immediate risk", color: "text-primary bg-primary/10 border-primary/30" };
+    if (isDuringService && isSafetyRisk) return { level: "CRITICAL", text: "Safety hazard during active service. Stop use immediately if risk to staff or guests.", color: '#ef4444', bgColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' };
+    if (isDuringService && !isSafetyRisk) return { level: "HIGH", text: "Workaround needed — service is active", color: '#f59e0b', bgColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.3)' };
+    if (!isDuringService && isSafetyRisk) return { level: "ELEVATED", text: "Safety issue. Resolve before next service.", color: '#f59e0b', bgColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.3)' };
+    return { level: "LOW", text: "Log for scheduled repair.", color: '#374151', bgColor: 'rgba(55,65,81,0.15)', borderColor: 'rgba(55,65,81,0.3)' };
   };
 
   const generateResponse = async () => {
-    if (mode === "breakdown" && !issueGoal) {
-      toast({ title: "Please describe the issue", variant: "destructive" });
-      return;
-    }
-    if (mode === "pm" && !equipmentType) {
-      toast({ title: "Please select equipment type", variant: "destructive" });
-      return;
-    }
-
-    setIsGenerating(true);
-    setResponse("");
-
+    if (mode === "breakdown" && !issueGoal) { toast({ title: "Please describe the issue", variant: "destructive" }); return; }
+    if (mode === "pm" && !equipmentType) { toast({ title: "Please select equipment type", variant: "destructive" }); return; }
+    setIsGenerating(true); setResponse(""); setCheckedTriageActions(new Set()); setCheckedDocItems(new Set());
     try {
       const equipmentLabel = equipmentTypes.find(e => e.value === equipmentType)?.label || equipmentType;
-      const failSilentLabels = failSilentMonitors.map(f => 
-        failSilentOptions.find(o => o.value === f)?.label || f
-      ).join(", ");
+      const failSilentLabels = failSilentMonitors.map(f => failSilentOptions.find(o => o.value === f)?.label || f).join(", ");
+      const matchingVendors = getSuggestedVendors();
+      const vendorInfo = matchingVendors.length > 0 ? matchingVendors.map((v: any) => `${v.name}: ${v.phone || 'no phone'}${v.callOutFee ? `, call-out fee: ${v.callOutFee}` : ''}${v.isEmergency ? ' (24/7)' : ''}`).join('; ') : '';
 
       let prompt = "";
-      
       const breakdownPriority = getBreakdownPriority();
 
       if (mode === "breakdown") {
-        prompt = `You are "Facility Command Center," an AI maintenance operations assistant for a live restaurant.
-Your job is to prevent downtime, control repair costs, and keep the restaurant service-ready.
+        prompt = `You are a maintenance operations expert for a live restaurant. Your job is to prevent downtime, control repair costs, and keep the restaurant service-ready.
 
 SITUATION:
 - Equipment/Problem: ${issueGoal}
@@ -9938,260 +9936,293 @@ SITUATION:
 ${equipmentName ? `- Equipment name/model: ${equipmentName}` : ""}
 ${lastServiceDate ? `- Last service date: ${lastServiceDate}` : ""}
 ${symptoms ? `- Symptoms: ${symptoms}` : ""}
-${quickTips.length > 0 ? `- Quick troubleshooting tips were shown to the operator: ${quickTips.join("; ")}` : ""}
+${estimatedDowntime ? `- Estimated downtime: ${estimatedDowntime}` : ""}
+${discoveredBy ? `- Discovered by: ${discoveredBy}` : ""}
+${vendorInfo ? `- Available vendors: ${vendorInfo}` : ""}
+${quickTips.length > 0 ? `- Quick troubleshooting tips were shown: ${quickTips.join("; ")}` : ""}
 
-Follow this order: Recognize → Contain → Triage → Decide → Document.
+Follow this order: Recognize, Contain, Triage, Decide, Document.
 
 Provide response in this EXACT format:
 
-A) SITUATION SUMMARY (1-2 lines)
+A) SITUATION SUMMARY
+(2-3 sentence summary of the situation and initial assessment)
 
 B) PRIORITY LEVEL
 Tier 1 (service-critical) / Tier 2 (service-impacting) / Tier 3 (non-critical)
-Service Impact: [describe]
+Service Impact: [describe the impact on service]
 
-C) IMMEDIATE ACTIONS (numbered list, max 7 items)
-${inActiveService === "yes" ? "PRIORITIZE containment and service continuity" : ""}
+C) IMMEDIATE ACTIONS
+1. [Action verb] [specific action]
+2. [Action verb] [specific action]
+(max 7 numbered items)
 
 D) VENDOR / REPAIR SCRIPT
-- Who to call
-- What to say
-- Authorization limit language
-- Questions to ask
+- Who to call: [specific vendor type or name]
+- What to say: [exact script to use on the phone]
+- Authorization limit: [dollar amount and language to use]
+- Questions to ask: [numbered list of questions]
 
-E) LOG ENTRY
-Date: [today]
-Issue: 
-Action Taken:
-Next Step:
-Owner:
+E) DOCUMENTATION CHECKLIST
+- Time and date logged
+- Vendor contacted with ETA
+- Repair completed and verified
+- Invoice filed
+- Follow-up scheduled
 
 IMPORTANT: Never recommend unsafe workarounds for gas, electrical, refrigeration, or fire suppression.`;
       } else if (mode === "pm") {
-        prompt = `You are "Facility Command Center," an AI maintenance operations assistant for a live restaurant.
-Build a comprehensive preventative maintenance plan.
+        prompt = `You are a maintenance operations expert for a live restaurant. Build a comprehensive preventative maintenance plan.
 
 EQUIPMENT FOCUS: ${equipmentLabel}
 ${equipmentName ? `Equipment name/model: ${equipmentName}` : ""}
-${lastServiceDate ? `Last service date: ${lastServiceDate}` : ""}
+${lastPMCompleted ? `Last PM completed: ${lastPMCompleted}` : ""}
+${serviceFrequency ? `Service volume: ${serviceFrequency}` : ""}
 ${failSilentMonitors.length > 0 ? `Fail-Silent Monitors requested: ${failSilentLabels}` : ""}
 
-Provide response in this EXACT format:
+Provide response as a structured PM schedule. For each task, use this format:
+TASK: [task name] | FREQUENCY: [Daily/Weekly/Monthly/Quarterly/Annual] | WHO: [role responsible]
 
-A) EQUIPMENT TIER CLASSIFICATION
-Classify into Tier 1 (service-critical), Tier 2 (service-impacting), Tier 3 (non-critical)
+Then if fail-silent monitors were requested, add:
+ESCALATION: [monitor name] | THRESHOLD: [value] | ACTION: [what to do]
 
-B) PREVENTATIVE MAINTENANCE SCHEDULE
-
-DAILY (opening/closing):
-- [max 5 items with specific action verbs]
-
-WEEKLY:
-- [max 5 items with day to perform]
-
-MONTHLY:
-- [max 5 items with week of month]
-
-QUARTERLY:
-- [max 3 items with professional service needs]
-
-C) POSTED CHECKLIST (max 15 items)
-Format each as: ☐ [Action verb] [specific task] - [time/initials required]
-
-D) MANAGER VERIFICATION ROUTINE
-- Who checks
-- When they check
-- What "pass" means
-
-${failSilentMonitors.length > 0 ? `E) FAIL-SILENT MONITORING LOG
-For each monitored item (${failSilentLabels}):
-- Acceptable range
-- Check frequency
-- Escalation threshold ("if X, then Y")
-- Log format` : ""}`;
+Keep it practical and specific to restaurant operations.`;
       } else {
-        prompt = `You are "Facility Command Center," an AI maintenance operations assistant for a live restaurant.
-Create an equipment log entry and maintenance history template.
+        prompt = `You are a maintenance operations expert for a live restaurant. Create an equipment profile and maintenance guide.
 
 EQUIPMENT: ${equipmentName || equipmentLabel || "General Equipment"}
 Type: ${equipmentLabel}
 ${lastServiceDate ? `Last service date: ${lastServiceDate}` : ""}
 ${symptoms ? `Current issues/symptoms: ${symptoms}` : ""}
 ${issueGoal ? `Notes: ${issueGoal}` : ""}
+${purchaseDate ? `Purchase/Install date: ${purchaseDate}` : ""}
+${warrantyExpiration ? `Warranty expires: ${warrantyExpiration}` : ""}
+${serialNumber ? `Serial number: ${serialNumber}` : ""}
+Criticality: ${equipmentCriticality === 'revenue-critical' ? 'Revenue-Critical (direct impact on service if down)' : 'Support Equipment (operation continues without it)'}
 
-Provide response in this EXACT format:
+Provide response in this format:
 
-A) EQUIPMENT LOG ENTRY
+A) EQUIPMENT PROFILE
+Summary of this equipment's role, typical lifespan, and maintenance needs.
 
-Equipment ID: [suggest format]
-Name/Model: ${equipmentName || "[To be filled]"}
-Location: [To be filled]
-Category: ${equipmentLabel}
-Tier: [1/2/3 with justification]
-Install Date: [To be filled]
-Warranty Expires: [To be filled]
-Service Contract: [Yes/No, vendor name]
+B) MAINTENANCE INTERVALS
+- [Task] every [interval]
+(list 3-5 key maintenance tasks with intervals)
 
-B) MAINTENANCE HISTORY TEMPLATE
-| Date | Issue | Action | Cost | Technician | Next Due |
-|------|-------|--------|------|------------|----------|
-| | | | | | |
+C) COMMON FAILURE POINTS
+- [Failure mode]: [warning signs]
+(list 2-3 common failures)
 
-C) RECURRING FAILURE TRACKING
-- Common failure modes for this equipment type
-- Warning signs to watch for
-- Preventive measures
-
-D) VENDOR CONTACTS TEMPLATE
-Primary Vendor:
-- Company:
-- Phone:
-- Account #:
-- Typical response time:
-- Authorization limit:
-
-Emergency After-Hours:
-- Contact:
-- Phone:`;
+D) RISK FLAGS
+- [Warning or risk to watch for]
+(list 2-3 operator warnings)`;
       }
 
-      const res = await fetch("/api/consultant/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: prompt }),
-        credentials: "include",
-      });
-
+      const res = await fetch("/api/consultant/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: prompt }), credentials: "include" });
       if (!res.ok) throw new Error("Failed to generate response");
-
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
-
       if (reader) {
         let content = "";
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                content += data.content;
-                setResponse(content);
-              }
-            } catch {}
-          }
+          for (const line of lines) { try { const data = JSON.parse(line.slice(6)); if (data.content) { content += data.content; setResponse(content); } } catch {} }
         }
       }
-    } catch (err) {
-      toast({ title: "Failed to generate response", variant: "destructive" });
-    } finally {
-      setIsGenerating(false);
-    }
+    } catch (err) { toast({ title: "Failed to generate response", variant: "destructive" }); } finally { setIsGenerating(false); }
+  };
+
+  const doHaptic = async () => { try { const h = (globalThis as any).Capacitor?.Plugins?.Haptics; if (h) await h.impact({ style: 'LIGHT' }); } catch {} };
+
+  const toggleTriageAction = (idx: number) => {
+    doHaptic();
+    setCheckedTriageActions(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; });
+  };
+  const toggleDocItem = (idx: number) => {
+    doHaptic();
+    setCheckedDocItems(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; });
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(response);
-    toast({ title: "Copied to clipboard!" });
+    navigator.clipboard.writeText(response.replace(/\*\*/g, '').replace(/#{1,3}\s/g, ''));
+    setCopySuccess(true); setTimeout(() => setCopySuccess(false), 2000);
+    toast({ title: "Copied to clipboard" });
+  };
+
+  const saveToIssueLog = () => {
+    const breakdownPriority = getBreakdownPriority();
+    createIssueMutation.mutate({
+      equipmentType: equipmentType || 'other',
+      equipmentName: equipmentName || equipmentTypes.find(e => e.value === equipmentType)?.label || 'Equipment',
+      description: issueGoal,
+      urgencyLevel: breakdownPriority.level.toLowerCase(),
+      triageResponse: response,
+    });
+  };
+
+  const saveEquipmentProfile = () => {
+    const newEquip: SavedEquipment = {
+      id: Date.now().toString(),
+      name: equipmentName || equipmentTypes.find(e => e.value === equipmentType)?.label || 'Equipment',
+      type: equipmentType,
+      criticality: equipmentCriticality,
+      serialNumber,
+      purchaseDate,
+      warrantyExpiration,
+      lastServiceDate,
+      notes: issueGoal,
+      aiProfile: response,
+      savedAt: new Date().toISOString(),
+    };
+    const updated = [newEquip, ...savedEquipment];
+    setSavedEquipment(updated);
+    if (typeof window !== 'undefined') localStorage.setItem(FACILITY_LS_KEYS.equipment, JSON.stringify(updated));
+    toast({ title: "Equipment profile saved" });
+  };
+
+  const deleteEquipment = (id: string) => {
+    const updated = savedEquipment.filter(e => e.id !== id);
+    setSavedEquipment(updated);
+    if (typeof window !== 'undefined') localStorage.setItem(FACILITY_LS_KEYS.equipment, JSON.stringify(updated));
+    toast({ title: "Equipment removed" });
+  };
+
+  const savePMSchedule = () => {
+    const newPM: SavedPMSchedule = {
+      id: Date.now().toString(),
+      equipmentType,
+      equipmentName: equipmentName || equipmentTypes.find(e => e.value === equipmentType)?.label || '',
+      frequency: serviceFrequency,
+      content: response,
+      savedAt: new Date().toISOString(),
+    };
+    const updated = [newPM, ...savedPMSchedules];
+    setSavedPMSchedules(updated);
+    if (typeof window !== 'undefined') localStorage.setItem(FACILITY_LS_KEYS.pmSchedules, JSON.stringify(updated));
+    toast({ title: "PM schedule saved" });
+  };
+
+  const exportPMSchedule = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`<html><head><title>PM Schedule</title><style>body{font-family:system-ui,sans-serif;color:#000;padding:40px;max-width:800px;margin:0 auto}h1{font-size:20px;border-bottom:2px solid #b8860b;padding-bottom:8px}pre{white-space:pre-wrap;font-size:13px;line-height:1.6}</style></head><body><h1>Preventative Maintenance Schedule — ${equipmentName || equipmentTypes.find(e => e.value === equipmentType)?.label || 'Equipment'}</h1><pre>${response.replace(/\*\*/g, '').replace(/#{1,3}\s/g, '')}</pre><p style="font-size:11px;color:#999;margin-top:40px">Generated ${new Date().toLocaleDateString()}</p></body></html>`);
+      printWindow.document.close();
+      printWindow.print();
+    }
   };
 
   const clearForm = () => {
-    setIssueGoal("");
-    setEquipmentName("");
-    setLastServiceDate("");
-    setSymptoms("");
-    setResponse("");
+    setIssueGoal(""); setEquipmentName(""); setLastServiceDate(""); setSymptoms(""); setResponse("");
+    setEstimatedDowntime(""); setDiscoveredBy(""); setPurchaseDate(""); setWarrantyExpiration("");
+    setSerialNumber(""); setCheckedTriageActions(new Set()); setCheckedDocItems(new Set());
   };
 
+  const navigateToTab = (tab: "breakdown" | "pm" | "log" | "vendors" | "dashboard", presetType?: string) => {
+    clearForm();
+    if (presetType) setEquipmentType(presetType);
+    setMode(tab);
+  };
+
+  const triageParsed = mode === "breakdown" && response ? parseFacilityTriageOutput(response) : null;
+
+  const sortedEquipment = [...savedEquipment].sort((a, b) => {
+    if (a.criticality === 'revenue-critical' && b.criticality !== 'revenue-critical') return -1;
+    if (b.criticality === 'revenue-critical' && a.criticality !== 'revenue-critical') return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const openIssues = issues.filter((i: any) => i.status === 'open');
+  const inProgressIssues = issues.filter((i: any) => i.status === 'in_progress' || i.status === 'waiting_parts');
+  const resolvedIssues = issues.filter((i: any) => i.status === 'resolved' || i.status === 'closed');
+
+  const totalRepairCost = issues.filter((i: any) => {
+    const d = new Date(i.reportedAt);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && i.repairCost;
+  }).reduce((sum: number, i: any) => sum + (parseFloat(i.repairCost) || 0), 0);
+
+  const equipTypeBreakdown = issues.reduce((acc: Record<string, number>, i: any) => {
+    acc[i.equipmentType] = (acc[i.equipmentType] || 0) + 1; return acc;
+  }, {} as Record<string, number>);
+  const maxIssueCount = Math.max(...Object.values(equipTypeBreakdown), 1);
+
+  const shimmerBorder = { animation: 'shimmer 3s ease-in-out infinite', background: '#1a1d2e', borderColor: '#b8860b22', borderWidth: '1px', borderStyle: 'solid' as const, borderRadius: '12px' };
+
   return (
-    <Card className="mb-8">
-      <CardHeader>
+    <Card className="mb-8" style={shimmerBorder} data-testid="facility-command-center">
+      <CardHeader style={{ background: 'linear-gradient(135deg, #1a1d2e 0%, #252840 100%)', borderRadius: '12px 12px 0 0' }}>
         <CardTitle className="flex items-center gap-2">
-          <Wrench className="h-5 w-5 text-primary" />
-          Facility Command Center
+          <Wrench className="h-5 w-5" style={{ color: '#d4a017' }} />
+          <span className="text-white">Facility Command Center</span>
         </CardTitle>
-        <CardDescription>
+        <CardDescription style={{ color: '#9ca3af' }}>
           Prevent downtime. Track repairs. Enforce PM schedules.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <Tabs value={mode} onValueChange={(v) => { setMode(v as "breakdown" | "pm" | "log" | "vendors" | "dashboard"); clearForm(); }}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="breakdown" data-testid="tab-breakdown" className="text-xs sm:text-sm">
-              <AlertTriangle className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Breakdown</span>
-              <span className="sm:hidden">Issue</span>
-            </TabsTrigger>
-            <TabsTrigger value="pm" data-testid="tab-pm" className="text-xs sm:text-sm">
-              <Calendar className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">PM Schedule</span>
-              <span className="sm:hidden">PM</span>
-            </TabsTrigger>
-            <TabsTrigger value="log" data-testid="tab-log" className="text-xs sm:text-sm">
-              <FileOutput className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Equipment</span>
-              <span className="sm:hidden">Log</span>
-            </TabsTrigger>
-            <TabsTrigger value="vendors" data-testid="tab-vendors" className="text-xs sm:text-sm">
-              <Users className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Vendors</span>
-              <span className="sm:hidden">Vendors</span>
-            </TabsTrigger>
-            <TabsTrigger value="dashboard" data-testid="tab-dashboard" className="text-xs sm:text-sm">
-              <LayoutDashboard className="h-4 w-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Dashboard</span>
-              <span className="sm:hidden">Dash</span>
-            </TabsTrigger>
-          </TabsList>
+      <CardContent className="space-y-4 pt-4" style={{ background: '#1a1d2e' }}>
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {[
+            { value: "breakdown", icon: AlertTriangle, label: "Breakdown", shortLabel: "Issue" },
+            { value: "pm", icon: Calendar, label: "PM Schedule", shortLabel: "PM" },
+            { value: "log", icon: FileOutput, label: "Equipment", shortLabel: "Log" },
+            { value: "vendors", icon: Users, label: "Vendors", shortLabel: "Vendors" },
+            { value: "dashboard", icon: LayoutDashboard, label: "Dashboard", shortLabel: "Dash" },
+          ].map(tab => (
+            <button key={tab.value} onClick={() => { setMode(tab.value as any); if (tab.value !== mode) clearForm(); }}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap min-h-[44px]"
+              style={{ background: mode === tab.value ? '#252840' : 'transparent', color: mode === tab.value ? '#ffffff' : '#9ca3af', borderBottom: mode === tab.value ? '2px solid #d4a017' : '2px solid transparent' }}
+              data-testid={`tab-${tab.value}`}>
+              <tab.icon className="h-4 w-4" style={{ color: mode === tab.value ? '#d4a017' : '#6b7280' }} />
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.shortLabel}</span>
+            </button>
+          ))}
+        </div>
+        <div className="h-px" style={{ background: '#2a2d3e' }} />
 
-          <TabsContent value="breakdown" className="space-y-4 mt-4">
+        {mode === "breakdown" && (
+          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">During Active Service?</Label>
-                <Button
-                  variant={inActiveService === "yes" ? "default" : "outline"}
-                  size="sm"
-                  className={`w-full mt-1 ${inActiveService === "yes" ? "bg-red-600 text-white" : ""}`}
-                  onClick={() => setInActiveService(inActiveService === "yes" ? "no" : "yes")}
-                  data-testid="btn-during-service"
-                >
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>During Active Service?</label>
+                <button onClick={() => setInActiveService(inActiveService === "yes" ? "no" : "yes")}
+                  className="w-full mt-1 py-2.5 px-3 rounded-lg text-sm font-medium min-h-[44px]"
+                  style={{ background: inActiveService === "yes" ? 'rgba(239,68,68,0.2)' : '#111827', border: `1px solid ${inActiveService === "yes" ? 'rgba(239,68,68,0.4)' : '#374151'}`, color: inActiveService === "yes" ? '#ef4444' : '#9ca3af' }}
+                  data-testid="btn-during-service">
                   {inActiveService === "yes" ? "Yes — In Service" : "No — Closed/Prep"}
-                </Button>
+                </button>
               </div>
               <div>
-                <Label className="text-xs">Safety Risk?</Label>
-                <Button
-                  variant={safetyRisk === "yes" ? "default" : "outline"}
-                  size="sm"
-                  className={`w-full mt-1 ${safetyRisk === "yes" ? "bg-red-600 text-white" : ""}`}
-                  onClick={() => setSafetyRisk(safetyRisk === "yes" ? "no" : "yes")}
-                  data-testid="btn-safety-risk"
-                >
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Safety Risk?</label>
+                <button onClick={() => setSafetyRisk(safetyRisk === "yes" ? "no" : "yes")}
+                  className="w-full mt-1 py-2.5 px-3 rounded-lg text-sm font-medium min-h-[44px]"
+                  style={{ background: safetyRisk === "yes" ? 'rgba(239,68,68,0.2)' : '#111827', border: `1px solid ${safetyRisk === "yes" ? 'rgba(239,68,68,0.4)' : '#374151'}`, color: safetyRisk === "yes" ? '#ef4444' : '#9ca3af' }}
+                  data-testid="btn-safety-risk">
                   {safetyRisk === "yes" ? "Yes — Safety Risk" : "No Safety Risk"}
-                </Button>
+                </button>
               </div>
             </div>
-            {(inActiveService === "yes" || safetyRisk === "yes") && (() => {
+
+            {(() => {
               const priority = getBreakdownPriority();
               return (
-                <div className={`p-3 border rounded-lg ${priority.color}`} data-testid="breakdown-priority">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span className="font-bold text-sm">{priority.level}</span>
-                    <span className="text-sm">— {priority.text}</span>
+                <div className="p-3 rounded-lg flex items-center gap-3" style={{ background: priority.bgColor, border: `1px solid ${priority.borderColor}`, borderLeft: `4px solid ${priority.color}` }} data-testid="breakdown-priority">
+                  <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: priority.color }} />
+                  <div>
+                    <span className="font-bold text-sm" style={{ color: priority.color }}>{priority.level}</span>
+                    <span className="text-sm ml-2" style={{ color: '#9ca3af' }}>{priority.text}</span>
                   </div>
                 </div>
               );
             })()}
 
             <div>
-              <Label htmlFor="equipmentType">Equipment Type</Label>
+              <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Type</label>
               <Select value={equipmentType} onValueChange={setEquipmentType}>
-                <SelectTrigger id="equipmentType" className="mt-1" data-testid="select-equipment-type">
+                <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="select-equipment-type">
                   <SelectValue placeholder="Select equipment type..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -10203,13 +10234,12 @@ Emergency After-Hours:
             </div>
 
             {quickTips.length > 0 && (
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <p className="text-xs font-medium text-primary mb-2">Quick checks before calling for repair:</p>
+              <div className="p-3 rounded-lg" style={{ background: 'rgba(212,160,23,0.05)', border: '1px solid rgba(212,160,23,0.2)' }}>
+                <p className="text-xs font-medium mb-2" style={{ color: '#d4a017' }}>Quick checks before calling for repair:</p>
                 <ul className="space-y-1">
                   {quickTips.map((tip, i) => (
-                    <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                      <Check className="h-3 w-3 shrink-0 mt-0.5 text-primary" />
-                      {tip}
+                    <li key={i} className="text-xs flex items-start gap-1.5" style={{ color: '#9ca3af' }}>
+                      <Check className="h-3 w-3 shrink-0 mt-0.5" style={{ color: '#d4a017' }} />{tip}
                     </li>
                   ))}
                 </ul>
@@ -10217,210 +10247,283 @@ Emergency After-Hours:
             )}
 
             <div>
-              <Label htmlFor="issueGoal">Issue / Problem Description</Label>
-              <Textarea
-                id="issueGoal"
-                placeholder="e.g., Walk-in cooler reading 45°F, ice machine not producing, fryer won't heat..."
-                className="mt-1 min-h-[80px]"
-                value={issueGoal}
-                onChange={(e) => setIssueGoal(e.target.value)}
-                data-testid="textarea-issue"
-              />
+              <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Issue / Problem Description</label>
+              <Textarea placeholder="e.g., Walk-in cooler reading 45F, ice machine not producing, fryer won't heat..." className="mt-1 min-h-[80px]" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} value={issueGoal} onChange={(e) => setIssueGoal(e.target.value)} data-testid="textarea-issue" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="equipmentName">Equipment Name/Model (optional)</Label>
-                <Input
-                  id="equipmentName"
-                  placeholder="e.g., True T-49 Reach-in"
-                  className="mt-1"
-                  value={equipmentName}
-                  onChange={(e) => setEquipmentName(e.target.value)}
-                  data-testid="input-equipment-name"
-                />
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Name/Model (optional)</label>
+                <Input className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} placeholder="e.g., True T-49 Reach-in" value={equipmentName} onChange={(e) => setEquipmentName(e.target.value)} data-testid="input-equipment-name" />
               </div>
               <div>
-                <Label htmlFor="symptoms">Symptoms (optional)</Label>
-                <Input
-                  id="symptoms"
-                  placeholder="e.g., temp high, leaking, error code E5"
-                  className="mt-1"
-                  value={symptoms}
-                  onChange={(e) => setSymptoms(e.target.value)}
-                  data-testid="input-symptoms"
-                />
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Symptoms (optional)</label>
+                <Input className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} placeholder="e.g., temp high, leaking, error code E5" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} data-testid="input-symptoms" />
+              </div>
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Estimated Downtime</label>
+                <Select value={estimatedDowntime} onValueChange={setEstimatedDowntime}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="select-downtime">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operational">Still operational (workaround in place)</SelectItem>
+                    <SelectItem value="under-2h">Less than 2 hours</SelectItem>
+                    <SelectItem value="half-day">Half day</SelectItem>
+                    <SelectItem value="full-day">Full day or more</SelectItem>
+                    <SelectItem value="unknown">Unknown</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Who Discovered It?</label>
+                <Select value={discoveredBy} onValueChange={setDiscoveredBy}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="select-discovered-by">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manager">Manager on Duty</SelectItem>
+                    <SelectItem value="kitchen">Kitchen Staff</SelectItem>
+                    <SelectItem value="foh">Front of House</SelectItem>
+                    <SelectItem value="vendor">Vendor</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {/* Suggested Vendors */}
             {equipmentType && (
-              <div className="p-3 bg-accent/30 rounded-lg border">
+              <div className="p-3 rounded-lg" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <Users className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">Suggested Vendors for {equipmentTypes.find(t => t.value === equipmentType)?.label}</span>
+                  <Users className="h-4 w-4" style={{ color: '#d4a017' }} />
+                  <span className="text-sm font-medium text-white">Suggested Vendors for {equipmentTypes.find(t => t.value === equipmentType)?.label}</span>
                 </div>
                 {getSuggestedVendors().length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {getSuggestedVendors().map((vendor: any) => (
-                      <div key={vendor.id} className="flex items-center gap-2 p-2 bg-background rounded border text-sm" data-testid={`suggested-vendor-${vendor.id}`}>
-                        <span className="font-medium">{vendor.name}</span>
+                      <div key={vendor.id} className="flex items-center gap-2 p-2 rounded-lg text-sm" style={{ background: '#1a1d2e', border: '1px solid #2a2d3e' }} data-testid={`suggested-vendor-${vendor.id}`}>
+                        <span className="font-medium text-white">{vendor.name}</span>
                         {vendor.phone && (
-                          <a href={`tel:${vendor.phone}`} className="text-primary hover:underline flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {vendor.phone}
+                          <a href={`tel:${vendor.phone}`} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017', border: '1px solid rgba(212,160,23,0.3)' }}>
+                            <Phone className="h-3 w-3" />{vendor.phone}
                           </a>
                         )}
-                        {vendor.isEmergency && <Badge variant="destructive" className="text-xs">24/7</Badge>}
+                        {vendor.isEmergency && <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>24/7</span>}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No vendors for this equipment type yet. Add them in the <span className="font-medium">Vendors</span> tab for quick access during emergencies.
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm" style={{ color: '#6b7280' }}>No vendors for this equipment type yet.</p>
+                    <button onClick={() => navigateToTab("vendors")} className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ color: '#d4a017', border: '1px solid rgba(212,160,23,0.3)', background: 'rgba(212,160,23,0.1)' }} data-testid="btn-add-vendor-shortcut">
+                      Add Vendor
+                    </button>
+                  </div>
                 )}
               </div>
             )}
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="pm" className="space-y-4 mt-4">
+        {mode === "pm" && (
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="pmEquipmentType">Equipment Type</Label>
+              <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Type</label>
               <Select value={equipmentType} onValueChange={setEquipmentType}>
-                <SelectTrigger id="pmEquipmentType" className="mt-1" data-testid="select-pm-equipment-type">
+                <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="select-pm-equipment-type">
                   <SelectValue placeholder="Select equipment type..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {equipmentTypes.map(type => (
-                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                  ))}
+                  {equipmentTypes.map(type => (<SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
-
             <div>
-              <Label htmlFor="pmEquipmentName">Specific Equipment (optional)</Label>
-              <Input
-                id="pmEquipmentName"
-                placeholder="e.g., Walk-in cooler, All fryers, Ice machine"
-                className="mt-1"
-                value={equipmentName}
-                onChange={(e) => setEquipmentName(e.target.value)}
-                data-testid="input-pm-equipment-name"
-              />
+              <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Specific Equipment (optional)</label>
+              <Input className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} placeholder="e.g., Walk-in cooler, All fryers, Ice machine" value={equipmentName} onChange={(e) => setEquipmentName(e.target.value)} data-testid="input-pm-equipment-name" />
             </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Service Frequency</label>
+                <Select value={serviceFrequency} onValueChange={setServiceFrequency}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="select-service-frequency">
+                    <SelectValue placeholder="Select volume..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High Volume (open 7 days, heavy use)</SelectItem>
+                    <SelectItem value="standard">Standard (5-6 days/week)</SelectItem>
+                    <SelectItem value="low">Low Volume (less than 5 days or seasonal)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Last PM Completed (optional)</label>
+                <Input type="date" className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} value={lastPMCompleted} onChange={(e) => setLastPMCompleted(e.target.value)} data-testid="input-last-pm" />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label>Fail-Silent Monitors (optional)</Label>
-              <p className="text-sm text-muted-foreground">Select items to include monitoring logs and escalation thresholds</p>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Fail-Silent Monitors (optional)</label>
+              <p className="text-xs" style={{ color: '#6b7280' }}>Select items to include monitoring logs and escalation thresholds</p>
+              <div className="flex flex-wrap gap-2 mt-1">
                 {failSilentOptions.map(option => (
-                  <Badge
-                    key={option.value}
-                    variant={failSilentMonitors.includes(option.value) ? "default" : "outline"}
-                    className="cursor-pointer toggle-elevate"
-                    onClick={() => toggleFailSilent(option.value)}
-                    data-testid={`badge-fail-silent-${option.value}`}
-                  >
+                  <button key={option.value} onClick={() => toggleFailSilent(option.value)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px]"
+                    style={{ background: failSilentMonitors.includes(option.value) ? 'rgba(184,134,11,0.15)' : 'transparent', border: `1px solid ${failSilentMonitors.includes(option.value) ? '#b8860b' : '#374151'}`, color: failSilentMonitors.includes(option.value) ? '#d4a017' : '#9ca3af' }}
+                    title={option.tip}
+                    data-testid={`badge-fail-silent-${option.value}`}>
                     {option.label}
-                  </Badge>
+                  </button>
                 ))}
               </div>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="log" className="space-y-4 mt-4">
+        {mode === "log" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Type</label>
+                <Select value={equipmentType} onValueChange={setEquipmentType}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="select-log-equipment-type">
+                    <SelectValue placeholder="Select equipment type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipmentTypes.map(type => (<SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Name/Model</label>
+                <Input className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} placeholder="e.g., Hoshizaki KM-320MAJ Ice Machine" value={equipmentName} onChange={(e) => setEquipmentName(e.target.value)} data-testid="input-log-equipment-name" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Purchase / Install Date (optional)</label>
+                <Input type="date" className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} data-testid="input-purchase-date" />
+              </div>
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Warranty Expiration (optional)</label>
+                <Input type="date" className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} value={warrantyExpiration} onChange={(e) => setWarrantyExpiration(e.target.value)} data-testid="input-warranty" />
+                {warrantyExpiration && (() => {
+                  const daysLeft = Math.ceil((new Date(warrantyExpiration).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                  if (daysLeft <= 0) return <span className="text-[10px] font-medium mt-1 inline-block px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>Expired</span>;
+                  if (daysLeft <= 60) return <span className="text-[10px] font-medium mt-1 inline-block px-2 py-0.5 rounded" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>Expiring Soon ({daysLeft}d)</span>;
+                  return null;
+                })()}
+              </div>
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Serial Number / Asset Tag (optional)</label>
+                <Input className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} placeholder="e.g., SN-2024-001" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} data-testid="input-serial" />
+              </div>
+              <div>
+                <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Last Service Date (optional)</label>
+                <Input type="date" className="mt-1" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} value={lastServiceDate} onChange={(e) => setLastServiceDate(e.target.value)} data-testid="input-last-service" />
+              </div>
+            </div>
             <div>
-              <Label htmlFor="logEquipmentType">Equipment Type</Label>
-              <Select value={equipmentType} onValueChange={setEquipmentType}>
-                <SelectTrigger id="logEquipmentType" className="mt-1" data-testid="select-log-equipment-type">
-                  <SelectValue placeholder="Select equipment type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {equipmentTypes.map(type => (
-                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Criticality</label>
+              <div className="flex gap-2 mt-1">
+                {[{ value: 'revenue-critical', label: 'Revenue-Critical', desc: 'Direct impact on service if down', color: '#ef4444' }, { value: 'support', label: 'Support Equipment', desc: 'Operation continues without it', color: '#6b7280' }].map(opt => (
+                  <button key={opt.value} onClick={() => setEquipmentCriticality(opt.value)}
+                    className="flex-1 p-3 rounded-lg text-left min-h-[44px]"
+                    style={{ background: equipmentCriticality === opt.value ? 'rgba(212,160,23,0.1)' : '#111827', border: `1px solid ${equipmentCriticality === opt.value ? '#d4a017' : '#374151'}` }}
+                    data-testid={`btn-criticality-${opt.value}`}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: opt.color }} />
+                      <span className="text-sm font-medium text-white">{opt.label}</span>
+                    </div>
+                    <p className="text-[11px] mt-1" style={{ color: '#6b7280' }}>{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Notes / Current Issues (optional)</label>
+              <Textarea className="mt-1 min-h-[80px]" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} placeholder="Any notes about this equipment..." value={issueGoal} onChange={(e) => setIssueGoal(e.target.value)} data-testid="textarea-log-notes" />
             </div>
 
-            <div>
-              <Label htmlFor="logEquipmentName">Equipment Name/Model</Label>
-              <Input
-                id="logEquipmentName"
-                placeholder="e.g., Hoshizaki KM-320MAJ Ice Machine"
-                className="mt-1"
-                value={equipmentName}
-                onChange={(e) => setEquipmentName(e.target.value)}
-                data-testid="input-log-equipment-name"
-              />
-            </div>
+            {savedEquipment.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <Package className="h-4 w-4" style={{ color: '#d4a017' }} />
+                  Saved Equipment ({savedEquipment.length})
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {sortedEquipment.map((equip) => {
+                    const typeLabel = equipmentTypes.find(e => e.value === equip.type)?.label || equip.type;
+                    const warrantyDays = equip.warrantyExpiration ? Math.ceil((new Date(equip.warrantyExpiration).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+                    return (
+                      <div key={equip.id} className="p-3 rounded-lg" style={{ background: '#111827', border: '1px solid #2a2d3e' }} data-testid={`equipment-card-${equip.id}`}>
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-medium text-white">{equip.name}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017' }}>{typeLabel}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: equip.criticality === 'revenue-critical' ? 'rgba(239,68,68,0.15)' : 'rgba(107,114,128,0.15)', color: equip.criticality === 'revenue-critical' ? '#ef4444' : '#6b7280' }}>
+                                {equip.criticality === 'revenue-critical' ? 'Revenue-Critical' : 'Support'}
+                              </span>
+                              {warrantyDays !== null && warrantyDays <= 60 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: warrantyDays <= 0 ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', color: warrantyDays <= 0 ? '#ef4444' : '#f59e0b' }}>
+                                  {warrantyDays <= 0 ? 'Warranty Expired' : `Warranty: ${warrantyDays}d left`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => navigateToTab("pm", equip.type)} className="p-1 rounded" style={{ color: '#d4a017' }} title="Create PM Schedule" data-testid={`btn-create-pm-${equip.id}`}>
+                              <Calendar className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => deleteEquipment(equip.id)} className="p-1 rounded" style={{ color: '#ef4444' }} data-testid={`btn-delete-equip-${equip.id}`}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[11px]" style={{ color: '#6b7280' }}>Saved {new Date(equip.savedAt).toLocaleDateString()}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-            <div>
-              <Label htmlFor="lastService">Last Service Date (optional)</Label>
-              <Input
-                id="lastService"
-                type="date"
-                className="mt-1"
-                value={lastServiceDate}
-                onChange={(e) => setLastServiceDate(e.target.value)}
-                data-testid="input-last-service"
-              />
-            </div>
+            {savedEquipment.length === 0 && !response && (
+              <div className="text-center py-6" style={{ color: '#6b7280' }}>
+                <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">No equipment logged yet. Add your first asset above.</p>
+              </div>
+            )}
+          </div>
+        )}
 
-            <div>
-              <Label htmlFor="logNotes">Notes / Current Issues (optional)</Label>
-              <Textarea
-                id="logNotes"
-                placeholder="Any notes about this equipment, recurring issues, or maintenance history..."
-                className="mt-1 min-h-[80px]"
-                value={issueGoal}
-                onChange={(e) => setIssueGoal(e.target.value)}
-                data-testid="textarea-log-notes"
-              />
-            </div>
-          </TabsContent>
-
-          {/* Vendor Directory Tab */}
-          <TabsContent value="vendors" className="space-y-4 mt-4">
+        {mode === "vendors" && (
+          <div className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-2 justify-between">
               <div className="flex gap-2 flex-1">
-                <Input
-                  placeholder="Search vendors..."
-                  value={vendorSearch}
-                  onChange={(e) => setVendorSearch(e.target.value)}
-                  className="max-w-xs"
-                  data-testid="input-vendor-search"
-                />
+                <Input placeholder="Search vendors..." value={vendorSearch} onChange={(e) => setVendorSearch(e.target.value)} className="max-w-xs" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="input-vendor-search" />
                 <Select value={vendorFilter} onValueChange={setVendorFilter}>
-                  <SelectTrigger className="w-40" data-testid="select-vendor-filter">
+                  <SelectTrigger className="w-40" style={{ background: '#111827', borderColor: '#374151', color: '#ffffff' }} data-testid="select-vendor-filter">
                     <SelectValue placeholder="Filter by..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Vendors</SelectItem>
                     <SelectItem value="favorite">Favorites</SelectItem>
-                    <SelectItem value="refrigeration">Refrigeration</SelectItem>
-                    <SelectItem value="hvac">HVAC</SelectItem>
-                    <SelectItem value="plumbing">Plumbing</SelectItem>
-                    <SelectItem value="electrical">Electrical</SelectItem>
-                    <SelectItem value="cooking">Cooking Equipment</SelectItem>
-                    <SelectItem value="dish">Dish Machine</SelectItem>
-                    <SelectItem value="pos">POS & Network</SelectItem>
+                    {equipmentTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                     <SelectItem value="general">General</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={() => { setEditingVendor(null); setShowVendorForm(true); }} data-testid="btn-add-vendor">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Vendor
-              </Button>
+              <button onClick={() => { setEditingVendor(null); setShowVendorForm(true); setVendorEquipmentTypes([]); setAfterHoursPhone(""); setAuthorizationLimit(""); setAvgResponseTime(""); setEmergencyAvailable("unsure"); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium min-h-[44px]"
+                style={{ background: '#b8860b', color: '#ffffff' }} data-testid="btn-add-vendor">
+                <Plus className="h-4 w-4" />Add Vendor
+              </button>
             </div>
 
-            {/* Vendor Form Dialog */}
             {showVendorForm && (
-              <div className="p-4 border rounded-lg bg-accent/20 space-y-4">
-                <h4 className="font-semibold">{editingVendor ? "Edit Vendor" : "Add New Vendor"}</h4>
+              <div className="p-4 rounded-xl space-y-4" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <h4 className="font-semibold text-white">{editingVendor ? "Edit Vendor" : "Add New Vendor"}</h4>
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   const formData = new FormData(e.currentTarget);
@@ -10431,351 +10534,631 @@ Emergency After-Hours:
                     email: formData.get("email") as string,
                     website: formData.get("website") as string,
                     notes: formData.get("notes") as string,
-                    responseTime: formData.get("responseTime") as string,
-                    callOutFee: formData.get("callOutFee") as string,
+                    responseTime: avgResponseTime || (formData.get("responseTime") as string),
+                    callOutFee: authorizationLimit || (formData.get("callOutFee") as string),
                     accountNumber: formData.get("accountNumber") as string,
                     rating: parseInt(formData.get("rating") as string) || 0,
-                    isEmergency: formData.get("isEmergency") === "on",
+                    isEmergency: emergencyAvailable === "yes",
+                    afterHoursPhone: afterHoursPhone,
+                    equipmentTypesCovered: vendorEquipmentTypes.join(","),
+                    authorizationLimit: authorizationLimit,
+                    avgResponseTime: avgResponseTime,
                   };
-                  if (editingVendor) {
-                    updateVendorMutation.mutate({ id: editingVendor.id, data });
-                  } else {
-                    createVendorMutation.mutate(data);
-                  }
+                  if (editingVendor) { updateVendorMutation.mutate({ id: editingVendor.id, data }); }
+                  else { createVendorMutation.mutate(data); }
                 }} className="space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label>Vendor Name *</Label>
-                      <Input name="name" required defaultValue={editingVendor?.name || ""} data-testid="input-vendor-name" />
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Vendor Name *</label>
+                      <Input name="name" required defaultValue={editingVendor?.name || ""} style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="input-vendor-name" />
                     </div>
                     <div>
-                      <Label>Specialty *</Label>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Primary Specialty *</label>
                       <Select name="specialty" defaultValue={editingVendor?.specialty || "general"}>
-                        <SelectTrigger data-testid="select-vendor-specialty">
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="select-vendor-specialty"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="refrigeration">Refrigeration</SelectItem>
-                          <SelectItem value="hvac">HVAC</SelectItem>
-                          <SelectItem value="plumbing">Plumbing</SelectItem>
-                          <SelectItem value="electrical">Electrical</SelectItem>
-                          <SelectItem value="cooking">Cooking Equipment</SelectItem>
-                          <SelectItem value="dish">Dish Machine</SelectItem>
-                          <SelectItem value="pos">POS & Network</SelectItem>
+                          {equipmentTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                           <SelectItem value="general">General</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label>Phone</Label>
-                      <Input name="phone" type="tel" defaultValue={editingVendor?.phone || ""} data-testid="input-vendor-phone" />
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Phone</label>
+                      <Input name="phone" type="tel" defaultValue={editingVendor?.phone || ""} style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="input-vendor-phone" />
                     </div>
                     <div>
-                      <Label>Email</Label>
-                      <Input name="email" type="email" defaultValue={editingVendor?.email || ""} data-testid="input-vendor-email" />
-                    </div>
-                    <div>
-                      <Label>Website</Label>
-                      <Input name="website" type="url" placeholder="https://..." defaultValue={editingVendor?.website || ""} data-testid="input-vendor-website" />
-                    </div>
-                    <div>
-                      <Label>Response Time</Label>
-                      <Input name="responseTime" placeholder="e.g., Same day, 2-4 hours" defaultValue={editingVendor?.responseTime || ""} data-testid="input-vendor-response" />
-                    </div>
-                    <div>
-                      <Label>Call-Out Fee</Label>
-                      <Input name="callOutFee" placeholder="e.g., $150" defaultValue={editingVendor?.callOutFee || ""} data-testid="input-vendor-fee" />
-                    </div>
-                    <div>
-                      <Label>Account Number</Label>
-                      <Input name="accountNumber" defaultValue={editingVendor?.accountNumber || ""} data-testid="input-vendor-account" />
-                    </div>
-                    <div>
-                      <Label>Rating (1-5)</Label>
-                      <Select name="rating" defaultValue={String(editingVendor?.rating || 0)}>
-                        <SelectTrigger data-testid="select-vendor-rating">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">Not rated</SelectItem>
-                          <SelectItem value="1">1 Star</SelectItem>
-                          <SelectItem value="2">2 Stars</SelectItem>
-                          <SelectItem value="3">3 Stars</SelectItem>
-                          <SelectItem value="4">4 Stars</SelectItem>
-                          <SelectItem value="5">5 Stars</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2 pt-6">
-                      <input type="checkbox" name="isEmergency" id="isEmergency" defaultChecked={editingVendor?.isEmergency} />
-                      <Label htmlFor="isEmergency">24/7 Emergency Available</Label>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Email</label>
+                      <Input name="email" type="email" defaultValue={editingVendor?.email || ""} style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="input-vendor-email" />
                     </div>
                   </div>
                   <div>
-                    <Label>Notes</Label>
-                    <Textarea name="notes" placeholder="Additional notes about this vendor..." defaultValue={editingVendor?.notes || ""} data-testid="textarea-vendor-notes" />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" disabled={createVendorMutation.isPending || updateVendorMutation.isPending} data-testid="btn-save-vendor">
-                      {(createVendorMutation.isPending || updateVendorMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      {editingVendor ? "Update Vendor" : "Add Vendor"}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => { setShowVendorForm(false); setEditingVendor(null); }} data-testid="btn-cancel-vendor">
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Vendor List */}
-            <div className="space-y-2">
-              {filteredVendors.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  {vendors.length === 0 ? "No vendors added yet. Add your first repair vendor above." : "No vendors match your search."}
-                </div>
-              ) : (
-                filteredVendors.map((vendor: any) => (
-                  <div key={vendor.id} className="p-3 border rounded-lg hover-elevate flex flex-col sm:flex-row sm:items-center gap-2 justify-between" data-testid={`vendor-card-${vendor.id}`}>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{vendor.name}</span>
-                        <Badge variant="outline" className="text-xs">{vendor.specialty}</Badge>
-                        {vendor.isFavorite && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
-                        {vendor.isEmergency && <Badge variant="destructive" className="text-xs">24/7</Badge>}
-                        {vendor.rating > 0 && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                            {[...Array(vendor.rating)].map((_, i) => (
-                              <Star key={i} className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                            ))}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground flex flex-wrap gap-3 mt-1">
-                        {vendor.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{vendor.phone}</span>}
-                        {vendor.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{vendor.email}</span>}
-                        {vendor.responseTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{vendor.responseTime}</span>}
-                        {vendor.callOutFee && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" />{vendor.callOutFee}</span>}
-                      </div>
-                      {vendor.notes && <p className="text-sm text-muted-foreground mt-1 italic">{vendor.notes}</p>}
-                    </div>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => toggleFavoriteMutation.mutate(vendor.id)} data-testid={`btn-favorite-${vendor.id}`}>
-                        <Star className={`h-4 w-4 ${vendor.isFavorite ? "text-yellow-500 fill-yellow-500" : ""}`} />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => { setEditingVendor(vendor); setShowVendorForm(true); }} data-testid={`btn-edit-vendor-${vendor.id}`}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => deleteVendorMutation.mutate(vendor.id)} data-testid={`btn-delete-vendor-${vendor.id}`}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                    <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Types Covered</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {equipmentTypes.map(t => (
+                        <button key={t.value} type="button" onClick={() => setVendorEquipmentTypes(prev => prev.includes(t.value) ? prev.filter(v => v !== t.value) : [...prev, t.value])}
+                          className="px-2.5 py-1 rounded-full text-[11px] font-medium"
+                          style={{ background: vendorEquipmentTypes.includes(t.value) ? 'rgba(184,134,11,0.15)' : 'transparent', border: `1px solid ${vendorEquipmentTypes.includes(t.value) ? '#b8860b' : '#374151'}`, color: vendorEquipmentTypes.includes(t.value) ? '#d4a017' : '#6b7280' }}
+                          data-testid={`chip-vendor-type-${t.value}`}>{t.label}</button>
+                      ))}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Issues Dashboard Tab */}
-          <TabsContent value="dashboard" className="space-y-4 mt-4">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20 text-center">
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{issueStats?.open || 0}</div>
-                <div className="text-xs text-muted-foreground">Open Issues</div>
-              </div>
-              <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20 text-center">
-                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{issueStats?.inProgress || 0}</div>
-                <div className="text-xs text-muted-foreground">In Progress</div>
-              </div>
-              <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20 text-center">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{issueStats?.resolved || 0}</div>
-                <div className="text-xs text-muted-foreground">Resolved</div>
-              </div>
-              <div className="p-3 bg-primary/10 rounded-lg border border-primary/20 text-center">
-                <div className="text-2xl font-bold text-primary">{issueStats?.avgResolutionDays || 0}</div>
-                <div className="text-xs text-muted-foreground">Avg. Days to Fix</div>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <h4 className="font-semibold">Recent Issues</h4>
-              <Button size="sm" onClick={() => setShowIssueForm(true)} data-testid="btn-log-issue">
-                <Plus className="h-4 w-4 mr-2" />
-                Log Issue
-              </Button>
-            </div>
-
-            {/* Issue Form */}
-            {showIssueForm && (
-              <div className="p-4 border rounded-lg bg-accent/20 space-y-3">
-                <h4 className="font-semibold">Log New Issue</h4>
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const vendorId = formData.get("vendorId") as string;
-                  const selectedVendor = vendors.find((v: any) => v.id === parseInt(vendorId));
-                  createIssueMutation.mutate({
-                    equipmentType: formData.get("equipmentType") as string,
-                    equipmentName: formData.get("equipmentName") as string,
-                    description: formData.get("description") as string,
-                    urgencyLevel: formData.get("urgencyLevel") as string,
-                    vendorId: vendorId ? parseInt(vendorId) : null,
-                    vendorName: selectedVendor?.name || null,
-                  });
-                }} className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
-                      <Label>Equipment Type *</Label>
-                      <Select name="equipmentType" required>
-                        <SelectTrigger data-testid="select-issue-equipment">
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Emergency / After-Hours?</label>
+                      <div className="flex gap-1 mt-1">
+                        {["yes", "no", "unsure"].map(v => (
+                          <button key={v} type="button" onClick={() => setEmergencyAvailable(v)}
+                            className="flex-1 py-2 rounded-lg text-xs font-medium min-h-[36px]"
+                            style={{ background: emergencyAvailable === v ? 'rgba(212,160,23,0.1)' : '#0f1117', border: `1px solid ${emergencyAvailable === v ? '#d4a017' : '#374151'}`, color: emergencyAvailable === v ? '#d4a017' : '#6b7280' }}>
+                            {v === 'yes' ? 'Yes' : v === 'no' ? 'No' : 'Unsure'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Avg. Response Time</label>
+                      <Select value={avgResponseTime} onValueChange={setAvgResponseTime}>
+                        <SelectTrigger className="mt-1" style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="select-vendor-avg-response">
                           <SelectValue placeholder="Select..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {equipmentTypes.map(type => (
-                            <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                          ))}
+                          <SelectItem value="under-2h">Under 2 hours</SelectItem>
+                          <SelectItem value="2-4h">2-4 hours</SelectItem>
+                          <SelectItem value="same-day">Same day</SelectItem>
+                          <SelectItem value="next-day">Next day</SelectItem>
+                          <SelectItem value="unknown">Unknown</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label>Urgency Level</Label>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Authorized Up To $</label>
+                      <Input type="text" placeholder="e.g., 500" value={authorizationLimit} onChange={(e) => setAuthorizationLimit(e.target.value)} style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="input-vendor-auth-limit" />
+                    </div>
+                  </div>
+                  {emergencyAvailable === "yes" && (
+                    <div>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>After-Hours Phone</label>
+                      <Input type="tel" value={afterHoursPhone} onChange={(e) => setAfterHoursPhone(e.target.value)} placeholder="After-hours contact number" style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="input-vendor-after-hours" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Notes / History</label>
+                    <Textarea name="notes" placeholder="Repair history, preferred contact name..." defaultValue={editingVendor?.notes || ""} style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="textarea-vendor-notes" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium min-h-[44px]" style={{ background: '#b8860b', color: '#ffffff' }} data-testid="btn-save-vendor">
+                      {(createVendorMutation.isPending || updateVendorMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {editingVendor ? "Update Vendor" : "Add Vendor"}
+                    </button>
+                    <button type="button" onClick={() => { setShowVendorForm(false); setEditingVendor(null); }} className="px-4 py-2 rounded-lg text-sm min-h-[44px]" style={{ border: '1px solid #374151', color: '#9ca3af' }} data-testid="btn-cancel-vendor">Cancel</button>
+                  </div>
+                  <input type="hidden" name="responseTime" value="" />
+                  <input type="hidden" name="callOutFee" value="" />
+                  <input type="hidden" name="accountNumber" value="" />
+                  <input type="hidden" name="website" value="" />
+                  <input type="hidden" name="rating" value="0" />
+                </form>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {filteredVendors.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-8 w-8 mx-auto mb-2 opacity-40" style={{ color: '#6b7280' }} />
+                  <p className="text-sm" style={{ color: '#6b7280' }}>{vendors.length === 0 ? "Your vendor bench determines how fast you recover. Build it before you need it." : "No vendors match your search."}</p>
+                </div>
+              ) : (
+                filteredVendors.map((vendor: any) => {
+                  const borderColor = EQUIP_TYPE_COLORS[vendor.specialty] || '#6b7280';
+                  return (
+                    <div key={vendor.id} className="p-4 rounded-xl" style={{ background: '#111827', borderLeft: `4px solid ${borderColor}`, border: `1px solid #2a2d3e`, borderLeftWidth: '4px', borderLeftColor: borderColor }} data-testid={`vendor-card-${vendor.id}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-white">{vendor.name}</span>
+                          {vendor.isEmergency && <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>24/7</span>}
+                          {!vendor.isEmergency && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(107,114,128,0.15)', color: '#6b7280' }}>Business Hours</span>}
+                        </div>
+                        <div className="flex gap-1">
+                          <button onClick={() => toggleFavoriteMutation.mutate(vendor.id)} className="p-1.5 rounded" data-testid={`btn-favorite-${vendor.id}`}>
+                            <Star className={`h-4 w-4 ${vendor.isFavorite ? "fill-yellow-500" : ""}`} style={{ color: vendor.isFavorite ? '#eab308' : '#6b7280' }} />
+                          </button>
+                          <button onClick={() => { setEditingVendor(vendor); setShowVendorForm(true); setVendorEquipmentTypes(vendor.equipmentTypesCovered?.split(',').filter(Boolean) || []); setAfterHoursPhone(vendor.afterHoursPhone || ''); setAuthorizationLimit(vendor.authorizationLimit || vendor.callOutFee || ''); setAvgResponseTime(vendor.avgResponseTime || ''); setEmergencyAvailable(vendor.isEmergency ? 'yes' : 'no'); }} className="p-1.5 rounded" style={{ color: '#9ca3af' }} data-testid={`btn-edit-vendor-${vendor.id}`}>
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => deleteVendorMutation.mutate(vendor.id)} className="p-1.5 rounded" style={{ color: '#ef4444' }} data-testid={`btn-delete-vendor-${vendor.id}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: `${borderColor}20`, color: borderColor }}>{vendor.specialty}</span>
+                        {vendor.equipmentTypesCovered?.split(',').filter(Boolean).map((t: string) => (
+                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(107,114,128,0.1)', color: '#9ca3af' }}>{equipmentTypes.find(et => et.value === t)?.label || t}</span>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {vendor.phone && (
+                          <a href={`tel:${vendor.phone}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium min-h-[36px]" style={{ background: 'rgba(212,160,23,0.12)', color: '#d4a017', border: '1px solid rgba(212,160,23,0.25)' }} data-testid={`btn-call-${vendor.id}`}>
+                            <Phone className="h-3.5 w-3.5" />{vendor.phone}
+                          </a>
+                        )}
+                        {vendor.afterHoursPhone && (
+                          <a href={`tel:${vendor.afterHoursPhone}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium min-h-[36px]" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+                            <Phone className="h-3.5 w-3.5" />After Hours
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-xs" style={{ color: '#6b7280' }}>
+                        {(vendor.avgResponseTime || vendor.responseTime) && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{vendor.avgResponseTime || vendor.responseTime}</span>}
+                        {(vendor.authorizationLimit || vendor.callOutFee) && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" />Auth: ${vendor.authorizationLimit || vendor.callOutFee}</span>}
+                        {vendor.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{vendor.email}</span>}
+                      </div>
+                      {vendor.notes && <p className="text-xs mt-2" style={{ color: '#6b7280', fontStyle: 'italic' }}>{vendor.notes}</p>}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {mode === "dashboard" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Open Issues", value: issueStats?.open || 0, color: '#ef4444', topBorder: '#ef4444' },
+                { label: "In Progress", value: issueStats?.inProgress || 0, color: '#f59e0b', topBorder: '#f59e0b' },
+                { label: "Resolved", value: issueStats?.resolved || 0, color: '#22c55e', topBorder: '#22c55e' },
+                { label: "Avg. Days to Fix", value: issueStats?.avgResolutionDays || 0, color: '#d4a017', topBorder: '#d4a017' },
+              ].map((stat, i) => (
+                <div key={i} className="p-3 rounded-xl text-center" style={{ background: '#111827', borderTop: `3px solid ${stat.topBorder}` }} data-testid={`dashboard-stat-${i}`}>
+                  <div className="text-3xl font-bold" style={{ color: stat.color }}>{stat.value}</div>
+                  <div className="text-[11px] mt-1" style={{ color: '#9ca3af' }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                <ClipboardList className="h-4 w-4" style={{ color: '#d4a017' }} />
+                Issue Tracker
+              </h4>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #374151' }}>
+                  {["list", "pipeline"].map(v => (
+                    <button key={v} onClick={() => setDashboardView(v as any)} className="px-3 py-1.5 text-xs font-medium min-h-[32px]"
+                      style={{ background: dashboardView === v ? '#252840' : 'transparent', color: dashboardView === v ? '#d4a017' : '#6b7280' }}
+                      data-testid={`btn-view-${v}`}>{v === 'list' ? 'List' : 'Pipeline'}</button>
+                  ))}
+                </div>
+                <button onClick={() => setShowIssueForm(true)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium min-h-[32px]" style={{ background: '#b8860b', color: '#ffffff' }} data-testid="btn-log-issue">
+                  <Plus className="h-3.5 w-3.5" />Log Issue
+                </button>
+              </div>
+            </div>
+
+            {showIssueForm && (
+              <div className="p-4 rounded-xl space-y-3" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <h4 className="font-semibold text-white">Log New Issue</h4>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  const vendorId = fd.get("vendorId") as string;
+                  const sv = vendors.find((v: any) => v.id === parseInt(vendorId));
+                  createIssueMutation.mutate({ equipmentType: fd.get("equipmentType") as string, equipmentName: fd.get("equipmentName") as string, description: fd.get("description") as string, urgencyLevel: fd.get("urgencyLevel") as string, vendorId: vendorId ? parseInt(vendorId) : null, vendorName: sv?.name || null });
+                }} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Type *</label>
+                      <Select name="equipmentType" required>
+                        <SelectTrigger style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="select-issue-equipment"><SelectValue placeholder="Select..." /></SelectTrigger>
+                        <SelectContent>{equipmentTypes.map(type => (<SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Urgency Level</label>
                       <Select name="urgencyLevel" defaultValue="medium">
-                        <SelectTrigger data-testid="select-issue-urgency">
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="select-issue-urgency"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="critical">Critical - Safety/Service Stop</SelectItem>
-                          <SelectItem value="high">High - Major Impact</SelectItem>
-                          <SelectItem value="medium">Medium - Can Work Around</SelectItem>
-                          <SelectItem value="low">Low - Minor Annoyance</SelectItem>
+                          <SelectItem value="critical">Critical</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="low">Low</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label>Equipment Name</Label>
-                      <Input name="equipmentName" placeholder="e.g., Walk-in cooler #1" data-testid="input-issue-name" />
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Equipment Name</label>
+                      <Input name="equipmentName" placeholder="e.g., Walk-in cooler #1" style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="input-issue-name" />
                     </div>
                     <div>
-                      <Label>Assigned Vendor</Label>
+                      <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Assigned Vendor</label>
                       <Select name="vendorId">
-                        <SelectTrigger data-testid="select-issue-vendor">
-                          <SelectValue placeholder="Select vendor..." />
-                        </SelectTrigger>
+                        <SelectTrigger style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="select-issue-vendor"><SelectValue placeholder="Select vendor..." /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">No vendor assigned</SelectItem>
-                          {vendors.map((v: any) => (
-                            <SelectItem key={v.id} value={String(v.id)}>{v.name} ({v.specialty})</SelectItem>
-                          ))}
+                          {vendors.map((v: any) => (<SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>))}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <div>
-                    <Label>Description *</Label>
-                    <Textarea name="description" required placeholder="Describe the issue..." data-testid="textarea-issue-description" />
+                    <label className="text-xs font-medium" style={{ color: '#9ca3af' }}>Description *</label>
+                    <Textarea name="description" required placeholder="Describe the issue..." style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid="textarea-issue-description" />
                   </div>
                   <div className="flex gap-2">
-                    <Button type="submit" disabled={createIssueMutation.isPending} data-testid="btn-submit-issue">
-                      {createIssueMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Log Issue
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => setShowIssueForm(false)}>Cancel</Button>
+                    <button type="submit" className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium min-h-[44px]" style={{ background: '#b8860b', color: '#ffffff' }} data-testid="btn-submit-issue">
+                      {createIssueMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Log Issue
+                    </button>
+                    <button type="button" onClick={() => setShowIssueForm(false)} className="px-4 py-2 rounded-lg text-sm min-h-[44px]" style={{ border: '1px solid #374151', color: '#9ca3af' }}>Cancel</button>
                   </div>
                 </form>
               </div>
             )}
 
-            {/* Issues List */}
-            <div className="space-y-2">
-              {issues.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No issues logged yet. Track equipment problems and repairs here.
-                </div>
-              ) : (
-                issues.slice(0, 10).map((issue: any) => (
-                  <div key={issue.id} className="p-3 border rounded-lg" data-testid={`issue-card-${issue.id}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={
-                            issue.urgencyLevel === "critical" ? "destructive" :
-                            issue.urgencyLevel === "high" ? "default" : "outline"
-                          } className="text-xs">{issue.urgencyLevel}</Badge>
-                          <Badge variant="outline" className="text-xs">{issue.equipmentType}</Badge>
-                          <Badge variant={
-                            issue.status === "open" ? "destructive" :
-                            issue.status === "resolved" || issue.status === "closed" ? "default" : "secondary"
-                          } className="text-xs">{issue.status.replace("_", " ")}</Badge>
+            {dashboardView === "pipeline" ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {[
+                  { title: "Open", items: openIssues, headerColor: '#ef4444' },
+                  { title: "In Progress", items: inProgressIssues, headerColor: '#f59e0b' },
+                  { title: "Resolved", items: resolvedIssues.slice(0, 10), headerColor: '#22c55e' },
+                ].map(col => (
+                  <div key={col.title} className="rounded-xl overflow-hidden" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                    <div className="px-3 py-2 flex items-center justify-between" style={{ background: `${col.headerColor}15`, borderBottom: `2px solid ${col.headerColor}` }}>
+                      <span className="text-xs font-bold" style={{ color: col.headerColor }}>{col.title}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: `${col.headerColor}20`, color: col.headerColor }}>{col.items.length}</span>
+                    </div>
+                    <div className="p-2 space-y-2 min-h-[80px]">
+                      {col.items.length === 0 ? (
+                        <p className="text-center text-[11px] py-4" style={{ color: '#6b7280' }}>No issues</p>
+                      ) : col.items.map((issue: any) => {
+                        const daysOpen = Math.floor((Date.now() - new Date(issue.reportedAt).getTime()) / (1000 * 60 * 60 * 24));
+                        const isExpanded = expandedIssueId === issue.id;
+                        return (
+                          <div key={issue.id} className="rounded-lg cursor-pointer" style={{ background: '#1a1d2e', border: '1px solid #2a2d3e' }}
+                            onClick={() => setExpandedIssueId(isExpanded ? null : issue.id)} data-testid={`pipeline-issue-${issue.id}`}>
+                            <div className="p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${EQUIP_TYPE_COLORS[issue.equipmentType] || '#6b7280'}20`, color: EQUIP_TYPE_COLORS[issue.equipmentType] || '#6b7280' }}>{issue.equipmentType}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: issue.urgencyLevel === 'critical' ? 'rgba(239,68,68,0.15)' : issue.urgencyLevel === 'high' ? 'rgba(245,158,11,0.15)' : 'rgba(107,114,128,0.1)', color: issue.urgencyLevel === 'critical' ? '#ef4444' : issue.urgencyLevel === 'high' ? '#f59e0b' : '#9ca3af' }}>{issue.urgencyLevel?.toUpperCase()}</span>
+                              </div>
+                              <p className="text-xs font-medium text-white truncate">{issue.equipmentName || issue.equipmentType}</p>
+                              <p className="text-[11px] truncate" style={{ color: '#6b7280' }}>{issue.description}</p>
+                              <div className="flex justify-between mt-1.5">
+                                <span className="text-[10px]" style={{ color: '#6b7280' }}>{new Date(issue.reportedAt).toLocaleDateString()}</span>
+                                <span className="text-[10px] font-medium" style={{ color: daysOpen > 3 ? '#f59e0b' : '#6b7280' }}>{daysOpen}d open</span>
+                              </div>
+                            </div>
+                            {isExpanded && (
+                              <div className="px-2.5 pb-2.5 space-y-2" style={{ borderTop: '1px solid #2a2d3e' }}>
+                                <div className="pt-2">
+                                  <label className="text-[10px] font-medium" style={{ color: '#9ca3af' }}>Status</label>
+                                  <Select value={issue.status} onValueChange={(v) => { updateIssueMutation.mutate({ id: issue.id, data: { status: v } }); }}>
+                                    <SelectTrigger className="h-8 text-xs mt-0.5" style={{ background: '#0f1117', borderColor: '#374151', color: '#ffffff' }} data-testid={`select-status-${issue.id}`}><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="open">Open</SelectItem>
+                                      <SelectItem value="in_progress">In Progress</SelectItem>
+                                      <SelectItem value="waiting_parts">Waiting Parts</SelectItem>
+                                      <SelectItem value="resolved">Resolved</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                {issue.vendorName && <p className="text-[11px]" style={{ color: '#6b7280' }}>Vendor: {issue.vendorName}</p>}
+                                {issue.status !== 'resolved' && issue.status !== 'closed' && (
+                                  <button onClick={(e) => { e.stopPropagation(); resolveIssueMutation.mutate({ id: issue.id }); }}
+                                    className="w-full py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 min-h-[32px]"
+                                    style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)' }}
+                                    data-testid={`btn-resolve-${issue.id}`}>
+                                    <Check className="h-3 w-3" />Resolve
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {issues.length === 0 ? (
+                  <div className="text-center py-8">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-40" style={{ color: '#6b7280' }} />
+                    <p className="text-sm" style={{ color: '#6b7280' }}>No issues logged yet. Track equipment problems and repairs here.</p>
+                  </div>
+                ) : issues.slice(0, 15).map((issue: any) => {
+                  const daysOpen = Math.floor((Date.now() - new Date(issue.reportedAt).getTime()) / (1000 * 60 * 60 * 24));
+                  return (
+                    <div key={issue.id} className="p-3 rounded-lg" style={{ background: '#111827', border: '1px solid #2a2d3e' }} data-testid={`issue-card-${issue.id}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: issue.urgencyLevel === 'critical' ? 'rgba(239,68,68,0.15)' : issue.urgencyLevel === 'high' ? 'rgba(245,158,11,0.15)' : 'rgba(107,114,128,0.1)', color: issue.urgencyLevel === 'critical' ? '#ef4444' : issue.urgencyLevel === 'high' ? '#f59e0b' : '#9ca3af' }}>{issue.urgencyLevel}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: `${EQUIP_TYPE_COLORS[issue.equipmentType] || '#6b7280'}15`, color: EQUIP_TYPE_COLORS[issue.equipmentType] || '#6b7280' }}>{issue.equipmentType}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: issue.status === 'open' ? 'rgba(239,68,68,0.1)' : issue.status === 'resolved' ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: issue.status === 'open' ? '#ef4444' : issue.status === 'resolved' ? '#22c55e' : '#f59e0b' }}>{issue.status.replace('_', ' ')}</span>
+                            {daysOpen > 3 && issue.status !== 'resolved' && <span className="text-[10px]" style={{ color: '#f59e0b' }}>{daysOpen}d</span>}
+                          </div>
+                          <p className="text-sm font-medium text-white">{issue.equipmentName || issue.equipmentType}</p>
+                          <p className="text-xs" style={{ color: '#6b7280' }}>{issue.description}</p>
                         </div>
-                        <p className="font-medium mt-1">{issue.equipmentName || issue.equipmentType}</p>
-                        <p className="text-sm text-muted-foreground">{issue.description}</p>
-                        {issue.vendorName && <p className="text-sm mt-1">Vendor: {issue.vendorName}</p>}
-                        <p className="text-xs text-muted-foreground mt-1">Reported: {new Date(issue.reportedAt).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex gap-1">
-                        {issue.status !== "resolved" && issue.status !== "closed" && (
-                          <>
-                            <Select 
-                              value={issue.status} 
-                              onValueChange={(v) => updateIssueMutation.mutate({ id: issue.id, data: { status: v } })}
-                            >
-                              <SelectTrigger className="w-28 text-xs" data-testid={`select-status-${issue.id}`}>
-                                <SelectValue />
-                              </SelectTrigger>
+                        {issue.status !== 'resolved' && issue.status !== 'closed' && (
+                          <div className="flex gap-1 shrink-0 ml-2">
+                            <Select value={issue.status} onValueChange={(v) => updateIssueMutation.mutate({ id: issue.id, data: { status: v } })}>
+                              <SelectTrigger className="w-24 h-7 text-[10px]" style={{ background: '#0f1117', borderColor: '#374151', color: '#9ca3af' }} data-testid={`select-status-${issue.id}`}><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="open">Open</SelectItem>
                                 <SelectItem value="in_progress">In Progress</SelectItem>
-                                <SelectItem value="waiting_parts">Waiting Parts</SelectItem>
+                                <SelectItem value="waiting_parts">Waiting</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Button size="sm" variant="outline" onClick={() => resolveIssueMutation.mutate({ id: issue.id })} data-testid={`btn-resolve-${issue.id}`}>
-                              <Check className="h-4 w-4 mr-1" />
-                              Resolve
-                            </Button>
-                          </>
+                            <button onClick={() => resolveIssueMutation.mutate({ id: issue.id })} className="px-2 py-1 rounded text-[10px] font-medium min-h-[28px]" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)' }} data-testid={`btn-resolve-${issue.id}`}>
+                              <Check className="h-3 w-3" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })}
+              </div>
+            )}
+
+            {Object.keys(equipTypeBreakdown).length > 0 && (
+              <div className="rounded-xl p-4" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <h4 className="text-xs font-semibold mb-3" style={{ color: '#9ca3af' }}>Equipment Failure Breakdown</h4>
+                <div className="space-y-2">
+                  {Object.entries(equipTypeBreakdown).sort(([,a],[,b]) => (b as number) - (a as number)).map(([type, count]) => (
+                    <div key={type} className="flex items-center gap-2">
+                      <span className="text-[11px] w-24 truncate" style={{ color: '#9ca3af' }}>{equipmentTypes.find(e => e.value === type)?.label || type}</span>
+                      <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ background: '#1a1d2e' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${((count as number) / maxIssueCount) * 100}%`, background: EQUIP_TYPE_COLORS[type] || '#d4a017' }} />
+                      </div>
+                      <span className="text-[11px] font-medium w-6 text-right" style={{ color: EQUIP_TYPE_COLORS[type] || '#d4a017' }}>{count as number}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {totalRepairCost > 0 && (
+              <div className="rounded-xl p-4" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <span className="text-[11px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Cost This Month</span>
+                <p className="text-2xl font-bold mt-1" style={{ color: '#f59e0b' }}>${totalRepairCost.toFixed(2)}</p>
+              </div>
+            )}
+
+            <div className="rounded-xl overflow-hidden" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+              <button onClick={() => setShowPMSchedules(!showPMSchedules)} className="w-full px-4 py-3 flex items-center justify-between" data-testid="btn-toggle-pm-schedules">
+                <span className="text-sm font-medium text-white flex items-center gap-2">
+                  <Calendar className="h-4 w-4" style={{ color: '#d4a017' }} />
+                  Saved PM Schedules ({savedPMSchedules.length})
+                </span>
+                <ChevronDown className="h-4 w-4 transition-transform" style={{ color: '#d4a017', transform: showPMSchedules ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+              </button>
+              {showPMSchedules && (
+                <div className="px-4 pb-3">
+                  {savedPMSchedules.length === 0 ? (
+                    <p className="text-xs py-3 text-center" style={{ color: '#6b7280' }}>No PM schedules saved yet. Build one in the PM Schedule tab.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {savedPMSchedules.map(pm => (
+                        <div key={pm.id} className="flex items-center justify-between p-2 rounded-lg" style={{ background: '#1a1d2e' }}>
+                          <div>
+                            <p className="text-xs font-medium text-white">{pm.equipmentName || pm.equipmentType}</p>
+                            <p className="text-[10px]" style={{ color: '#6b7280' }}>Saved {new Date(pm.savedAt).toLocaleDateString()}</p>
+                          </div>
+                          <button onClick={() => { const pw = window.open('', '_blank'); if (pw) { pw.document.write(`<html><head><title>PM Schedule</title><style>body{font-family:system-ui;padding:40px;max-width:800px;margin:0 auto}pre{white-space:pre-wrap;font-size:13px;line-height:1.6}</style></head><body><h1>PM Schedule — ${pm.equipmentName || pm.equipmentType}</h1><pre>${pm.content.replace(/\*\*/g,'')}</pre></body></html>`); pw.document.close(); pw.print(); } }}
+                            className="text-[10px] px-2 py-1 rounded" style={{ color: '#d4a017', border: '1px solid rgba(212,160,23,0.2)' }}>Print</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
 
-        {(mode === "breakdown" || mode === "pm" || mode === "log") && (
-          <Button 
-            onClick={generateResponse} 
-            disabled={isGenerating || (mode === "breakdown" && !issueGoal) || (mode === "pm" && !equipmentType)}
-            className="w-full"
-            data-testid="btn-generate-facility"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {mode === "breakdown" ? "Generating triage response..." : mode === "pm" ? "Building PM schedule..." : "Creating equipment log..."}
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                {mode === "breakdown" ? "Log an Issue" : mode === "pm" ? "Build PM Schedule" : "Generate Equipment Log"}
-              </>
-            )}
-          </Button>
+            <button onClick={() => navigateToTab("breakdown")} className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 min-h-[44px]" style={{ border: '1px solid #374151', color: '#d4a017' }} data-testid="btn-dashboard-log-issue">
+              <AlertTriangle className="h-4 w-4" />Log a Breakdown Issue
+            </button>
+          </div>
         )}
 
-        {response && (
-          <div className="mt-4 space-y-4">
-            <div className="p-4 bg-accent/50 rounded-lg">
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                {response}
+        {(mode === "breakdown" || mode === "pm" || mode === "log") && (
+          <button onClick={generateResponse}
+            disabled={isGenerating || (mode === "breakdown" && !issueGoal) || (mode === "pm" && !equipmentType)}
+            className="w-full py-3 rounded-lg text-sm font-medium flex items-center justify-center gap-2 min-h-[48px] disabled:opacity-40"
+            style={{ background: isGenerating ? '#252840' : '#b8860b', color: '#ffffff' }}
+            data-testid="btn-generate-facility">
+            {isGenerating ? (
+              <><Loader2 className="h-4 w-4 animate-spin" />{mode === "breakdown" ? "Generating triage response..." : mode === "pm" ? "Building PM schedule..." : "Creating equipment profile..."}</>
+            ) : (
+              <><Sparkles className="h-4 w-4" />{mode === "breakdown" ? "Run Triage" : mode === "pm" ? "Build PM Schedule" : "Generate Equipment Profile"}</>
+            )}
+          </button>
+        )}
+
+        {isGenerating && (
+          <div className="space-y-3 p-4 rounded-xl" style={{ background: '#111827' }}>
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-4 rounded" style={{ background: '#1a1d2e', width: `${85 - i * 12}%`, animation: `shimmer 1.5s ease-in-out ${i * 0.15}s infinite` }} />
+            ))}
+          </div>
+        )}
+
+        {response && !isGenerating && mode === "breakdown" && triageParsed && (
+          <div className="space-y-4 mt-4">
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #2a2d3e' }}>
+              {triageParsed.situation && (
+                <div className="p-4" style={{ background: '#111827' }}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: '#d4a017' }}>Situation Summary</p>
+                  <p className="text-sm" style={{ color: '#9ca3af' }}>{triageParsed.situation}</p>
+                </div>
+              )}
+              <div className="p-4" style={{ background: '#1a1d2e', borderTop: '1px solid #2a2d3e' }}>
+                <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: '#d4a017' }}>Priority Level</p>
+                <div className="flex items-center gap-2">
+                  {(() => { const p = getBreakdownPriority(); return <span className="text-xs px-2 py-1 rounded font-bold" style={{ background: `${p.color}20`, color: p.color, border: `1px solid ${p.color}40` }}>{p.level}</span>; })()}
+                  {triageParsed.priorityTier && <span className="text-xs" style={{ color: '#9ca3af' }}>{triageParsed.priorityTier}</span>}
+                </div>
+                {triageParsed.serviceImpact && <p className="text-xs mt-1" style={{ color: '#6b7280' }}>{triageParsed.serviceImpact}</p>}
+              </div>
+              {triageParsed.actions.length > 0 && (
+                <div className="p-4" style={{ background: '#111827', borderTop: '1px solid #2a2d3e' }}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold mb-3" style={{ color: '#d4a017' }}>Immediate Actions</p>
+                  <div className="space-y-2">
+                    {triageParsed.actions.map((action, idx) => (
+                      <button key={idx} onClick={() => toggleTriageAction(idx)}
+                        className="flex items-start gap-3 w-full text-left py-1.5 group"
+                        style={{ opacity: checkedTriageActions.has(idx) ? 0.5 : 1 }}
+                        data-testid={`triage-action-${idx}`}>
+                        <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5"
+                          style={{ background: checkedTriageActions.has(idx) ? '#d4a017' : 'transparent', border: `2px solid ${checkedTriageActions.has(idx) ? '#d4a017' : '#374151'}` }}>
+                          {checkedTriageActions.has(idx) && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className={`text-sm ${checkedTriageActions.has(idx) ? 'line-through' : ''}`} style={{ color: checkedTriageActions.has(idx) ? '#6b7280' : '#ffffff' }}>
+                          <span className="font-semibold" style={{ color: checkedTriageActions.has(idx) ? '#6b7280' : '#d4a017' }}>{idx + 1}.</span> {action}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="p-4" style={{ background: '#1a1d2e', borderTop: '1px solid #2a2d3e' }}>
+                <p className="text-[10px] uppercase tracking-wider font-bold mb-3" style={{ color: '#d4a017' }}>Vendor / Repair Script</p>
+                {triageParsed.vendorScript.whoToCall && (
+                  <p className="text-sm mb-2"><span className="font-semibold text-white">Who to call:</span> <span style={{ color: '#9ca3af' }}>{triageParsed.vendorScript.whoToCall}</span></p>
+                )}
+                {triageParsed.vendorScript.whatToSay && (
+                  <div className="p-3 rounded-lg mb-2" style={{ background: '#111827', borderLeft: '3px solid #374151' }}>
+                    <p className="text-xs italic" style={{ color: '#9ca3af' }}>"{triageParsed.vendorScript.whatToSay}"</p>
+                  </div>
+                )}
+                {triageParsed.vendorScript.authLimit && (
+                  <div className="p-2.5 rounded-lg mb-2" style={{ background: 'rgba(212,160,23,0.05)', border: '1px solid rgba(212,160,23,0.2)' }}>
+                    <p className="text-xs"><span className="font-medium" style={{ color: '#d4a017' }}>Authorization:</span> <span style={{ color: '#9ca3af' }}>{triageParsed.vendorScript.authLimit}</span></p>
+                  </div>
+                )}
+                {triageParsed.vendorScript.questions.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-white mb-1">Questions to ask:</p>
+                    <ul className="space-y-1">
+                      {triageParsed.vendorScript.questions.map((q, i) => (
+                        <li key={i} className="text-xs flex items-start gap-1.5" style={{ color: '#9ca3af' }}>
+                          <span style={{ color: '#d4a017' }}>{i + 1}.</span> {q}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="p-4" style={{ background: '#111827', borderTop: '1px solid #2a2d3e' }}>
+                <p className="text-[10px] uppercase tracking-wider font-bold mb-3" style={{ color: '#d4a017' }}>Documentation Checklist</p>
+                <div className="space-y-2">
+                  {triageParsed.docChecklist.map((item, idx) => (
+                    <button key={idx} onClick={() => toggleDocItem(idx)}
+                      className="flex items-center gap-3 w-full text-left py-1"
+                      style={{ opacity: checkedDocItems.has(idx) ? 0.5 : 1 }}
+                      data-testid={`doc-check-${idx}`}>
+                      <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                        style={{ background: checkedDocItems.has(idx) ? '#d4a017' : 'transparent', border: `2px solid ${checkedDocItems.has(idx) ? '#d4a017' : '#374151'}` }}>
+                        {checkedDocItems.has(idx) && <Check className="h-2.5 w-2.5 text-white" />}
+                      </div>
+                      <span className={`text-xs ${checkedDocItems.has(idx) ? 'line-through' : ''}`} style={{ color: checkedDocItems.has(idx) ? '#6b7280' : '#9ca3af' }}>{item}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-facility">
-              <Copy className="h-4 w-4 mr-2" />
-              Copy to Clipboard
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={copyToClipboard} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ border: '1px solid #374151', color: copySuccess ? '#22c55e' : '#9ca3af' }} data-testid="btn-copy-facility">
+                {copySuccess ? <><Check className="h-3.5 w-3.5" />Copied</> : <><Copy className="h-3.5 w-3.5" />Copy Triage Report</>}
+              </button>
+              <button onClick={saveToIssueLog} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', border: '1px solid rgba(212,160,23,0.2)' }} data-testid="btn-save-to-dashboard">
+                <Save className="h-3.5 w-3.5" />Save to Issue Log
+              </button>
+              {(() => {
+                const sv = getSuggestedVendors();
+                if (sv.length > 0 && sv[0].phone) {
+                  return (
+                    <a href={`tel:${sv[0].phone}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)' }} data-testid="btn-start-vendor-call">
+                      <Phone className="h-3.5 w-3.5" />Call {sv[0].name}
+                    </a>
+                  );
+                }
+                return (
+                  <button onClick={() => navigateToTab("vendors")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ border: '1px solid #374151', color: '#6b7280' }}>
+                    <Phone className="h-3.5 w-3.5" />Add vendor first
+                  </button>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {response && !isGenerating && mode === "breakdown" && !triageParsed && (
+          <div className="mt-4 space-y-4">
+            <div className="p-4 rounded-xl" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+              <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm" style={{ color: '#9ca3af' }}>{response}</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={copyToClipboard} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ border: '1px solid #374151', color: '#9ca3af' }} data-testid="btn-copy-facility">
+                <Copy className="h-3.5 w-3.5" />Copy
+              </button>
+              <button onClick={saveToIssueLog} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', border: '1px solid rgba(212,160,23,0.2)' }} data-testid="btn-save-to-dashboard">
+                <Save className="h-3.5 w-3.5" />Save to Issue Log
+              </button>
+            </div>
+          </div>
+        )}
+
+        {response && !isGenerating && mode === "pm" && (
+          <div className="mt-4 space-y-4">
+            <div className="p-4 rounded-xl" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+              <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm" style={{ color: '#9ca3af' }}>{response}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={exportPMSchedule} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ border: '1px solid #374151', color: '#9ca3af' }}>
+                <Printer className="h-3.5 w-3.5" />Export PM Schedule
+              </button>
+              <button onClick={savePMSchedule} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', border: '1px solid rgba(212,160,23,0.2)' }} data-testid="btn-save-pm">
+                <Save className="h-3.5 w-3.5" />Save PM Schedule
+              </button>
+              <button onClick={copyToClipboard} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ border: '1px solid #374151', color: '#9ca3af' }} data-testid="btn-copy-facility">
+                <Copy className="h-3.5 w-3.5" />Copy
+              </button>
+            </div>
+          </div>
+        )}
+
+        {response && !isGenerating && mode === "log" && (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #2a2d3e' }}>
+              <div className="p-4 flex items-center justify-between" style={{ background: '#1a1d2e' }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-white">{equipmentName || equipmentTypes.find(e => e.value === equipmentType)?.label || 'Equipment'}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017' }}>{equipmentTypes.find(e => e.value === equipmentType)?.label}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: equipmentCriticality === 'revenue-critical' ? 'rgba(239,68,68,0.15)' : 'rgba(107,114,128,0.15)', color: equipmentCriticality === 'revenue-critical' ? '#ef4444' : '#6b7280' }}>
+                    {equipmentCriticality === 'revenue-critical' ? 'Revenue-Critical' : 'Support'}
+                  </span>
+                </div>
+              </div>
+              <div className="p-4" style={{ background: '#111827' }}>
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm" style={{ color: '#9ca3af' }}>{response}</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={saveEquipmentProfile} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ background: 'rgba(212,160,23,0.1)', color: '#d4a017', border: '1px solid rgba(212,160,23,0.2)' }} data-testid="btn-save-equipment">
+                <Save className="h-3.5 w-3.5" />Save Equipment Profile
+              </button>
+              <button onClick={() => navigateToTab("pm", equipmentType)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ border: '1px solid #374151', color: '#9ca3af' }} data-testid="btn-create-pm-from-equip">
+                <Calendar className="h-3.5 w-3.5" />Create PM Schedule
+              </button>
+              <button onClick={copyToClipboard} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium min-h-[36px]" style={{ border: '1px solid #374151', color: '#9ca3af' }} data-testid="btn-copy-facility">
+                <Copy className="h-3.5 w-3.5" />Copy
+              </button>
+            </div>
           </div>
         )}
       </CardContent>
@@ -11508,7 +11891,8 @@ export default function DomainPage() {
         {slug === "crisis" && <CrisisReadinessStrip />}
         {slug === "crisis" && <CrisisResponseEngine />}
 
-        {/* Facility Command Center - only show for facilities domain */}
+        {/* Facility Asset Health Strip + Command Center - only show for facilities domain */}
+        {slug === "facilities" && <AssetHealthStrip />}
         {slug === "facilities" && <FacilityCommandCenter />}
 
         {/* Social Media Post Builder - only show for social-media domain */}
