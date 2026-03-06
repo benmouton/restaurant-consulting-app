@@ -22,6 +22,7 @@ export interface IStorage {
   getTrainingTemplates(): Promise<TrainingTemplate[]>;
   getTemplatesByCategory(category: string): Promise<TrainingTemplate[]>;
   createTemplate(template: Omit<TrainingTemplate, "id">): Promise<TrainingTemplate>;
+  deleteTemplatesByCategory(category: string): Promise<void>;
   
   // Financial Documents
   getFinancialDocuments(userId: string): Promise<FinancialDocument[]>;
@@ -295,6 +296,10 @@ export class DatabaseStorage implements IStorage {
   async createTemplate(template: Omit<TrainingTemplate, "id">): Promise<TrainingTemplate> {
     const [newTemplate] = await db.insert(trainingTemplates).values(template).returning();
     return newTemplate;
+  }
+
+  async deleteTemplatesByCategory(category: string): Promise<void> {
+    await db.delete(trainingTemplates).where(eq(trainingTemplates.category, category));
   }
   
   // Financial Documents

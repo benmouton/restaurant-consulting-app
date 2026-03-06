@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **Financial Insights**: Tools for document upload, financial analysis, text extraction, and an AI-powered financial consultant.
 - **Consulting Engine**: AI-driven consultant chat with domain-specific context, smart prompt starters, and conversation history.
 - **Operational Command Centers**: Specialized modules for Leadership, Crisis Management, Facility Management, and Kitchen Operations, each with tailored tools and AI assistance.
-- **Content & Training**: Dynamic training templates, a handbook builder, and personalized content generation based on restaurant-specific information.
+- **Content & Training**: Dynamic training templates, a handbook builder, and personalized content generation based on restaurant-specific information. Kitchen manual templates feature expanded industry-standard content with Temperature Reference Card, FIFO protocol, cross-contamination prevention, station setup checklists, kitchen calls reference, ticket reading/timing standards, quality check protocol, station close-down checklists, sanitation log, 10-question written assessment, trainer sign-off sheet, 90-day probation card, and certification closing block. Templates use {{variable}} placeholders mapped to handbook_settings fields.
 - **Labor Demand Engine**: Forecasting and analysis for labor needs.
 - **HR Documentation Engine**: Tools for progressive discipline tracking and policy management.
 - **Living Playbooks**: AI-generated and customizable operational playbooks with different execution modes (checklist, step-by-step).
