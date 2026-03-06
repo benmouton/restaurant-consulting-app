@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { extractTextFromImage } from '../lib/visionOCR';
+import { nativeShare } from '../lib/native';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -7668,14 +7669,14 @@ Generate ONLY the response text, nothing else.`,
 }
 
 const CRISIS_TYPES = [
-  { id: "kitchen_backed_up", label: "Kitchen backed up / ticket times blown", icon: Clock },
-  { id: "guests_angry", label: "Guests angry / multiple complaints", icon: MessageSquare },
-  { id: "staff_conflict", label: "Staff conflict or panic", icon: Users },
-  { id: "walkout", label: "Walkout or call-off mid-shift", icon: AlertTriangle },
-  { id: "system_failure", label: "POS / system failure", icon: AlertTriangle },
-  { id: "owner_overwhelmed", label: "Owner or manager overwhelmed", icon: AlertTriangle },
-  { id: "health_inspector", label: "Health inspector / surprise visit", icon: AlertTriangle },
-  { id: "food_safety", label: "Food safety / contamination issue", icon: AlertTriangle },
+  { id: "kitchen_backed_up", label: "Kitchen backed up / ticket times blown", icon: Clock, accent: '#f59e0b' },
+  { id: "guests_angry", label: "Guests angry / multiple complaints", icon: MessageSquare, accent: '#f97316' },
+  { id: "staff_conflict", label: "Staff conflict or panic", icon: Users, accent: '#eab308' },
+  { id: "walkout", label: "Walkout or call-off mid-shift", icon: AlertTriangle, accent: '#ef4444' },
+  { id: "system_failure", label: "POS / system failure", icon: Settings, accent: '#3b82f6' },
+  { id: "owner_overwhelmed", label: "Owner or manager overwhelmed", icon: Shield, accent: '#8b5cf6' },
+  { id: "health_inspector", label: "Health inspector / surprise visit", icon: Search, accent: '#14b8a6' },
+  { id: "food_safety", label: "Food safety / contamination issue", icon: AlertTriangle, accent: '#dc2626' },
 ];
 
 const IMMEDIATE_ACTIONS: Record<string, { step1: string; step2: string; step3: string }> = {
@@ -7722,9 +7723,9 @@ const IMMEDIATE_ACTIONS: Record<string, { step1: string; step2: string; step3: s
 };
 
 const SEVERITY_LEVELS = [
-  { id: "mild", label: "Manageable", description: "We can handle this, need guidance", color: "bg-yellow-500" },
-  { id: "moderate", label: "Serious", description: "Things are getting out of control", color: "bg-orange-500" },
-  { id: "critical", label: "Critical", description: "Full emergency, need help NOW", color: "bg-red-600" },
+  { id: "mild", label: "Manageable", description: "We can handle this, need guidance", color: '#eab308' },
+  { id: "moderate", label: "Serious", description: "Things are getting out of control", color: '#f97316' },
+  { id: "critical", label: "Critical", description: "Full emergency, need help NOW", color: '#dc2626' },
 ];
 
 interface CrisisMessage {
@@ -7734,7 +7735,98 @@ interface CrisisMessage {
   timestamp: Date;
 }
 
-const CRISIS_SYSTEM_PROMPT = `You are an elite restaurant crisis response AI operating in REAL-TIME COMMAND MODE. You are calm, direct, and immediately actionable. You speak like a seasoned restaurant GM who has seen everything.
+interface CrisisSession {
+  id: string;
+  scenario: string;
+  scenarioLabel: string;
+  severity: string;
+  severityLabel: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  phase: string;
+  messageCount: number;
+  completedSteps: string[];
+  tappedReplies: string[];
+  coverCount?: number;
+  staffCount?: number;
+  timeOfService?: string;
+  debrief?: { q1: string; q2: string; q3: string; q4: string; report: string };
+  accentColor: string;
+}
+
+const CRISIS_PHASES = [
+  { id: 'onset', label: 'Onset', sub: 'Crisis identified' },
+  { id: 'active', label: 'Active', sub: 'Managing now' },
+  { id: 'stabilizing', label: 'Stabilizing', sub: 'Getting under control' },
+  { id: 'recovery', label: 'Recovery', sub: 'Back on track' },
+];
+
+const PHASE_TONE: Record<string, string> = {
+  onset: 'Be direct. Give immediate tactical steps only. No explanations, no context. Just actions.',
+  active: "They're managing it. Reinforce actions, catch anything missed. Ask for updates.",
+  stabilizing: 'Crisis is calming. Shift to damage control and communication. Help them communicate to guests and staff.',
+  recovery: 'Crisis is over. Help them debrief and communicate to guests/staff. Shift to prevention.',
+};
+
+const QUICK_REPLIES: Record<string, Record<string, string[]>> = {
+  kitchen_backed_up: {
+    onset: ["Things are getting worse", "It's calming down", "Need a guest script", "86 something now"],
+    active: ["Things are getting worse", "It's calming down", "Need a guest script", "86 something now"],
+    stabilizing: ["How do I recover ticket times?", "What do I tell guests?", "Staff is stressed — help", "Did it. Now what?"],
+    recovery: ["How do I debrief the team?", "What changes tomorrow?", "Did it. Now what?", "Need a guest script"],
+  },
+  health_inspector: {
+    onset: ["They're asking about temps", "They found a violation", "What do I say to them?", "It went fine — now what?"],
+    active: ["They're asking about temps", "They found a violation", "What do I say to them?", "It went fine — now what?"],
+    stabilizing: ["They're asking about temps", "They found a violation", "What do I say to them?", "It went fine — now what?"],
+    recovery: ["They're asking about temps", "They found a violation", "What do I say to them?", "It went fine — now what?"],
+  },
+  food_safety: {
+    onset: ["Need to identify affected guests", "Should I close tonight?", "Writing an incident report", "Notifying the health dept"],
+    active: ["Need to identify affected guests", "Should I close tonight?", "Writing an incident report", "Notifying the health dept"],
+    stabilizing: ["Need to identify affected guests", "Should I close tonight?", "Writing an incident report", "Notifying the health dept"],
+    recovery: ["Need to identify affected guests", "Should I close tonight?", "Writing an incident report", "Notifying the health dept"],
+  },
+  system_failure: {
+    onset: ["Going manual now", "Guests are frustrated", "System came back — now what?", "Need a refund script"],
+    active: ["Going manual now", "Guests are frustrated", "System came back — now what?", "Need a refund script"],
+    stabilizing: ["Going manual now", "Guests are frustrated", "System came back — now what?", "Need a refund script"],
+    recovery: ["Going manual now", "Guests are frustrated", "System came back — now what?", "Need a refund script"],
+  },
+  owner_overwhelmed: {
+    onset: ["One thing at a time", "I need to delegate this", "I need a minute", "I'm okay now"],
+    active: ["One thing at a time", "I need to delegate this", "I need a minute", "I'm okay now"],
+    stabilizing: ["One thing at a time", "I need to delegate this", "I need a minute", "I'm okay now"],
+    recovery: ["One thing at a time", "I need to delegate this", "I need a minute", "I'm okay now"],
+  },
+  staff_conflict: {
+    onset: ["It's getting physical", "One person is escalating", "Team is watching — what do I say?", "After service conversation"],
+    active: ["It's getting physical", "One person is escalating", "Team is watching — what do I say?", "After service conversation"],
+    stabilizing: ["It's getting physical", "One person is escalating", "Team is watching — what do I say?", "After service conversation"],
+    recovery: ["It's getting physical", "One person is escalating", "Team is watching — what do I say?", "After service conversation"],
+  },
+  walkout: {
+    onset: ["I'm short 2 people mid-service", "Kitchen can't cover", "Do I call someone in?", "Talking to the team after"],
+    active: ["I'm short 2 people mid-service", "Kitchen can't cover", "Do I call someone in?", "Talking to the team after"],
+    stabilizing: ["I'm short 2 people mid-service", "Kitchen can't cover", "Do I call someone in?", "Talking to the team after"],
+    recovery: ["I'm short 2 people mid-service", "Kitchen can't cover", "Do I call someone in?", "Talking to the team after"],
+  },
+  guests_angry: {
+    onset: ["Guest wants to speak to owner", "Table walking out", "Need a comp script", "Review is being written now"],
+    active: ["Guest wants to speak to owner", "Table walking out", "Need a comp script", "Review is being written now"],
+    stabilizing: ["Guest wants to speak to owner", "Table walking out", "Need a comp script", "Review is being written now"],
+    recovery: ["Guest wants to speak to owner", "Table walking out", "Need a comp script", "Review is being written now"],
+  },
+  custom: {
+    onset: ["Things are getting worse", "It's starting to calm down", "Did it. Now what?", "Need a guest script"],
+    active: ["Things are getting worse", "It's starting to calm down", "Did it. Now what?", "Need a guest script"],
+    stabilizing: ["Things are getting worse", "It's starting to calm down", "Did it. Now what?", "Need a guest script"],
+    recovery: ["Things are getting worse", "It's starting to calm down", "Did it. Now what?", "Need a guest script"],
+  },
+};
+
+const CRISIS_SYSTEM_PROMPT = `You are an elite restaurant crisis response expert operating in REAL-TIME COMMAND MODE. You are calm, direct, and immediately actionable. You speak like a seasoned restaurant GM who has seen everything.
 
 CRITICAL RULES:
 1. Keep responses SHORT and ACTIONABLE - max 3-4 sentences per response unless you need to give a protocol
@@ -7760,76 +7852,281 @@ RESPONSE FORMAT:
 
 Remember: They are IN THE CRISIS RIGHT NOW. Every word must earn its place.`;
 
+const OVERWHELMED_SYSTEM_PROMPT = `This operator is overwhelmed. Do NOT give them a long list. Give them ONE action at a time. 
+Ask what's most urgent. When they answer, give them the single next step only. 
+After each step, ask: "Done. What's next on your mind?" 
+Keep responses under 4 sentences. Be calm, steady, and direct. 
+Do not use bullet points or numbered lists. Write like a trusted partner talking them through it.`;
+
+const SERVICE_TIMES = ['Breakfast', 'Lunch', 'Dinner', 'Late Night', 'Off-Hours', 'Pre-Open'];
+
+function parseCrisisMarkdown(text: string, accent: string) {
+  const lines = text.split('\n');
+  const elements: any[] = [];
+  let i = 0;
+  for (const line of lines) {
+    i++;
+    const trimmed = line.trim();
+    if (!trimmed) { elements.push(<div key={i} className="h-2" />); continue; }
+    const boldMatch = trimmed.match(/^\*\*(.+?):\*\*\s*(.*)/);
+    if (boldMatch) {
+      elements.push(
+        <div key={i} className="mb-1">
+          <span className="font-semibold text-sm" style={{ color: accent }}>{boldMatch[1]}:</span>
+          {boldMatch[2] && <span className="text-sm text-white ml-1">{boldMatch[2]}</span>}
+        </div>
+      );
+      continue;
+    }
+    const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+    if (numMatch) {
+      elements.push(
+        <div key={i} className="flex gap-2 mb-1 ml-1">
+          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ background: accent, color: '#ffffff' }}>{numMatch[1]}</span>
+          <span className="text-sm text-white">{numMatch[2].replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').split('<strong>').map((part: string, pi: number) => {
+            if (pi === 0) return part;
+            const [bold, rest] = part.split('</strong>');
+            return <span key={pi}><strong>{bold}</strong>{rest}</span>;
+          })}</span>
+        </div>
+      );
+      continue;
+    }
+    if (trimmed.startsWith('- ')) {
+      elements.push(
+        <div key={i} className="flex gap-2 mb-0.5 ml-3">
+          <span className="text-[10px] mt-1.5 shrink-0" style={{ color: accent }}>--</span>
+          <span className="text-sm" style={{ color: '#9ca3af' }}>{trimmed.slice(2).replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').split('<strong').map((part: string, pi: number) => {
+            if (pi === 0) return part;
+            const classEnd = part.indexOf('>');
+            const closeTag = part.indexOf('</strong>');
+            const cls = part.slice(0, classEnd);
+            const bold = part.slice(classEnd + 1, closeTag);
+            const rest = part.slice(closeTag + 9);
+            return <span key={pi}><strong className={cls.replace('="', ' ').replace('"', '')}>{bold}</strong>{rest}</span>;
+          })}</span>
+        </div>
+      );
+      continue;
+    }
+    const inlineBold = trimmed.replace(/\*\*(.*?)\*\*/g, '|||BOLD|||$1|||ENDBOLD|||');
+    const parts = inlineBold.split('|||');
+    elements.push(
+      <p key={i} className="text-sm text-white mb-1">
+        {parts.map((p: string, pi: number) => {
+          if (p === 'BOLD' || p === 'ENDBOLD') return null;
+          if (parts[pi - 1] === 'BOLD') return <strong key={pi}>{p}</strong>;
+          return <span key={pi}>{p}</span>;
+        })}
+      </p>
+    );
+  }
+  return elements;
+}
+
+function CrisisReadinessStrip() {
+  const [sessions] = useState<CrisisSession[]>(() => {
+    try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('trc_crisis_sessions') || '[]'); } catch {} return [];
+  });
+
+  const mostCommon = useMemo(() => {
+    if (sessions.length === 0) return "No data yet";
+    const counts: Record<string, number> = {};
+    sessions.forEach((s: CrisisSession) => { counts[s.scenarioLabel] = (counts[s.scenarioLabel] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  }, [sessions]);
+
+  const avgLength = useMemo(() => {
+    if (sessions.length === 0) return "--";
+    const avg = sessions.reduce((sum: number, s: CrisisSession) => sum + s.duration, 0) / sessions.length;
+    return `${Math.round(avg)} min`;
+  }, [sessions]);
+
+  const lastSession = sessions.length > 0 ? sessions[0] : null;
+  const lastAgo = lastSession ? Math.floor((Date.now() - new Date(lastSession.endTime).getTime()) / (1000*60*60*24)) : 0;
+
+  const cards = [
+    { label: "Crisis Sessions Run", value: sessions.length > 0 ? `${sessions.length} sessions` : "0 sessions", muted: sessions.length === 0 },
+    { label: "Most Common Crisis", value: mostCommon, muted: sessions.length === 0 },
+    { label: "Average Session Length", value: avgLength, muted: sessions.length === 0 },
+    { label: "Last Crisis", value: lastSession ? `${lastSession.scenarioLabel}` : "No sessions yet", sub: lastSession ? `${lastSession.severityLabel} · ${lastAgo}d ago` : undefined, muted: !lastSession },
+  ];
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="crisis-readiness-strip">
+      {cards.map((card: any, i: number) => (
+        <div key={i} className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+          <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>{card.label}</p>
+          <p className="text-sm font-semibold truncate" style={{ color: card.muted ? '#6b7280' : '#ffffff' }} data-testid={`crisis-strip-${i}`}>{card.value}</p>
+          {card.sub && <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>{card.sub}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CrisisResponseEngine() {
   const { toast } = useToast();
   const [messages, setMessages] = useState<CrisisMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [mode, setMode] = useState<"start" | "severity" | "chat">("start");
+  const [mode, setMode] = useState<"start" | "context" | "severity" | "overwhelmed_q" | "chat" | "summary" | "debrief" | "debrief_report">("start");
   const [selectedCrisis, setSelectedCrisis] = useState<string | null>(null);
   const [severity, setSeverity] = useState<string | null>(null);
   const [crisisStartTime, setCrisisStartTime] = useState<Date | null>(null);
+  const [elapsedDisplay, setElapsedDisplay] = useState("00:00:00");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [coverCount, setCoverCount] = useState<string>("");
+  const [staffCount, setStaffCount] = useState<string>("");
+  const [timeOfService, setTimeOfService] = useState<string>("Dinner");
+
+  const [phase, setPhase] = useState<number>(0);
+  const [completedSteps, setCompletedSteps] = useState<boolean[]>([false, false, false]);
+  const [tappedReplies, setTappedReplies] = useState<string[]>([]);
+
+  const [customDescription, setCustomDescription] = useState("");
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState<CrisisSession[]>(() => {
+    try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('trc_crisis_sessions') || '[]'); } catch {} return [];
+  });
+
+  const [debriefAnswers, setDebriefAnswers] = useState<string[]>(["", "", "", ""]);
+  const [debriefStep, setDebriefStep] = useState(0);
+  const [debriefReport, setDebriefReport] = useState("");
+  const [debriefGenerating, setDebriefGenerating] = useState(false);
+  const [debriefSession, setDebriefSession] = useState<CrisisSession | null>(null);
+
+  const [overwhelmedText, setOverwhelmedText] = useState("");
+  const [showSummary, setShowSummary] = useState(false);
+  const [copyBriefState, setCopyBriefState] = useState(false);
+
+  const crisis = selectedCrisis ? CRISIS_TYPES.find(c => c.id === selectedCrisis) : null;
+  const sev = severity ? SEVERITY_LEVELS.find(s => s.id === severity) : null;
+  const accentColor = crisis?.accent || '#dc2626';
+  const isOverwhelmed = selectedCrisis === 'owner_overwhelmed';
+
+  useEffect(() => {
+    if (!crisisStartTime || mode !== 'chat') return;
+    const interval = setInterval(() => {
+      const diff = Date.now() - crisisStartTime.getTime();
+      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      setElapsedDisplay(`${h}:${m}:${s}`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [crisisStartTime, mode]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  useEffect(() => { scrollToBottom(); }, [messages]);
 
   const startCrisis = (crisisId: string) => {
     setSelectedCrisis(crisisId);
+    if (crisisId === 'owner_overwhelmed') {
+      setMode("severity");
+    } else if (crisisId === 'custom') {
+      setMode("context");
+    } else {
+      setMode("context");
+    }
+  };
+
+  const skipContext = () => {
     setMode("severity");
+  };
+
+  const continueFromContext = () => {
+    setMode("severity");
+  };
+
+  const getContextString = () => {
+    const parts: string[] = [];
+    if (coverCount) parts.push(`${coverCount} covers mid-service`);
+    if (staffCount) parts.push(`${staffCount} staff on floor`);
+    if (timeOfService) parts.push(`${timeOfService} service`);
+    return parts.length > 0 ? `Context: ${parts.join(', ')}.` : '';
+  };
+
+  const startOverwhelmedSession = async () => {
+    if (!overwhelmedText.trim()) return;
+    setSeverity("critical");
+    setMode("chat");
+    setCrisisStartTime(new Date());
+    setPhase(0);
+
+    const userMessage: CrisisMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: overwhelmedText.trim(),
+      timestamp: new Date(),
+    };
+    setMessages([userMessage]);
+    await sendToAI(overwhelmedText.trim(), [userMessage], "critical");
   };
 
   const selectSeverity = async (severityId: string) => {
     setSeverity(severityId);
     setMode("chat");
     setCrisisStartTime(new Date());
-    
-    const crisis = CRISIS_TYPES.find(c => c.id === selectedCrisis);
-    const sev = SEVERITY_LEVELS.find(s => s.id === severityId);
-    
-    const initialMessage = `${crisis?.label || selectedCrisis} - ${sev?.label} severity`;
-    
+    setPhase(0);
+
+    const crisisObj = CRISIS_TYPES.find(c => c.id === selectedCrisis);
+    const sevObj = SEVERITY_LEVELS.find(s => s.id === severityId);
+    const ctx = getContextString();
+    const initialMessage = `${crisisObj?.label || selectedCrisis} - ${sevObj?.label} severity${ctx ? `. ${ctx}` : ''}`;
+
     const userMessage: CrisisMessage = {
       id: Date.now().toString(),
       role: "user",
       content: initialMessage,
       timestamp: new Date(),
     };
-    
+
     setMessages([userMessage]);
     await sendToAI(initialMessage, [userMessage], severityId);
   };
 
+  const getSystemPrompt = () => {
+    if (isOverwhelmed) return OVERWHELMED_SYSTEM_PROMPT;
+    const phaseTone = PHASE_TONE[CRISIS_PHASES[phase]?.id || 'onset'];
+    return `${CRISIS_SYSTEM_PROMPT}\n\nCURRENT PHASE GUIDANCE: ${phaseTone}`;
+  };
+
   const sendToAI = async (userInput: string, allMessages: CrisisMessage[], currentSeverity?: string) => {
     setIsGenerating(true);
-    
-    const crisis = CRISIS_TYPES.find(c => c.id === selectedCrisis);
-    const sev = SEVERITY_LEVELS.find(s => s.id === (currentSeverity || severity));
-    
+
+    const crisisObj = CRISIS_TYPES.find(c => c.id === selectedCrisis);
+    const sevObj = SEVERITY_LEVELS.find(s => s.id === (currentSeverity || severity));
+    const ctx = getContextString();
+    const phaseName = CRISIS_PHASES[phase]?.label || 'Onset';
+
     const contextPrompt = `
-CURRENT CRISIS: ${crisis?.label || selectedCrisis}
-SEVERITY: ${sev?.label || severity} - ${sev?.description || ""}
+CURRENT CRISIS: ${crisisObj?.label || selectedCrisis}
+${customDescription ? `CRISIS DESCRIPTION: ${customDescription}` : ''}
+SEVERITY: ${sevObj?.label || severity} - ${sevObj?.description || ""}
+CURRENT PHASE: ${phaseName}
+${ctx ? `SITUATION: ${ctx}` : ''}
 ${crisisStartTime ? `TIME IN CRISIS: ${Math.round((Date.now() - crisisStartTime.getTime()) / 60000)} minutes` : ""}
 
 CONVERSATION HISTORY:
-${allMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
+${allMessages.filter(m => m.role !== 'system').map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
 
 USER'S LATEST UPDATE: ${userInput}
 
-Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-up questions to understand and help.`;
+Respond as the crisis command expert. Be direct, short, and actionable. Ask follow-up questions to understand and help.`;
 
     try {
       const res = await fetch("/api/consultant/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           question: contextPrompt,
-          systemPrompt: CRISIS_SYSTEM_PROMPT,
+          systemPrompt: getSystemPrompt(),
         }),
         credentials: "include",
       });
@@ -7853,16 +8150,14 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
           for (const line of lines) {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 content += data.content;
-                setMessages(prev => 
+                setMessages(prev =>
                   prev.map(m => m.id === assistantMessage.id ? { ...m, content } : m)
                 );
               }
@@ -7879,25 +8174,101 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isGenerating) return;
-
     const userMessage: CrisisMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: inputValue.trim(),
-      timestamp: new Date(),
+      id: Date.now().toString(), role: "user", content: inputValue.trim(), timestamp: new Date(),
     };
-
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInputValue("");
-    
     await sendToAI(userMessage.content, updatedMessages);
   };
 
+  const handleQuickReply = async (text: string) => {
+    if (isGenerating) return;
+    setTappedReplies(prev => [...prev, text]);
+    const userMessage: CrisisMessage = {
+      id: Date.now().toString(), role: "user", content: text, timestamp: new Date(),
+    };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    await sendToAI(text, updatedMessages);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
+  };
+
+  const advancePhase = () => {
+    if (phase >= 3) {
+      endSession();
+      return;
+    }
+    const newPhase = phase + 1;
+    setPhase(newPhase);
+    const phaseLabel = CRISIS_PHASES[newPhase].label;
+    const systemNote: CrisisMessage = {
+      id: Date.now().toString(), role: "system",
+      content: `Phase advanced to ${phaseLabel}`, timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, systemNote]);
+
+    sendToAI(`Update: situation has moved to ${phaseLabel} phase. Adjust your guidance accordingly.`,
+      [...messages, systemNote]);
+  };
+
+  const toggleStep = (idx: number) => {
+    setCompletedSteps(prev => {
+      const next = [...prev];
+      next[idx] = !next[idx];
+      return next;
+    });
+  };
+
+  const endSession = () => {
+    setShowSummary(true);
+  };
+
+  const saveSession = (runDebrief: boolean) => {
+    const crisisObj = CRISIS_TYPES.find(c => c.id === selectedCrisis);
+    const sevObj = SEVERITY_LEVELS.find(s => s.id === severity);
+    const duration = crisisStartTime ? Math.round((Date.now() - crisisStartTime.getTime()) / 60000) : 0;
+
+    const actions = selectedCrisis && IMMEDIATE_ACTIONS[selectedCrisis]
+      ? [IMMEDIATE_ACTIONS[selectedCrisis].step1, IMMEDIATE_ACTIONS[selectedCrisis].step2, IMMEDIATE_ACTIONS[selectedCrisis].step3]
+      : [];
+
+    const session: CrisisSession = {
+      id: Date.now().toString(),
+      scenario: selectedCrisis || 'custom',
+      scenarioLabel: crisisObj?.label || 'Custom',
+      severity: severity || 'mild',
+      severityLabel: sevObj?.label || 'Manageable',
+      startTime: crisisStartTime?.toISOString() || new Date().toISOString(),
+      endTime: new Date().toISOString(),
+      duration,
+      phase: CRISIS_PHASES[phase].label,
+      messageCount: messages.filter(m => m.role !== 'system').length,
+      completedSteps: actions.filter((_, i) => completedSteps[i]),
+      tappedReplies,
+      coverCount: coverCount ? parseInt(coverCount) : undefined,
+      staffCount: staffCount ? parseInt(staffCount) : undefined,
+      timeOfService: timeOfService || undefined,
+      accentColor,
+    };
+
+    const updated = [session, ...sessions].slice(0, 10);
+    setSessions(updated);
+    localStorage.setItem('trc_crisis_sessions', JSON.stringify(updated));
+    setShowSummary(false);
+
+    if (runDebrief) {
+      setDebriefSession(session);
+      setDebriefStep(0);
+      setDebriefAnswers(["", "", "", ""]);
+      setDebriefReport("");
+      setMode("debrief");
+    } else {
+      resetCrisis();
     }
   };
 
@@ -7908,158 +8279,473 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
     setMessages([]);
     setCrisisStartTime(null);
     setInputValue("");
+    setPhase(0);
+    setCompletedSteps([false, false, false]);
+    setTappedReplies([]);
+    setCoverCount("");
+    setStaffCount("");
+    setTimeOfService("Dinner");
+    setOverwhelmedText("");
+    setShowSummary(false);
+    setCustomDescription("");
   };
 
-  const getElapsedTime = () => {
-    if (!crisisStartTime) return "";
-    const minutes = Math.round((Date.now() - crisisStartTime.getTime()) / 60000);
-    return `${minutes}m`;
+  const shareBriefing = async () => {
+    const crisisObj = CRISIS_TYPES.find(c => c.id === selectedCrisis);
+    const sevObj = SEVERITY_LEVELS.find(s => s.id === severity);
+    const phaseName = CRISIS_PHASES[phase].label;
+    const minutes = crisisStartTime ? Math.round((Date.now() - crisisStartTime.getTime()) / 60000) : 0;
+    const actions = selectedCrisis && IMMEDIATE_ACTIONS[selectedCrisis]
+      ? [IMMEDIATE_ACTIONS[selectedCrisis].step1, IMMEDIATE_ACTIONS[selectedCrisis].step2, IMMEDIATE_ACTIONS[selectedCrisis].step3]
+      : [];
+    const doneActions = actions.filter((_, i) => completedSteps[i]);
+    const allActions = [...doneActions, ...tappedReplies];
+
+    let brief = `CRISIS BRIEFING — ${new Date().toLocaleTimeString()}\nScenario: ${crisisObj?.label || 'Custom'}\nSeverity: ${sevObj?.label || 'Unknown'}\nPhase: ${phaseName} (${minutes} min in)`;
+    if (staffCount || coverCount) brief += `\nStaff: ${staffCount || '?'} on floor | Covers: ${coverCount || '?'} | Service: ${timeOfService || '?'}`;
+    if (allActions.length > 0) {
+      brief += `\n\nActions taken:`;
+      allActions.forEach(a => { brief += `\n- ${a}`; });
+    }
+    brief += `\n\nStatus: ${phaseName}. Monitor situation.`;
+
+    const shared = await nativeShare({ title: 'Crisis Briefing', text: brief });
+    if (!shared) {
+      navigator.clipboard.writeText(brief);
+    }
+    setCopyBriefState(true);
+    setTimeout(() => setCopyBriefState(false), 2000);
+    toast({ title: shared ? "Briefing shared" : "Briefing copied to clipboard" });
   };
+
+  const generateDebrief = async () => {
+    if (!debriefSession) return;
+    setDebriefGenerating(true);
+    setDebriefReport("");
+    try {
+      const prompt = `You are helping a restaurant operator debrief after a crisis. 
+Synthesize their answers into a concise After Action Report.
+
+Scenario: ${debriefSession.scenarioLabel}
+Severity: ${debriefSession.severityLabel}
+
+What caused it: ${debriefAnswers[0]}
+What worked: ${debriefAnswers[1]}
+What didn't work: ${debriefAnswers[2]}
+What changes: ${debriefAnswers[3]}
+
+Write a 3-paragraph After Action Report:
+Paragraph 1: What happened and why (root cause)
+Paragraph 2: What worked and what didn't
+Paragraph 3: The single most important operational change to prevent this or handle it better next time
+
+Be direct. Use plain language. Write for a restaurant operator, not a consultant.
+Format as plain paragraphs. No headers, no bullets.`;
+
+      const res = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: prompt }),
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Failed");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        let content = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
+          for (const line of lines) {
+            try { const data = JSON.parse(line.slice(6)); if (data.content) { content += data.content; setDebriefReport(content); } } catch {}
+          }
+        }
+      }
+    } catch { toast({ title: "Failed to generate report", variant: "destructive" }); }
+    finally { setDebriefGenerating(false); }
+  };
+
+  const saveDebriefToSession = () => {
+    if (!debriefSession) return;
+    const updated = sessions.map((s: CrisisSession) => s.id === debriefSession.id ? { ...s, debrief: { q1: debriefAnswers[0], q2: debriefAnswers[1], q3: debriefAnswers[2], q4: debriefAnswers[3], report: debriefReport } } : s);
+    setSessions(updated);
+    localStorage.setItem('trc_crisis_sessions', JSON.stringify(updated));
+    toast({ title: "Report saved to session" });
+    setMode("start");
+    resetCrisis();
+  };
+
+  const startDebriefForSession = (session: CrisisSession) => {
+    setDebriefSession(session);
+    setDebriefStep(0);
+    setDebriefAnswers(["", "", "", ""]);
+    setDebriefReport("");
+    setMode("debrief");
+  };
+
+  const currentQuickReplies = useMemo(() => {
+    const scenarioId = selectedCrisis || 'custom';
+    const phaseId = CRISIS_PHASES[phase]?.id || 'onset';
+    return QUICK_REPLIES[scenarioId]?.[phaseId] || QUICK_REPLIES.custom.onset;
+  }, [selectedCrisis, phase]);
+
+  const allStepsComplete = completedSteps.every(Boolean);
+
+  const debriefQuestions = [
+    { title: "What caused it?", sub: "Be honest. What was the real root cause — not just what went wrong on the surface?" },
+    { title: "What worked?", sub: "What did you or your team do that actually helped?" },
+    { title: "What didn't work?", sub: "What made it worse, or what would you do differently?" },
+    { title: "What changes because of this?", sub: "One SOP, one training change, or one operational shift. What's the fix?" },
+  ];
 
   return (
-    <Card className="mb-8 border-destructive/30">
-      <CardHeader className="bg-red-500/10">
+    <>
+    {mode === "debrief" || mode === "debrief_report" ? (
+      <Card className="mb-8 relative overflow-hidden" style={{ background: '#1a1d2e', border: '1px solid #d4a017' }}>
+        <CardHeader>
+          <button onClick={() => { setMode("start"); resetCrisis(); }} className="flex items-center gap-1 text-xs mb-2" style={{ color: '#d4a017' }} data-testid="btn-back-from-debrief">
+            <ArrowLeft className="h-3 w-3" /> Back to Session Log
+          </button>
+          <CardTitle className="text-white flex items-center gap-2 text-base">
+            <ClipboardList className="h-5 w-5" style={{ color: '#d4a017' }} />
+            Post-Crisis Debrief
+          </CardTitle>
+          {debriefSession && (
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge className="text-[10px]" style={{ background: `${debriefSession.accentColor}20`, color: debriefSession.accentColor, borderColor: `${debriefSession.accentColor}50` }}>{debriefSession.scenarioLabel}</Badge>
+              <Badge className="text-[10px]" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}>{debriefSession.severityLabel}</Badge>
+              <span className="text-xs" style={{ color: '#6b7280' }}>{new Date(debriefSession.startTime).toLocaleDateString()}</span>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {mode === "debrief" && !debriefReport && (
+            <div className="space-y-4">
+              <p className="text-xs" style={{ color: '#6b7280' }}>{debriefStep + 1} of 4</p>
+              <div className="p-5 rounded-lg" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+                <p className="text-white font-semibold mb-1">{debriefQuestions[debriefStep].title}</p>
+                <p className="text-xs mb-3" style={{ color: '#9ca3af', fontStyle: 'italic' }}>{debriefQuestions[debriefStep].sub}</p>
+                <Textarea
+                  value={debriefAnswers[debriefStep]}
+                  onChange={(e) => { const upd = [...debriefAnswers]; upd[debriefStep] = e.target.value; setDebriefAnswers(upd); }}
+                  className="min-h-[120px]"
+                  style={{ background: '#0f1117', borderColor: '#374151' }}
+                  placeholder="Type your answer..."
+                  data-testid={`debrief-q${debriefStep + 1}`}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                {debriefStep > 0 ? (
+                  <button onClick={() => setDebriefStep(debriefStep - 1)} className="text-xs" style={{ color: '#9ca3af' }}>Back</button>
+                ) : <div />}
+                {debriefStep < 3 ? (
+                  <Button size="sm" onClick={() => setDebriefStep(debriefStep + 1)} disabled={!debriefAnswers[debriefStep].trim()} style={{ background: '#b8860b' }} className="text-white" data-testid="btn-debrief-next">
+                    Next <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={() => { setMode("debrief_report"); generateDebrief(); }} disabled={!debriefAnswers[debriefStep].trim() || debriefGenerating} style={{ background: '#b8860b' }} className="text-white" data-testid="btn-debrief-submit">
+                    {debriefGenerating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    Generate Report
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          {(mode === "debrief_report" || debriefReport) && (
+            <div className="space-y-4">
+              {debriefGenerating && !debriefReport && (
+                <div className="space-y-2">
+                  <div className="h-4 rounded" style={{ background: '#111827', animation: 'shimmer 1.5s linear infinite', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg, #111827 0%, #1a1d2e 50%, #111827 100%)' }} />
+                  <div className="h-4 rounded w-3/4" style={{ background: '#111827', animation: 'shimmer 1.5s linear infinite 0.3s', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg, #111827 0%, #1a1d2e 50%, #111827 100%)' }} />
+                </div>
+              )}
+              {debriefReport && (
+                <div className="rounded-lg p-5 border-l-[3px]" style={{ background: '#111827', borderLeftColor: '#d4a017' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-white font-semibold">After Action Report</p>
+                    <span className="text-xs" style={{ color: '#6b7280' }}>{new Date().toLocaleDateString()}</span>
+                  </div>
+                  <div className="space-y-3 text-sm text-white leading-relaxed">
+                    {debriefReport.split('\n\n').filter(Boolean).map((p: string, i: number) => (
+                      <p key={i}>{p}</p>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-4 pt-3" style={{ borderTop: '1px solid #2a2d3e' }}>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" style={{ borderColor: '#d4a017', color: '#d4a017' }} onClick={() => { navigator.clipboard.writeText(debriefReport); toast({ title: "Report copied" }); }} data-testid="btn-copy-debrief">
+                      <Copy className="h-3 w-3 mr-1" /> Copy Report
+                    </Button>
+                    <Button size="sm" className="h-7 text-xs text-white" style={{ background: '#b8860b' }} onClick={saveDebriefToSession} data-testid="btn-save-debrief">
+                      <Save className="h-3 w-3 mr-1" /> Save to Session
+                    </Button>
+                  </div>
+                  <p className="text-[10px] mt-3" style={{ color: '#6b7280', fontStyle: 'italic' }}>Consider sharing this with your management team.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    ) : (
+    <Card className="mb-8 relative overflow-hidden" style={{ background: '#1a1d2e', borderColor: mode === 'chat' ? `rgba(239,68,68,0.6)` : '#2a2d3e', boxShadow: mode === 'chat' ? `0 0 20px rgba(239,68,68,0.15)` : 'none' }}>
+      <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+        border: mode === 'chat' ? `1px solid rgba(239,68,68,0.3)` : '1px solid transparent',
+        borderRadius: 'inherit',
+        animation: mode === 'chat' ? 'crisisPulse 3s ease-in-out infinite' : 'none',
+      }} />
+      <CardHeader className="relative" style={{ background: 'linear-gradient(135deg, #1a0a0a 0%, #2d0f0f 100%)' }}>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2 text-destructive text-lg">
-              <Shield className="h-6 w-6" />
-              Crisis Command Center
-              {mode === "chat" && crisisStartTime && (
-                <Badge variant="outline" className="ml-2 text-destructive border-destructive/50">
-                  <Clock className="h-3 w-3 mr-1" />
-                  {getElapsedTime()} active
-                </Badge>
-              )}
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Shield className="h-6 w-6" style={{ color: '#ef4444', filter: 'drop-shadow(0 0 6px rgba(239,68,68,0.5))' }} />
+              <span className="text-white">Crisis Command Center</span>
             </CardTitle>
-            <CardDescription className="mt-1">
-              {mode === "start" && "Select what's happening. Get immediate action steps."}
-              {mode === "severity" && "How serious is the situation right now?"}
-              {mode === "chat" && "I'm here with you. Update me as things change."}
-            </CardDescription>
+            {mode === "chat" && (
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {crisis && <Badge className="text-[10px]" style={{ background: `${accentColor}20`, color: accentColor, borderColor: `${accentColor}50` }}>{crisis.label}</Badge>}
+                {sev && <Badge className="text-[10px]" style={{
+                  background: `${sev.color}20`, color: sev.color, borderColor: `${sev.color}50`,
+                  animation: severity === 'critical' ? 'crisisPulse 2s ease-in-out infinite' : 'none',
+                }}>{sev.label}</Badge>}
+                <span className="font-mono text-sm font-bold" style={{ color: accentColor }} data-testid="crisis-timer">{elapsedDisplay}</span>
+                {!isOverwhelmed && <span className="text-xs" style={{ color: '#6b7280' }}>{CRISIS_PHASES[phase].label} Phase</span>}
+                {isOverwhelmed && <span className="text-xs" style={{ color: '#6b7280' }}>Time in session</span>}
+              </div>
+            )}
+            {mode !== "chat" && (
+              <CardDescription className="mt-1" style={{ color: '#9ca3af' }}>
+                {mode === "start" && "Select what's happening. Get immediate action steps."}
+                {mode === "context" && "Quick context for better guidance."}
+                {mode === "severity" && "How serious is the situation right now?"}
+                {mode === "overwhelmed_q" && ""}
+              </CardDescription>
+            )}
           </div>
           {mode === "chat" && (
-            <Button variant="outline" size="sm" onClick={resetCrisis} data-testid="btn-end-crisis">
-              <X className="h-4 w-4 mr-2" />
-              End Session
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={shareBriefing} className="h-7 text-xs" style={{ borderColor: copyBriefState ? '#22c55e' : '#d4a017', color: copyBriefState ? '#22c55e' : '#d4a017' }} data-testid="btn-share-briefing">
+                {copyBriefState ? <><Check className="h-3 w-3 mr-1" /> Copied</> : <><Share2 className="h-3 w-3 mr-1" /> Share Briefing</>}
+              </Button>
+              <Button variant="outline" size="sm" onClick={endSession} className="h-7 text-xs" style={{ borderColor: '#ef4444', color: '#ef4444' }} data-testid="btn-end-crisis">
+                <X className="h-3 w-3 mr-1" /> End Session
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-6">
+      <CardContent className="pt-6 relative">
         {mode === "start" && (
           <div className="space-y-4">
-            <Label className="text-lg font-bold text-destructive">What's happening?</Label>
+            <p className="text-sm font-semibold" style={{ color: '#ef4444' }}>What's happening?</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {CRISIS_TYPES.map((crisis) => (
-                <Button
-                  key={crisis.id}
-                  variant="outline"
-                  onClick={() => startCrisis(crisis.id)}
-                  className="flex items-center justify-start gap-3 h-auto py-4 text-left"
-                  data-testid={`crisis-start-${crisis.id}`}
-                >
-                  <crisis.icon className="h-5 w-5 text-destructive flex-shrink-0" />
-                  <span className="text-sm">{crisis.label}</span>
-                </Button>
+              {CRISIS_TYPES.map((ct) => (
+                <button key={ct.id} onClick={() => startCrisis(ct.id)}
+                  className="flex items-center justify-start gap-3 h-auto py-4 px-4 text-left rounded-lg transition-colors"
+                  style={{ background: '#111827', border: `1px solid ${ct.accent}30` }}
+                  data-testid={`crisis-start-${ct.id}`}>
+                  <ct.icon className="h-5 w-5 flex-shrink-0" style={{ color: ct.accent }} />
+                  <span className="text-sm text-white">{ct.label}</span>
+                </button>
               ))}
             </div>
-            <div className="pt-2">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setSelectedCrisis("custom");
-                  setMode("severity");
-                }}
-                className="w-full text-muted-foreground"
-                data-testid="crisis-start-other"
-              >
-                Something else not listed above
+            <button onClick={() => { setSelectedCrisis("custom"); setMode("context"); }}
+              className="w-full py-3 rounded-lg text-sm" style={{ border: '1px dashed #374151', color: '#6b7280', background: 'transparent' }}
+              data-testid="crisis-start-other">
+              Something else not listed above
+            </button>
+          </div>
+        )}
+
+        {mode === "context" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Button variant="ghost" size="sm" onClick={() => setMode("start")} className="h-7 px-2" style={{ color: '#9ca3af' }} data-testid="btn-crisis-back">
+                <ChevronLeft className="h-4 w-4" />
               </Button>
+              <span className="text-sm" style={{ color: '#9ca3af' }}>{crisis?.label || 'Custom crisis'}</span>
+            </div>
+            <div className="rounded-lg p-5" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
+              <p className="text-white font-semibold mb-1">Quick Context</p>
+              <p className="text-xs mb-4" style={{ color: '#9ca3af', fontStyle: 'italic' }}>30 seconds now saves 10 minutes of bad advice.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-white text-xs">Cover count right now</Label>
+                  <Input type="number" placeholder="e.g., 60" className="mt-1" style={{ background: '#0f1117', borderColor: '#374151' }}
+                    value={coverCount} onChange={(e) => setCoverCount(e.target.value)} data-testid="input-cover-count" />
+                </div>
+                <div>
+                  <Label className="text-white text-xs">Staff on floor</Label>
+                  <Input type="number" placeholder="e.g., 8" className="mt-1" style={{ background: '#0f1117', borderColor: '#374151' }}
+                    value={staffCount} onChange={(e) => setStaffCount(e.target.value)} data-testid="input-staff-count" />
+                </div>
+                <div>
+                  <Label className="text-white text-xs">Time of service</Label>
+                  <Select value={timeOfService} onValueChange={setTimeOfService}>
+                    <SelectTrigger className="mt-1" style={{ background: '#0f1117', borderColor: '#374151' }} data-testid="select-time-service">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_TIMES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {selectedCrisis === 'custom' && (
+                <div className="mt-3">
+                  <Label className="text-white text-xs">Describe what's happening</Label>
+                  <Textarea placeholder="Be specific. What's happening right now, and what's your biggest concern?" className="mt-1 min-h-[100px]"
+                    style={{ background: '#0f1117', borderColor: '#374151' }} value={customDescription} onChange={(e) => setCustomDescription(e.target.value)} data-testid="textarea-custom-crisis" />
+                </div>
+              )}
+            </div>
+            <Button className="w-full text-white" style={{ background: '#b8860b' }} onClick={continueFromContext} data-testid="btn-context-continue">
+              Continue <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+            <button onClick={skipContext} className="w-full text-center text-xs py-1" style={{ color: '#6b7280' }} data-testid="btn-skip-context">
+              Skip for now
+            </button>
+          </div>
+        )}
+
+        {mode === "severity" && !isOverwhelmed && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Button variant="ghost" size="sm" onClick={() => selectedCrisis === 'owner_overwhelmed' ? setMode("start") : setMode("context")} className="h-7 px-2" style={{ color: '#9ca3af' }} data-testid="btn-crisis-back">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm" style={{ color: '#9ca3af' }}>{crisis?.label || 'Custom crisis'}</span>
+            </div>
+            <p className="text-white font-semibold">How serious is it right now?</p>
+            <div className="grid gap-3">
+              {SEVERITY_LEVELS.map((sv) => (
+                <button key={sv.id} onClick={() => selectSeverity(sv.id)}
+                  className="flex items-center justify-start gap-4 h-auto py-4 px-4 text-left rounded-lg transition-colors"
+                  style={{ background: '#111827', borderLeft: `3px solid ${sv.color}`, border: `1px solid ${sv.color}30`, borderLeftWidth: '3px' }}
+                  data-testid={`severity-${sv.id}`}>
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ background: sv.color, animation: sv.id === 'critical' ? 'crisisPulse 2s ease-in-out infinite' : 'none' }} />
+                  <div>
+                    <div className="font-medium text-white flex items-center gap-2">{sv.label}
+                      {sv.id === 'critical' && <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#dc2626', animation: 'crisisPulse 1.5s ease-in-out infinite' }} />}
+                    </div>
+                    <div className="text-xs" style={{ color: '#9ca3af' }}>{sv.description}</div>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {mode === "severity" && (
+        {mode === "severity" && isOverwhelmed && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Button variant="ghost" size="sm" onClick={() => setMode("start")} data-testid="btn-crisis-back">
+            <div className="flex items-center gap-2 mb-2">
+              <Button variant="ghost" size="sm" onClick={() => setMode("start")} className="h-7 px-2" style={{ color: '#9ca3af' }} data-testid="btn-crisis-back">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm text-muted-foreground">
-                {CRISIS_TYPES.find(c => c.id === selectedCrisis)?.label || "Custom crisis"}
-              </span>
+              <span className="text-sm" style={{ color: '#8b5cf6' }}>{crisis?.label}</span>
             </div>
-            <Label className="text-base font-semibold">How serious is it right now?</Label>
-            <div className="grid gap-3">
-              {SEVERITY_LEVELS.map((sev) => (
-                <Button
-                  key={sev.id}
-                  variant="outline"
-                  onClick={() => selectSeverity(sev.id)}
-                  className="flex items-center justify-start gap-4 h-auto py-4 text-left"
-                  data-testid={`severity-${sev.id}`}
-                >
-                  <div className={`w-3 h-3 rounded-full ${sev.color} flex-shrink-0`} />
-                  <div>
-                    <div className="font-medium">{sev.label}</div>
-                    <div className="text-sm text-muted-foreground">{sev.description}</div>
-                  </div>
-                </Button>
-              ))}
+            <div className="rounded-lg p-5" style={{ background: '#1a1528', border: '1px solid #8b5cf640' }}>
+              <p className="text-white mb-2" style={{ fontStyle: 'italic' }}>
+                I've got you. Before we do anything else — what's the one thing that absolutely cannot wait right now?
+              </p>
+              <Textarea value={overwhelmedText} onChange={(e) => setOverwhelmedText(e.target.value)}
+                placeholder="Type it out. Just one thing."
+                className="min-h-[120px] mt-3" style={{ background: '#0f1117', borderColor: '#8b5cf640' }}
+                data-testid="textarea-overwhelmed" />
+              <Button className="w-full mt-3 text-white" style={{ background: '#8b5cf6' }} onClick={startOverwhelmedSession}
+                disabled={!overwhelmedText.trim()} data-testid="btn-overwhelmed-start">
+                Start Here <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
             </div>
           </div>
         )}
 
         {mode === "chat" && (
           <div className="space-y-4">
-            {selectedCrisis && IMMEDIATE_ACTIONS[selectedCrisis] && (
-              <div className="p-4 border-2 border-red-500/30 bg-red-500/5 rounded-lg" data-testid="first-60-seconds">
-                <div className="flex items-center gap-2 mb-3">
-                  <Clock className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  <span className="font-bold text-red-700 dark:text-red-400">First 60 Seconds</span>
-                </div>
-                <ol className="space-y-2">
-                  <li className="flex items-start gap-2">
-                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">1.</span>
-                    <span className="text-sm">{IMMEDIATE_ACTIONS[selectedCrisis].step1}</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">2.</span>
-                    <span className="text-sm">{IMMEDIATE_ACTIONS[selectedCrisis].step2}</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">3.</span>
-                    <span className="text-sm">{IMMEDIATE_ACTIONS[selectedCrisis].step3}</span>
-                  </li>
-                </ol>
+            {!isOverwhelmed && (
+              <div className="flex items-center gap-1 py-2 px-1" data-testid="crisis-phase-tracker">
+                {CRISIS_PHASES.map((p, i) => (
+                  <div key={p.id} className="flex items-center" style={{ flex: i < 3 ? 1 : 0 }}>
+                    <div className="flex flex-col items-center">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold" style={{
+                        background: i <= phase ? accentColor : '#111827',
+                        border: i <= phase ? `2px solid ${accentColor}` : '2px solid #374151',
+                        color: i <= phase ? '#ffffff' : '#6b7280',
+                      }}>
+                        {i < phase ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                      </div>
+                      <span className="text-[9px] mt-0.5 whitespace-nowrap" style={{ color: i <= phase ? '#ffffff' : '#6b7280' }}>{p.label}</span>
+                    </div>
+                    {i < 3 && (
+                      <div className="h-[2px] flex-1 mx-1" style={{ background: i < phase ? accentColor : '#374151' }} />
+                    )}
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={advancePhase} className="ml-2 h-6 text-[10px] px-2 shrink-0" style={{ borderColor: accentColor, color: accentColor }} data-testid="btn-advance-phase">
+                  {phase >= 3 ? 'End' : 'Advance'} <ArrowRight className="h-2.5 w-2.5 ml-0.5" />
+                </Button>
               </div>
             )}
-            <div className="h-[400px] overflow-y-auto border rounded-lg p-4 bg-accent/20">
+
+            {selectedCrisis && IMMEDIATE_ACTIONS[selectedCrisis] && (
+              <div className="p-4 rounded-lg" style={{ background: '#1a0a0a', border: '1px solid rgba(239,68,68,0.2)' }} data-testid="first-60-seconds">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="h-5 w-5" style={{ color: '#ef4444' }} />
+                  <span className="font-bold text-sm" style={{ color: '#ef4444' }}>First 60 Seconds</span>
+                  {allStepsComplete && <span className="text-xs ml-auto" style={{ color: '#22c55e' }}>Complete</span>}
+                </div>
+                <div className="space-y-2">
+                  {[IMMEDIATE_ACTIONS[selectedCrisis].step1, IMMEDIATE_ACTIONS[selectedCrisis].step2, IMMEDIATE_ACTIONS[selectedCrisis].step3].map((step, idx) => (
+                    <button key={idx} onClick={() => toggleStep(idx)} className="flex items-center gap-3 w-full text-left py-1 group" data-testid={`step-${idx}`}>
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style={{
+                        background: completedSteps[idx] ? '#22c55e' : 'transparent',
+                        border: completedSteps[idx] ? '2px solid #22c55e' : '2px solid #ef4444',
+                        color: completedSteps[idx] ? '#ffffff' : '#ef4444',
+                      }}>
+                        {completedSteps[idx] ? <Check className="h-3 w-3" /> : idx + 1}
+                      </div>
+                      <span className={`text-sm ${completedSteps[idx] ? 'line-through' : ''}`} style={{ color: completedSteps[idx] ? '#6b7280' : '#ffffff' }}>{step}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="h-[400px] overflow-y-auto rounded-lg p-4" style={{ background: '#0f1117', border: '1px solid #2a2d3e' }}>
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`mb-4 ${message.role === "user" ? "text-right" : "text-left"}`}
-                >
-                  <div
-                    className={`inline-block max-w-[85%] p-3 rounded-lg ${
-                      message.role === "user"
-                        ? "bg-destructive text-destructive-foreground"
-                        : "bg-card border"
-                    }`}
-                  >
-                    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                    <div className={`text-xs mt-1 ${
-                      message.role === "user" ? "text-destructive-foreground/70" : "text-muted-foreground"
-                    }`}>
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                message.role === 'system' ? (
+                  <div key={message.id} className="text-center py-2">
+                    <span className="text-[11px]" style={{ color: '#6b7280' }}>— {message.content} —</span>
+                  </div>
+                ) : (
+                  <div key={message.id} className={`mb-4 ${message.role === "user" ? "text-right" : "text-left"}`}>
+                    <div className={`inline-block max-w-[85%] p-3`} style={{
+                      background: message.role === 'user' ? '#dc2626' : '#1a1d2e',
+                      borderRadius: message.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                      borderLeft: message.role === 'assistant' ? `3px solid ${isOverwhelmed ? '#8b5cf6' : accentColor}` : 'none',
+                    }}>
+                      {message.role === 'assistant' ? (
+                        <div className="text-sm">{parseCrisisMarkdown(message.content, isOverwhelmed ? '#8b5cf6' : accentColor)}</div>
+                      ) : (
+                        <div className="text-sm text-white whitespace-pre-wrap">{message.content}</div>
+                      )}
+                      <div className="text-[10px] mt-1" style={{ color: message.role === 'user' ? 'rgba(255,255,255,0.6)' : '#6b7280' }}>
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )
               ))}
               {isGenerating && messages[messages.length - 1]?.role === "user" && (
                 <div className="text-left mb-4">
-                  <div className="inline-block p-3 rounded-lg bg-card border">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="inline-block p-3 rounded-[18px_18px_18px_4px]" style={{ background: '#1a1d2e', borderLeft: `3px solid ${accentColor}` }}>
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map(d => (
+                        <div key={d} className="w-2 h-2 rounded-full" style={{ background: accentColor, animation: `crisisPulse 1.2s ease-in-out ${d * 0.2}s infinite` }} />
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -8067,84 +8753,95 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
             </div>
 
             <div className="flex gap-2">
-              <Textarea
-                placeholder="Update me... What's happening now? Did that work?"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="min-h-[60px] resize-none"
-                disabled={isGenerating}
-                data-testid="crisis-chat-input"
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isGenerating}
-                variant="destructive"
-                size="icon"
-                data-testid="crisis-chat-send"
-              >
-                {isGenerating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+              <Textarea placeholder="Update me... What's happening now?" value={inputValue} onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown} className="min-h-[52px] resize-none text-sm" style={{ background: '#111827', borderColor: '#374151' }}
+                disabled={isGenerating} data-testid="crisis-chat-input" />
+              <Button onClick={handleSendMessage} disabled={!inputValue.trim() || isGenerating} size="icon" className="h-[52px] w-[52px] shrink-0"
+                style={{ background: '#dc2626' }} data-testid="crisis-chat-send">
+                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : <Send className="h-4 w-4 text-white" />}
               </Button>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setInputValue("Things are getting worse");
-                }}
-                disabled={isGenerating}
-                className="text-xs"
-                data-testid="quick-escalate"
-              >
-                Things are getting worse
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setInputValue("It's starting to calm down");
-                }}
-                disabled={isGenerating}
-                className="text-xs"
-                data-testid="quick-improving"
-              >
-                It's starting to calm down
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setInputValue("I did what you said. Now what?");
-                }}
-                disabled={isGenerating}
-                className="text-xs"
-                data-testid="quick-next"
-              >
-                Did it. Now what?
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setInputValue("Give me a script for what to say to guests");
-                }}
-                disabled={isGenerating}
-                className="text-xs"
-                data-testid="quick-script"
-              >
-                Need a guest script
-              </Button>
+              {currentQuickReplies.map((text, i) => (
+                <button key={i} onClick={() => handleQuickReply(text)} disabled={isGenerating}
+                  className="text-xs py-2 px-3 transition-colors disabled:opacity-40" data-testid={`quick-reply-${i}`}
+                  style={{ borderRadius: '20px', border: `1px solid ${accentColor}50`, color: accentColor, background: 'transparent' }}>
+                  {text}
+                </button>
+              ))}
             </div>
           </div>
         )}
       </CardContent>
     </Card>
+    )}
+
+    {showSummary && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+        <div className="w-full max-w-md rounded-xl p-6" style={{ background: '#1a1d2e', border: '1px solid #d4a017' }} data-testid="crisis-summary-modal">
+          <p className="text-white font-semibold text-lg mb-4">Crisis Session Complete</p>
+          <div className="space-y-2 py-3 mb-4" style={{ borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
+            <div className="flex justify-between text-sm"><span style={{ color: '#9ca3af' }}>Scenario</span><span className="text-white">{crisis?.label || 'Custom'}</span></div>
+            <div className="flex justify-between text-sm"><span style={{ color: '#9ca3af' }}>Severity</span><span style={{ color: sev?.color }}>{sev?.label}</span></div>
+            <div className="flex justify-between text-sm"><span style={{ color: '#9ca3af' }}>Duration</span><span className="text-white">{crisisStartTime ? `${Math.round((Date.now() - crisisStartTime.getTime()) / 60000)} minutes` : '--'}</span></div>
+            {!isOverwhelmed && <div className="flex justify-between text-sm"><span style={{ color: '#9ca3af' }}>Final Phase</span><span className="text-white">{CRISIS_PHASES[phase].label}</span></div>}
+            <div className="flex justify-between text-sm"><span style={{ color: '#9ca3af' }}>Messages</span><span className="text-white">{messages.filter(m => m.role !== 'system').length} exchanges</span></div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button className="w-full text-white" style={{ background: '#b8860b' }} onClick={() => saveSession(true)} data-testid="btn-save-debrief-session">
+              Save & Run Debrief
+            </Button>
+            <Button variant="outline" className="w-full" style={{ borderColor: '#374151', color: '#9ca3af' }} onClick={() => saveSession(false)} data-testid="btn-save-only">
+              Save Only
+            </Button>
+            <button onClick={() => { setShowSummary(false); resetCrisis(); }} className="text-xs py-2" style={{ color: '#6b7280' }} data-testid="btn-close-summary">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    <Card className="mb-8" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
+      <CardHeader className="cursor-pointer" onClick={() => setShowHistory(!showHistory)}>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <History className="h-5 w-5" style={{ color: '#d4a017' }} />
+            <span className="text-white">Session History</span>
+          </span>
+          <ChevronDown className="h-4 w-4 transition-transform duration-300" style={{ color: '#d4a017', transform: showHistory ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+        </CardTitle>
+      </CardHeader>
+      {showHistory && (
+        <CardContent>
+          {sessions.length === 0 ? (
+            <p className="text-sm py-4 text-center" style={{ color: '#6b7280' }}>No sessions saved yet. Complete a session and tap Save to begin building your crisis history.</p>
+          ) : (
+            <div className="space-y-2">
+              {sessions.map((session: CrisisSession) => (
+                <div key={session.id} className="p-3 rounded-lg flex items-center justify-between gap-3 flex-wrap" style={{ background: '#111827', border: '1px solid #2a2d3e' }} data-testid={`session-${session.id}`}>
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <Badge className="text-[9px] shrink-0" style={{ background: `${session.accentColor}20`, color: session.accentColor, borderColor: `${session.accentColor}50` }}>{session.scenarioLabel}</Badge>
+                    <Badge className="text-[9px] shrink-0" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}>{session.severityLabel}</Badge>
+                    <span className="text-xs" style={{ color: '#6b7280' }}>{new Date(session.startTime).toLocaleDateString()} · {session.duration}m · {session.phase}</span>
+                    {session.debrief && <Badge className="text-[9px]" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' }}>Debrief Done</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {session.debrief ? (
+                      <button onClick={() => { setDebriefSession(session); setDebriefReport(session.debrief!.report); setMode("debrief_report"); }} className="text-xs" style={{ color: '#d4a017' }} data-testid={`view-report-${session.id}`}>View Report</button>
+                    ) : (
+                      <button onClick={() => startDebriefForSession(session)} className="text-xs" style={{ color: '#d4a017' }} data-testid={`run-debrief-${session.id}`}>Run Debrief</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+    </>
   );
 }
 
@@ -10807,7 +11504,8 @@ export default function DomainPage() {
         {slug === "sops" && <SOPHealthStrip />}
         {slug === "sops" && <SOPCaptureEngine />}
 
-        {/* Crisis Response Engine - only show for crisis domain */}
+        {/* Crisis Readiness Strip + Crisis Response Engine - only show for crisis domain */}
+        {slug === "crisis" && <CrisisReadinessStrip />}
         {slug === "crisis" && <CrisisResponseEngine />}
 
         {/* Facility Command Center - only show for facilities domain */}

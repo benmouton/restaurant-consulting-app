@@ -254,3 +254,8 @@
   0%, 100% { background-position: 200% 0; }
   50% { background-position: -200% 0; }
 }
+
+@keyframes crisisPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
