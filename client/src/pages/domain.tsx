@@ -8148,6 +8148,53 @@ Respond as the crisis command AI. Be direct, short, and actionable. Ask follow-u
   );
 }
 
+const SOP_FREQUENCIES = ['Daily', 'Per Shift', 'Weekly', 'Monthly', 'As Needed', 'On Hire', 'Emergency Only'];
+const SOP_COMPLEXITY = [
+  { value: 'simple', label: 'Simple (< 5 steps)' },
+  { value: 'standard', label: 'Standard (5-15 steps)' },
+  { value: 'complex', label: 'Complex (15+ steps)' },
+];
+const CHECKLIST_STATIONS = ['Front of House', 'Back of House', 'Bar', 'Host Stand', 'Expo', 'Office', 'Any'];
+const CHECKLIST_SHIFTS = ['Opening', 'Mid', 'Closing', 'All Shifts'];
+const AUDIT_FREQUENCIES = ['Daily', 'Weekly', 'Monthly', 'Rarely', 'Never documented'];
+const AUDIT_TEAM_SIZES = ['Solo', '2-5 staff', '6-15 staff', '16+ staff'];
+
+interface SavedSOP { id: string; title: string; role: string; trigger: string; frequency: string; complexity: string; content: string; savedAt: string; }
+interface SavedChecklist { id: string; title: string; station: string; shift: string; content: string; savedAt: string; }
+
+function SOPHealthStrip() {
+  const [sopLib] = useState<SavedSOP[]>(() => {
+    try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('sops_library') || '[]'); } catch {} return [];
+  });
+  const [checkLib] = useState<SavedChecklist[]>(() => {
+    try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('checklists_library') || '[]'); } catch {} return [];
+  });
+
+  const oldest = sopLib.length > 0
+    ? sopLib.reduce((o: SavedSOP, s: SavedSOP) => new Date(s.savedAt) < new Date(o.savedAt) ? s : o, sopLib[0])
+    : null;
+  const oldestAge = oldest ? Math.floor((Date.now() - new Date(oldest.savedAt).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+  const cards = [
+    { label: "SOPs Documented", value: sopLib.length > 0 ? `${sopLib.length} SOPs saved` : "0 SOPs saved", muted: sopLib.length === 0 },
+    { label: "Checklists Built", value: checkLib.length > 0 ? `${checkLib.length} checklists saved` : "0 checklists saved", muted: checkLib.length === 0 },
+    { label: "Last Audit Run", value: "No audit run yet", muted: true },
+    { label: "Oldest SOP", value: oldest ? oldest.title : "--", sub: oldest && oldestAge > 90 ? "Review Due" : oldest ? `${oldestAge}d ago` : undefined, subColor: oldestAge > 90 ? '#f59e0b' : '#9ca3af', muted: !oldest },
+  ];
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-6 scrollbar-thin" data-testid="sop-health-strip">
+      {cards.map((card: any, i: number) => (
+        <div key={i} className="flex-shrink-0 min-w-[180px] rounded-lg p-3 border-l-[3px]" style={{ background: '#1a1d2e', borderLeftColor: '#b8860b' }}>
+          <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>{card.label}</p>
+          <p className={`text-sm font-semibold truncate`} style={{ color: card.muted ? '#6b7280' : '#ffffff' }} data-testid={`sop-strip-${i}`}>{card.value}</p>
+          {card.sub && <p className="text-xs mt-0.5" style={{ color: card.subColor }}>{card.sub}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SOPCaptureEngine() {
   const { toast } = useToast();
   const [mode, setMode] = useState<"capture" | "checklist" | "audit">("capture");
@@ -8155,9 +8202,37 @@ function SOPCaptureEngine() {
   const [taskName, setTaskName] = useState<string>("");
   const [roleOwner, setRoleOwner] = useState<string>("");
   const [trigger, setTrigger] = useState<string>("");
+  const [frequency, setFrequency] = useState<string>("Daily");
+  const [complexity, setComplexity] = useState<string>("standard");
+  const [station, setStation] = useState<string>("Any");
+  const [shiftType, setShiftType] = useState<string>("All Shifts");
+  const [auditFrequency, setAuditFrequency] = useState<string>("Weekly");
+  const [teamSize, setTeamSize] = useState<string>("2-5 staff");
+
   const [result, setResult] = useState<string>("");
+  const [parsedSOP, setParsedSOP] = useState<any>(null);
+  const [parsedChecklist, setParsedChecklist] = useState<any>(null);
+  const [parsedAudit, setParsedAudit] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showExampleSOP, setShowExampleSOP] = useState(false);
+  const [copyState, setCopyState] = useState(false);
+  const [savedState, setSavedState] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryTab, setLibraryTab] = useState<"sops" | "checklists">("sops");
+
+  const [sopLibrary, setSopLibrary] = useState<SavedSOP[]>(() => {
+    try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('sops_library') || '[]'); } catch {} return [];
+  });
+  const [checklistLibrary, setChecklistLibrary] = useState<SavedChecklist[]>(() => {
+    try { if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('checklists_library') || '[]'); } catch {} return [];
+  });
+
+  const tryParseJSON = (text: string) => {
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    } catch {}
+    return null;
+  };
 
   const generateSOP = async () => {
     if (!workflowDescription.trim()) {
@@ -8167,89 +8242,74 @@ function SOPCaptureEngine() {
 
     setIsGenerating(true);
     setResult("");
+    setParsedSOP(null);
+    setParsedChecklist(null);
+    setParsedAudit(null);
+    setSavedState(false);
 
     try {
       let prompt = "";
-      
+
       if (mode === "capture") {
         prompt = `You are an expert restaurant operations consultant specializing in SOP documentation.
 
-Convert the following workflow description into a structured, professional SOP document.
+Convert the following workflow description into a structured SOP.
 
 TASK/PROCEDURE NAME: ${taskName || "Not specified"}
 ROLE OWNER: ${roleOwner || "To be assigned"}
 TRIGGER: ${trigger || "As needed"}
+FREQUENCY: ${frequency}
+COMPLEXITY: ${complexity}
 
 WORKFLOW DESCRIPTION:
 ${workflowDescription}
 
-Generate a complete SOP in this EXACT format:
-
-═══════════════════════════════════════════
-SOP: ${taskName || "[Task Name]"}
-═══════════════════════════════════════════
-
-PURPOSE:
-[One clear sentence explaining why this procedure exists]
-
-OWNER:
-${roleOwner || "[Role - not person name]"}
-
-TRIGGER:
-${trigger || "[When this procedure is initiated]"}
-
-CHECKLIST:
-□ Step 1: [Action verb] [specific action]
-□ Step 2: [Action verb] [specific action]
-□ Step 3: [Action verb] [specific action]
-[Continue with all steps - max 15 items]
-
-VERIFICATION:
-[How a manager confirms this was done correctly]
-
-FAILURE PROTOCOL:
-[What to do if steps cannot be completed or issues arise]
-
-NOTES:
-• [Any important reminders or common mistakes]
-• [Equipment or supplies needed]
-• [Time estimates if applicable]
-
-═══════════════════════════════════════════
+You MUST respond with ONLY a valid JSON object in this exact format (no markdown, no extra text):
+{
+  "purpose": "One clear sentence explaining why this procedure exists",
+  "steps": ["Step 1 text", "Step 2 text"],
+  "failure_points": ["Common mistake 1", "Common mistake 2"],
+  "second_location_test": {
+    "passes": true,
+    "notes": "Brief explanation"
+  },
+  "estimated_training_time": "~5 min"
+}
 
 Make it practical, actionable, and ready to post at the workstation. Use clear action verbs. No fluff.`;
       } else if (mode === "checklist") {
         prompt = `You are an expert restaurant operations consultant.
 
-Convert this workflow description into a CLEAN, PRINTABLE CHECKLIST ONLY.
+Convert this workflow description into a structured checklist.
 
-TASK: ${taskName || "Daily Task"}
+CHECKLIST NAME: ${taskName || "Daily Task"}
+STATION/AREA: ${station}
+SHIFT: ${shiftType}
+
 WORKFLOW DESCRIPTION:
 ${workflowDescription}
 
-Generate a checklist following these rules:
-- Maximum 15 items
-- Actionable verbs only ("Verify," "Stock," "Confirm," "Check," "Clean," "Count")
-- Checkboxes only - no explanations
-- Ready to be posted at point of use
-- Include space for initials and time
+You MUST respond with ONLY a valid JSON object in this exact format (no markdown, no extra text):
+{
+  "sections": [
+    {
+      "title": "PRE-SERVICE",
+      "items": ["Check item 1", "Check item 2"]
+    },
+    {
+      "title": "DURING SERVICE",
+      "items": ["Check item 3"]
+    },
+    {
+      "title": "CLOSE OUT",
+      "items": ["Check item 4"]
+    }
+  ],
+  "total_items": 10,
+  "estimated_completion_time": "~8 min"
+}
 
-FORMAT:
-
-═══════════════════════════════════════════
-${taskName || "CHECKLIST"}
-Date: _______ Shift: _______ Manager: _______
-═══════════════════════════════════════════
-
-□ _________________________ Initials: ___ Time: ___
-□ _________________________ Initials: ___ Time: ___
-[Fill in all steps from the workflow]
-
-═══════════════════════════════════════════
-VERIFIED BY: _____________ TIME: ___________
-═══════════════════════════════════════════
-
-Make it clean enough to print and post.`;
+Maximum 15 items total. Actionable verbs only. Ready to be posted at point of use.`;
       } else {
         prompt = `You are an expert restaurant operations consultant.
 
@@ -8258,56 +8318,27 @@ Audit this workflow description against the "Second Location Test" standards.
 WORKFLOW DESCRIPTION:
 ${workflowDescription}
 
-Evaluate against these criteria:
+REVIEW FREQUENCY: ${auditFrequency}
+TEAM SIZE: ${teamSize}
 
 THE SECOND LOCATION TEST:
-□ Could a new manager run this without calling the owner?
-□ Could a new hire execute this using only what's written?
-□ Does this rely on one person's memory or judgment?
-□ Would this work tomorrow in a different building?
-□ Is this documented — or just "how we do it"?
+1. Could a new manager run this without calling the owner?
+2. Could a new hire execute this using only what's written?
+3. Does this rely on one person's memory or judgment?
+4. Would this work tomorrow in a different building?
+5. Is this documented — or just "how we do it"?
 
-Generate an audit report:
+You MUST respond with ONLY a valid JSON object in this exact format (no markdown, no extra text):
+{
+  "scalability_score": 74,
+  "second_location_test_passes": false,
+  "second_location_verdict": "One sentence verdict",
+  "gaps": ["Gap 1", "Gap 2"],
+  "strengths": ["Strength 1", "Strength 2"],
+  "recommended_fixes": ["Fix 1", "Fix 2"]
+}
 
-═══════════════════════════════════════════
-SOP SCALABILITY AUDIT
-═══════════════════════════════════════════
-
-OVERALL RATING: [READY / NEEDS WORK / NOT SCALABLE]
-
-SECOND LOCATION TEST RESULTS:
-
-1. New manager independence: [PASS/FAIL]
-   • [Explanation]
-
-2. New hire execution: [PASS/FAIL]
-   • [Explanation]
-
-3. Memory dependency: [PASS/FAIL]
-   • [Explanation]
-
-4. Location portability: [PASS/FAIL]
-   • [Explanation]
-
-5. Proper documentation: [PASS/FAIL]
-   • [Explanation]
-
-GAPS IDENTIFIED:
-• [List specific missing elements]
-• [List ambiguous instructions]
-• [List person-dependent steps]
-
-RECOMMENDATIONS TO FIX:
-1. [Specific action to improve]
-2. [Specific action to improve]
-3. [Specific action to improve]
-
-VERDICT:
-[Is this a system or a dependency? One clear statement]
-
-═══════════════════════════════════════════
-
-Be honest. If it's not scalable, say so. Dependencies don't scale.`;
+Be honest. If it's not scalable, say so. The scalability_score should be 0-100.`;
       }
 
       const res = await fetch("/api/consultant/ask", {
@@ -8327,10 +8358,8 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n").filter(line => line.startsWith("data: "));
-          
           for (const line of lines) {
             try {
               const data = JSON.parse(line.slice(6));
@@ -8341,181 +8370,337 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
             } catch {}
           }
         }
+
+        const parsed = tryParseJSON(content);
+        if (parsed) {
+          if (mode === "capture" && parsed.purpose) setParsedSOP(parsed);
+          else if (mode === "checklist" && parsed.sections) setParsedChecklist(parsed);
+          else if (mode === "audit" && parsed.scalability_score !== undefined) setParsedAudit(parsed);
+        }
       }
     } catch (err) {
-      toast({ title: "Failed to generate SOP", variant: "destructive" });
+      toast({ title: "Failed to generate", variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(result);
-    toast({ title: "Copied to clipboard!" });
+    const text = parsedSOP ? formatSOPText() : parsedChecklist ? formatChecklistText() : parsedAudit ? formatAuditText() : result;
+    navigator.clipboard.writeText(text);
+    setCopyState(true);
+    setTimeout(() => setCopyState(false), 2000);
+  };
+
+  const formatSOPText = () => {
+    if (!parsedSOP) return result;
+    let t = `SOP: ${taskName || 'Untitled'}\nOwner: ${roleOwner || 'TBD'} | Trigger: ${trigger || 'As needed'}\nFrequency: ${frequency} | Complexity: ${complexity}\n\nPURPOSE:\n${parsedSOP.purpose}\n\nSTEPS:\n`;
+    parsedSOP.steps?.forEach((s: string, i: number) => { t += `${i + 1}. ${s}\n`; });
+    t += `\nFAILURE POINTS:\n`;
+    parsedSOP.failure_points?.forEach((f: string) => { t += `- ${f}\n`; });
+    t += `\nSECOND LOCATION TEST: ${parsedSOP.second_location_test?.passes ? 'PASSES' : 'FAILS'}\n${parsedSOP.second_location_test?.notes || ''}`;
+    return t;
+  };
+
+  const formatChecklistText = () => {
+    if (!parsedChecklist) return result;
+    let t = `${taskName || 'Checklist'}\nStation: ${station} | Shift: ${shiftType}\n\n`;
+    parsedChecklist.sections?.forEach((s: any) => {
+      t += `${s.title}\n`;
+      s.items?.forEach((item: string) => { t += `[ ] ${item}\n`; });
+      t += '\n';
+    });
+    return t;
+  };
+
+  const formatAuditText = () => {
+    if (!parsedAudit) return result;
+    let t = `SCALABILITY AUDIT\nScore: ${parsedAudit.scalability_score}/100\n\nSecond Location Test: ${parsedAudit.second_location_test_passes ? 'PASSES' : 'FAILS'}\n${parsedAudit.second_location_verdict}\n\nGAPS:\n`;
+    parsedAudit.gaps?.forEach((g: string) => { t += `- ${g}\n`; });
+    t += `\nSTRENGTHS:\n`;
+    parsedAudit.strengths?.forEach((s: string) => { t += `- ${s}\n`; });
+    t += `\nRECOMMENDED FIXES:\n`;
+    parsedAudit.recommended_fixes?.forEach((f: string) => { t += `- ${f}\n`; });
+    return t;
+  };
+
+  const saveSOP = () => {
+    if (mode === "capture" && (parsedSOP || result)) {
+      const entry: SavedSOP = {
+        id: Date.now().toString(), title: taskName || 'Untitled SOP', role: roleOwner, trigger,
+        frequency, complexity, content: parsedSOP ? JSON.stringify(parsedSOP) : result, savedAt: new Date().toISOString(),
+      };
+      const updated = [entry, ...sopLibrary];
+      setSopLibrary(updated);
+      localStorage.setItem('sops_library', JSON.stringify(updated));
+    } else if (mode === "checklist" && (parsedChecklist || result)) {
+      const entry: SavedChecklist = {
+        id: Date.now().toString(), title: taskName || 'Untitled Checklist', station, shift: shiftType,
+        content: parsedChecklist ? JSON.stringify(parsedChecklist) : result, savedAt: new Date().toISOString(),
+      };
+      const updated = [entry, ...checklistLibrary];
+      setChecklistLibrary(updated);
+      localStorage.setItem('checklists_library', JSON.stringify(updated));
+    }
+    setSavedState(true);
+    setTimeout(() => setSavedState(false), 2000);
+    toast({ title: `${mode === "capture" ? "SOP" : "Checklist"} saved!` });
+  };
+
+  const deleteSOP = (id: string) => {
+    const updated = sopLibrary.filter(s => s.id !== id);
+    setSopLibrary(updated);
+    localStorage.setItem('sops_library', JSON.stringify(updated));
+    toast({ title: "SOP deleted" });
+  };
+
+  const deleteChecklist = (id: string) => {
+    const updated = checklistLibrary.filter(s => s.id !== id);
+    setChecklistLibrary(updated);
+    localStorage.setItem('checklists_library', JSON.stringify(updated));
+    toast({ title: "Checklist deleted" });
+  };
+
+  const getAgeBadge = (dateStr: string) => {
+    const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+    if (days > 90) return { label: `${days}d · Review Due`, color: '#ef4444', bg: 'rgba(239,68,68,0.1)' };
+    if (days > 30) return { label: `${days}d ago`, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' };
+    return { label: `${days}d ago`, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' };
   };
 
   const printChecklist = () => {
     const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      const title = taskName || (mode === "capture" ? "SOP Document" : mode === "checklist" ? "Checklist" : "Audit Report");
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${title}</title>
-            <style>
-              body {
-                font-family: 'Courier New', Courier, monospace;
-                padding: 40px;
-                max-width: 800px;
-                margin: 0 auto;
-                line-height: 1.6;
-              }
-              pre {
-                white-space: pre-wrap;
-                word-wrap: break-word;
-                font-size: 12px;
-              }
-              @media print {
-                body { padding: 20px; }
-              }
-            </style>
-          </head>
-          <body>
-            <pre>${result}</pre>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
+    if (!printWindow) return;
+    let body = '';
+    if (parsedChecklist) {
+      body = `<h1 style="font-size:20px;margin-bottom:4px;">${taskName || 'Checklist'}</h1>
+        <p style="color:#666;font-size:12px;margin-bottom:16px;">Station: ${station} | Shift: ${shiftType} | Date: _________ | Manager: _________</p>`;
+      parsedChecklist.sections?.forEach((s: any) => {
+        body += `<h2 style="font-size:14px;text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px;">${s.title}</h2>`;
+        s.items?.forEach((item: string) => {
+          body += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee;">
+            <span style="display:inline-block;width:18px;height:18px;border:2px solid #333;border-radius:2px;flex-shrink:0;"></span>
+            <span style="font-size:13px;">${item}</span>
+            <span style="margin-left:auto;font-size:11px;color:#999;">Init: ___ Time: ___</span>
+          </div>`;
+        });
+      });
+      body += `<div style="margin-top:24px;padding-top:12px;border-top:2px solid #333;font-size:13px;">VERIFIED BY: _____________ TIME: ___________</div>`;
+    } else {
+      body = `<pre style="white-space:pre-wrap;font-size:12px;">${result}</pre>`;
     }
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>${taskName || 'Checklist'}</title>
+      <style>body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:0 auto;color:#000;background:#fff;}
+      @media print{body{padding:16px;}}</style></head><body>${body}</body></html>`);
+    printWindow.document.close();
+    printWindow.print();
   };
 
+  const scoreColor = (s: number) => s >= 80 ? '#22c55e' : s >= 60 ? '#f59e0b' : '#ef4444';
+
   return (
-    <Card className="mb-8">
-      <CardHeader>
+    <>
+    <Card className="mb-8 relative overflow-hidden" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
+      <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent 0%, rgba(212,160,23,0.08) 50%, transparent 100%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 3s linear infinite',
+      }} />
+      <CardHeader className="relative">
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Smart SOP Capture
+          <Sparkles className="h-5 w-5" style={{ color: '#d4a017' }} />
+          <span className="text-white">Smart SOP Capture</span>
         </CardTitle>
-        <CardDescription>
-          Describe how a task is actually performed. It gets converted into standardized, transferable documentation.
-          No theory. No guessing. Capture reality.
-        </CardDescription>
+        <div className="flex items-center gap-2">
+          <div className="w-[3px] h-4 rounded-full" style={{ background: '#d4a017' }} />
+          <CardDescription style={{ color: '#9ca3af' }}>
+            Describe how a task is actually performed. It gets converted into standardized, transferable documentation.
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 relative">
         <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="capture" data-testid="tab-sop-capture">Capture SOP</TabsTrigger>
-            <TabsTrigger value="checklist" data-testid="tab-sop-checklist">Quick Checklist</TabsTrigger>
-            <TabsTrigger value="audit" data-testid="tab-sop-audit">Audit</TabsTrigger>
-          </TabsList>
+          <div className="border-b" style={{ borderColor: '#2a2d3e' }}>
+            <TabsList className="grid w-full grid-cols-3 bg-transparent h-auto p-0">
+              {[
+                { value: "capture", label: "Capture SOP", Icon: ClipboardList },
+                { value: "checklist", label: "Quick Checklist", Icon: ClipboardCheck },
+                { value: "audit", label: "Audit", Icon: Search },
+              ].map(tab => (
+                <TabsTrigger key={tab.value} value={tab.value} data-testid={`tab-sop-${tab.value}`}
+                  className="text-xs sm:text-sm py-2.5 px-1 rounded-none border-b-2 border-transparent data-[state=active]:border-b-0 data-[state=active]:bg-transparent"
+                  style={{ color: mode === tab.value ? '#ffffff' : '#9ca3af', borderBottomColor: mode === tab.value ? '#d4a017' : 'transparent' }}>
+                  <tab.Icon className="h-3.5 w-3.5 mr-1 hidden sm:inline-block" />
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           <TabsContent value="capture" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm" style={{ color: '#9ca3af' }}>
               Describe how your best performer does this task. It will be converted into a structured SOP.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="taskName">Task/Procedure Name</Label>
-                <Input
-                  id="taskName"
-                  placeholder="e.g., Opening Cash Drawer"
-                  className="mt-1"
-                  value={taskName}
-                  onChange={(e) => setTaskName(e.target.value)}
-                  data-testid="input-task-name"
-                />
+                <Label htmlFor="taskName" className="text-white">Task/Procedure Name</Label>
+                <Input id="taskName" placeholder="e.g., Opening Cash Drawer" className="mt-1" style={{ background: '#111827', borderColor: '#374151' }}
+                  value={taskName} onChange={(e) => setTaskName(e.target.value)} data-testid="input-task-name" />
               </div>
               <div>
-                <Label htmlFor="roleOwner">Role Owner</Label>
-                <Input
-                  id="roleOwner"
-                  placeholder="e.g., Shift Lead"
-                  className="mt-1"
-                  value={roleOwner}
-                  onChange={(e) => setRoleOwner(e.target.value)}
-                  data-testid="input-role-owner"
-                />
+                <Label htmlFor="roleOwner" className="text-white">Role Owner</Label>
+                <Input id="roleOwner" placeholder="e.g., Shift Lead" className="mt-1" style={{ background: '#111827', borderColor: '#374151' }}
+                  value={roleOwner} onChange={(e) => setRoleOwner(e.target.value)} data-testid="input-role-owner" />
               </div>
               <div>
-                <Label htmlFor="trigger">Trigger (When?)</Label>
-                <Input
-                  id="trigger"
-                  placeholder="e.g., Start of every shift"
-                  className="mt-1"
-                  value={trigger}
-                  onChange={(e) => setTrigger(e.target.value)}
-                  data-testid="input-trigger"
-                />
+                <Label htmlFor="trigger" className="text-white">Trigger (When?)</Label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#6b7280' }} />
+                  <Input id="trigger" placeholder="e.g., Start of every shift" className="mt-1 pl-9" style={{ background: '#111827', borderColor: '#374151' }}
+                    value={trigger} onChange={(e) => setTrigger(e.target.value)} data-testid="input-trigger" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-white">Frequency</Label>
+                <Select value={frequency} onValueChange={setFrequency}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-frequency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOP_FREQUENCIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-white">Complexity</Label>
+                <div className="flex gap-1 mt-1">
+                  {SOP_COMPLEXITY.map(c => (
+                    <button key={c.value} onClick={() => setComplexity(c.value)}
+                      className="flex-1 text-xs py-2 px-2 rounded-lg transition-colors" data-testid={`complexity-${c.value}`}
+                      style={{ background: complexity === c.value ? '#b8860b' : '#111827', color: complexity === c.value ? '#ffffff' : '#9ca3af', border: `1px solid ${complexity === c.value ? '#d4a017' : '#374151'}` }}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="checklist" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm" style={{ color: '#9ca3af' }}>
               Get a clean, printable checklist ready to post at the workstation.
             </p>
             <div>
-              <Label htmlFor="checklistTaskName">Checklist Name</Label>
-              <Input
-                id="checklistTaskName"
-                placeholder="e.g., Closing Checklist, Pre-Service Checklist"
-                className="mt-1"
-                value={taskName}
-                onChange={(e) => setTaskName(e.target.value)}
-                data-testid="input-checklist-task-name"
-              />
+              <Label htmlFor="checklistTaskName" className="text-white">Checklist Name</Label>
+              <Input id="checklistTaskName" placeholder="e.g., Closing Checklist" className="mt-1" style={{ background: '#111827', borderColor: '#374151' }}
+                value={taskName} onChange={(e) => setTaskName(e.target.value)} data-testid="input-checklist-task-name" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-white">Station/Area</Label>
+                <Select value={station} onValueChange={setStation}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-station">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CHECKLIST_STATIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-white">Shift</Label>
+                <div className="flex gap-1 mt-1">
+                  {CHECKLIST_SHIFTS.map(s => (
+                    <button key={s} onClick={() => setShiftType(s)}
+                      className="flex-1 text-xs py-2 px-2 rounded-lg transition-colors" data-testid={`shift-${s}`}
+                      style={{ background: shiftType === s ? '#b8860b' : '#111827', color: shiftType === s ? '#ffffff' : '#9ca3af', border: `1px solid ${shiftType === s ? '#d4a017' : '#374151'}` }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </TabsContent>
 
           <TabsContent value="audit" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm" style={{ color: '#9ca3af' }}>
               Test your workflow against the "Second Location Test." Would this survive turnover and expansion?
             </p>
-            <div className="p-3 bg-muted/50 rounded-lg">
+            <div className="p-3 rounded-lg border-l-[3px]" style={{ background: '#1f1a0f', borderLeftColor: '#f59e0b' }}>
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <span className="text-sm font-medium">SOP Freshness Check</span>
+                <AlertTriangle className="h-4 w-4" style={{ color: '#f59e0b' }} />
+                <span className="text-sm font-medium text-white">SOP Freshness Check</span>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: '#9ca3af' }}>
                 SOPs should be reviewed at least every 90 days. Run an audit on each SOP periodically to make sure
                 your documentation reflects how things are actually done — not how they were done 6 months ago.
               </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-white">Review Frequency</Label>
+                <Select value={auditFrequency} onValueChange={setAuditFrequency}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-audit-freq">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AUDIT_FREQUENCIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-white">Team Size</Label>
+                <Select value={teamSize} onValueChange={setTeamSize}>
+                  <SelectTrigger className="mt-1" style={{ background: '#111827', borderColor: '#374151' }} data-testid="select-team-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AUDIT_TEAM_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
 
         <div>
-          <Label htmlFor="workflowDescription">
+          <Label htmlFor="workflowDescription" className="text-white">
             {mode === "capture" ? "Describe the Workflow" : mode === "checklist" ? "List the Steps" : "Paste Your Current SOP or Describe the Process"}
           </Label>
-          <Textarea
-            id="workflowDescription"
-            placeholder={mode === "capture" 
-              ? "e.g., First thing in the morning, the shift lead goes to the office and gets the cash drawer from the safe. They count it twice to verify the starting amount matches the log. Then they take it to the register, open the drawer, and do a test transaction to make sure the system is working..."
-              : mode === "checklist"
-              ? "e.g., Count starting cash, verify safe log, transport to register, test POS system, verify receipt printer, stock register tape..."
-              : "Paste your existing SOP or describe how the process currently works. It will be audited for scalability..."
-            }
-            className="mt-1 min-h-[150px]"
-            value={workflowDescription}
-            onChange={(e) => setWorkflowDescription(e.target.value)}
-            data-testid="textarea-workflow-description"
-          />
+          <div className="relative">
+            <Textarea
+              id="workflowDescription"
+              placeholder={mode === "capture"
+                ? "e.g., First thing in the morning, the shift lead goes to the office and gets the cash drawer from the safe..."
+                : mode === "checklist"
+                ? "e.g., Count starting cash, verify safe log, transport to register, test POS system..."
+                : "Paste your existing SOP or describe how the process currently works..."
+              }
+              className="mt-1 min-h-[160px]"
+              style={{ background: '#111827', borderColor: '#374151' }}
+              value={workflowDescription}
+              onChange={(e) => setWorkflowDescription(e.target.value)}
+              maxLength={2000}
+              data-testid="textarea-workflow-description"
+            />
+            <span className="absolute bottom-2 right-3 text-[10px]" style={{ color: '#6b7280' }}>{workflowDescription.length} / 2000</span>
+          </div>
         </div>
 
-        <Button 
-          onClick={generateSOP} 
+        <Button
+          onClick={generateSOP}
           disabled={isGenerating || !workflowDescription.trim()}
-          className="w-full"
+          className="w-full h-[52px] text-white"
+          style={{ background: isGenerating ? '#374151' : '#b8860b' }}
           data-testid="btn-generate-sop"
         >
           {isGenerating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {mode === "capture" ? "Generating SOP..." : mode === "checklist" ? "Creating Checklist..." : "Auditing..."}
-            </>
+            <span className="flex items-center gap-2 italic" style={{ color: '#d4a017' }}>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {mode === "capture" ? "Structuring your SOP..." : mode === "checklist" ? "Building checklist..." : "Running scalability audit..."}
+            </span>
           ) : (
             <>
               <Sparkles className="h-4 w-4 mr-2" />
@@ -8524,76 +8709,289 @@ Be honest. If it's not scalable, say so. Dependencies don't scale.`;
           )}
         </Button>
 
-        {mode === "capture" && (
-          <div className="border-t pt-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowExampleSOP(!showExampleSOP)}
-              className="text-xs text-muted-foreground"
-              data-testid="btn-toggle-example-sop"
-            >
-              {showExampleSOP ? "Hide example output" : "See example output →"}
-            </Button>
-            {showExampleSOP && (
-              <div className="mt-3 p-4 bg-muted/50 rounded-lg text-sm space-y-3">
-                <div>
-                  <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Example: Opening Cash Drawer</p>
-                </div>
-                <div>
-                  <p className="font-medium">Purpose</p>
-                  <p className="text-muted-foreground text-xs">Standardize the opening cash count process to ensure accuracy and prevent discrepancies across shifts.</p>
-                </div>
-                <div>
-                  <p className="font-medium">Role Owner</p>
-                  <p className="text-muted-foreground text-xs">Opening Manager / Shift Lead</p>
-                </div>
-                <div>
-                  <p className="font-medium">Trigger</p>
-                  <p className="text-muted-foreground text-xs">Before the first transaction of each business day.</p>
-                </div>
-                <div>
-                  <p className="font-medium">Steps</p>
-                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                    <li>Retrieve the cash drawer from the safe using the opening key</li>
-                    <li>Count all denominations and record on the Opening Count Sheet</li>
-                    <li>Compare to the expected starting bank amount ($200.00)</li>
-                    <li>Note any discrepancies and report to GM immediately</li>
-                    <li>Sign the count sheet and place in the manager's box</li>
-                    <li>Load the drawer into the POS terminal</li>
-                  </ol>
-                </div>
-                <div>
-                  <p className="font-medium">Verification / Sign-off</p>
-                  <p className="text-muted-foreground text-xs">Opening count must match expected bank. Any variance over $1.00 requires GM notification before service begins.</p>
-                </div>
-              </div>
-            )}
+        {isGenerating && (
+          <div className="space-y-2">
+            <div className="h-4 rounded" style={{ background: '#111827', animation: 'shimmer 1.5s linear infinite', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg, #111827 0%, #1a1d2e 50%, #111827 100%)' }} />
+            <div className="h-4 rounded w-3/4" style={{ background: '#111827', animation: 'shimmer 1.5s linear infinite 0.3s', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg, #111827 0%, #1a1d2e 50%, #111827 100%)' }} />
           </div>
         )}
 
-        {result && (
+        {parsedSOP && mode === "capture" && (
+          <div className="mt-4 rounded-xl p-5" style={{ background: '#1a1d2e', border: '1px solid #d4a017' }} data-testid="sop-output-card">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+              <Badge className="text-[10px]" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>SOP GENERATED</Badge>
+              <div className="flex items-center gap-2">
+                {roleOwner && <Badge className="text-[10px]" style={{ background: '#111827', color: '#9ca3af', borderColor: '#374151' }}>{roleOwner}</Badge>}
+                {parsedSOP.estimated_training_time && <Badge className="text-[10px]" style={{ background: '#111827', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>{parsedSOP.estimated_training_time} to train</Badge>}
+              </div>
+            </div>
+            <div className="flex items-center gap-4 mb-4 text-xs flex-wrap" style={{ color: '#9ca3af' }}>
+              <span>Task: <strong className="text-white">{taskName || 'Untitled'}</strong></span>
+              {trigger && <span>Trigger: <strong className="text-white">{trigger}</strong></span>}
+              <span>Frequency: <strong className="text-white">{frequency}</strong></span>
+            </div>
+            <div className="mb-4 py-3" style={{ borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
+              <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>PURPOSE</p>
+              <p className="text-sm text-white">{parsedSOP.purpose}</p>
+            </div>
+            <div className="mb-4">
+              <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>STEPS</p>
+              <div className="space-y-1.5">
+                {parsedSOP.steps?.map((step: string, i: number) => (
+                  <div key={i} className="flex gap-2 text-sm">
+                    <span className="font-bold shrink-0" style={{ color: '#d4a017' }}>{i + 1}.</span>
+                    <span className="text-white">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {parsedSOP.failure_points?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>FAILURE POINTS</p>
+                <div className="space-y-1">
+                  {parsedSOP.failure_points.map((fp: string, i: number) => (
+                    <div key={i} className="flex gap-2 text-sm">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: '#f59e0b' }} />
+                      <span style={{ color: '#9ca3af' }}>{fp}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="mb-4">
+              <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>SECOND LOCATION TEST</p>
+              <div className="flex items-center gap-2">
+                {parsedSOP.second_location_test?.passes
+                  ? <CheckCircle2 className="h-4 w-4" style={{ color: '#22c55e' }} />
+                  : <XCircle className="h-4 w-4" style={{ color: '#ef4444' }} />
+                }
+                <span className="text-sm" style={{ color: parsedSOP.second_location_test?.passes ? '#22c55e' : '#ef4444' }}>
+                  {parsedSOP.second_location_test?.passes ? 'PASSES' : 'FAILS'} — {parsedSOP.second_location_test?.notes}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-3" style={{ borderTop: '1px solid #2a2d3e' }}>
+              <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-7 text-xs" style={{ borderColor: copyState ? '#22c55e' : '#d4a017', color: copyState ? '#22c55e' : '#d4a017' }} data-testid="btn-copy-sop">
+                {copyState ? <><Check className="h-3 w-3 mr-1" /> Copied!</> : <><Copy className="h-3 w-3 mr-1" /> Copy SOP</>}
+              </Button>
+              <Button size="sm" onClick={saveSOP} className="h-7 text-xs text-white" style={savedState ? { background: '#166534' } : { background: '#b8860b' }} data-testid="btn-save-sop">
+                {savedState ? <><Check className="h-3 w-3 mr-1" /> Saved!</> : <><Save className="h-3 w-3 mr-1" /> Save SOP</>}
+              </Button>
+              <Button variant="outline" size="sm" onClick={generateSOP} className="h-7 text-xs" style={{ borderColor: '#9ca3af', color: '#9ca3af' }} data-testid="btn-regen-sop">
+                <RefreshCw className="h-3 w-3 mr-1" /> Regenerate
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {parsedChecklist && mode === "checklist" && (
+          <div className="mt-4 rounded-xl p-5" style={{ background: '#1a1d2e', border: '1px solid #d4a017' }} data-testid="checklist-output-card">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <Badge className="text-[10px]" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>CHECKLIST READY</Badge>
+              <div className="flex items-center gap-2">
+                <Badge className="text-[10px]" style={{ background: '#111827', color: '#9ca3af', borderColor: '#374151' }}>{station}</Badge>
+                <Badge className="text-[10px]" style={{ background: '#111827', color: '#9ca3af', borderColor: '#374151' }}>{shiftType}</Badge>
+                {parsedChecklist.estimated_completion_time && <Badge className="text-[10px]" style={{ background: '#111827', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>{parsedChecklist.estimated_completion_time}</Badge>}
+              </div>
+            </div>
+            <p className="text-lg font-semibold text-white mb-4">{taskName || 'Checklist'}</p>
+            {parsedChecklist.sections?.map((section: any, si: number) => (
+              <div key={si} className="mb-4">
+                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>{section.title}</p>
+                <div className="space-y-1.5">
+                  {section.items?.map((item: string, ii: number) => (
+                    <div key={ii} className="flex items-center gap-3 text-sm py-1">
+                      <span className="w-4 h-4 rounded-sm shrink-0" style={{ border: '1.5px solid #374151' }} />
+                      <span className="text-white">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2 pt-3" style={{ borderTop: '1px solid #2a2d3e' }}>
+              <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-7 text-xs" style={{ borderColor: copyState ? '#22c55e' : '#d4a017', color: copyState ? '#22c55e' : '#d4a017' }} data-testid="btn-copy-checklist">
+                {copyState ? <><Check className="h-3 w-3 mr-1" /> Copied!</> : <><Copy className="h-3 w-3 mr-1" /> Copy</>}
+              </Button>
+              <Button variant="outline" size="sm" onClick={printChecklist} className="h-7 text-xs" style={{ borderColor: '#d4a017', color: '#d4a017' }} data-testid="btn-print-checklist">
+                <Printer className="h-3 w-3 mr-1" /> Print View
+              </Button>
+              <Button size="sm" onClick={saveSOP} className="h-7 text-xs text-white" style={savedState ? { background: '#166534' } : { background: '#b8860b' }} data-testid="btn-save-checklist">
+                {savedState ? <><Check className="h-3 w-3 mr-1" /> Saved!</> : <><Save className="h-3 w-3 mr-1" /> Save</>}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {parsedAudit && mode === "audit" && (
+          <div className="mt-4 rounded-xl p-5" style={{ background: '#1a1d2e', border: '1px solid #d4a017' }} data-testid="audit-output-card">
+            <div className="flex items-center gap-2 mb-4">
+              <Badge className="text-[10px]" style={{ background: 'rgba(212,160,23,0.15)', color: '#d4a017', borderColor: 'rgba(212,160,23,0.3)' }}>AUDIT COMPLETE</Badge>
+            </div>
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm text-white font-semibold">Scalability Score</p>
+                <p className="text-lg font-bold" style={{ color: scoreColor(parsedAudit.scalability_score) }}>{parsedAudit.scalability_score}/100</p>
+              </div>
+              <div className="w-full h-3 rounded-full" style={{ background: '#111827' }}>
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${parsedAudit.scalability_score}%`, background: scoreColor(parsedAudit.scalability_score) }} />
+              </div>
+            </div>
+            <div className="mb-4">
+              <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>SECOND LOCATION TEST</p>
+              <div className="flex items-center gap-2">
+                {parsedAudit.second_location_test_passes
+                  ? <CheckCircle2 className="h-4 w-4" style={{ color: '#22c55e' }} />
+                  : <XCircle className="h-4 w-4" style={{ color: '#ef4444' }} />
+                }
+                <span className="text-sm" style={{ color: parsedAudit.second_location_test_passes ? '#22c55e' : '#ef4444' }}>
+                  {parsedAudit.second_location_test_passes ? 'PASSES' : 'FAILS'} — {parsedAudit.second_location_verdict}
+                </span>
+              </div>
+            </div>
+            {parsedAudit.gaps?.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-[11px] uppercase tracking-wider" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>GAPS FOUND</p>
+                  <Badge className="text-[9px]" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}>{parsedAudit.gaps.length}</Badge>
+                </div>
+                {parsedAudit.gaps.map((g: string, i: number) => (
+                  <div key={i} className="flex gap-2 text-sm mb-1">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: '#f59e0b' }} />
+                    <span style={{ color: '#9ca3af' }}>{g}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {parsedAudit.strengths?.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-[11px] uppercase tracking-wider" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>STRENGTHS</p>
+                  <Badge className="text-[9px]" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' }}>{parsedAudit.strengths.length}</Badge>
+                </div>
+                {parsedAudit.strengths.map((s: string, i: number) => (
+                  <div key={i} className="flex gap-2 text-sm mb-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: '#22c55e' }} />
+                    <span style={{ color: '#9ca3af' }}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {parsedAudit.recommended_fixes?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: '#d4a017', letterSpacing: '0.08em' }}>RECOMMENDED FIXES</p>
+                {parsedAudit.recommended_fixes.map((f: string, i: number) => (
+                  <div key={i} className="flex gap-2 text-sm mb-1">
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: '#d4a017' }} />
+                    <span className="text-white">{f}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2 pt-3" style={{ borderTop: '1px solid #2a2d3e' }}>
+              <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-7 text-xs" style={{ borderColor: copyState ? '#22c55e' : '#d4a017', color: copyState ? '#22c55e' : '#d4a017' }} data-testid="btn-copy-audit">
+                {copyState ? <><Check className="h-3 w-3 mr-1" /> Copied!</> : <><Copy className="h-3 w-3 mr-1" /> Copy Report</>}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {result && !parsedSOP && !parsedChecklist && !parsedAudit && (
           <div className="mt-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <Label>Generated {mode === "capture" ? "SOP" : mode === "checklist" ? "Checklist" : "Audit Report"}</Label>
+              <Label className="text-white">Generated {mode === "capture" ? "SOP" : mode === "checklist" ? "Checklist" : "Audit Report"}</Label>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={printChecklist} data-testid="btn-print-sop">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print
+                <Button variant="outline" size="sm" onClick={printChecklist} className="h-7 text-xs" style={{ borderColor: '#d4a017', color: '#d4a017' }} data-testid="btn-print-sop">
+                  <Printer className="h-3 w-3 mr-1" /> Print
                 </Button>
-                <Button variant="outline" size="sm" onClick={copyToClipboard} data-testid="btn-copy-sop">
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy
+                <Button variant="outline" size="sm" onClick={copyToClipboard} className="h-7 text-xs" style={{ borderColor: copyState ? '#22c55e' : '#d4a017', color: copyState ? '#22c55e' : '#d4a017' }} data-testid="btn-copy-sop-raw">
+                  {copyState ? <><Check className="h-3 w-3 mr-1" /> Copied!</> : <><Copy className="h-3 w-3 mr-1" /> Copy</>}
                 </Button>
               </div>
             </div>
-            <div className="p-4 bg-accent/50 rounded-lg whitespace-pre-wrap text-sm font-mono">
+            <div className="p-4 rounded-lg whitespace-pre-wrap text-sm font-mono" style={{ background: '#111827', color: '#ffffff' }}>
               {result}
             </div>
           </div>
         )}
       </CardContent>
     </Card>
+
+    <Card className="mb-8" style={{ background: '#1a1d2e', borderColor: '#2a2d3e' }}>
+      <CardHeader className="cursor-pointer" onClick={() => setShowLibrary(!showLibrary)}>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <Save className="h-5 w-5" style={{ color: '#d4a017' }} />
+            <span className="text-white">Saved SOPs & Checklists</span>
+          </span>
+          <ChevronDown className="h-4 w-4 transition-transform duration-300" style={{ color: '#d4a017', transform: showLibrary ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+        </CardTitle>
+      </CardHeader>
+      {showLibrary && (
+        <CardContent>
+          <div className="flex gap-2 mb-4">
+            {(['sops', 'checklists'] as const).map(t => (
+              <button key={t} onClick={() => setLibraryTab(t)} className="text-xs px-3 py-1.5 rounded-lg" data-testid={`lib-tab-${t}`}
+                style={{ background: libraryTab === t ? '#b8860b' : '#111827', color: libraryTab === t ? '#ffffff' : '#9ca3af', border: `1px solid ${libraryTab === t ? '#d4a017' : '#374151'}` }}>
+                {t === 'sops' ? 'SOPs' : 'Checklists'} ({t === 'sops' ? sopLibrary.length : checklistLibrary.length})
+              </button>
+            ))}
+          </div>
+          {libraryTab === 'sops' && (
+            sopLibrary.length === 0 ? (
+              <p className="text-sm py-4 text-center" style={{ color: '#6b7280' }}>No SOPs saved yet — generate your first above</p>
+            ) : (
+              <div className="space-y-2">
+                {sopLibrary.map((sop) => {
+                  const age = getAgeBadge(sop.savedAt);
+                  return (
+                    <div key={sop.id} className="p-3 rounded-lg flex items-center justify-between gap-3" style={{ background: '#111827', border: '1px solid #2a2d3e' }} data-testid={`saved-sop-${sop.id}`}>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{sop.title}</p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {sop.role && <Badge className="text-[9px]" style={{ background: '#111827', color: '#9ca3af', borderColor: '#374151' }}>{sop.role}</Badge>}
+                          {sop.frequency && <Badge className="text-[9px]" style={{ background: '#111827', color: '#9ca3af', borderColor: '#374151' }}>{sop.frequency}</Badge>}
+                          <Badge className="text-[9px]" style={{ background: age.bg, color: age.color, borderColor: `${age.color}40` }}>{age.label}</Badge>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => deleteSOP(sop.id)} data-testid={`delete-sop-${sop.id}`}>
+                        <Trash2 className="h-3.5 w-3.5" style={{ color: '#ef4444' }} />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+          {libraryTab === 'checklists' && (
+            checklistLibrary.length === 0 ? (
+              <p className="text-sm py-4 text-center" style={{ color: '#6b7280' }}>No checklists saved yet — generate your first above</p>
+            ) : (
+              <div className="space-y-2">
+                {checklistLibrary.map((cl) => {
+                  const age = getAgeBadge(cl.savedAt);
+                  return (
+                    <div key={cl.id} className="p-3 rounded-lg flex items-center justify-between gap-3" style={{ background: '#111827', border: '1px solid #2a2d3e' }} data-testid={`saved-checklist-${cl.id}`}>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{cl.title}</p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge className="text-[9px]" style={{ background: '#111827', color: '#9ca3af', borderColor: '#374151' }}>{cl.station}</Badge>
+                          <Badge className="text-[9px]" style={{ background: '#111827', color: '#9ca3af', borderColor: '#374151' }}>{cl.shift}</Badge>
+                          <Badge className="text-[9px]" style={{ background: age.bg, color: age.color, borderColor: `${age.color}40` }}>{age.label}</Badge>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => deleteChecklist(cl.id)} data-testid={`delete-checklist-${cl.id}`}>
+                        <Trash2 className="h-3.5 w-3.5" style={{ color: '#ef4444' }} />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+        </CardContent>
+      )}
+    </Card>
+    </>
   );
 }
 
@@ -10405,7 +10803,8 @@ export default function DomainPage() {
         {slug === "kitchen" && <KitchenStatusStrip />}
         {slug === "kitchen" && <KitchenComplianceEngine />}
 
-        {/* SOP Capture Engine - only show for sops domain */}
+        {/* SOP Health Strip + SOP Capture Engine - only show for sops domain */}
+        {slug === "sops" && <SOPHealthStrip />}
         {slug === "sops" && <SOPCaptureEngine />}
 
         {/* Crisis Response Engine - only show for crisis domain */}
