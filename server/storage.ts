@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, restaurantStandards, certificationAttempts, trainingAssignments, trainingDayCompletions, conversations, messages, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings, type RestaurantStandards, type CertificationAttempt, type InsertRestaurantStandards, type InsertCertificationAttempt, type TrainingAssignment, type TrainingDayCompletion, type InsertTrainingAssignment, type InsertTrainingDayCompletion, type Conversation, type Message } from "@shared/schema";
-import { testAccessTokens, type TestAccessToken, type InsertTestAccessToken, primeCostEntries, type PrimeCostEntry, type InsertPrimeCostEntry, trainingRecords, type TrainingRecord, type InsertTrainingRecord, generatedSops, type GeneratedSop, type InsertGeneratedSop } from "@shared/schema";
+import { testAccessTokens, type TestAccessToken, type InsertTestAccessToken, primeCostEntries, type PrimeCostEntry, type InsertPrimeCostEntry, trainingRecords, type TrainingRecord, type InsertTrainingRecord, generatedSops, type GeneratedSop, type InsertGeneratedSop, menuCategories, menuItems, type MenuCategory, type InsertMenuCategory, type MenuItem, type InsertMenuItem } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -244,6 +244,17 @@ export interface IStorage {
   getGeneratedSopByKey(userId: string, sopKey: string): Promise<GeneratedSop | undefined>;
   createOrUpdateSop(userId: string, data: InsertGeneratedSop): Promise<GeneratedSop>;
   deleteSop(id: number, userId: string): Promise<boolean>;
+
+  getMenuCategories(userId: string): Promise<MenuCategory[]>;
+  createMenuCategory(data: InsertMenuCategory): Promise<MenuCategory>;
+  updateMenuCategory(id: number, userId: string, data: Partial<InsertMenuCategory>): Promise<MenuCategory | undefined>;
+  deleteMenuCategory(id: number, userId: string): Promise<boolean>;
+
+  getMenuItems(userId: string): Promise<MenuItem[]>;
+  getMenuItem(id: number, userId: string): Promise<MenuItem | undefined>;
+  createMenuItem(data: InsertMenuItem): Promise<MenuItem>;
+  updateMenuItem(id: number, userId: string, data: Partial<InsertMenuItem>): Promise<MenuItem | undefined>;
+  deleteMenuItem(id: number, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1932,6 +1943,81 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSop(id: number, userId: string): Promise<boolean> {
     const result = await db.delete(generatedSops).where(and(eq(generatedSops.id, id), eq(generatedSops.userId, userId))).returning();
+    return result.length > 0;
+  }
+
+  async getMenuCategories(userId: string): Promise<MenuCategory[]> {
+    return await db.select().from(menuCategories).where(eq(menuCategories.userId, userId)).orderBy(menuCategories.displayOrder);
+  }
+
+  async createMenuCategory(data: InsertMenuCategory): Promise<MenuCategory> {
+    const [cat] = await db.insert(menuCategories).values(data).returning();
+    return cat;
+  }
+
+  async updateMenuCategory(id: number, userId: string, data: Partial<InsertMenuCategory>): Promise<MenuCategory | undefined> {
+    const [updated] = await db.update(menuCategories).set(data).where(and(eq(menuCategories.id, id), eq(menuCategories.userId, userId))).returning();
+    return updated;
+  }
+
+  async deleteMenuCategory(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(menuCategories).where(and(eq(menuCategories.id, id), eq(menuCategories.userId, userId))).returning();
+    return result.length > 0;
+  }
+
+  async getMenuItems(userId: string): Promise<MenuItem[]> {
+    return await db.select().from(menuItems).where(eq(menuItems.userId, userId)).orderBy(menuItems.name);
+  }
+
+  async getMenuItem(id: number, userId: string): Promise<MenuItem | undefined> {
+    const [item] = await db.select().from(menuItems).where(and(eq(menuItems.id, id), eq(menuItems.userId, userId)));
+    return item;
+  }
+
+  async createMenuItem(data: InsertMenuItem): Promise<MenuItem> {
+    const menuPrice = parseFloat(String(data.menuPrice));
+    const itemCost = parseFloat(String(data.itemCost));
+    const units = data.weeklyUnitsSold || 0;
+    const foodCostPct = menuPrice > 0 ? ((itemCost / menuPrice) * 100).toFixed(2) : "0";
+    const contributionMargin = (menuPrice - itemCost).toFixed(2);
+    const weeklyRevenue = (menuPrice * units).toFixed(2);
+    const weeklyContribution = ((menuPrice - itemCost) * units).toFixed(2);
+
+    const [item] = await db.insert(menuItems).values({
+      ...data,
+      foodCostPct,
+      contributionMargin,
+      weeklyRevenue,
+      weeklyContribution,
+    }).returning();
+    return item;
+  }
+
+  async updateMenuItem(id: number, userId: string, data: Partial<InsertMenuItem>): Promise<MenuItem | undefined> {
+    const existing = await this.getMenuItem(id, userId);
+    if (!existing) return undefined;
+
+    const menuPrice = data.menuPrice !== undefined ? parseFloat(String(data.menuPrice)) : parseFloat(String(existing.menuPrice));
+    const itemCost = data.itemCost !== undefined ? parseFloat(String(data.itemCost)) : parseFloat(String(existing.itemCost));
+    const units = data.weeklyUnitsSold !== undefined ? data.weeklyUnitsSold || 0 : existing.weeklyUnitsSold || 0;
+    const foodCostPct = menuPrice > 0 ? ((itemCost / menuPrice) * 100).toFixed(2) : "0";
+    const contributionMargin = (menuPrice - itemCost).toFixed(2);
+    const weeklyRevenue = (menuPrice * units).toFixed(2);
+    const weeklyContribution = ((menuPrice - itemCost) * units).toFixed(2);
+
+    const [updated] = await db.update(menuItems).set({
+      ...data,
+      foodCostPct,
+      contributionMargin,
+      weeklyRevenue,
+      weeklyContribution,
+      updatedAt: new Date(),
+    }).where(and(eq(menuItems.id, id), eq(menuItems.userId, userId))).returning();
+    return updated;
+  }
+
+  async deleteMenuItem(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(menuItems).where(and(eq(menuItems.id, id), eq(menuItems.userId, userId))).returning();
     return result.length > 0;
   }
 }

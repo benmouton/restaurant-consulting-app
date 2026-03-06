@@ -51,6 +51,10 @@ const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
     headline: "Your Operations Manual — Generated, Not Written",
     sub: "16 SOPs personalized to your restaurant. Bar, kitchen, front of house, and management procedures — all using your actual settings, staff, and policies."
   },
+  "menu-engineering": {
+    headline: "Know Which Items Are Costing You and Which Are Carrying You",
+    sub: "Enter your menu with costs and sales data. Get a visual matrix showing your Stars, Plowhorses, Puzzles, and Dogs — with specific actions for each one."
+  },
   facilities: {
     headline: "Build a Schedule That Hits Your Labor Target",
     sub: "AI-assisted scheduling with live labor cost calculation. Know what the schedule costs before you publish it."

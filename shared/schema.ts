@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, unique, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -940,3 +940,38 @@ export const generatedSops = pgTable("generated_sops", {
 export const insertGeneratedSopSchema = createInsertSchema(generatedSops).omit({ id: true, lastGeneratedAt: true, createdAt: true });
 export type GeneratedSop = typeof generatedSops.$inferSelect;
 export type InsertGeneratedSop = z.infer<typeof insertGeneratedSopSchema>;
+
+export const menuCategories = pgTable("menu_categories", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMenuCategorySchema = createInsertSchema(menuCategories).omit({ id: true, createdAt: true });
+export type MenuCategory = typeof menuCategories.$inferSelect;
+export type InsertMenuCategory = z.infer<typeof insertMenuCategorySchema>;
+
+export const menuItems = pgTable("menu_items", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  categoryId: integer("category_id").references(() => menuCategories.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  menuPrice: numeric("menu_price", { precision: 10, scale: 2 }).notNull(),
+  itemCost: numeric("item_cost", { precision: 10, scale: 2 }).notNull(),
+  foodCostPct: numeric("food_cost_pct", { precision: 5, scale: 2 }),
+  contributionMargin: numeric("contribution_margin", { precision: 10, scale: 2 }),
+  weeklyUnitsSold: integer("weekly_units_sold").default(0),
+  weeklyRevenue: numeric("weekly_revenue", { precision: 10, scale: 2 }),
+  weeklyContribution: numeric("weekly_contribution", { precision: 10, scale: 2 }),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true, foodCostPct: true, contributionMargin: true, weeklyRevenue: true, weeklyContribution: true, createdAt: true, updatedAt: true });
+export type MenuItem = typeof menuItems.$inferSelect;
+export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;

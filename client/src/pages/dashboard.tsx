@@ -349,6 +349,12 @@ export default function Dashboard() {
     queryKey: ["/api/training/summary"],
   });
 
+  const { data: menuAnalysis } = useQuery<{
+    summary: { totalItems: number; stars: number; dogs: number };
+  }>({
+    queryKey: ["/api/menu/analysis"],
+  });
+
   const primeCostStatusColor = useMemo(() => {
     if (!primeCostSummary || primeCostSummary.totalEntries === 0) return undefined;
     const latest = primeCostSummary.entries[0];
@@ -642,6 +648,14 @@ export default function Dashboard() {
               value: trainingSummary?.certsThisMonth ? `${trainingSummary.certsThisMonth} this month` : "0 this month",
               icon: GraduationCap,
               onClick: () => navigate("/training-log"),
+            },
+            {
+              label: "Menu Health",
+              value: menuAnalysis?.summary?.totalItems
+                ? `${menuAnalysis.summary.stars} Stars · ${menuAnalysis.summary.dogs} Dogs`
+                : "Not set up",
+              icon: BarChart3,
+              onClick: () => navigate("/menu-engineering"),
             },
           ].map((card, idx) => (
             <div

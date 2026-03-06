@@ -95,6 +95,7 @@ import {
   CloudSun,
   ChevronDown,
   ChevronRight,
+  BarChart3,
   Gauge,
   Timer,
   BookOpen,
@@ -11861,6 +11862,20 @@ export default function DomainPage() {
         {slug === "service" && <GuestRecoveryAdvisor />}
 
         {/* Food Cost Calculator - only show for costs domain */}
+        {slug === "costs" && (
+          <Link href="/menu-engineering">
+            <div className="flex items-center gap-3 p-4 rounded-lg mb-4 cursor-pointer" style={{ background: 'linear-gradient(135deg, #1a1d2e 0%, #252840 100%)', border: '1px solid #b8860b' }} data-testid="link-menu-engineering">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(212,160,23,0.15)' }}>
+                <BarChart3 className="h-5 w-5" style={{ color: '#d4a017' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm">Menu Engineering</p>
+                <p className="text-xs" style={{ color: '#9ca3af' }}>Analyze every menu item by cost, margin, and popularity. Find your Stars and Dogs.</p>
+              </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0" style={{ color: '#d4a017' }} />
+            </div>
+          </Link>
+        )}
         {slug === "costs" && <MarginStatusStrip />}
         {slug === "costs" && <FoodCostCalculator />}
 

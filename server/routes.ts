@@ -233,6 +233,40 @@ OPERATOR'S STATED CHALLENGE:
 ${val(s.topChallenge, "No specific challenge entered yet. Ask what they're working on.")}
 
 ---
+
+${await (async () => {
+      try {
+        const menuItemsData = await storage.getMenuItems(userId);
+        const activeItems = menuItemsData.filter(i => i.isActive !== false);
+        if (activeItems.length === 0) return "MENU ENGINEERING:\nNo menu items entered yet. If the operator asks about menu pricing or item profitability, suggest they use the Menu Engineering tool to enter their menu items.\n";
+        
+        const totalUnits = activeItems.reduce((s, i) => s + (i.weeklyUnitsSold || 0), 0);
+        const avgPop = activeItems.length > 0 ? totalUnits / activeItems.length : 0;
+        const avgCM = activeItems.reduce((s, i) => s + parseFloat(String(i.contributionMargin || 0)), 0) / activeItems.length;
+        const weightedFC = totalUnits > 0
+          ? activeItems.reduce((s, i) => s + parseFloat(String(i.foodCostPct || 0)) * (i.weeklyUnitsSold || 0), 0) / totalUnits
+          : activeItems.reduce((s, i) => s + parseFloat(String(i.foodCostPct || 0)), 0) / activeItems.length;
+        
+        const stars = activeItems.filter(i => (i.weeklyUnitsSold || 0) >= avgPop && parseFloat(String(i.contributionMargin || 0)) >= avgCM);
+        const plowhorses = activeItems.filter(i => (i.weeklyUnitsSold || 0) >= avgPop && parseFloat(String(i.contributionMargin || 0)) < avgCM);
+        const puzzles = activeItems.filter(i => (i.weeklyUnitsSold || 0) < avgPop && parseFloat(String(i.contributionMargin || 0)) >= avgCM);
+        const dogs = activeItems.filter(i => (i.weeklyUnitsSold || 0) < avgPop && parseFloat(String(i.contributionMargin || 0)) < avgCM);
+        
+        const topStar = stars.sort((a, b) => parseFloat(String(b.contributionMargin || 0)) - parseFloat(String(a.contributionMargin || 0)))[0];
+        const highestFC = [...activeItems].sort((a, b) => parseFloat(String(b.foodCostPct || 0)) - parseFloat(String(a.foodCostPct || 0)))[0];
+        const lowestCM = [...activeItems].sort((a, b) => parseFloat(String(a.contributionMargin || 0)) - parseFloat(String(b.contributionMargin || 0)))[0];
+        
+        return `MENU ENGINEERING:
+Total menu items: ${activeItems.length}
+Average food cost %: ${weightedFC.toFixed(1)}% (target: ${foodTarget !== null ? foodTarget + "%" : "not set"})
+Stars: ${stars.length} items | Plowhorses: ${plowhorses.length} | Puzzles: ${puzzles.length} | Dogs: ${dogs.length}
+${topStar ? `Top Star by CM: ${topStar.name} ($${parseFloat(String(topStar.contributionMargin || 0)).toFixed(2)} contribution margin)` : ""}
+${highestFC ? `Highest food cost item: ${highestFC.name} (${parseFloat(String(highestFC.foodCostPct || 0)).toFixed(1)}% food cost)` : ""}
+${lowestCM ? `Lowest CM item still on menu: ${lowestCM.name} ($${parseFloat(String(lowestCM.contributionMargin || 0)).toFixed(2)})` : ""}
+`;
+      } catch { return ""; }
+    })()}
+---
 ${missingNote}
 PROVEN FRAMEWORKS (from this platform's methodology):
 
@@ -4652,6 +4686,261 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
     } catch (err) {
       console.error("Error exporting staff training record:", err);
       res.status(500).json({ message: "Failed to export record" });
+    }
+  });
+
+  // ===== MENU ENGINEERING ROUTES =====
+
+  app.get("/api/menu/categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const categories = await storage.getMenuCategories(userId);
+      res.json(categories);
+    } catch (err) {
+      console.error("Error fetching menu categories:", err);
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  app.post("/api/menu/categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, displayOrder } = req.body;
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+      const cat = await storage.createMenuCategory({ userId, name: name.trim(), displayOrder: displayOrder || 0 });
+      res.status(201).json(cat);
+    } catch (err) {
+      console.error("Error creating menu category:", err);
+      res.status(500).json({ message: "Failed to create category" });
+    }
+  });
+
+  app.put("/api/menu/categories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { name, displayOrder } = req.body;
+      const updated = await storage.updateMenuCategory(id, userId, { name, displayOrder });
+      if (!updated) return res.status(404).json({ message: "Category not found" });
+      res.json(updated);
+    } catch (err) {
+      console.error("Error updating menu category:", err);
+      res.status(500).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/menu/categories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteMenuCategory(id, userId);
+      if (!deleted) return res.status(404).json({ message: "Category not found" });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting menu category:", err);
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  app.get("/api/menu/items", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const items = await storage.getMenuItems(userId);
+      res.json(items);
+    } catch (err) {
+      console.error("Error fetching menu items:", err);
+      res.status(500).json({ message: "Failed to fetch items" });
+    }
+  });
+
+  app.get("/api/menu/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const item = await storage.getMenuItem(id, userId);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+      res.json(item);
+    } catch (err) {
+      console.error("Error fetching menu item:", err);
+      res.status(500).json({ message: "Failed to fetch item" });
+    }
+  });
+
+  app.post("/api/menu/items", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, categoryId, description, menuPrice, itemCost, weeklyUnitsSold, isActive, notes } = req.body;
+      if (!name || typeof name !== "string") return res.status(400).json({ message: "Item name is required" });
+      const price = parseFloat(menuPrice);
+      const cost = parseFloat(itemCost);
+      if (isNaN(price) || price <= 0) return res.status(400).json({ message: "Menu price must be a positive number" });
+      if (isNaN(cost) || cost < 0) return res.status(400).json({ message: "Item cost must be zero or positive" });
+      const units = parseInt(weeklyUnitsSold) || 0;
+      if (units < 0) return res.status(400).json({ message: "Weekly units sold must be zero or positive" });
+
+      const warnings: string[] = [];
+      if (price > 0 && (cost / price) * 100 > 80) {
+        warnings.push("Food cost exceeds 80% — this may be a data entry error");
+      }
+
+      const item = await storage.createMenuItem({
+        userId,
+        name: name.trim(),
+        categoryId: categoryId || null,
+        description: description || null,
+        menuPrice: price.toFixed(2),
+        itemCost: cost.toFixed(2),
+        weeklyUnitsSold: units,
+        isActive: isActive !== false,
+        notes: notes || null,
+      });
+      res.status(201).json({ ...item, warnings });
+    } catch (err) {
+      console.error("Error creating menu item:", err);
+      res.status(500).json({ message: "Failed to create item" });
+    }
+  });
+
+  app.put("/api/menu/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { name, categoryId, description, menuPrice, itemCost, weeklyUnitsSold, isActive, notes } = req.body;
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name.trim();
+      if (categoryId !== undefined) updateData.categoryId = categoryId;
+      if (description !== undefined) updateData.description = description;
+      if (menuPrice !== undefined) {
+        const price = parseFloat(menuPrice);
+        if (isNaN(price) || price <= 0) return res.status(400).json({ message: "Menu price must be positive" });
+        updateData.menuPrice = price.toFixed(2);
+      }
+      if (itemCost !== undefined) {
+        const cost = parseFloat(itemCost);
+        if (isNaN(cost) || cost < 0) return res.status(400).json({ message: "Item cost must be zero or positive" });
+        updateData.itemCost = cost.toFixed(2);
+      }
+      if (weeklyUnitsSold !== undefined) {
+        const units = parseInt(weeklyUnitsSold);
+        if (isNaN(units) || units < 0) return res.status(400).json({ message: "Units must be zero or positive" });
+        updateData.weeklyUnitsSold = units;
+      }
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (notes !== undefined) updateData.notes = notes;
+
+      const warnings: string[] = [];
+      const updated = await storage.updateMenuItem(id, userId, updateData);
+      if (!updated) return res.status(404).json({ message: "Item not found" });
+
+      const fc = parseFloat(String(updated.foodCostPct || 0));
+      if (fc > 80) warnings.push("Food cost exceeds 80% — this may be a data entry error");
+
+      res.json({ ...updated, warnings });
+    } catch (err) {
+      console.error("Error updating menu item:", err);
+      res.status(500).json({ message: "Failed to update item" });
+    }
+  });
+
+  app.delete("/api/menu/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteMenuItem(id, userId);
+      if (!deleted) return res.status(404).json({ message: "Item not found" });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting menu item:", err);
+      res.status(500).json({ message: "Failed to delete item" });
+    }
+  });
+
+  app.get("/api/menu/analysis", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const allItems = await storage.getMenuItems(userId);
+      const items = allItems.filter(i => i.isActive !== false);
+
+      if (items.length === 0) {
+        return res.json({ items: [], summary: { totalItems: 0, avgFoodCostPct: 0, totalWeeklyContribution: 0, needsAttention: 0, stars: 0, plowhorses: 0, puzzles: 0, dogs: 0 }, quadrants: { stars: [], plowhorses: [], puzzles: [], dogs: [] } });
+      }
+
+      const totalUnitsSold = items.reduce((s, i) => s + (i.weeklyUnitsSold || 0), 0);
+      const avgPopularity = items.length > 0 ? totalUnitsSold / items.length : 0;
+      const avgCM = items.length > 0 ? items.reduce((s, i) => s + parseFloat(String(i.contributionMargin || 0)), 0) / items.length : 0;
+
+      const weightedFoodCost = totalUnitsSold > 0
+        ? items.reduce((s, i) => s + parseFloat(String(i.foodCostPct || 0)) * (i.weeklyUnitsSold || 0), 0) / totalUnitsSold
+        : items.reduce((s, i) => s + parseFloat(String(i.foodCostPct || 0)), 0) / items.length;
+
+      const totalWeeklyContribution = items.reduce((s, i) => s + parseFloat(String(i.weeklyContribution || 0)), 0);
+
+      const classified = items.map(item => {
+        const cm = parseFloat(String(item.contributionMargin || 0));
+        const units = item.weeklyUnitsSold || 0;
+        const highPopularity = units >= avgPopularity;
+        const highCM = cm >= avgCM;
+
+        let quadrant: string;
+        if (highPopularity && highCM) quadrant = "star";
+        else if (highPopularity && !highCM) quadrant = "plowhorse";
+        else if (!highPopularity && highCM) quadrant = "puzzle";
+        else quadrant = "dog";
+
+        return { ...item, quadrant };
+      });
+
+      const stars = classified.filter(i => i.quadrant === "star");
+      const plowhorses = classified.filter(i => i.quadrant === "plowhorse");
+      const puzzles = classified.filter(i => i.quadrant === "puzzle");
+      const dogs = classified.filter(i => i.quadrant === "dog");
+
+      const settings = await storage.getHandbookSettings(userId);
+      const foodCostTarget = settings?.foodCostTarget ? parseFloat(settings.foodCostTarget) : null;
+
+      res.json({
+        items: classified,
+        summary: {
+          totalItems: items.length,
+          avgFoodCostPct: parseFloat(weightedFoodCost.toFixed(1)),
+          totalWeeklyContribution: parseFloat(totalWeeklyContribution.toFixed(2)),
+          needsAttention: dogs.length + puzzles.length,
+          stars: stars.length,
+          plowhorses: plowhorses.length,
+          puzzles: puzzles.length,
+          dogs: dogs.length,
+          avgCM: parseFloat(avgCM.toFixed(2)),
+          avgPopularity: parseFloat(avgPopularity.toFixed(1)),
+          foodCostTarget,
+        },
+        quadrants: { stars, plowhorses, puzzles, dogs },
+      });
+    } catch (err) {
+      console.error("Error analyzing menu:", err);
+      res.status(500).json({ message: "Failed to analyze menu" });
+    }
+  });
+
+  app.get("/api/menu/export", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const items = await storage.getMenuItems(userId);
+      const categories = await storage.getMenuCategories(userId);
+      const settings = await storage.getHandbookSettings(userId);
+      const user = await storage.getUser(userId);
+      res.json({
+        restaurantName: settings?.restaurantName || user?.restaurantName || "Restaurant",
+        ownerName: settings?.ownerNames || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Owner",
+        items,
+        categories,
+        exportDate: new Date().toISOString().split("T")[0],
+      });
+    } catch (err) {
+      console.error("Error exporting menu:", err);
+      res.status(500).json({ message: "Failed to export menu" });
     }
   });
 
