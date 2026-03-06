@@ -10,8 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +41,18 @@ import {
   Trash2,
   Award,
   Calendar,
-  Share2
+  Share2,
+  Copy,
+  Edit3,
+  Sparkles,
+  X,
+  Loader2,
+  ChevronRight,
+  Wine,
+  Briefcase,
+  HandMetal,
+  StickyNote,
+  Shield,
 } from "lucide-react";
 import { isNativeApp, nativeShare, hapticTap, hapticSuccess } from "@/lib/native";
 import { useOfflineCache } from "@/hooks/use-native-features";
@@ -48,6 +61,7 @@ import { HandbookBuilder } from "@/components/handbook/HandbookBuilder";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { TrainingTemplate } from "@shared/schema";
+import ReactMarkdown from "react-markdown";
 
 function personalizeContent(content: string, restaurantName: string | null | undefined): string {
   if (!restaurantName) return content;
@@ -67,11 +81,13 @@ const contentTypeIcons: Record<string, React.ComponentType<{ className?: string 
   assessment: CheckSquare,
 };
 
-const contentTypeColors: Record<string, string> = {
-  overview: "bg-primary/10 text-primary",
-  procedure: "bg-green-500/10 text-green-600 dark:text-green-400",
-  checklist: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  assessment: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+const contentTypeColors: Record<string, { bg: string; text: string; label: string }> = {
+  overview: { bg: "rgba(212,160,23,0.15)", text: "#d4a017", label: "Overview" },
+  procedure: { bg: "rgba(59,130,246,0.15)", text: "#60a5fa", label: "Procedure" },
+  policy: { bg: "rgba(245,158,11,0.15)", text: "#f59e0b", label: "Policy" },
+  quiz: { bg: "rgba(34,197,94,0.15)", text: "#22c55e", label: "Quiz" },
+  checklist: { bg: "rgba(59,130,246,0.15)", text: "#60a5fa", label: "Checklist" },
+  assessment: { bg: "rgba(34,197,94,0.15)", text: "#22c55e", label: "Assessment" },
 };
 
 const serverDayTitles: Record<number, string> = {
@@ -99,6 +115,29 @@ function getDayTitle(category: string, dayNumber: number): string {
   return titles[dayNumber] || `Day ${dayNumber}`;
 }
 
+const COMING_SOON_ROLES: Record<string, { icon: React.ComponentType<{ className?: string }>; description: string; responsibilities: string }> = {
+  host: {
+    icon: Users,
+    description: "Structured training for hosts and hostesses covering reservation management, seating flow, guest experience, and waitlist management.",
+    responsibilities: "Greeting guests, managing reservations, seating rotation, waitlist management, phone handling, first impression standards",
+  },
+  bartender: {
+    icon: Wine,
+    description: "Comprehensive bartender training covering cocktail preparation, speed techniques, responsible alcohol service, and bar inventory management.",
+    responsibilities: "Cocktail preparation, speed bartending, responsible alcohol service, bar inventory, guest interaction, bar cleanliness",
+  },
+  manager: {
+    icon: Briefcase,
+    description: "Shift lead and manager training covering labor management, conflict resolution, opening/closing procedures, and operational decision-making.",
+    responsibilities: "Shift management, labor cost control, conflict resolution, opening/closing procedures, team leadership, operational decisions",
+  },
+  busser: {
+    icon: HandMetal,
+    description: "Food runner and busser training covering table turnover, support service, dish handling, and team coordination during peak service.",
+    responsibilities: "Table clearing, resetting, food running, dish handling, team coordination, cleanliness standards",
+  },
+};
+
 interface TrainingCompletion {
   id: number;
   assignmentId: number;
@@ -119,6 +158,53 @@ interface TrainingAssignment {
   completedDate: string | null;
   createdAt: string;
   completions: TrainingCompletion[];
+}
+
+function TrainingIntelligenceStrip() {
+  const { data: allAssignments } = useQuery<TrainingAssignment[]>({
+    queryKey: ["/api/training-assignments"],
+  });
+  const { data: templates } = useQuery<TrainingTemplate[]>({
+    queryKey: ["/api/templates"],
+  });
+
+  const rolesWithManuals = templates
+    ? new Set(templates.map(t => t.category)).size
+    : 0;
+
+  const staffAssigned = allAssignments?.length || 0;
+  const handbookPolicies = 0;
+  const handbookStatus = "Not Started";
+
+  const metrics = [
+    { label: "Roles with Manuals", value: `${rolesWithManuals}`, icon: BookOpen },
+    { label: "Handbook Status", value: handbookStatus, icon: Shield },
+    { label: "Staff Assigned", value: `${staffAssigned}`, icon: Users },
+    { label: "Handbook Policies", value: `${handbookPolicies}`, icon: FileText },
+  ];
+
+  return (
+    <div className="flex gap-3 mb-6 overflow-x-auto pb-2" data-testid="training-intelligence-strip">
+      {metrics.map((metric, i) => (
+        <div
+          key={metric.label}
+          className="flex-shrink-0 min-w-[150px] rounded-lg p-4"
+          style={{
+            backgroundColor: '#1a1d2e',
+            borderLeft: '3px solid #d4a017',
+            animation: `scheduleStaggerIn 0.3s ease-out ${i * 30}ms both`,
+          }}
+          data-testid={`metric-${metric.label.toLowerCase().replace(/ /g, '-')}`}
+        >
+          <div className="flex items-center gap-1.5 mb-1">
+            <metric.icon className="h-3.5 w-3.5" style={{ color: '#9ca3af' }} />
+            <span className="text-xs" style={{ color: '#9ca3af' }}>{metric.label}</span>
+          </div>
+          <div className="text-lg font-bold text-white">{metric.value}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function TrainingProgressPanel({ activeCategory }: { activeCategory: string }) {
@@ -216,12 +302,25 @@ function TrainingProgressPanel({ activeCategory }: { activeCategory: string }) {
     const isOverdue = assignment.status !== "completed" && daysSinceStart > 14;
 
     if (assignment.status === "completed") {
-      return <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400" data-testid={`badge-status-${assignment.id}`}>Completed</Badge>;
+      return <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' }} data-testid={`badge-status-${assignment.id}`}>Completed</Badge>;
     }
     if (isOverdue) {
-      return <Badge variant="secondary" className="bg-red-500/10 text-red-600 dark:text-red-400" data-testid={`badge-status-${assignment.id}`}>Overdue</Badge>;
+      return <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' }} data-testid={`badge-status-${assignment.id}`}>Overdue</Badge>;
     }
-    return <Badge variant="secondary" className="bg-primary/10 text-primary" data-testid={`badge-status-${assignment.id}`}>In Progress</Badge>;
+    return <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" style={{ backgroundColor: 'rgba(212,160,23,0.15)', color: '#d4a017' }} data-testid={`badge-status-${assignment.id}`}>In Progress</Badge>;
+  }
+
+  function getRoleBadge(category: string) {
+    const colors: Record<string, { bg: string; text: string }> = {
+      server: { bg: 'rgba(59,130,246,0.15)', text: '#60a5fa' },
+      kitchen: { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b' },
+    };
+    const c = colors[category] || { bg: 'rgba(156,163,175,0.15)', text: '#9ca3af' };
+    return (
+      <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" style={{ backgroundColor: c.bg, color: c.text }}>
+        {category.charAt(0).toUpperCase() + category.slice(1)}
+      </Badge>
+    );
   }
 
   function handleSubmitAssignment(e: React.FormEvent) {
@@ -239,76 +338,81 @@ function TrainingProgressPanel({ activeCategory }: { activeCategory: string }) {
 
   return (
     <Collapsible open={panelOpen} onOpenChange={setPanelOpen} className="mb-6">
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
+      <div className="rounded-lg" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+        <div className="flex items-center justify-between gap-2 flex-wrap p-4 pb-2">
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="flex flex-wrap items-center gap-2 p-0" data-testid="button-toggle-progress-panel">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Employee Training Progress</CardTitle>
-              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${panelOpen ? "rotate-180" : ""}`} />
+            <Button variant="ghost" className="flex items-center gap-2 p-0 text-white" data-testid="button-toggle-progress-panel">
+              <GraduationCap className="h-5 w-5" style={{ color: '#d4a017' }} />
+              <span className="text-lg font-semibold">Employee Training Progress</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${panelOpen ? "rotate-180" : ""}`} style={{ color: '#9ca3af' }} />
             </Button>
           </CollapsibleTrigger>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowAssignForm(!showAssignForm)}
+            style={{ borderColor: '#d4a017', color: '#d4a017' }}
             data-testid="button-assign-training"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             Assign Training
           </Button>
-        </CardHeader>
+        </div>
         <CollapsibleContent>
-          <CardContent className="pt-2">
+          <div className="px-4 pb-4 pt-2">
             {showAssignForm && (
-              <Card className="mb-4">
-                <CardContent className="pt-4">
-                  <form onSubmit={handleSubmitAssignment} className="flex flex-wrap items-end gap-3">
-                    <div className="flex-1 min-w-[180px]">
-                      <label className="text-sm font-medium text-muted-foreground mb-1 block">Employee Name</label>
-                      <Input
-                        value={employeeName}
-                        onChange={(e) => setEmployeeName(e.target.value)}
-                        placeholder="Employee name"
-                        required
-                        data-testid="input-employee-name"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-[180px]">
-                      <label className="text-sm font-medium text-muted-foreground mb-1 block">Trainer Name</label>
-                      <Input
-                        value={trainerName}
-                        onChange={(e) => setTrainerName(e.target.value)}
-                        placeholder="Who will sign off"
-                        data-testid="input-trainer-name"
-                      />
-                    </div>
-                    <div className="min-w-[160px]">
-                      <label className="text-sm font-medium text-muted-foreground mb-1 block">Start Date</label>
-                      <Input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        data-testid="input-start-date"
-                      />
-                    </div>
-                    <Button type="submit" disabled={createMutation.isPending || !employeeName.trim()} data-testid="button-submit-assignment">
-                      {createMutation.isPending ? "Assigning..." : "Submit"}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
+              <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e' }}>
+                <form onSubmit={handleSubmitAssignment} className="flex flex-wrap items-end gap-3">
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="text-sm font-medium mb-1 block" style={{ color: '#9ca3af' }}>Employee Name</label>
+                    <Input
+                      value={employeeName}
+                      onChange={(e) => setEmployeeName(e.target.value)}
+                      placeholder="Employee name"
+                      required
+                      className="border-[#2a2d3e] text-white focus:ring-[#d4a017]"
+                      style={{ backgroundColor: '#0f1117' }}
+                      data-testid="input-employee-name"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="text-sm font-medium mb-1 block" style={{ color: '#9ca3af' }}>Trainer Name</label>
+                    <Input
+                      value={trainerName}
+                      onChange={(e) => setTrainerName(e.target.value)}
+                      placeholder="Who will sign off"
+                      className="border-[#2a2d3e] text-white focus:ring-[#d4a017]"
+                      style={{ backgroundColor: '#0f1117' }}
+                      data-testid="input-trainer-name"
+                    />
+                  </div>
+                  <div className="min-w-[160px]">
+                    <label className="text-sm font-medium mb-1 block" style={{ color: '#9ca3af' }}>Start Date</label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="border-[#2a2d3e] text-white focus:ring-[#d4a017]"
+                      style={{ backgroundColor: '#0f1117' }}
+                      data-testid="input-start-date"
+                    />
+                  </div>
+                  <Button type="submit" disabled={createMutation.isPending || !employeeName.trim()} style={{ backgroundColor: '#d4a017', color: '#0f1117' }} data-testid="button-submit-assignment">
+                    {createMutation.isPending ? "Assigning..." : "Submit"}
+                  </Button>
+                </form>
+              </div>
             )}
 
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(2)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
+                  <Skeleton key={i} className="h-16 w-full" style={{ backgroundColor: '#2a2d3e' }} />
                 ))}
               </div>
             ) : assignments.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground text-sm">
-                <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+              <div className="text-center py-6 text-sm" style={{ color: '#9ca3af' }}>
+                <Clock className="h-8 w-8 mx-auto mb-2" style={{ color: '#4a4d5e' }} />
                 No training assignments for {categoryLabel}. Click "Assign Training" to get started.
               </div>
             ) : (
@@ -317,212 +421,481 @@ function TrainingProgressPanel({ activeCategory }: { activeCategory: string }) {
                   const completedDays = assignment.completions.length;
                   const progressPercent = Math.round((completedDays / assignment.totalDays) * 100);
                   const isExpanded = expandedAssignment === assignment.id;
-                  const allDaysComplete = completedDays >= assignment.totalDays;
                   const day7Complete = assignment.completions.some(c => c.dayNumber === 7);
 
                   return (
-                    <Card key={assignment.id} data-testid={`assignment-card-${assignment.id}`}>
-                      <CardContent className="pt-4 pb-3">
-                        <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                            <span className="font-semibold text-sm truncate" data-testid={`text-employee-name-${assignment.id}`}>
-                              {assignment.employeeName}
-                            </span>
-                            <span className="text-muted-foreground text-sm">
-                              {categoryLabel}: Day {completedDays} of {assignment.totalDays} ({progressPercent}%)
-                            </span>
-                            {getStatusBadge(assignment)}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1">
-                            {day7Complete && assignment.status !== "completed" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => certifyMutation.mutate({ assignmentId: assignment.id })}
-                                disabled={certifyMutation.isPending}
-                                data-testid={`button-certify-${assignment.id}`}
-                              >
-                                <Award className="h-4 w-4 mr-1" />
-                                Certify
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setExpandedAssignment(isExpanded ? null : assignment.id)}
-                              data-testid={`button-expand-${assignment.id}`}
-                            >
-                              <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => deleteMutation.mutate({ assignmentId: assignment.id })}
-                              disabled={deleteMutation.isPending}
-                              data-testid={`button-delete-assignment-${assignment.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </div>
+                    <div
+                      key={assignment.id}
+                      className="rounded-lg p-4"
+                      style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e' }}
+                      data-testid={`assignment-card-${assignment.id}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                          <span className="font-semibold text-sm truncate text-white" data-testid={`text-employee-name-${assignment.id}`}>
+                            {assignment.employeeName}
+                          </span>
+                          {getRoleBadge(assignment.templateCategory)}
+                          <span className="text-sm" style={{ color: '#9ca3af' }}>
+                            Day {completedDays} of {assignment.totalDays} ({progressPercent}%)
+                          </span>
+                          {getStatusBadge(assignment)}
                         </div>
-                        <Progress
-                          value={progressPercent}
-                          className={`h-2 ${assignment.status === "completed" ? "[&>div]:bg-green-500" : ""}`}
-                          data-testid={`progress-bar-${assignment.id}`}
+                        <div className="flex flex-wrap items-center gap-1">
+                          {day7Complete && assignment.status !== "completed" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => certifyMutation.mutate({ assignmentId: assignment.id })}
+                              disabled={certifyMutation.isPending}
+                              style={{ borderColor: '#d4a017', color: '#d4a017' }}
+                              data-testid={`button-certify-${assignment.id}`}
+                            >
+                              <Award className="h-4 w-4 mr-1" />
+                              Certify
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setExpandedAssignment(isExpanded ? null : assignment.id)}
+                            className="text-white"
+                            data-testid={`button-expand-${assignment.id}`}
+                          >
+                            <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteMutation.mutate({ assignmentId: assignment.id })}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-assignment-${assignment.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" style={{ color: '#9ca3af' }} />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#2a2d3e' }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${progressPercent}%`,
+                            backgroundColor: assignment.status === "completed" ? '#22c55e' : '#d4a017',
+                          }}
                         />
+                      </div>
 
-                        {isExpanded && (
-                          <div className="mt-4 space-y-2">
-                            {Array.from({ length: assignment.totalDays }, (_, i) => i + 1).map((dayNum) => {
-                              const completion = assignment.completions.find(c => c.dayNumber === dayNum);
-                              const dayTitle = getDayTitle(assignment.templateCategory, dayNum);
+                      {isExpanded && (
+                        <div className="mt-4 space-y-2">
+                          {Array.from({ length: assignment.totalDays }, (_, i) => i + 1).map((dayNum) => {
+                            const completion = assignment.completions.find(c => c.dayNumber === dayNum);
+                            const dayTitle = getDayTitle(assignment.templateCategory, dayNum);
 
-                              return (
-                                <div
-                                  key={dayNum}
-                                  className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-border last:border-0"
-                                  data-testid={`day-row-${assignment.id}-${dayNum}`}
-                                >
-                                  {completion ? (
-                                    <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                                      <span className="text-sm">
-                                        Day {dayNum}: {dayTitle}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground">
-                                        Completed by {completion.signedOffBy} on {new Date(completion.completedAt).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                                      <Clock className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-                                      <span className="text-sm text-muted-foreground">
-                                        Day {dayNum}: {dayTitle}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div>
-                                    {completion ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => uncompleteDayMutation.mutate({ completionId: completion.id })}
-                                        disabled={uncompleteDayMutation.isPending}
-                                        data-testid={`button-uncomplete-day-${assignment.id}-${dayNum}`}
-                                      >
-                                        Undo
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => completeDayMutation.mutate({
-                                          assignmentId: assignment.id,
-                                          dayNumber: dayNum,
-                                          signedOffBy: trainerName || "Manager",
-                                        })}
-                                        disabled={completeDayMutation.isPending}
-                                        data-testid={`button-complete-day-${assignment.id}-${dayNum}`}
-                                      >
-                                        <CheckSquare className="h-3 w-3 mr-1" />
-                                        Mark Complete
-                                      </Button>
-                                    )}
+                            return (
+                              <div
+                                key={dayNum}
+                                className="flex flex-wrap items-center justify-between gap-2 py-2"
+                                style={{ borderBottom: '1px solid #2a2d3e' }}
+                                data-testid={`day-row-${assignment.id}-${dayNum}`}
+                              >
+                                {completion ? (
+                                  <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                                    <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#22c55e' }} />
+                                    <span className="text-sm text-white">
+                                      Day {dayNum}: {dayTitle}
+                                    </span>
+                                    <span className="text-xs" style={{ color: '#9ca3af' }}>
+                                      Completed by {completion.signedOffBy} on {new Date(completion.completedAt).toLocaleDateString()}
+                                    </span>
                                   </div>
+                                ) : (
+                                  <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                                    <Clock className="h-4 w-4 shrink-0" style={{ color: '#4a4d5e' }} />
+                                    <span className="text-sm" style={{ color: '#9ca3af' }}>
+                                      Day {dayNum}: {dayTitle}
+                                    </span>
+                                  </div>
+                                )}
+                                <div>
+                                  {completion ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => uncompleteDayMutation.mutate({ completionId: completion.id })}
+                                      disabled={uncompleteDayMutation.isPending}
+                                      className="text-white"
+                                      data-testid={`button-uncomplete-day-${assignment.id}-${dayNum}`}
+                                    >
+                                      Undo
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => completeDayMutation.mutate({
+                                        assignmentId: assignment.id,
+                                        dayNumber: dayNum,
+                                        signedOffBy: trainerName || "Manager",
+                                      })}
+                                      disabled={completeDayMutation.isPending}
+                                      style={{ borderColor: '#2a2d3e', color: '#d4a017' }}
+                                      data-testid={`button-complete-day-${assignment.id}-${dayNum}`}
+                                    >
+                                      <CheckSquare className="h-3 w-3 mr-1" />
+                                      Mark Complete
+                                    </Button>
+                                  )}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             )}
-          </CardContent>
+          </div>
         </CollapsibleContent>
-      </Card>
+      </div>
     </Collapsible>
   );
 }
 
-function TrainingDashboardSummary() {
-  const { data: allAssignments } = useQuery<TrainingAssignment[]>({
-    queryKey: ["/api/training-assignments"],
-  });
+function ComingSoonTab({ role }: { role: string }) {
+  const { toast } = useToast();
+  const roleConfig = COMING_SOON_ROLES[role];
+  const RoleIcon = roleConfig?.icon || GraduationCap;
+  const [responsibilities, setResponsibilities] = useState(roleConfig?.responsibilities || "");
+  const [duration, setDuration] = useState("5 days");
+  const [generatedContent, setGeneratedContent] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  if (!allAssignments || allAssignments.length === 0) return null;
+  const handleGenerate = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setGeneratedContent("");
 
-  const inProgress = allAssignments.filter(a => a.status !== "completed");
-  const completed = allAssignments.filter(a => a.status === "completed");
-  const recentlyCertified = completed.filter(a => {
-    if (!a.completedDate) return false;
-    const daysSince = Math.floor((Date.now() - new Date(a.completedDate).getTime()) / (1000 * 60 * 60 * 24));
-    return daysSince <= 7;
-  });
-  const overdue = inProgress.filter(a => {
-    const daysSinceStart = Math.floor((Date.now() - new Date(a.startDate).getTime()) / (1000 * 60 * 60 * 24));
-    return daysSinceStart > 14;
-  });
+    try {
+      const response = await fetch("/api/training/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          role: role.charAt(0).toUpperCase() + role.slice(1),
+          responsibilities: responsibilities.trim() || undefined,
+          duration,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to generate");
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader");
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                fullContent += data.content;
+                setGeneratedContent(fullContent);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch {
+      toast({ title: "Failed to generate training content", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" data-testid="training-dashboard-summary">
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <Clock className="h-4 w-4 text-primary" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">In Training</span>
+    <div className="space-y-6" style={{ animation: 'scheduleStaggerIn 0.3s ease-out both' }}>
+      <div className="rounded-lg p-6" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(212,160,23,0.15)' }}>
+            <Sparkles className="h-5 w-5" style={{ color: '#d4a017' }} />
           </div>
-          <div className="text-2xl font-bold" data-testid="stat-in-training">{inProgress.length}</div>
-          {inProgress.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {inProgress.map(a => a.employeeName).slice(0, 2).join(", ")}
-              {inProgress.length > 2 && ` +${inProgress.length - 2} more`}
+          <div>
+            <h3 className="font-semibold text-white text-lg">Quick-Start Outline</h3>
+            <p className="text-sm" style={{ color: '#9ca3af' }}>Generate a training outline for this role instantly</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block" style={{ color: '#9ca3af' }}>Key Responsibilities</label>
+            <Textarea
+              value={responsibilities}
+              onChange={(e) => setResponsibilities(e.target.value)}
+              placeholder="Describe the key responsibilities for this role..."
+              rows={3}
+              className="border-[#2a2d3e] text-white focus:ring-[#d4a017] resize-none"
+              style={{ backgroundColor: '#0f1117' }}
+              data-testid={`textarea-responsibilities-${role}`}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[180px]">
+              <label className="text-sm font-medium mb-1.5 block" style={{ color: '#9ca3af' }}>Training Duration</label>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger className="border-[#2a2d3e] text-white" style={{ backgroundColor: '#0f1117' }} data-testid={`select-duration-${role}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3 days">3 Days</SelectItem>
+                  <SelectItem value="5 days">5 Days</SelectItem>
+                  <SelectItem value="7 days">7 Days</SelectItem>
+                  <SelectItem value="10 days">10 Days</SelectItem>
+                  <SelectItem value="14 days">14 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+              data-testid={`button-generate-${role}`}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {generatedContent && (
+          <div className="mt-6">
+            <div className="rounded-lg p-4" style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e', borderLeftWidth: '3px', borderLeftColor: '#d4a017', animation: isGenerating ? 'goldStreamBorder 2s ease-in-out infinite' : 'none' }}>
+              <div className="prose prose-sm prose-invert max-w-none">
+                <ReactMarkdown>{generatedContent}</ReactMarkdown>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(generatedContent);
+                  toast({ title: "Copied to clipboard" });
+                }}
+                style={{ borderColor: '#2a2d3e', color: '#9ca3af' }}
+                data-testid={`button-copy-generated-${role}`}
+              >
+                <Copy className="h-3 w-3 mr-1" />
+                Copy
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg p-6" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <RoleIcon className="h-6 w-6 gold-text" />
+          <h3 className="font-semibold text-white text-lg">
+            {role.charAt(0).toUpperCase() + role.slice(1)} Training
+          </h3>
+          <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate italic" style={{ backgroundColor: 'rgba(156,163,175,0.15)', color: '#9ca3af' }}>
+            Soon
+          </Badge>
+        </div>
+        <p className="text-sm mb-3" style={{ color: '#9ca3af' }}>
+          {roleConfig?.description}
+        </p>
+        <p className="text-xs" style={{ color: '#6b7280' }}>
+          Until this track is available, use the Server or Kitchen training programs as a starting framework and customize with your own notes.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CustomizePanel({ template, restaurantName, onClose }: { template: TrainingTemplate; restaurantName?: string | null; onClose: () => void }) {
+  const { toast } = useToast();
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [generatedContent, setGeneratedContent] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleCustomize = async () => {
+    if (!customPrompt.trim() || isGenerating) return;
+    setIsGenerating(true);
+    setGeneratedContent("");
+
+    try {
+      const context = `Original training content for "${template.title}" (${template.section}):\n\n${template.content.slice(0, 1500)}`;
+      const response = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          question: `Customize this training content based on: ${customPrompt}`,
+          context,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed");
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader");
+
+      const decoder = new TextDecoder();
+      let full = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        for (const line of chunk.split("\n")) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                full += data.content;
+                setGeneratedContent(full);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch {
+      toast({ title: "Failed to customize", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleReplace = () => {
+    if (!generatedContent) return;
+    const key = `template-notes-${template.id}`;
+    localStorage.setItem(key, generatedContent);
+    toast({ title: "Content saved as notes" });
+    onClose();
+  };
+
+  const handleAddAsNotes = () => {
+    if (!generatedContent) return;
+    const key = `template-notes-${template.id}`;
+    const existing = localStorage.getItem(key) || "";
+    localStorage.setItem(key, existing ? `${existing}\n\n---\n\n${generatedContent}` : generatedContent);
+    toast({ title: "Added to notes" });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-y-0 right-0 z-50 flex" style={{ animation: 'scheduleStaggerIn 0.2s ease-out both' }}>
+      <div className="w-[380px] max-w-full h-full overflow-y-auto" style={{ backgroundColor: '#1a1d2e', borderLeft: '1px solid #2a2d3e' }}>
+        <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid #2a2d3e' }}>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" style={{ color: '#d4a017' }} />
+            <span className="font-semibold text-white">Customize This Section</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="text-white" data-testid="button-close-customize">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="rounded-lg p-3" style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e' }}>
+            <p className="text-xs" style={{ color: '#9ca3af' }}>
+              Customizing: <span className="text-white font-medium">{template.title}</span>
             </p>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <Award className="h-4 w-4 text-green-500" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Certified</span>
+            {restaurantName && (
+              <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
+                For: <span style={{ color: '#d4a017' }}>{restaurantName}</span>
+              </p>
+            )}
           </div>
-          <div className="text-2xl font-bold" data-testid="stat-certified">{completed.length}</div>
-          {recentlyCertified.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {recentlyCertified.length} in the last 7 days
-            </p>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <Calendar className="h-4 w-4 text-red-500" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overdue</span>
+
+          <div>
+            <label className="text-sm font-medium mb-1.5 block" style={{ color: '#9ca3af' }}>What would you like to change?</label>
+            <Textarea
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              placeholder="e.g., Adjust for a fast-casual concept with counter service..."
+              rows={4}
+              className="border-[#2a2d3e] text-white focus:ring-[#d4a017] resize-none"
+              style={{ backgroundColor: '#0f1117' }}
+              data-testid="textarea-customize-prompt"
+            />
           </div>
-          <div className={`text-2xl font-bold ${overdue.length > 0 ? "text-red-600 dark:text-red-400" : ""}`} data-testid="stat-overdue">{overdue.length}</div>
-          {overdue.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Started 14+ days ago
-            </p>
+
+          <Button
+            onClick={handleCustomize}
+            disabled={isGenerating || !customPrompt.trim()}
+            className="w-full"
+            style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+            data-testid="button-customize-generate"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Customization
+              </>
+            )}
+          </Button>
+
+          {generatedContent && (
+            <div className="space-y-3">
+              <div className="rounded-lg p-3" style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e', borderLeftWidth: '3px', borderLeftColor: '#d4a017' }}>
+                <div className="prose prose-sm prose-invert max-w-none text-sm">
+                  <ReactMarkdown>{generatedContent}</ReactMarkdown>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddAsNotes}
+                  style={{ borderColor: '#2a2d3e', color: '#d4a017' }}
+                  data-testid="button-add-as-notes"
+                >
+                  <StickyNote className="h-3 w-3 mr-1" />
+                  Add as Notes
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReplace}
+                  style={{ borderColor: '#2a2d3e', color: '#9ca3af' }}
+                  data-testid="button-replace-section"
+                >
+                  Replace Section
+                </Button>
+              </div>
+            </div>
           )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <GraduationCap className="h-4 w-4 text-primary" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Assigned</span>
-          </div>
-          <div className="text-2xl font-bold" data-testid="stat-total">{allAssignments.length}</div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {allAssignments.filter(a => a.templateCategory === "server").length} server, {allAssignments.filter(a => a.templateCategory === "kitchen").length} kitchen
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+      <div className="flex-1 bg-black/50" onClick={onClose} />
     </div>
   );
 }
@@ -530,8 +903,12 @@ function TrainingDashboardSummary() {
 export default function TemplatesPage() {
   const [, navigate] = useLocation();
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<TrainingTemplate | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("server");
+  const [showEditNotes, setShowEditNotes] = useState(false);
+  const [editNotesContent, setEditNotesContent] = useState("");
+  const [showCustomize, setShowCustomize] = useState(false);
 
   const { data: templates, isLoading } = useQuery<TrainingTemplate[]>({
     queryKey: ["/api/templates"],
@@ -556,6 +933,13 @@ export default function TemplatesPage() {
     }
   }, [activeCategory]);
 
+  useEffect(() => {
+    if (selectedTemplate) {
+      const key = `template-notes-${selectedTemplate.id}`;
+      setEditNotesContent(localStorage.getItem(key) || "");
+    }
+  }, [selectedTemplate]);
+
   const groupedBySection = currentTemplates.reduce<Record<string, TrainingTemplate[]>>((acc, template) => {
     if (!acc[template.section]) {
       acc[template.section] = [];
@@ -564,34 +948,53 @@ export default function TemplatesPage() {
     return acc;
   }, {});
 
+  const handleSaveNotes = () => {
+    if (!selectedTemplate) return;
+    const key = `template-notes-${selectedTemplate.id}`;
+    if (editNotesContent.trim()) {
+      localStorage.setItem(key, editNotesContent);
+    } else {
+      localStorage.removeItem(key);
+    }
+    toast({ title: "Notes saved" });
+  };
+
+  const isComingSoonTab = ["host", "bartender", "manager", "busser"].includes(activeCategory);
+  const hasContent = ["server", "kitchen"].includes(activeCategory);
+  const tabHasTemplates = (cat: string) => {
+    if (cat === "server") return serverTemplates.length > 0;
+    if (cat === "kitchen") return kitchenTemplates.length > 0;
+    return false;
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#0f1117' }}>
+      <header className="border-b sticky top-0 z-50 backdrop-blur" style={{ borderColor: '#2a2d3e', backgroundColor: 'rgba(15,17,23,0.95)', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back">
+              <Button variant="ghost" size="icon" data-testid="button-back" className="text-white">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
             <div className="flex items-center gap-2">
-              <ChefHat className="h-6 w-6 text-primary" />
-              <span className="font-bold">Training Templates</span>
+              <ChefHat className="h-6 w-6" style={{ color: '#d4a017' }} />
+              <span className="font-bold text-white">Training Templates</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-muted cursor-pointer" data-testid="button-user-menu">
+              <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer" data-testid="button-user-menu">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
-                  <AvatarFallback>
+                  <AvatarFallback style={{ backgroundColor: '#2a2d3e', color: '#d4a017' }}>
                     {user?.firstName?.[0] || user?.email?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-sm hidden md:inline">
+                <span className="text-sm hidden md:inline text-white">
                   {user?.firstName || user?.email || "User"}
                 </span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4" style={{ color: '#9ca3af' }} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
@@ -623,288 +1026,354 @@ export default function TemplatesPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Real Training Templates</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold mb-2 text-white">Training Templates</h1>
+          <p style={{ color: '#9ca3af' }}>
             {user?.restaurantName ? (
-              <>These training templates are personalized for <strong>{user.restaurantName}</strong>. Use them to build consistent, repeatable systems.</>
+              <>Personalized for <strong style={{ color: '#d4a017' }}>{user.restaurantName}</strong>. Build consistent, repeatable training systems.</>
             ) : (
-              <>These examples demonstrate how the consulting philosophy translates into actual training materials. Use these as models for building your own systems.</>
+              <>Build consistent, repeatable training systems using proven restaurant frameworks.</>
             )}
           </p>
         </div>
 
-        <TrainingDashboardSummary />
+        <TrainingIntelligenceStrip />
 
-        <Tabs value={activeCategory} onValueChange={setActiveCategory} className="mb-6">
-          <TabsList className="flex flex-wrap gap-1 h-auto w-full max-w-4xl">
-            <TabsTrigger value="server" className="flex flex-wrap items-center gap-2" data-testid="tab-server">
-              <Users className="h-4 w-4" />
-              Server
-            </TabsTrigger>
-            <TabsTrigger value="kitchen" className="flex flex-wrap items-center gap-2" data-testid="tab-kitchen">
-              <ChefHat className="h-4 w-4" />
-              Kitchen
-            </TabsTrigger>
-            <TabsTrigger value="host" className="flex flex-wrap items-center gap-2" data-testid="tab-host">
-              Host
-            </TabsTrigger>
-            <TabsTrigger value="bartender" className="flex flex-wrap items-center gap-2" data-testid="tab-bartender">
-              Bartender
-            </TabsTrigger>
-            <TabsTrigger value="manager" className="flex flex-wrap items-center gap-2" data-testid="tab-manager">
-              Manager
-            </TabsTrigger>
-            <TabsTrigger value="busser" className="flex flex-wrap items-center gap-2" data-testid="tab-busser">
-              Busser
-            </TabsTrigger>
-            <TabsTrigger value="handbook" className="flex flex-wrap items-center gap-2" data-testid="tab-handbook">
-              <BookOpen className="h-4 w-4" />
-              Handbook
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="mb-6 overflow-x-auto">
+          <div className="flex gap-1 min-w-max pb-2">
+            {[
+              { value: "server", label: "Server", icon: Users },
+              { value: "kitchen", label: "Kitchen", icon: ChefHat },
+              { value: "host", label: "Host", icon: Users, comingSoon: true },
+              { value: "bartender", label: "Bartender", icon: Wine, comingSoon: true },
+              { value: "manager", label: "Manager", icon: Briefcase, comingSoon: true },
+              { value: "busser", label: "Busser", icon: HandMetal, comingSoon: true },
+              { value: "handbook", label: "Handbook", icon: BookOpen },
+            ].map((tab) => {
+              const isActive = activeCategory === tab.value;
+              const hasData = tabHasTemplates(tab.value);
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setActiveCategory(tab.value)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                  style={{
+                    backgroundColor: isActive ? '#1a1d2e' : 'transparent',
+                    borderBottom: isActive ? '2px solid #d4a017' : '2px solid transparent',
+                    color: isActive ? '#ffffff' : tab.comingSoon ? '#6b7280' : '#9ca3af',
+                    fontStyle: tab.comingSoon ? 'italic' : 'normal',
+                  }}
+                  data-testid={`tab-${tab.value}`}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  {tab.label}
+                  {tab.comingSoon && (
+                    <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-[10px] px-1.5 py-0" style={{ backgroundColor: 'rgba(156,163,175,0.15)', color: '#6b7280' }}>
+                      Soon
+                    </Badge>
+                  )}
+                  {!tab.comingSoon && !isActive && hasData && (
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: '#d4a017' }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {activeCategory === "handbook" ? (
           <HandbookBuilder user={user} />
-        ) : ["host", "bartender", "manager", "busser"].includes(activeCategory) ? (
-          <Card className="min-h-[400px] flex items-center justify-center">
-            <CardContent className="text-center py-12">
-              <GraduationCap className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-              <h3 className="font-semibold text-xl mb-2">
-                {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)} Training
-              </h3>
-              <Badge variant="secondary" className="mb-4">Coming Soon</Badge>
-              <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
-                {activeCategory === "host" && "Structured training for hosts and hostesses covering reservation management, seating flow, guest experience, and waitlist management."}
-                {activeCategory === "bartender" && "Comprehensive bartender training covering cocktail preparation, speed techniques, responsible alcohol service, and bar inventory management."}
-                {activeCategory === "manager" && "Shift lead and manager training covering labor management, conflict resolution, opening/closing procedures, and operational decision-making."}
-                {activeCategory === "busser" && "Food runner and busser training covering table turnover, support service, dish handling, and team coordination during peak service."}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Until this track is available, use the Server or Kitchen training programs as a starting framework and customize with your own notes.
-              </p>
-            </CardContent>
-          </Card>
+        ) : isComingSoonTab ? (
+          <ComingSoonTab role={activeCategory} />
         ) : (
           <div>
-          <TrainingProgressPanel activeCategory={activeCategory} />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-                  <GraduationCap className="h-5 w-5 text-primary" />
-                  {activeCategory === "server" ? "Server Manual" : "Kitchen Manual"}
-                </CardTitle>
-                <CardDescription>
-                  7-day training program with structured daily objectives
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[60vh]">
-                  {isLoading ? (
-                    <div className="p-4 space-y-4">
-                      {[...Array(6)].map((_, i) => (
-                        <Skeleton key={i} className="h-16 w-full" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-2">
-                      {Object.entries(groupedBySection).map(([section, sectionTemplates]) => (
-                        <div key={section} className="mb-4">
-                          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            {section}
-                          </div>
-                          {sectionTemplates.map((template) => {
-                            const Icon = contentTypeIcons[template.contentType] || FileText;
-                            const isSelected = selectedTemplate?.id === template.id;
-                            return (
-                              <button
-                                key={template.id}
-                                onClick={() => setSelectedTemplate(template)}
-                                className={`w-full text-left p-3 rounded-md transition-colors ${
-                                  isSelected 
-                                    ? "bg-primary/10 border border-primary/20" 
-                                    : "hover-elevate"
-                                }`}
-                                data-testid={`template-item-${template.id}`}
-                              >
-                                <div className="flex items-start gap-2">
-                                  <Icon className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-sm truncate">
-                                      {template.title}
-                                    </div>
-                                    <Badge 
-                                      variant="secondary" 
-                                      className={`mt-1 text-xs ${contentTypeColors[template.contentType] || ""}`}
-                                    >
-                                      {template.contentType}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-2">
-            {selectedTemplate ? (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-xl">
-                        {personalizeContent(selectedTemplate.title, user?.restaurantName)}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {selectedTemplate.section}
-                      </CardDescription>
-                    </div>
+            <TrainingProgressPanel activeCategory={activeCategory} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <div className="rounded-lg" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+                  <div className="p-4" style={{ borderBottom: '1px solid #2a2d3e' }}>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const printContent = personalizeContent(selectedTemplate.content, user?.restaurantName);
-                          const printWindow = window.open('', '_blank');
-                          if (printWindow) {
-                            printWindow.document.write(`
-                              <!DOCTYPE html>
-                              <html>
-                              <head>
-                                <title>${personalizeContent(selectedTemplate.title, user?.restaurantName)}</title>
-                                <style>
-                                  body { 
-                                    font-family: system-ui, -apple-system, sans-serif; 
-                                    padding: 40px; 
-                                    max-width: 800px; 
-                                    margin: 0 auto;
-                                    line-height: 1.6;
-                                  }
-                                  h1 { margin-bottom: 8px; font-size: 24px; }
-                                  .section { color: #666; margin-bottom: 16px; font-size: 14px; }
-                                  .badge { 
-                                    display: inline-block; 
-                                    background: #f3f4f6; 
-                                    padding: 4px 8px; 
-                                    border-radius: 4px; 
-                                    font-size: 12px;
-                                    margin-right: 8px;
-                                    margin-bottom: 8px;
-                                  }
-                                  .key-points { margin-bottom: 24px; }
-                                  .content { 
-                                    white-space: pre-wrap; 
-                                    font-family: monospace; 
-                                    background: #f9fafb; 
-                                    padding: 20px; 
-                                    border-radius: 8px;
-                                    border: 1px solid #e5e7eb;
-                                    font-size: 13px;
-                                  }
-                                  @media print {
-                                    body { padding: 20px; }
-                                    .no-print { display: none; }
-                                  }
-                                </style>
-                              </head>
-                              <body>
-                                <h1>${escapeHtml(personalizeContent(selectedTemplate.title, user?.restaurantName))}</h1>
-                                <div class="section">${escapeHtml(selectedTemplate.section)} | ${escapeHtml(selectedTemplate.contentType)}</div>
-                                ${selectedTemplate.keyPoints?.length ? `
-                                  <div class="key-points">
-                                    <strong>Key Points:</strong><br/>
-                                    ${selectedTemplate.keyPoints.map(p => `<span class="badge">${escapeHtml(personalizeContent(p, user?.restaurantName))}</span>`).join('')}
+                      <GraduationCap className="h-5 w-5" style={{ color: '#d4a017' }} />
+                      <span className="font-semibold text-white text-lg">
+                        {activeCategory === "server" ? "Server Manual" : "Kitchen Manual"}
+                      </span>
+                    </div>
+                    <p className="text-sm mt-1" style={{ color: '#9ca3af' }}>
+                      7-day training program with structured daily objectives
+                    </p>
+                  </div>
+                  <ScrollArea className="h-[60vh]">
+                    {isLoading ? (
+                      <div className="p-4 space-y-4">
+                        {[...Array(6)].map((_, i) => (
+                          <Skeleton key={i} className="h-16 w-full" style={{ backgroundColor: '#2a2d3e' }} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-2">
+                        {Object.entries(groupedBySection).map(([section, sectionTemplates]) => (
+                          <div key={section} className="mb-4">
+                            <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide" style={{ color: '#d4a017' }}>
+                              {section}
+                            </div>
+                            {sectionTemplates.map((template) => {
+                              const Icon = contentTypeIcons[template.contentType] || FileText;
+                              const isSelected = selectedTemplate?.id === template.id;
+                              const typeColor = contentTypeColors[template.contentType] || contentTypeColors.overview;
+                              return (
+                                <button
+                                  key={template.id}
+                                  onClick={() => setSelectedTemplate(template)}
+                                  className="w-full text-left p-3 rounded-md transition-colors"
+                                  style={{
+                                    backgroundColor: isSelected ? 'rgba(212,160,23,0.08)' : 'transparent',
+                                    borderLeft: isSelected ? '3px solid #d4a017' : '3px solid transparent',
+                                  }}
+                                  data-testid={`template-item-${template.id}`}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <span style={{ color: isSelected ? '#d4a017' : '#9ca3af' }}><Icon className="h-4 w-4 mt-0.5" /></span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-sm truncate" style={{ color: isSelected ? '#ffffff' : '#c0c0c0' }}>
+                                        {template.title}
+                                      </div>
+                                      <span
+                                        className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded"
+                                        style={{ backgroundColor: typeColor.bg, color: typeColor.text }}
+                                      >
+                                        {typeColor.label}
+                                      </span>
+                                    </div>
                                   </div>
-                                ` : ''}
-                                <div class="content">${escapeHtml(printContent)}</div>
-                              </body>
-                              </html>
-                            `);
-                            printWindow.document.close();
-                            printWindow.print();
-                          }
-                        }}
-                        data-testid="btn-print-template"
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2">
+                {selectedTemplate ? (
+                  <div className="rounded-lg" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+                    <div className="p-4" style={{ borderBottom: '1px solid #2a2d3e' }}>
+                      <div className="flex items-center gap-2 text-xs mb-2" style={{ color: '#9ca3af' }}>
+                        <span>{activeCategory === "server" ? "Server Manual" : "Kitchen Manual"}</span>
+                        <ChevronRight className="h-3 w-3" />
+                        <span>{selectedTemplate.section}</span>
+                        <ChevronRight className="h-3 w-3" />
+                        <span className="text-white">{selectedTemplate.title}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div>
+                          <h2 className="text-xl font-bold text-white">
+                            {personalizeContent(selectedTemplate.title, user?.restaurantName)}
+                          </h2>
+                          <p className="text-sm mt-1" style={{ color: '#9ca3af' }}>
+                            {selectedTemplate.section}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {(() => {
+                            const tc = contentTypeColors[selectedTemplate.contentType] || contentTypeColors.overview;
+                            return (
+                              <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: tc.bg, color: tc.text }}>
+                                {tc.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4">
+                      {selectedTemplate.keyPoints && selectedTemplate.keyPoints.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-semibold text-xs mb-2 uppercase tracking-wide" style={{ color: '#9ca3af' }}>
+                            Key Points
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedTemplate.keyPoints.map((point, i) => (
+                              <span
+                                key={i}
+                                className="text-xs px-2.5 py-1 rounded-full"
+                                style={{ border: '1px solid #d4a017', color: '#d4a017' }}
+                              >
+                                {personalizeContent(point, user?.restaurantName)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div
+                        className="whitespace-pre-wrap text-sm p-4 rounded-lg"
+                        style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e', color: '#c0c0c0', fontFamily: 'monospace' }}
+                        data-testid="template-content"
                       >
-                        <Printer className="h-4 w-4 mr-2" />
-                        Print
-                      </Button>
-                      {isNativeApp() && (
+                        {personalizeContent(selectedTemplate.content, user?.restaurantName)}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 mt-4" style={{ borderTop: '1px solid #2a2d3e', paddingTop: '1rem' }}>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            hapticTap();
-                            nativeShare({
-                              title: selectedTemplate.title,
-                              text: `Training Template: ${selectedTemplate.title}\n\n${selectedTemplate.content.slice(0, 200)}...`,
-                              url: `https://restaurantai.consulting/templates`,
-                            });
+                            navigator.clipboard.writeText(personalizeContent(selectedTemplate.content, user?.restaurantName));
+                            toast({ title: "Copied to clipboard" });
                           }}
-                          data-testid="btn-share-template"
+                          style={{ borderColor: '#2a2d3e', color: '#9ca3af' }}
+                          data-testid="btn-copy-template"
                         >
-                          <Share2 className="h-4 w-4 mr-2" />
-                          Share
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy
                         </Button>
-                      )}
-                      <Badge 
-                        variant="secondary"
-                        className={contentTypeColors[selectedTemplate.contentType] || ""}
-                      >
-                        {selectedTemplate.contentType}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {selectedTemplate.keyPoints && selectedTemplate.keyPoints.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="font-semibold text-sm mb-2 text-muted-foreground uppercase tracking-wide">
-                        Key Points
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedTemplate.keyPoints.map((point, i) => (
-                          <Badge key={i} variant="outline">
-                            {personalizeContent(point, user?.restaurantName)}
-                          </Badge>
-                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowEditNotes(!showEditNotes)}
+                          style={{ borderColor: '#2a2d3e', color: showEditNotes ? '#d4a017' : '#9ca3af' }}
+                          data-testid="btn-edit-notes"
+                        >
+                          <Edit3 className="h-3 w-3 mr-1" />
+                          Edit Notes
+                        </Button>
+                        {isNativeApp() && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              hapticTap();
+                              nativeShare({
+                                title: selectedTemplate.title,
+                                text: `Training Template: ${selectedTemplate.title}\n\n${selectedTemplate.content.slice(0, 200)}...`,
+                                url: `https://restaurantai.consulting/templates`,
+                              });
+                            }}
+                            style={{ borderColor: '#2a2d3e', color: '#9ca3af' }}
+                            data-testid="btn-share-template"
+                          >
+                            <Share2 className="h-3 w-3 mr-1" />
+                            Share
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const printContent = personalizeContent(selectedTemplate.content, user?.restaurantName);
+                            const printWindow = window.open('', '_blank');
+                            if (printWindow) {
+                              printWindow.document.write(`
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                  <title>${personalizeContent(selectedTemplate.title, user?.restaurantName)}</title>
+                                  <style>
+                                    body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+                                    h1 { margin-bottom: 8px; font-size: 24px; }
+                                    .section { color: #666; margin-bottom: 16px; font-size: 14px; }
+                                    .badge { display: inline-block; background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-right: 8px; margin-bottom: 8px; }
+                                    .key-points { margin-bottom: 24px; }
+                                    .content { white-space: pre-wrap; font-family: monospace; background: #f9fafb; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 13px; }
+                                    @media print { body { padding: 20px; } .no-print { display: none; } }
+                                  </style>
+                                </head>
+                                <body>
+                                  <h1>${escapeHtml(personalizeContent(selectedTemplate.title, user?.restaurantName))}</h1>
+                                  <div class="section">${escapeHtml(selectedTemplate.section)} | ${escapeHtml(selectedTemplate.contentType)}</div>
+                                  ${selectedTemplate.keyPoints?.length ? `
+                                    <div class="key-points">
+                                      <strong>Key Points:</strong><br/>
+                                      ${selectedTemplate.keyPoints.map(p => `<span class="badge">${escapeHtml(personalizeContent(p, user?.restaurantName))}</span>`).join('')}
+                                    </div>
+                                  ` : ''}
+                                  <div class="content">${escapeHtml(printContent)}</div>
+                                </body>
+                                </html>
+                              `);
+                              printWindow.document.close();
+                              printWindow.print();
+                            }
+                          }}
+                          style={{ borderColor: '#2a2d3e', color: '#9ca3af' }}
+                          data-testid="btn-print-template"
+                        >
+                          <Printer className="h-3 w-3 mr-1" />
+                          Print
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowCustomize(true)}
+                          style={{ borderColor: '#d4a017', color: '#d4a017' }}
+                          data-testid="btn-customize-template"
+                        >
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          Customize
+                        </Button>
                       </div>
-                    </div>
-                  )}
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <div className="whitespace-pre-wrap font-mono text-sm bg-muted/50 p-4 rounded-lg border">
-                      {personalizeContent(selectedTemplate.content, user?.restaurantName)}
+
+                      {showEditNotes && (
+                        <div className="mt-4" style={{ animation: 'scheduleStaggerIn 0.2s ease-out both' }}>
+                          <Textarea
+                            value={editNotesContent}
+                            onChange={(e) => setEditNotesContent(e.target.value)}
+                            placeholder="Add your notes for this template..."
+                            rows={4}
+                            className="border-[#2a2d3e] text-white focus:ring-[#d4a017] resize-none mb-2"
+                            style={{ backgroundColor: '#0f1117' }}
+                            data-testid="textarea-edit-notes"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={handleSaveNotes}
+                            style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+                            data-testid="btn-save-notes"
+                          >
+                            Save Notes
+                          </Button>
+                          {editNotesContent && (
+                            <div className="mt-3 rounded-lg p-3" style={{ backgroundColor: 'rgba(212,160,23,0.08)', border: '1px solid rgba(212,160,23,0.2)' }}>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <StickyNote className="h-3 w-3" style={{ color: '#d4a017' }} />
+                                <span className="text-xs font-medium" style={{ color: '#d4a017' }}>Saved Notes</span>
+                              </div>
+                              <p className="text-sm whitespace-pre-wrap" style={{ color: '#c0c0c0' }}>{editNotesContent}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="h-full flex items-center justify-center min-h-[400px]">
-                <CardContent className="text-center">
-                  <BookOpen className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                  <h3 className="font-semibold text-lg mb-2">Select a Template</h3>
-                  <p className="text-muted-foreground text-sm max-w-xs">
-                    Choose a training template from the list to view its contents and see how structured training programs are built.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="rounded-lg h-full flex items-center justify-center min-h-[400px]" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+                    <div className="text-center">
+                      <BookOpen className="h-12 w-12 mx-auto mb-4" style={{ color: '#4a4d5e' }} />
+                      <h3 className="font-semibold text-lg mb-2 text-white">Select a Template</h3>
+                      <p className="text-sm max-w-xs" style={{ color: '#9ca3af' }}>
+                        Choose a training template from the list to view its contents.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-        </div>
         )}
       </main>
+
+      {showCustomize && selectedTemplate && (
+        <CustomizePanel
+          template={selectedTemplate}
+          restaurantName={user?.restaurantName}
+          onClose={() => setShowCustomize(false)}
+        />
+      )}
     </div>
   );
 }

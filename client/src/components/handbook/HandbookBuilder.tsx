@@ -3,14 +3,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -32,12 +30,13 @@ import {
   Shirt,
   Calendar,
   Clock,
-  AlertTriangle,
-  CheckCircle2,
   Loader2,
   X,
   Shield,
   Check,
+  Download,
+  Copy,
+  Plus,
 } from "lucide-react";
 import type { HandbookSettings } from "@shared/schema";
 
@@ -69,10 +68,74 @@ const schedulingApps = [
   { value: "none", label: "None / Paper Schedule" },
 ];
 
+const CUSTOM_POLICIES_KEY = "handbook-custom-policies";
+
+interface CustomPolicy {
+  id: string;
+  label: string;
+  desc: string;
+  enabled: boolean;
+}
+
+function getStoredCustomPolicies(): CustomPolicy[] {
+  try {
+    const stored = localStorage.getItem(CUSTOM_POLICIES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomPolicies(policies: CustomPolicy[]) {
+  localStorage.setItem(CUSTOM_POLICIES_KEY, JSON.stringify(policies));
+}
+
+function getSectionCompleteness(formData: Partial<HandbookSettings>): Record<string, number> {
+  const restaurantFields = [
+    formData.restaurantName,
+    formData.ownerNames,
+    formData.restaurantAddress,
+    formData.restaurantPhone,
+    formData.restaurantEmail,
+    formData.missionStatement,
+  ];
+  const restaurantFilled = restaurantFields.filter(f => f && String(f).trim().length > 0).length;
+
+  const operationsFields = [
+    formData.schedulingApp,
+    formData.orientationDays,
+    formData.evaluationSchedule,
+  ];
+  const operationsFilled = operationsFields.filter(f => f && String(f).trim().length > 0).length;
+
+  const uniformFields = [
+    formData.uniformDiningRoom,
+    formData.uniformKitchen,
+  ];
+  const uniformFilled = uniformFields.filter(f => f && String(f).trim().length > 0).length;
+
+  const benefitsFields = [
+    formData.employeeMealPolicy,
+    formData.parkingPolicy,
+  ];
+  const benefitsFilled = benefitsFields.filter(f => f && String(f).trim().length > 0).length;
+
+  return {
+    restaurant: Math.round((restaurantFilled / restaurantFields.length) * 100),
+    operations: Math.round((operationsFilled / operationsFields.length) * 100),
+    uniform: Math.round((uniformFilled / uniformFields.length) * 100),
+    benefits: Math.round((benefitsFilled / benefitsFields.length) * 100),
+  };
+}
+
 export function HandbookBuilder({ user }: { user?: any }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("setup");
   const [newHoliday, setNewHoliday] = useState("");
+  const [showAddCustomPolicy, setShowAddCustomPolicy] = useState(false);
+  const [customPolicyLabel, setCustomPolicyLabel] = useState("");
+  const [customPolicyDesc, setCustomPolicyDesc] = useState("");
+  const [customPolicies, setCustomPolicies] = useState<CustomPolicy[]>(getStoredCustomPolicies);
   const [policyToggles, setPolicyToggles] = useState<Record<string, boolean>>({
     attendance: true,
     discipline: true,
@@ -175,6 +238,37 @@ export function HandbookBuilder({ user }: { user?: any }) {
       ...formData,
       closedHolidays: formData.closedHolidays?.filter(h => h !== holiday) || [],
     });
+  };
+
+  const addCustomPolicy = () => {
+    if (!customPolicyLabel.trim()) return;
+    const newPolicy: CustomPolicy = {
+      id: `custom-${Date.now()}`,
+      label: customPolicyLabel.trim(),
+      desc: customPolicyDesc.trim(),
+      enabled: true,
+    };
+    const updated = [...customPolicies, newPolicy];
+    setCustomPolicies(updated);
+    saveCustomPolicies(updated);
+    setCustomPolicyLabel("");
+    setCustomPolicyDesc("");
+    setShowAddCustomPolicy(false);
+    toast({ title: "Custom policy added" });
+  };
+
+  const toggleCustomPolicy = (id: string) => {
+    const updated = customPolicies.map(p =>
+      p.id === id ? { ...p, enabled: !p.enabled } : p
+    );
+    setCustomPolicies(updated);
+    saveCustomPolicies(updated);
+  };
+
+  const removeCustomPolicy = (id: string) => {
+    const updated = customPolicies.filter(p => p.id !== id);
+    setCustomPolicies(updated);
+    saveCustomPolicies(updated);
   };
 
   const generateHandbook = (): string => {
@@ -499,7 +593,6 @@ Date: ________________________________
 `;
   };
 
-  // HTML escape function to prevent XSS
   const escapeHtml = (str: string): string => {
     const htmlEscapes: Record<string, string> = {
       '&': '&amp;',
@@ -625,28 +718,50 @@ Date: ________________________________
     }
   };
 
+  const handleDownloadPdf = () => {
+    handlePrint();
+  };
+
+  const handleCopyAll = () => {
+    const content = generateHandbook();
+    navigator.clipboard.writeText(content).then(() => {
+      toast({ title: "Copied to clipboard", description: "Handbook content has been copied." });
+    }).catch(() => {
+      toast({ title: "Copy failed", description: "Unable to copy content.", variant: "destructive" });
+    });
+  };
+
+  const completeness = getSectionCompleteness(formData);
+
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <div className="rounded-md p-8 flex items-center justify-center" style={{ background: "#0f1117", minHeight: 256 }}>
+        <Loader2 className="h-8 w-8 animate-spin gold-text" />
+      </div>
     );
   }
 
+  const tabs = [
+    { id: "setup", label: "Setup", icon: Settings },
+    { id: "policies", label: "Policies", icon: Shield },
+    { id: "preview", label: "Preview", icon: FileText },
+  ];
+
+  const enabledStandardCount = Object.values(policyToggles).filter(Boolean).length;
+  const enabledCustomCount = customPolicies.filter(p => p.enabled).length;
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="space-y-0">
+      <div className="rounded-md p-5" style={{ background: "#1a1d2e" }}>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-              <BookOpen className="h-5 w-5 text-primary" />
+            <h3 className="flex flex-wrap items-center gap-2 text-lg font-bold text-white">
+              <BookOpen className="h-5 w-5 gold-text" />
               Employee Handbook Builder
-            </CardTitle>
-            <CardDescription>
+            </h3>
+            <p className="text-sm mt-1" style={{ color: "hsl(220,10%,55%)" }}>
               Create a customized employee handbook for your restaurant
-            </CardDescription>
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -673,69 +788,91 @@ Date: ________________________________
             </Button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-4">
-            <TabsTrigger value="setup" className="flex flex-wrap items-center gap-2" data-testid="tab-handbook-setup">
-              <Settings className="h-4 w-4" />
-              Setup
-            </TabsTrigger>
-            <TabsTrigger value="policies" className="flex flex-wrap items-center gap-2" data-testid="tab-handbook-policies">
-              <AlertTriangle className="h-4 w-4" />
-              Policies
-            </TabsTrigger>
-            <TabsTrigger value="preview" className="flex flex-wrap items-center gap-2" data-testid="tab-handbook-preview">
-              <FileText className="h-4 w-4" />
-              Preview
-            </TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="setup" className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="font-semibold flex flex-wrap items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Restaurant Information
-              </h3>
+        <div className="flex gap-1 mb-5" data-testid="handbook-tab-bar">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const TabIcon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  isActive
+                    ? "text-white"
+                    : "text-gray-400"
+                }`}
+                style={{
+                  background: isActive ? "#0f1117" : "transparent",
+                  borderBottom: isActive ? "2px solid hsl(38,55%,52%)" : "2px solid transparent",
+                }}
+                data-testid={`tab-handbook-${tab.id}`}
+              >
+                <TabIcon className={`h-4 w-4 ${isActive ? "gold-text" : ""}`} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeTab === "setup" && (
+          <div className="space-y-6" style={{ animation: "scheduleStaggerIn 0.3s ease-out" }}>
+            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
+                  <Building2 className="h-4 w-4 gold-text" />
+                  Restaurant Information
+                </h3>
+                <div className="flex items-center gap-2 min-w-[120px]">
+                  <Progress value={completeness.restaurant} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
+                  <span className="text-xs gold-text">{completeness.restaurant}%</span>
+                </div>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="restaurantName">Restaurant Name</Label>
+                  <Label htmlFor="restaurantName" className="text-sm text-gray-300">Restaurant Name</Label>
                   <Input
                     id="restaurantName"
                     placeholder="e.g., The Golden Fork"
                     value={formData.restaurantName || ""}
                     onChange={(e) => setFormData({ ...formData, restaurantName: e.target.value })}
+                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-restaurant-name"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ownerNames">Owner Name(s)</Label>
+                  <Label htmlFor="ownerNames" className="text-sm text-gray-300">Owner Name(s)</Label>
                   <Input
                     id="ownerNames"
                     placeholder="e.g., John and Jane Smith"
                     value={formData.ownerNames || ""}
                     onChange={(e) => setFormData({ ...formData, ownerNames: e.target.value })}
+                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-owner-names"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="restaurantAddress">Address</Label>
+                <Label htmlFor="restaurantAddress" className="text-sm text-gray-300">Address</Label>
                 <Input
                   id="restaurantAddress"
                   placeholder="e.g., 123 Main Street, Austin, TX 78701"
                   value={formData.restaurantAddress || ""}
                   onChange={(e) => setFormData({ ...formData, restaurantAddress: e.target.value })}
+                  className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                  style={{ background: "#0f1117" }}
                   data-testid="input-restaurant-address"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="restaurantPhone" className="flex flex-wrap items-center gap-1">
-                    <Phone className="h-3 w-3" />
+                  <Label htmlFor="restaurantPhone" className="flex flex-wrap items-center gap-1 text-sm text-gray-300">
+                    <Phone className="h-3 w-3 gold-text" />
                     Phone
                   </Label>
                   <Input
@@ -743,12 +880,14 @@ Date: ________________________________
                     placeholder="(512) 555-1234"
                     value={formData.restaurantPhone || ""}
                     onChange={(e) => setFormData({ ...formData, restaurantPhone: e.target.value })}
+                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-restaurant-phone"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="restaurantEmail" className="flex flex-wrap items-center gap-1">
-                    <Mail className="h-3 w-3" />
+                  <Label htmlFor="restaurantEmail" className="flex flex-wrap items-center gap-1 text-sm text-gray-300">
+                    <Mail className="h-3 w-3 gold-text" />
                     Email
                   </Label>
                   <Input
@@ -756,12 +895,14 @@ Date: ________________________________
                     placeholder="manager@restaurant.com"
                     value={formData.restaurantEmail || ""}
                     onChange={(e) => setFormData({ ...formData, restaurantEmail: e.target.value })}
+                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-restaurant-email"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="restaurantWebsite" className="flex flex-wrap items-center gap-1">
-                    <Globe className="h-3 w-3" />
+                  <Label htmlFor="restaurantWebsite" className="flex flex-wrap items-center gap-1 text-sm text-gray-300">
+                    <Globe className="h-3 w-3 gold-text" />
                     Website
                   </Label>
                   <Input
@@ -769,40 +910,52 @@ Date: ________________________________
                     placeholder="www.restaurant.com"
                     value={formData.restaurantWebsite || ""}
                     onChange={(e) => setFormData({ ...formData, restaurantWebsite: e.target.value })}
+                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-restaurant-website"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="missionStatement">Mission Statement</Label>
+                <Label htmlFor="missionStatement" className="text-sm text-gray-300">Mission Statement</Label>
                 <Textarea
                   id="missionStatement"
                   placeholder="Your restaurant's mission and values..."
                   value={formData.missionStatement || ""}
                   onChange={(e) => setFormData({ ...formData, missionStatement: e.target.value })}
-                  className="min-h-[100px]"
+                  className="min-h-[100px] border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                  style={{ background: "#0f1117" }}
                   data-testid="textarea-mission-statement"
                 />
               </div>
             </div>
 
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="font-semibold flex flex-wrap items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Operations
-              </h3>
+            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
+                  <Clock className="h-4 w-4 gold-text" />
+                  Operations
+                </h3>
+                <div className="flex items-center gap-2 min-w-[120px]">
+                  <Progress value={completeness.operations} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
+                  <span className="text-xs gold-text">{completeness.operations}%</span>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="schedulingApp">Scheduling App</Label>
+                  <Label htmlFor="schedulingApp" className="text-sm text-gray-300">Scheduling App</Label>
                   <Select
                     value={formData.schedulingApp || ""}
                     onValueChange={(value) => setFormData({ ...formData, schedulingApp: value })}
                   >
-                    <SelectTrigger id="schedulingApp" data-testid="select-scheduling-app">
+                    <SelectTrigger
+                      id="schedulingApp"
+                      className="border-[hsl(232,15%,20%)] focus:ring-[hsl(38,55%,52%)]"
+                      style={{ background: "#0f1117" }}
+                      data-testid="select-scheduling-app"
+                    >
                       <SelectValue placeholder="Select app" />
                     </SelectTrigger>
                     <SelectContent>
@@ -815,7 +968,7 @@ Date: ________________________________
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="orientationDays">Orientation Period (days)</Label>
+                  <Label htmlFor="orientationDays" className="text-sm text-gray-300">Orientation Period (days)</Label>
                   <Input
                     id="orientationDays"
                     type="number"
@@ -823,24 +976,28 @@ Date: ________________________________
                     max={90}
                     value={formData.orientationDays || 30}
                     onChange={(e) => setFormData({ ...formData, orientationDays: parseInt(e.target.value) || 30 })}
+                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-orientation-days"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="evaluationSchedule">Evaluation Schedule</Label>
+                  <Label htmlFor="evaluationSchedule" className="text-sm text-gray-300">Evaluation Schedule</Label>
                   <Input
                     id="evaluationSchedule"
                     placeholder="e.g., January and June"
                     value={formData.evaluationSchedule || ""}
                     onChange={(e) => setFormData({ ...formData, evaluationSchedule: e.target.value })}
+                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-evaluation-schedule"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label className="flex flex-wrap items-center gap-2">
-                  <Calendar className="h-4 w-4" />
+                <Label className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
+                  <Calendar className="h-4 w-4 gold-text" />
                   Closed Holidays
                 </Label>
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -853,7 +1010,7 @@ Date: ________________________________
                       {holiday}
                       <button
                         onClick={() => removeHoliday(holiday)}
-                        className="ml-1 hover:text-destructive"
+                        className="ml-1"
                         data-testid={`button-remove-holiday-${holiday.replace(/\s+/g, '-').toLowerCase()}`}
                       >
                         <X className="h-3 w-3" />
@@ -867,7 +1024,8 @@ Date: ________________________________
                     value={newHoliday}
                     onChange={(e) => setNewHoliday(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addHoliday())}
-                    className="flex-1"
+                    className="flex-1 border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                    style={{ background: "#0f1117" }}
                     data-testid="input-new-holiday"
                   />
                   <Button variant="outline" size="sm" onClick={addHoliday} data-testid="button-add-holiday">
@@ -877,83 +1035,98 @@ Date: ________________________________
               </div>
             </div>
 
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="font-semibold flex flex-wrap items-center gap-2">
-                <Shirt className="h-4 w-4" />
-                Uniform Policy
-              </h3>
+            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
+                  <Shirt className="h-4 w-4 gold-text" />
+                  Uniform Policy
+                </h3>
+                <div className="flex items-center gap-2 min-w-[120px]">
+                  <Progress value={completeness.uniform} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
+                  <span className="text-xs gold-text">{completeness.uniform}%</span>
+                </div>
+              </div>
 
               <div className="space-y-2">
-                <Label htmlFor="uniformDiningRoom">Dining Room Dress Code</Label>
+                <Label htmlFor="uniformDiningRoom" className="text-sm text-gray-300">Dining Room Dress Code</Label>
                 <Textarea
                   id="uniformDiningRoom"
                   placeholder="Describe the uniform requirements for dining room staff..."
                   value={formData.uniformDiningRoom || ""}
                   onChange={(e) => setFormData({ ...formData, uniformDiningRoom: e.target.value })}
-                  className="min-h-[120px] font-mono text-sm"
+                  className="min-h-[120px] font-mono text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                  style={{ background: "#0f1117" }}
                   data-testid="textarea-uniform-dining"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="uniformKitchen">Kitchen Dress Code</Label>
+                <Label htmlFor="uniformKitchen" className="text-sm text-gray-300">Kitchen Dress Code</Label>
                 <Textarea
                   id="uniformKitchen"
                   placeholder="Describe the uniform requirements for kitchen staff..."
                   value={formData.uniformKitchen || ""}
                   onChange={(e) => setFormData({ ...formData, uniformKitchen: e.target.value })}
-                  className="min-h-[120px] font-mono text-sm"
+                  className="min-h-[120px] font-mono text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                  style={{ background: "#0f1117" }}
                   data-testid="textarea-uniform-kitchen"
                 />
               </div>
             </div>
 
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="font-semibold flex flex-wrap items-center gap-2">
-                <Users className="h-4 w-4" />
-                Employee Benefits
-              </h3>
+            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
+                  <Users className="h-4 w-4 gold-text" />
+                  Employee Benefits
+                </h3>
+                <div className="flex items-center gap-2 min-w-[120px]">
+                  <Progress value={completeness.benefits} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
+                  <span className="text-xs gold-text">{completeness.benefits}%</span>
+                </div>
+              </div>
 
               <div className="space-y-2">
-                <Label htmlFor="employeeMealPolicy">Employee Meal Policy</Label>
+                <Label htmlFor="employeeMealPolicy" className="text-sm text-gray-300">Employee Meal Policy</Label>
                 <Textarea
                   id="employeeMealPolicy"
                   placeholder="Describe your employee meal discount or policy..."
                   value={formData.employeeMealPolicy || ""}
                   onChange={(e) => setFormData({ ...formData, employeeMealPolicy: e.target.value })}
-                  className="min-h-[80px]"
+                  className="min-h-[80px] border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                  style={{ background: "#0f1117" }}
                   data-testid="textarea-meal-policy"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="parkingPolicy">Parking Policy</Label>
+                <Label htmlFor="parkingPolicy" className="text-sm text-gray-300">Parking Policy</Label>
                 <Input
                   id="parkingPolicy"
                   placeholder="e.g., Park in employee designated areas only"
                   value={formData.parkingPolicy || ""}
                   onChange={(e) => setFormData({ ...formData, parkingPolicy: e.target.value })}
+                  className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                  style={{ background: "#0f1117" }}
                   data-testid="input-parking-policy"
                 />
               </div>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="policies" className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <h3 className="font-semibold flex flex-wrap items-center gap-2">
-                <Shield className="h-4 w-4" />
+        {activeTab === "policies" && (
+          <div className="space-y-5" style={{ animation: "scheduleStaggerIn 0.3s ease-out" }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
+                <Shield className="h-4 w-4 gold-text" />
                 Standard Policies
               </h3>
               <Badge variant="secondary" data-testid="badge-policy-count">
-                {Object.values(policyToggles).filter(Boolean).length} of {STANDARD_POLICIES.length} policies included
+                {enabledStandardCount + enabledCustomCount} of {STANDARD_POLICIES.length + customPolicies.length} included
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm" style={{ color: "hsl(220,10%,55%)" }}>
               Toggle policies on or off to include them in your handbook. Add custom notes where needed.
             </p>
 
@@ -963,15 +1136,23 @@ Date: ________________________________
                 return (
                   <div
                     key={policy.key}
-                    className="border rounded-md p-3 space-y-2"
+                    className="rounded-md p-3 space-y-2 transition-colors"
+                    style={{
+                      background: "#0f1117",
+                      border: "1px solid hsl(232,15%,20%)",
+                    }}
                     data-testid={`policy-section-${policy.key}`}
                   >
                     <div className="flex items-start gap-3">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={`toggle-elevate ${isOn ? "toggle-elevated" : ""} shrink-0 mt-0.5`}
+                      <button
+                        className="shrink-0 mt-0.5 rounded-md flex items-center justify-center transition-colors"
+                        style={{
+                          width: 28,
+                          height: 28,
+                          background: isOn ? "hsl(38,55%,52%)" : "transparent",
+                          border: isOn ? "none" : "1px solid hsl(232,15%,25%)",
+                          color: isOn ? "#0f1117" : "hsl(220,10%,55%)",
+                        }}
                         onClick={() =>
                           setPolicyToggles((prev) => ({
                             ...prev,
@@ -985,16 +1166,16 @@ Date: ________________________________
                         ) : (
                           <X className="h-4 w-4" />
                         )}
-                      </Button>
+                      </button>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm">{policy.label}</div>
-                        <div className="text-xs text-muted-foreground">{policy.desc}</div>
+                        <div className="font-medium text-sm text-white">{policy.label}</div>
+                        <div className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>{policy.desc}</div>
                       </div>
                     </div>
 
                     {isOn && policy.key === "alcohol" && (
                       <div className="pl-10 space-y-1">
-                        <Label htmlFor="alcoholPolicy" className="text-xs text-muted-foreground">
+                        <Label htmlFor="alcoholPolicy" className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>
                           Custom notes (optional)
                         </Label>
                         <Textarea
@@ -1002,7 +1183,8 @@ Date: ________________________________
                           placeholder="Any additional alcohol service policies specific to your restaurant..."
                           value={formData.alcoholPolicy || ""}
                           onChange={(e) => setFormData({ ...formData, alcoholPolicy: e.target.value })}
-                          className="min-h-[80px] text-sm"
+                          className="min-h-[80px] text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                          style={{ background: "#0f1117" }}
                           data-testid="textarea-alcohol-policy"
                         />
                       </div>
@@ -1010,7 +1192,7 @@ Date: ________________________________
 
                     {isOn && policy.key === "socialMedia" && (
                       <div className="pl-10 space-y-1">
-                        <Label htmlFor="socialMediaPolicy" className="text-xs text-muted-foreground">
+                        <Label htmlFor="socialMediaPolicy" className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>
                           Custom notes (optional)
                         </Label>
                         <Textarea
@@ -1018,7 +1200,8 @@ Date: ________________________________
                           placeholder="Any additional social media guidelines specific to your restaurant..."
                           value={formData.socialMediaPolicy || ""}
                           onChange={(e) => setFormData({ ...formData, socialMediaPolicy: e.target.value })}
-                          className="min-h-[80px] text-sm"
+                          className="min-h-[80px] text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                          style={{ background: "#0f1117" }}
                           data-testid="textarea-social-media-policy"
                         />
                       </div>
@@ -1028,35 +1211,176 @@ Date: ________________________________
               })}
             </div>
 
-            <Separator />
+            {customPolicies.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Plus className="h-3 w-3 gold-text" />
+                  Custom Policies
+                </h4>
+                {customPolicies.map((policy) => (
+                  <div
+                    key={policy.id}
+                    className="rounded-md p-3 space-y-2 transition-colors"
+                    style={{
+                      background: "#0f1117",
+                      border: "1px solid hsl(232,15%,20%)",
+                    }}
+                    data-testid={`policy-section-${policy.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <button
+                        className="shrink-0 mt-0.5 rounded-md flex items-center justify-center transition-colors"
+                        style={{
+                          width: 28,
+                          height: 28,
+                          background: policy.enabled ? "hsl(38,55%,52%)" : "transparent",
+                          border: policy.enabled ? "none" : "1px solid hsl(232,15%,25%)",
+                          color: policy.enabled ? "#0f1117" : "hsl(220,10%,55%)",
+                        }}
+                        onClick={() => toggleCustomPolicy(policy.id)}
+                        data-testid={`toggle-custom-policy-${policy.id}`}
+                      >
+                        {policy.enabled ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-white">{policy.label}</div>
+                        {policy.desc && (
+                          <div className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>{policy.desc}</div>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeCustomPolicy(policy.id)}
+                        data-testid={`button-remove-custom-policy-${policy.id}`}
+                      >
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="additionalPolicies">Other Policies</Label>
-              <p className="text-xs text-muted-foreground">
-                Any other policies you want to include in your handbook.
-              </p>
-              <Textarea
-                id="additionalPolicies"
-                placeholder="Any other policies you want to include in your handbook..."
-                value={formData.additionalPolicies || ""}
-                onChange={(e) => setFormData({ ...formData, additionalPolicies: e.target.value })}
-                className="min-h-[120px]"
-                data-testid="textarea-additional-policies"
-              />
+            <div className="pt-2">
+              {showAddCustomPolicy ? (
+                <div
+                  className="rounded-md p-4 space-y-3"
+                  style={{ background: "#0f1117", border: "1px solid hsl(38,55%,52%)" }}
+                >
+                  <h4 className="text-sm font-semibold text-white">Add Custom Policy</h4>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-300">Policy Name</Label>
+                    <Input
+                      placeholder="e.g., Technology Usage"
+                      value={customPolicyLabel}
+                      onChange={(e) => setCustomPolicyLabel(e.target.value)}
+                      className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                      style={{ background: "#0f1117" }}
+                      data-testid="input-custom-policy-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-300">Description (optional)</Label>
+                    <Input
+                      placeholder="Brief description of the policy..."
+                      value={customPolicyDesc}
+                      onChange={(e) => setCustomPolicyDesc(e.target.value)}
+                      className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                      style={{ background: "#0f1117" }}
+                      data-testid="input-custom-policy-desc"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={addCustomPolicy}
+                      disabled={!customPolicyLabel.trim()}
+                      data-testid="button-submit-custom-policy"
+                    >
+                      Add Policy
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setShowAddCustomPolicy(false); setCustomPolicyLabel(""); setCustomPolicyDesc(""); }}
+                      data-testid="button-cancel-custom-policy"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddCustomPolicy(true)}
+                  className="gold-text"
+                  data-testid="button-add-custom-policy"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Custom Policy
+                </Button>
+              )}
             </div>
-          </TabsContent>
 
-          <TabsContent value="preview">
-            <div className="border rounded-lg p-4">
+            <div className="border-t pt-4" style={{ borderColor: "hsl(232,15%,20%)" }}>
+              <div className="space-y-2">
+                <Label htmlFor="additionalPolicies" className="text-sm text-gray-300">Other Policies</Label>
+                <p className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>
+                  Any other policies you want to include in your handbook.
+                </p>
+                <Textarea
+                  id="additionalPolicies"
+                  placeholder="Any other policies you want to include in your handbook..."
+                  value={formData.additionalPolicies || ""}
+                  onChange={(e) => setFormData({ ...formData, additionalPolicies: e.target.value })}
+                  className="min-h-[120px] border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
+                  style={{ background: "#0f1117" }}
+                  data-testid="textarea-additional-policies"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "preview" && (
+          <div className="space-y-4" style={{ animation: "scheduleStaggerIn 0.3s ease-out" }}>
+            <div
+              className="rounded-md p-6"
+              style={{
+                background: "#ffffff",
+                border: "2px solid hsl(38,55%,52%)",
+              }}
+            >
               <ScrollArea className="h-[60vh]">
-                <pre className="whitespace-pre-wrap font-mono text-sm">
+                <pre className="whitespace-pre-wrap font-mono text-sm" style={{ color: "#1a1a1a" }}>
                   {generateHandbook()}
                 </pre>
               </ScrollArea>
             </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+
+            <div
+              className="flex flex-wrap items-center justify-center gap-3 p-3 rounded-md"
+              style={{ background: "#0f1117" }}
+              data-testid="preview-action-bar"
+            >
+              <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-preview-print">
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownloadPdf} data-testid="button-preview-download">
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleCopyAll} data-testid="button-preview-copy">
+                <Copy className="h-4 w-4 mr-2" />
+                Copy All Text
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

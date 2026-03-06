@@ -3811,6 +3811,55 @@ Generate JSON with:
     }
   });
 
+  app.post("/api/training/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { role, responsibilities, duration } = req.body;
+      if (!role || typeof role !== "string") {
+        return res.status(400).json({ message: "role is required" });
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const prompt = `You are a restaurant training program designer with 20+ years of experience building onboarding systems for independent restaurants.
+
+Generate a structured training outline for the "${role}" position.
+
+${responsibilities ? `KEY RESPONSIBILITIES:\n${responsibilities}\n` : ""}
+${duration ? `TRAINING DURATION: ${duration}` : "TRAINING DURATION: 5 days"}
+
+Create a day-by-day training program with:
+1. Each day's focus area and learning objectives
+2. Specific tasks and activities for each day
+3. Key skills to demonstrate
+4. Sign-off criteria for each day
+5. A final evaluation checklist
+
+Use restaurant-specific language. Be practical and actionable — not theoretical. Format with clear headers, numbered lists, and bullet points.`;
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        stream: true,
+        max_tokens: 3000,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("Training generation error:", err);
+      res.status(500).json({ message: "Failed to generate training content" });
+    }
+  });
+
   // Financial Document Routes
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
