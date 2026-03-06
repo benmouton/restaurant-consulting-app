@@ -2145,6 +2145,115 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/playbooks/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { title, description, context, category, role, mode } = req.body;
+      if (!title || typeof title !== "string") {
+        return res.status(400).json({ message: "title is required" });
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const modeInstructions: Record<string, string> = {
+        checklist: "Generate a clear, actionable checklist with bullet points. Each item should be a single, concrete task that can be checked off. Use '- [ ]' prefix for each item. Keep items concise but specific enough to execute without guessing.",
+        step_by_step: "Generate numbered steps with brief explanatory details under each. Format as '1. Step Title' followed by a short paragraph explaining how to execute it. Include timing estimates where relevant.",
+        deep_procedure: "Generate a comprehensive narrative procedure document with section headers (using ##), detailed instructions, context for why each section matters, and notes for common pitfalls. Write it like a training manual section.",
+      };
+
+      const prompt = `You are a restaurant operations expert with 20+ years building systems for independent restaurants. Generate a professional operational playbook.
+
+PLAYBOOK TITLE: ${title}
+${description ? `DESCRIPTION: ${description}` : ""}
+CATEGORY: ${category || "general"}
+ASSIGNED ROLE: ${role || "all team members"}
+${context ? `RESTAURANT CONTEXT: ${context}` : ""}
+
+FORMAT INSTRUCTIONS:
+${modeInstructions[mode] || modeInstructions.checklist}
+
+Write for restaurant operators — practical, specific, and immediately usable. Reference industry standards where relevant. Do not use generic corporate language.`;
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        stream: true,
+        max_tokens: 3000,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("Playbook generation error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to generate playbook content" });
+      } else {
+        res.end();
+      }
+    }
+  });
+
+  app.post("/api/playbooks/improve", isAuthenticated, async (req: any, res) => {
+    try {
+      const { title, currentContent, improvement, mode } = req.body;
+      if (!currentContent || !improvement) {
+        return res.status(400).json({ message: "currentContent and improvement are required" });
+      }
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const formatNote = mode === "checklist" ? "Keep the checklist format with '- [ ]' prefixed items." :
+        mode === "step_by_step" ? "Keep the numbered step format with explanatory details." :
+        "Keep the comprehensive narrative format with section headers.";
+
+      const prompt = `You are a restaurant operations expert. The operator wants to improve the following playbook for their restaurant. Rewrite it incorporating their requested changes, keeping the same format.
+
+PLAYBOOK TITLE: ${title}
+CURRENT CONTENT:
+${currentContent}
+
+REQUESTED IMPROVEMENT: ${improvement}
+
+${formatNote}
+
+Rewrite the entire playbook with the improvements applied. Be specific and practical.`;
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        stream: true,
+        max_tokens: 3000,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("Playbook improvement error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to improve playbook" });
+      } else {
+        res.end();
+      }
+    }
+  });
+
   // ===== SCHEDULING ROUTES =====
 
   // Staff Positions

@@ -654,6 +654,8 @@ export const playbooks = pgTable("playbooks", {
   userId: text("user_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
+  content: text("content"),
+  context: text("context"),
   category: text("category").notNull(), // 'opening', 'closing', 'prep', 'service', 'cleaning', 'safety', 'training', 'other'
   role: text("role"), // 'boh', 'foh', 'management', 'all'
   mode: text("mode").notNull().default("checklist"), // 'checklist', 'step_by_step', 'deep_procedure'
