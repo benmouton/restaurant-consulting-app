@@ -15,7 +15,6 @@ import {
   Star, 
   ClipboardList, 
   AlertTriangle,
-  CheckCircle,
   ArrowRight,
   MessageSquare,
   Wrench,
@@ -25,13 +24,12 @@ import {
   ChevronUp,
   Shield,
   BookOpen,
-  TrendingUp,
-  Flame
+  FileStack,
+  BarChart3
 } from "lucide-react";
 import { BrandLogoNav } from "@/components/BrandLogo";
 import screenshotKitchen from "@/assets/images/screenshot-kitchen.png";
 import screenshotHr from "@/assets/images/screenshot-hr.png";
-import screenshotFoodcost from "@/assets/images/screenshot-foodcost.png";
 import screenshotConsultant from "@/assets/images/screenshot-consultant.png";
 
 const domains = [
@@ -103,34 +101,17 @@ const consultantExamples = [
     answer: "A 4% jump is a system failure, not a mystery. Start with three things: (1) Check your waste log\u2014if you don't have one, that's problem one. (2) Spot-check 10 proteins at service tonight\u2014are they hitting spec? (3) Review your last three vendor invoices for price creep. Most of the time it's a combination of portion drift and vendor increases nobody caught."
   },
   {
-    question: "How do I handle a server who keeps over-portioning?",
-    answer: "This isn't a conversation problem\u2014it's a systems problem. First: do you have portioning specs posted at every station? If not, you're asking people to guess. Second: weigh 5 plates at random during service tonight. Show the server the actual cost difference between their portions and spec. Make it about math, not feelings. Third: if it continues after documented coaching, it's a progressive discipline issue."
+    question: "My labor cost is over target. What do I check first?",
+    answer: "Three things, in order: (1) Pull your actual hours versus your projected hours for the last two weeks\u2014are you overstaffing openers or closers? Most labor waste happens in the first and last hour of a shift. (2) Check your cut discipline\u2014are managers cutting servers when covers drop, or are they letting people stand around? (3) Look at overtime\u2014one employee at 48 hours costs more than two at 24. Fix the schedule before you cut heads."
   },
   {
-    question: "Give me a script for cutting staff on a slow night.",
-    answer: "Here's your script: 'Hey [name], we're running light tonight. I'm going to cut you at [time]. Get your sidework done, close out your tables, and tip out by [time]. Thanks for being flexible.' The key: cut early, cut decisively. Don't wait until 8pm hoping it picks up. Check your covers at 5:30\u2014if you're 30% below projection, start cutting immediately. Every hour you wait costs you $15-25 per extra server."
+    question: "How do I write up an employee without a TWC problem later?",
+    answer: "Three rules: (1) Be specific\u2014'showed up 12 minutes late on 3/4, 3/7, and 3/11' beats 'has attendance issues.' Dates, times, witnesses. (2) State the policy they violated\u2014cite your handbook section. If you don't have one, build it today. (3) Document the conversation\u2014'employee was informed this is a written warning. Next occurrence may result in termination.' Have them sign it. If they refuse, note 'employee declined to sign' with a witness signature. TWC wants a paper trail. Give them one."
   },
   {
-    question: "What should I do when the kitchen gets slammed?",
-    answer: "Stop talking and start triaging. (1) Call out ticket times\u2014'Table 12 is at 18 minutes, that's priority.' (2) Consolidate the board\u2014group similar items to batch cook. (3) Pull one person off prep to expedite or run food. (4) Communicate with the floor: 'We're running 5 minutes long on entr\u00e9es\u2014buy me time with table touches.' After service, debrief: what broke and what system prevents it next time?"
+    question: "We're losing money on a popular dish. What do I do?",
+    answer: "Popular but unprofitable is a Plowhorse\u2014it drives traffic but bleeds margin. Three options: (1) Re-engineer the plate\u2014swap one expensive protein component for a cheaper one without changing the identity. Can you use chicken thigh instead of breast? House-made sauce instead of purchased? (2) Reduce the portion by 10%\u2014most guests won't notice if you plate it correctly. (3) Raise the price $1.50-2.00 and reposition it on the menu. Test for two weeks and watch the mix. Don't kill a Plowhorse\u2014fix it."
   }
-];
-
-const pricingFeatures = [
-  `All ${TOTAL_DOMAIN_COUNT} operational domains`,
-  "Operations Consultant (unlimited)",
-  "Kitchen Command Center",
-  "HR Documentation & Compliance Engine",
-  "Training Templates & Programs",
-  "Skills Certification Engine",
-  "Food Cost Tools & Plate Costing",
-  "Staff Scheduling & Labor Demand",
-  "Financial Insights & Analysis",
-  "Crisis Management Playbooks",
-  "Review Response Generator",
-  "Social Media Post Builder",
-  "Employee Handbook Builder",
-  "Living Playbooks & SOPs",
 ];
 
 function TypingDots() {
@@ -170,6 +151,41 @@ function TypewriterText({ text, onComplete }: { text: string; onComplete?: () =>
   return <>{displayed}{!done && <span className="animate-pulse">|</span>}</>;
 }
 
+function TrainingManualMockup() {
+  return (
+    <div
+      className="w-full rounded-lg overflow-hidden"
+      style={{ backgroundColor: '#12141f', border: '1px solid #2a2d3e' }}
+    >
+      <div className="p-5">
+        <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: '#b8860b' }}>Server Training Manual</p>
+        <p className="text-sm font-semibold text-white mb-0.5">Mouton's Bistro & Bar</p>
+        <p className="text-xs" style={{ color: '#6b7280' }}>7-Day Certification Program</p>
+      </div>
+      <div className="px-5 pb-4 space-y-2.5">
+        {[
+          { day: "Day 1: Orientation & Standards", pct: 100 },
+          { day: "Day 2: Menu Knowledge", pct: 85 },
+          { day: "Day 3: POS & Service Flow", pct: 70 },
+          { day: "Day 4: Upselling & Guest Experience", pct: 55 },
+          { day: "Day 5: Sidework & Closing", pct: 40 },
+        ].map((item) => (
+          <div key={item.day}>
+            <p className="text-xs mb-1" style={{ color: '#9ca3af' }}>{item.day}</p>
+            <div className="h-1.5 rounded-full" style={{ backgroundColor: '#2a2d3e' }}>
+              <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: 'linear-gradient(90deg, #b8860b, #d4a017)' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="px-5 pb-5 pt-2 flex gap-2">
+        <div className="px-3 py-1.5 rounded text-xs font-medium" style={{ backgroundColor: '#b8860b', color: '#0f1117' }}>Download PDF</div>
+        <div className="px-3 py-1.5 rounded text-xs font-medium" style={{ border: '1px solid #2a2d3e', color: '#9ca3af' }}>Share</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Landing() {
   const [activeExample, setActiveExample] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
@@ -188,8 +204,8 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
+    <div className="min-h-screen" style={{ backgroundColor: '#0f1117' }}>
+      {/* 1. Nav */}
       <header className="sticky top-0 z-50" style={{ backgroundColor: '#0f1117', borderBottom: '1px solid #2a2d3e', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <BrandLogoNav linkTo="/" />
@@ -204,19 +220,21 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="py-16 md:py-24 px-4">
+      {/* 2. Hero */}
+      <section className="py-16 md:py-24 px-4" style={{ backgroundColor: '#0f1117' }}>
         <div className="container mx-auto max-w-4xl text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4" data-testid="text-hero-headline">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-white" data-testid="text-hero-headline">
             Replace Chaos with{" "}
-            <span className="text-primary">Systems</span>
+            <span style={{ color: '#d4a017' }}>Systems</span>
           </h1>
-          <p className="text-xl text-muted-foreground mb-3 max-w-2xl mx-auto">
-            A hands-on restaurant consultant built by real service, real payroll, real guests, and real consequences. 
-            Not theory. Not motivation. <strong>Structure.</strong>
+          <p className="text-xl mb-3 max-w-2xl mx-auto" style={{ color: '#6b7280' }}>
+            Built on real service, real payroll, and real consequences — not theory.
           </p>
-          <p className="text-base text-foreground/70 mb-8 max-w-xl mx-auto">
-            Used by independent restaurant owners to cut labor costs, protect margins, and stop firefighting every shift.
+          <p className="text-xl mb-3 max-w-2xl mx-auto text-white font-bold">
+            Structure.
+          </p>
+          <p className="text-base mb-8 max-w-xl mx-auto" style={{ color: '#6b7280' }}>
+            Used by independent operators to cut labor costs, protect margins, and stop firefighting every shift.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
@@ -230,19 +248,20 @@ export default function Landing() {
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
-          <p className="text-sm text-primary font-medium italic mt-4" data-testid="text-tagline">
+          <p className="text-sm font-medium italic mt-4" style={{ color: '#d4a017' }} data-testid="text-tagline">
             Systems that work on your worst night.
           </p>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-sm mt-2" style={{ color: '#6b7280' }}>
             {FREE_DOMAIN_COUNT} core domains free forever. No credit card required.
           </p>
-          <p className="text-sm font-medium mt-3" data-testid="text-social-proof">
-            Built by Ben Mouton — restaurant owner, operator, and consultant.
+          <p className="text-sm mt-3" data-testid="text-social-proof">
+            <span className="font-semibold text-white">Built by Ben Mouton</span>
+            <span style={{ color: '#6b7280' }}> — restaurant owner, operator, and consultant.</span>
           </p>
         </div>
       </section>
 
-      {/* Consultant Feature - Interactive */}
+      {/* 3. Chat Demo */}
       <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#0f1117' }}>
         <div className="container mx-auto max-w-4xl">
           <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-start">
@@ -291,7 +310,7 @@ export default function Landing() {
               <div className="space-y-4">
                 <div className="p-3 rounded-md" style={{ backgroundColor: '#12141f' }}>
                   <p className="text-xs font-medium uppercase mb-1" style={{ color: '#6b7280' }}>You:</p>
-                  <p className="text-sm text-white" style={{ padding: '0' }}>{consultantExamples[activeExample].question}</p>
+                  <p className="text-sm text-white">{consultantExamples[activeExample].question}</p>
                 </div>
                 <div className="p-3 min-h-[120px]">
                   <p className="text-xs font-medium uppercase mb-1" style={{ color: '#6b7280' }}>Consultant:</p>
@@ -311,36 +330,69 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Philosophy */}
-      <section className="py-12 md:py-16 px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
-        <div className="container mx-auto max-w-4xl">
-          <div className="grid md:grid-cols-3 gap-6 md:gap-8 text-center">
-            <div className="p-4">
-              <Shield className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
-              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Structure Over Motivation</h3>
-              <p className="text-sm" style={{ color: '#6b7280' }}>
-                I don't sell inspiration. I sell systems that work when you're not there.
-              </p>
-            </div>
-            <div className="p-4">
-              <TrendingUp className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
-              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Systems Over Heroics</h3>
-              <p className="text-sm" style={{ color: '#6b7280' }}>
-                If one person has to save every shift, you don't have a business — you have a dependency.
-              </p>
-            </div>
-            <div className="p-4">
-              <Flame className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
-              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Clarity Over Chaos</h3>
-              <p className="text-sm" style={{ color: '#6b7280' }}>
-                Every recommendation is tested against a slammed dinner rush. If it doesn't hold up, it doesn't belong.
-              </p>
-            </div>
+      {/* 4. Testimonial Placeholder */}
+      {/* PLACEHOLDER: replace with real testimonial */}
+      <section className="py-12 md:py-16 px-4" style={{ backgroundColor: '#0f1117' }}>
+        <div className="mx-auto" style={{ maxWidth: '680px' }}>
+          <div
+            className="relative p-6 md:p-8 lg:p-10"
+            style={{
+              backgroundColor: '#1a1d2e',
+              borderLeft: '3px solid #b8860b',
+              borderRadius: '4px',
+            }}
+            data-testid="testimonial-block"
+          >
+            <span
+              className="absolute select-none"
+              style={{ color: '#b8860b', fontSize: '64px', lineHeight: '0', top: '28px', left: '16px', opacity: 0.3 }}
+              aria-hidden="true"
+            >
+              "
+            </span>
+            <p className="text-white italic mb-4 pl-6" style={{ fontSize: '18px', lineHeight: '1.8' }}>
+              I generated our Server and Manager manuals in one afternoon. New hire training went from three days of chaos to a system that works whether I'm in the building or not.
+            </p>
+            <p className="pl-6" style={{ color: '#6b7280', fontSize: '14px' }}>
+              — Independent Restaurant Owner, Texas
+            </p>
           </div>
         </div>
       </section>
 
-      {/* See It In Action - Product Screenshots */}
+      {/* 5. Three Product Capability Cards */}
+      <section className="py-12 md:py-16 px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
+        <div className="container mx-auto max-w-4xl">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8 text-center">
+            <div className="p-4">
+              <FileStack className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
+              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Training Manuals in 30 Seconds</h3>
+              <p className="text-sm" style={{ color: '#6b7280' }}>
+                Six role-specific manuals — Server, Kitchen, Bartender, Host, Busser, Manager — personalized to your restaurant the moment you click Generate. No starting from scratch. No generic templates.
+              </p>
+            </div>
+            <div className="p-4">
+              <BarChart3 className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
+              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Your Prime Cost, Every Week</h3>
+              <p className="text-sm" style={{ color: '#6b7280' }}>
+                Enter three numbers. Get your prime cost percentage versus your target, a 4-week trend, and a plain-language status: on track, watch this, or act now. Operators who track weekly make better decisions than operators who find out at month end.
+              </p>
+            </div>
+            <div className="p-4">
+              <Shield className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
+              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>An Ops Consultant Who Knows Your Restaurant</h3>
+              <p className="text-sm" style={{ color: '#6b7280' }}>
+                Not a generic chatbot. An operations consultant pre-loaded with your restaurant name, your concept, your financial targets, and your team. Ask it about your food cost. It answers with your numbers, not a tutorial.
+              </p>
+            </div>
+          </div>
+          <p className="text-center mt-8 italic" style={{ color: '#6b7280', fontSize: '14px' }}>
+            "Every recommendation is tested against a slammed dinner rush. If it doesn't hold up, it doesn't belong."
+          </p>
+        </div>
+      </section>
+
+      {/* 6. See It In Action */}
       <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#0f1117' }}>
         <div className="container mx-auto max-w-5xl">
           <h2 className="text-3xl font-bold text-center mb-3 text-white" data-testid="text-screenshots-heading">
@@ -350,10 +402,27 @@ export default function Landing() {
             Real tools, real dashboards. Not mockups — this is what you get on day one.
           </p>
           <div className="grid md:grid-cols-2 gap-6">
+            <div
+              className="group transition-all"
+              style={{
+                backgroundColor: '#1a1d2e',
+                border: '1px solid #2a2d3e',
+                borderRadius: '8px',
+                padding: '16px',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#b8860b'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2a2d3e'; }}
+              data-testid="screenshot-0"
+            >
+              <TrainingManualMockup />
+              <div className="mt-3">
+                <p className="font-semibold text-white" style={{ fontSize: '16px' }}>Training Manual Generator</p>
+                <p className="mt-1" style={{ color: '#6b7280', fontSize: '14px' }}>Six personalized manuals. One Generate button. Ready to print in 30 seconds.</p>
+              </div>
+            </div>
             {[
-              { img: screenshotKitchen, caption: "Know if your kitchen is ready before service — not during it.", label: "Kitchen Command Center" },
               { img: screenshotConsultant, caption: "Ask any operations question. Get real answers, not motivational quotes.", label: "Operations Consultant" },
-              { img: screenshotFoodcost, caption: "Build plates, track costs, protect margins — all in one place.", label: "Food Cost Tools" },
+              { img: screenshotKitchen, caption: "Know if your kitchen is ready before service — not during it.", label: "Kitchen Command Center" },
               { img: screenshotHr, caption: "Generate proper documentation in seconds. Protect yourself legally.", label: "HR & Compliance" },
             ].map((item, i) => (
               <div
@@ -367,7 +436,7 @@ export default function Landing() {
                 }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#b8860b'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2a2d3e'; }}
-                data-testid={`screenshot-${i}`}
+                data-testid={`screenshot-${i + 1}`}
               >
                 <div className="overflow-hidden" style={{ borderRadius: '6px' }}>
                   <img 
@@ -387,46 +456,78 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Credibility / About Section */}
-      <section className="py-16 md:py-20 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
-          <BookOpen className="h-10 w-10 text-primary mx-auto mb-4" />
-          <h2 className="text-3xl font-bold mb-4" data-testid="text-credibility-heading">
-            Built by an Operator, for Operators
-          </h2>
-          <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-            I built every system in this platform because I needed them in my own restaurants. 
-            They're not theoretical — they've been tested on real floors, during real rushes, with real staff.
+      {/* 7. Inline Pricing Callout */}
+      <section className="py-12 md:py-16 px-4" style={{ backgroundColor: '#1a1d2e' }}>
+        <div className="container mx-auto max-w-xl text-center">
+          <p className="text-white text-lg font-semibold mb-1">
+            {FREE_DOMAIN_COUNT} core domains free forever. No credit card required.
           </p>
-          <div className="grid sm:grid-cols-3 gap-4 text-center mt-8">
-            <Card className="p-4">
-              <p className="text-2xl font-bold text-primary">20+</p>
-              <p className="text-sm text-muted-foreground">Years in restaurant operations</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-2xl font-bold text-primary">12</p>
-              <p className="text-sm text-muted-foreground">Complete operational frameworks</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-2xl font-bold text-primary">Real</p>
-              <p className="text-sm text-muted-foreground">Battle-tested systems</p>
-            </Card>
+          <p className="mb-6" style={{ color: '#6b7280' }}>
+            Full platform access from <span style={{ color: '#d4a017', fontWeight: 600 }}>$10/month</span>.
+          </p>
+          <Button
+            size="lg"
+            onClick={() => { window.location.href = "/login"; }}
+            style={{ backgroundColor: '#b8860b', color: '#0f1117', fontWeight: 600, border: 'none' }}
+            className="hover:opacity-90"
+            data-testid="button-pricing-inline"
+          >
+            Get Started Free
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
+          <div className="mt-4">
+            <Link href="/pricing" className="text-sm hover:underline" style={{ color: '#d4a017' }} data-testid="link-view-pricing">
+              Want to see everything that's included? View full pricing
+            </Link>
           </div>
-          <p className="text-sm text-muted-foreground mt-8 italic">
-            "Every framework in this platform has been tested at Mouton's Bistro & Bar — 
-            during rushes, staff shortages, and the kind of nights that break restaurants without systems."
-          </p>
-          <p className="text-sm font-medium mt-2">— Ben Mouton, Founder</p>
         </div>
       </section>
 
-      {/* 12 Domains - Expandable */}
+      {/* 8. FAQ Section */}
+      <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#0f1117' }}>
+        <div className="mx-auto" style={{ maxWidth: '680px' }}>
+          <h2 className="font-semibold text-white mb-10" style={{ fontSize: '28px', fontWeight: 600 }} data-testid="text-faq-heading">
+            Common Questions
+          </h2>
+          <div className="space-y-0">
+            {[
+              {
+                q: "Is this built for independent restaurants or large chains?",
+                a: "Independent operators only. The systems, the language, and the tools are built for owners who are in their restaurant — not regional managers running reports from a corporate office."
+              },
+              {
+                q: "Do I need to be tech-savvy to use this?",
+                a: "No. If you can send an email, you can use this platform. Setup takes 5 minutes. Your first training manual takes 30 seconds."
+              },
+              {
+                q: "What's the difference between the free plan and paid?",
+                a: "Free gives you 3 core domains — Kitchen Operations, Crisis Management, and Ownership & Leadership. Paid unlocks everything: all 6 training manuals, prime cost tracking, menu engineering, HR documentation, scheduling tools, and the full Consultant."
+              },
+            ].map((item, i, arr) => (
+              <div
+                key={i}
+                style={{
+                  paddingBottom: '32px',
+                  marginBottom: i < arr.length - 1 ? '32px' : '0',
+                  borderBottom: i < arr.length - 1 ? '1px solid #2a2d3e' : 'none',
+                }}
+                data-testid={`faq-${i}`}
+              >
+                <h3 className="text-white mb-2" style={{ fontWeight: 600, fontSize: '17px' }}>{item.q}</h3>
+                <p style={{ color: '#6b7280', fontSize: '15px', lineHeight: '1.7' }}>{item.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 9. 12 Domains - Expandable */}
       <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
         <div className="container mx-auto max-w-5xl">
-          <h2 className="text-3xl font-bold text-center mb-3">
+          <h2 className="text-3xl font-bold text-center mb-3 text-white">
             12 Operational Domains
           </h2>
-          <p className="text-muted-foreground text-center mb-10 max-w-2xl mx-auto">
+          <p className="text-center mb-10 max-w-2xl mx-auto" style={{ color: '#6b7280' }}>
             Complete frameworks covering every area where restaurants succeed or fail.
             Tap any domain to see what's inside.
           </p>
@@ -476,48 +577,39 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing Breakdown */}
-      <section className="py-16 md:py-20 px-4">
+      {/* 10. Credibility */}
+      <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#0f1117' }}>
         <div className="container mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold mb-3" data-testid="text-pricing-heading">
-            Start Free. Upgrade When You're Ready.
+          <BookOpen className="h-10 w-10 text-primary mx-auto mb-4" />
+          <h2 className="text-3xl font-bold mb-4 text-white" data-testid="text-credibility-heading">
+            Built by an Operator, for Operators
           </h2>
-          <p className="text-muted-foreground mb-8">
-            {FREE_DOMAIN_COUNT} core domains — Leadership, Kitchen, and Crisis — are free forever. No credit card. No trial expiration. Upgrade to unlock all {TOTAL_DOMAIN_COUNT}:
+          <p className="mb-6 max-w-2xl mx-auto" style={{ color: '#6b7280' }}>
+            I built every system in this platform because I needed them in my own restaurants. 
+            They're not theoretical — they've been tested on real floors, during real rushes, with real staff.
           </p>
-          <Card className="p-6 md:p-8 text-left">
-            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
-              {pricingFeatures.map((feature) => (
-                <div key={feature} className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-sm">{feature}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 pt-6 border-t border-border text-center">
-              <p className="text-sm text-muted-foreground">
-                No credit card required. No contracts. Cancel anytime.
-              </p>
-              <Button
-                size="lg"
-                onClick={() => { window.location.href = "/login"; }}
-                className="mt-4 hover:opacity-90"
-                style={{ backgroundColor: '#b8860b', color: '#0f1117', fontWeight: 600, border: 'none' }}
-                data-testid="button-pricing-cta"
-              >
-                Get Started Free
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
-          </Card>
+          <div className="grid sm:grid-cols-3 gap-4 text-center mt-8">
+            <Card className="p-4">
+              <p className="text-2xl font-bold text-primary">20+</p>
+              <p className="text-sm text-muted-foreground">Years in restaurant operations</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-2xl font-bold text-primary">12</p>
+              <p className="text-sm text-muted-foreground">Complete operational frameworks</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-2xl font-bold text-primary">Real</p>
+              <p className="text-sm text-muted-foreground">Battle-tested systems</p>
+            </Card>
+          </div>
         </div>
       </section>
 
-      {/* Who It's For */}
+      {/* 11. Who It's For */}
       <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
         <div className="container mx-auto max-w-4xl">
-          <h2 className="text-3xl font-bold text-center mb-3">Built for Operators, Not Theorists</h2>
-          <p className="text-muted-foreground text-center mb-8 max-w-2xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-3 text-white">Built for Operators, Not Theorists</h2>
+          <p className="text-center mb-8 max-w-2xl mx-auto" style={{ color: '#6b7280' }}>
             This is for owners who are tired of carrying everything themselves and ready to build systems that run without them.
           </p>
           <div className="grid md:grid-cols-3 gap-4 text-left">
@@ -530,9 +622,9 @@ export default function Landing() {
             </Card>
             <Card className="p-5">
               <Users className="h-6 w-6 text-primary mb-3" />
-              <h3 className="font-semibold mb-2">Small Groups (Under 10)</h3>
+              <h3 className="font-semibold mb-2">Working GMs</h3>
               <p className="text-sm text-muted-foreground">
-                Growing from 1 to 3 locations breaks everything that worked at one. Get systems in place before your second location exposes every gap.
+                You know how to run a shift. Now learn how to run the business behind the shift — labor, food cost, documentation, and systems that scale.
               </p>
             </Card>
             <Card className="p-5">
@@ -544,66 +636,43 @@ export default function Landing() {
             </Card>
           </div>
           <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground max-w-lg mx-auto">
+            <p className="text-xs max-w-lg mx-auto" style={{ color: '#6b7280' }}>
               This isn't for chains with corporate support teams, consultants looking for templates to resell, or anyone looking for motivation without execution.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Testimonials Placeholder */}
-      <section className="py-16 md:py-20 px-4">
+      {/* 12. Closing CTA */}
+      <section className="px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #b8860b', borderBottom: '1px solid #b8860b', padding: '80px 24px' }}>
         <div className="container mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold mb-3">What Operators Are Saying</h2>
-          <p className="text-muted-foreground mb-8">
-            We're just getting started, and our founding members are already seeing results.
-          </p>
-          <Card className="p-6 md:p-8">
-            <p className="text-muted-foreground italic mb-4">
-              "Every framework in this platform has been tested at Mouton's Bistro & Bar. 
-              These aren't templates I found online — they're systems I built because I needed them to survive real service."
-            </p>
-            <p className="text-sm font-medium">— Ben Mouton, Founder & Operator</p>
-            <div className="mt-6 pt-6 border-t border-border">
-              <p className="text-sm text-muted-foreground mb-3">
-                Be one of our founding members.
-              </p>
-              <Button variant="outline" onClick={() => { window.location.href = "/login"; }} data-testid="btn-founding-member">
-                Join as a Founding Member
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      {/* Bottom CTA */}
-      <section className="py-16 md:py-20 px-4 bg-primary text-primary-foreground">
-        <div className="container mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Start Building Real Systems Today
+          <h2 className="font-bold mb-4 text-white text-[28px] md:text-[36px]" data-testid="text-closing-cta">
+            Stop Running on Gut Feel.
           </h2>
-          <p className="text-primary-foreground/80 mb-3">
-            Systems that work on your worst night. Start free. No contracts.
+          <p className="mb-8" style={{ color: '#6b7280', fontSize: '16px' }}>
+            The operators who survive aren't working harder. They're running better systems.
           </p>
-          <p className="text-primary-foreground/70 mb-8 text-sm">
-            {TOTAL_DOMAIN_COUNT} operational domains. Expert consultant included. If it wouldn't hold up during a slammed dinner rush, it's not in here.
-          </p>
-          <Button size="lg" variant="secondary" onClick={() => { window.location.href = "/login"; }} data-testid="button-cta-bottom">
+          <Button
+            size="lg"
+            onClick={() => { window.location.href = "/login"; }}
+            style={{ backgroundColor: '#b8860b', color: '#0f1117', fontWeight: 600, border: 'none' }}
+            className="hover:opacity-90"
+            data-testid="button-cta-bottom"
+          >
             Get Started Free
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
-          <p className="text-primary-foreground/60 text-sm mt-4">
-            No credit card required. Free forever on core domains.
+          <p className="mt-4" style={{ color: '#6b7280', fontSize: '13px' }}>
+            {FREE_DOMAIN_COUNT} domains free. No credit card required.
           </p>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="py-10 px-4" style={{ borderTop: '1px solid #2a2d3e' }}>
-        <div className="container mx-auto flex flex-col items-center gap-4 text-sm text-muted-foreground">
+        <div className="container mx-auto flex flex-col items-center gap-4 text-sm" style={{ color: '#6b7280' }}>
           <BrandLogoNav linkTo="/" />
-          <p className="italic text-xs text-muted-foreground">Systems that work on your worst night.</p>
+          <p className="italic text-xs" style={{ color: '#6b7280' }}>Systems that work on your worst night.</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link href="/privacy" className="hover:underline" data-testid="link-privacy">Privacy Policy</Link>
             <span>|</span>
