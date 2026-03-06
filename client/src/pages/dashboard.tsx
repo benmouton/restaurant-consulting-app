@@ -782,8 +782,8 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
             <div className="flex items-center gap-2">
-              <Wrench className="h-4 w-4" style={{ color: "#d4a017" }} />
-              <h3 className="text-base font-bold text-white">More Tools from ALSTIG INC</h3>
+              <Crown className="h-4 w-4" style={{ color: "#d4a017" }} />
+              <h3 className="text-base font-bold text-white">More Tools from The Restaurant Consultant</h3>
             </div>
             <p className="text-[13px] italic" style={{ color: "#b8860b" }}>Built by operators, for operators.</p>
           </div>
@@ -834,7 +834,7 @@ export default function Dashboard() {
             ))}
           </div>
           <p className="text-center text-[12px] mt-4" style={{ color: "rgba(255,255,255,0.25)" }}>
-            All apps by ALSTIG INC ·{" "}
+            All apps by The Restaurant Consultant ·{" "}
             <a href="https://restaurantai.consulting" target="_blank" rel="noopener noreferrer" style={{ color: "#d4a017" }}>
               restaurantai.consulting
             </a>
