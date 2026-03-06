@@ -43,6 +43,7 @@ import {
   Monitor,
   Coffee,
   Wine,
+  Briefcase,
 } from "lucide-react";
 import type { HandbookSettings } from "@shared/schema";
 
@@ -1633,6 +1634,124 @@ Date: ________________________________
                     className={focusClass}
                     style={inputStyle}
                     data-testid="input-closing-time"
+                  />
+                </FieldWrapper>
+              </div>
+            </div>
+
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Briefcase} title="Manager Operations" subtitle="Used in the Manager Training Manual for financial targets, vendor management, and emergency procedures." />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <FieldWrapper filled={isFieldFilled(formData.laborTargetPct)} label="Labor Target %">
+                  <Input
+                    placeholder="e.g., 30%"
+                    value={formData.laborTargetPct || ""}
+                    onChange={(e) => updateField("laborTargetPct", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-labor-target-pct"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.foodCostTarget)} label="Food Cost Target %">
+                  <Input
+                    placeholder="e.g., 28-32%"
+                    value={formData.foodCostTarget || ""}
+                    onChange={(e) => updateField("foodCostTarget", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-food-cost-target"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.primeCostTarget)} label="Prime Cost Target %">
+                  <Input
+                    placeholder="e.g., 55-60%"
+                    value={formData.primeCostTarget || ""}
+                    onChange={(e) => updateField("primeCostTarget", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-prime-cost-target"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.reservationSystem)} label="Reservation System">
+                  <Input
+                    placeholder="e.g., OpenTable, Resy, Yelp Reservations"
+                    value={formData.reservationSystem || ""}
+                    onChange={(e) => updateField("reservationSystem", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-reservation-system"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.totalCovers)} label="Total Covers (Max Seated)">
+                  <Input
+                    type="number"
+                    placeholder="e.g., 120"
+                    value={formData.totalCovers || ""}
+                    onChange={(e) => updateField("totalCovers", e.target.value ? parseInt(e.target.value) : null)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-total-covers"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.avgTurnTime)} label="Average Table Turn Time (minutes)">
+                  <Input
+                    type="number"
+                    placeholder="e.g., 45"
+                    value={formData.avgTurnTime || ""}
+                    onChange={(e) => updateField("avgTurnTime", e.target.value ? parseInt(e.target.value) : null)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-avg-turn-time"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.openingTime)} label="Opening Time">
+                  <Input
+                    placeholder="e.g., 11:00 AM"
+                    value={formData.openingTime || ""}
+                    onChange={(e) => updateField("openingTime", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-opening-time"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.safeDropProcedure)} label="Safe Drop Procedure">
+                  <Input
+                    placeholder="e.g., Count drawer, complete drop slip, deposit in safe"
+                    value={formData.safeDropProcedure || ""}
+                    onChange={(e) => updateField("safeDropProcedure", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-safe-drop-procedure"
+                  />
+                </FieldWrapper>
+              </div>
+              <div className="mt-5 space-y-5">
+                <FieldWrapper filled={isFieldFilled(formData.vendorList)} label="Vendor List">
+                  <Textarea
+                    placeholder="List your primary vendors (food, beverage, linen, cleaning, etc.)..."
+                    value={formData.vendorList || ""}
+                    onChange={(e) => updateField("vendorList", e.target.value)}
+                    className={`min-h-[100px] font-mono text-sm ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-vendor-list"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.emergencyContacts)} label="Emergency Contacts">
+                  <Textarea
+                    placeholder="List emergency contacts: fire, police, plumber, electrician, HVAC, etc..."
+                    value={formData.emergencyContacts || ""}
+                    onChange={(e) => updateField("emergencyContacts", e.target.value)}
+                    className={`min-h-[100px] font-mono text-sm ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-emergency-contacts"
                   />
                 </FieldWrapper>
               </div>

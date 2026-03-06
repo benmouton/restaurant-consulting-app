@@ -120,8 +120,21 @@ const bartenderDayTitles: Record<number, string> = {
   7: "Assessment & Certification",
 };
 
+const managerDayTitles: Record<number, string> = {
+  1: "Orientation & Leadership Philosophy",
+  2: "FOH Operations",
+  3: "BOH Operations & Food Safety",
+  4: "Bar Operations & TABC",
+  5: "POS Mastery & Cash Handling",
+  6: "Labor Management & Prime Cost",
+  7: "Food Cost & Vendor Management",
+  8: "HR & TWC Compliance",
+  9: "Guest Experience & Crisis Management",
+  10: "Opening/Closing & Certification",
+};
+
 function getDayTitle(category: string, dayNumber: number): string {
-  const titles = category === "server" ? serverDayTitles : category === "bartender" ? bartenderDayTitles : kitchenDayTitles;
+  const titles = category === "server" ? serverDayTitles : category === "bartender" ? bartenderDayTitles : category === "manager" ? managerDayTitles : kitchenDayTitles;
   return titles[dayNumber] || `Day ${dayNumber}`;
 }
 
@@ -339,12 +352,12 @@ function TrainingProgressPanel({ activeCategory }: { activeCategory: string }) {
     createMutation.mutate({
       employeeName: employeeName.trim(),
       templateCategory: activeCategory,
-      totalDays: 7,
+      totalDays: activeCategory === "manager" ? 10 : 7,
       startDate,
     });
   }
 
-  const categoryLabel = activeCategory === "server" ? "Server Training" : activeCategory === "bartender" ? "Bartender Training" : "Kitchen Training";
+  const categoryLabel = activeCategory === "server" ? "Server Training" : activeCategory === "bartender" ? "Bartender Training" : activeCategory === "manager" ? "Manager Training" : "Kitchen Training";
 
   return (
     <Collapsible open={panelOpen} onOpenChange={setPanelOpen} className="mb-6">
@@ -1023,8 +1036,9 @@ export default function TemplatesPage() {
   const serverTemplates = templates?.filter(t => t.category === "server") || [];
   const kitchenTemplates = templates?.filter(t => t.category === "kitchen") || [];
   const bartenderTemplates = templates?.filter(t => t.category === "bartender") || [];
+  const managerTemplates = templates?.filter(t => t.category === "manager") || [];
 
-  const currentTemplates = activeCategory === "server" ? serverTemplates : activeCategory === "bartender" ? bartenderTemplates : kitchenTemplates;
+  const currentTemplates = activeCategory === "server" ? serverTemplates : activeCategory === "bartender" ? bartenderTemplates : activeCategory === "manager" ? managerTemplates : kitchenTemplates;
 
   useEffect(() => {
     if (currentTemplates.length > 0 && !selectedTemplate) {
@@ -1143,12 +1157,13 @@ export default function TemplatesPage() {
     toast({ title: "Notes saved" });
   };
 
-  const isComingSoonTab = ["host", "manager", "busser"].includes(activeCategory);
-  const hasContent = ["server", "kitchen", "bartender"].includes(activeCategory);
+  const isComingSoonTab = ["host", "busser"].includes(activeCategory);
+  const hasContent = ["server", "kitchen", "bartender", "manager"].includes(activeCategory);
   const tabHasTemplates = (cat: string) => {
     if (cat === "server") return serverTemplates.length > 0;
     if (cat === "kitchen") return kitchenTemplates.length > 0;
     if (cat === "bartender") return bartenderTemplates.length > 0;
+    if (cat === "manager") return managerTemplates.length > 0;
     return false;
   };
 
@@ -1232,7 +1247,7 @@ export default function TemplatesPage() {
               { value: "kitchen", label: "Kitchen", icon: ChefHat },
               { value: "host", label: "Host", icon: Users, comingSoon: true },
               { value: "bartender", label: "Bartender", icon: Wine, comingSoon: false },
-              { value: "manager", label: "Manager", icon: Briefcase, comingSoon: true },
+              { value: "manager", label: "Manager", icon: Briefcase, comingSoon: false },
               { value: "busser", label: "Busser", icon: HandMetal, comingSoon: true },
               { value: "handbook", label: "Handbook", icon: BookOpen },
             ].map((tab) => {
@@ -1310,11 +1325,11 @@ export default function TemplatesPage() {
                     <div className="flex items-center gap-2">
                       <GraduationCap className="h-5 w-5" style={{ color: '#d4a017' }} />
                       <span className="font-semibold text-white text-lg">
-                        {activeCategory === "server" ? "Server Manual" : activeCategory === "bartender" ? "Bartender Manual" : "Kitchen Manual"}
+                        {activeCategory === "server" ? "Server Manual" : activeCategory === "bartender" ? "Bartender Manual" : activeCategory === "manager" ? "Manager Manual" : "Kitchen Manual"}
                       </span>
                     </div>
                     <p className="text-sm mt-1" style={{ color: '#9ca3af' }}>
-                      7-day training program with structured daily objectives
+                      {activeCategory === "manager" ? "10-day certification program with structured daily objectives" : "7-day training program with structured daily objectives"}
                     </p>
 
                     <Button
@@ -1429,7 +1444,7 @@ export default function TemplatesPage() {
                   <div className="rounded-lg" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
                     <div className="p-4" style={{ borderBottom: '1px solid #2a2d3e' }}>
                       <div className="flex items-center gap-2 text-xs mb-2" style={{ color: '#9ca3af' }}>
-                        <span>{activeCategory === "server" ? "Server Manual" : activeCategory === "bartender" ? "Bartender Manual" : "Kitchen Manual"}</span>
+                        <span>{activeCategory === "server" ? "Server Manual" : activeCategory === "bartender" ? "Bartender Manual" : activeCategory === "manager" ? "Manager Manual" : "Kitchen Manual"}</span>
                         <ChevronRight className="h-3 w-3" />
                         <span>{selectedTemplate.section}</span>
                         <ChevronRight className="h-3 w-3" />
