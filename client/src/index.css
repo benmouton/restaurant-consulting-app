@@ -280,3 +280,18 @@
   70% { box-shadow: 0 0 0 8px rgba(212,160,23,0); }
   100% { box-shadow: 0 0 0 0 rgba(212,160,23,0); }
 }
+
+@keyframes consultantTypingDot {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes goldStreamBorder {
+  0%, 100% { border-left-color: rgba(212,160,23,0.4); }
+  50% { border-left-color: rgba(212,160,23,1); }
+}
+
+@keyframes goldGlowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,160,23,0); }
+  50% { box-shadow: 0 0 12px 2px rgba(212,160,23,0.3); }
+}
