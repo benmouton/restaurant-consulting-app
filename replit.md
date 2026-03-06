@@ -43,7 +43,8 @@ Preferred communication style: Simple, everyday language.
 - **Reviews & Reputation**: AI-powered response generation for customer reviews, including OCR capabilities.
 - **Social Media**: A social media management tool for post creation, scheduling, and brand voice preview, integrated with external platforms.
 - **Dashboard**: A personalized landing page providing an overview of key operational metrics, quick access to features, and dynamic priority displays.
-- **Subscription & Access Control**: Freemium model with domain-based feature gating and Role-Based Access Control (Owner, General Manager, Manager).
+- **Subscription & Access Control**: Freemium model with domain-based feature gating and Role-Based Access Control (Owner, General Manager, Manager). Consultant allows 3 free messages per month for free users (tracked via `consultantMessagesUsed` and `consultantMessagesResetDate` on users table), with counter display and inline upgrade CTA after limit. UpgradeGate has domain-specific copy per slug. Post-generation modal shows once after first manual export for free users.
+- **Conversion Optimization**: Domain-specific UpgradeGate copy per slug with price in CTA. Dashboard upgrade banner is behavior-based (consultant limit, manual export, default) with 7-day dismiss. Pricing page has ROI math card and testimonial. Post-manual-generation modal for free users. Consultant message limit (3/month free) with inline partial answer + upgrade CTA.
 - **Marketing & Onboarding**: Conversion-optimized landing page and a multi-step onboarding wizard.
 
 ## External Dependencies

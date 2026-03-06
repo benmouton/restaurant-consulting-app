@@ -58,6 +58,8 @@ import {
   Upload,
 } from "lucide-react";
 import { isNativeApp, nativeShare, hapticTap, hapticSuccess } from "@/lib/native";
+import { useTierAccess } from "@/hooks/use-tier-access";
+import { TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { useOfflineCache } from "@/hooks/use-native-features";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { HandbookBuilder } from "@/components/handbook/HandbookBuilder";
@@ -992,6 +994,9 @@ export default function TemplatesPage() {
   const [, navigate] = useLocation();
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const { isFreeTier } = useTierAccess();
+  const [showPostGenModal, setShowPostGenModal] = useState(false);
+  const [postGenManualName, setPostGenManualName] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<TrainingTemplate | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("server");
   const [showEditNotes, setShowEditNotes] = useState(false);
@@ -1099,12 +1104,24 @@ export default function TemplatesPage() {
     setTimeout(() => setExportState(prev => ({ ...prev, [key]: 'idle' })), delay);
   };
 
+  const triggerPostGenModal = (manualName: string) => {
+    if (!isFreeTier || isNativeApp()) return;
+    if (typeof window !== 'undefined' && localStorage.getItem('hasSeenPostGenerationModal')) return;
+    setPostGenManualName(manualName);
+    setShowPostGenModal(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hasSeenPostGenerationModal', 'true');
+      localStorage.setItem('hasExportedManual', 'true');
+    }
+  };
+
   const handlePrintManual = () => {
     setExportState(prev => ({ ...prev, print: 'loading' }));
     try {
       printManual(getExportData());
       setExportState(prev => ({ ...prev, print: 'success' }));
       resetExportState('print');
+      triggerPostGenModal(selectedTemplate?.title || "Training Manual");
     } catch {
       setExportState(prev => ({ ...prev, print: 'error' }));
       toast({ title: "Print failed. Please try again.", variant: "destructive" });
@@ -1119,6 +1136,7 @@ export default function TemplatesPage() {
       setExportState(prev => ({ ...prev, pdf: 'success' }));
       toast({ title: "In the print dialog, select 'Save as PDF' as your destination" });
       resetExportState('pdf');
+      triggerPostGenModal(selectedTemplate?.title || "Training Manual");
     } catch {
       setExportState(prev => ({ ...prev, pdf: 'error' }));
       toast({ title: "PDF generation failed. Please try again.", variant: "destructive" });
@@ -1133,6 +1151,7 @@ export default function TemplatesPage() {
       setExportState(prev => ({ ...prev, docx: 'success' }));
       toast({ title: "Document exported successfully" });
       resetExportState('docx');
+      triggerPostGenModal(selectedTemplate?.title || "Training Manual");
     } catch {
       setExportState(prev => ({ ...prev, docx: 'error' }));
       toast({ title: "Export failed. Please try again.", variant: "destructive" });
@@ -1862,6 +1881,45 @@ export default function TemplatesPage() {
           restaurantName={user?.restaurantName}
           onClose={() => setShowCustomize(false)}
         />
+      )}
+
+      {showPostGenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} data-testid="modal-post-generation">
+          <div
+            className="max-w-md w-full mx-4 p-8 rounded-xl text-center"
+            style={{
+              backgroundColor: '#1a1d2e',
+              border: '1px solid rgba(212,160,23,0.3)',
+            }}
+          >
+            <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center mb-5" style={{ backgroundColor: 'rgba(212,160,23,0.1)' }}>
+              <BookOpen className="h-7 w-7" style={{ color: '#d4a017' }} />
+            </div>
+            <h2 className="text-xl font-bold mb-2 text-white" data-testid="text-post-gen-title">
+              Nice work on your {postGenManualName}
+            </h2>
+            <p className="text-sm mb-6" style={{ color: '#9ca3af' }}>
+              You just built one manual. Paid members get all four role manuals, the full operations consultant, staff scheduling, food costing, and {TOTAL_DOMAIN_COUNT} operational domains.
+            </p>
+            <Link href="/pricing">
+              <Button
+                className="w-full mb-4 font-semibold"
+                style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+                data-testid="btn-post-gen-upgrade"
+              >
+                See what's included — $10/month
+              </Button>
+            </Link>
+            <button
+              onClick={() => setShowPostGenModal(false)}
+              className="text-xs underline underline-offset-4 bg-transparent border-none cursor-pointer"
+              style={{ color: '#6b7280' }}
+              data-testid="btn-post-gen-dismiss"
+            >
+              Not right now
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

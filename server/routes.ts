@@ -1580,10 +1580,76 @@ export async function registerRoutes(
   });
 
   // Consultant Ask Route (streaming with conversation persistence)
+  app.get("/api/consultant/message-count", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const tier = user.subscriptionTier || "free";
+      if (tier !== "free") {
+        return res.json({ unlimited: true, used: 0, limit: 0 });
+      }
+
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      let used = user.consultantMessagesUsed || 0;
+
+      if (user.consultantMessagesResetDate !== currentMonth) {
+        await storage.updateConsultantMessageCount(userId, 0, currentMonth);
+        used = 0;
+      }
+
+      return res.json({ unlimited: false, used, limit: 3 });
+    } catch (err) {
+      console.error("Error fetching consultant message count:", err);
+      res.status(500).json({ message: "Failed to fetch message count" });
+    }
+  });
+
   app.post(api.consultant.ask.path, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { question, context, image, images, conversationId, history } = req.body;
+
+      const user = await storage.getUserById(userId);
+      const tier = user?.subscriptionTier || "free";
+
+      if (tier === "free" && user) {
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        let used = user.consultantMessagesUsed || 0;
+
+        if (user.consultantMessagesResetDate !== currentMonth) {
+          await storage.updateConsultantMessageCount(userId, 0, currentMonth);
+          used = 0;
+        }
+
+        if (used >= 3) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+
+          const topic = question.length > 100 ? question.substring(0, 100) : question;
+          const partialAnswer = `That's a solid question about "${topic.trim()}." The short answer is: this is exactly the kind of operational challenge where having a structured system makes the difference between guessing and knowing.\n\n---\n\n**You've used your 3 free consultant messages this month.** Upgrade to unlock unlimited access to expert operational guidance — staffing, costs, training, service standards, and more.\n\n[Upgrade for $10/month →](/pricing)`;
+
+          let convId = conversationId;
+          if (!convId) {
+            const title = question.length > 60 ? question.substring(0, 57) + "..." : question;
+            const conv = await storage.createConversation(userId, title);
+            convId = conv.id;
+          }
+          await storage.addMessage(convId, "user", question);
+          await storage.addMessage(convId, "assistant", partialAnswer);
+
+          res.write(`data: ${JSON.stringify({ content: partialAnswer })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true, conversationId: convId, limitReached: true })}\n\n`);
+          res.end();
+          return;
+        }
+
+        await storage.updateConsultantMessageCount(userId, used + 1, currentMonth);
+      }
 
       let convId = conversationId;
       if (!convId) {

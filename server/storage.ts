@@ -58,6 +58,7 @@ export interface IStorage {
     subscriptionStatus?: string;
     subscriptionTier?: string;
   }): Promise<User | undefined>;
+  updateConsultantMessageCount(userId: string, count: number, resetDate?: string): Promise<User | undefined>;
   getAllUsersWithSubscriptions(): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
   
@@ -380,6 +381,13 @@ export class DatabaseStorage implements IStorage {
     subscriptionTier?: string;
   }): Promise<User | undefined> {
     const [user] = await db.update(users).set(stripeInfo).where(eq(users.id, userId)).returning();
+    return user;
+  }
+
+  async updateConsultantMessageCount(userId: string, count: number, resetDate?: string): Promise<User | undefined> {
+    const updateData: any = { consultantMessagesUsed: count };
+    if (resetDate) updateData.consultantMessagesResetDate = resetDate;
+    const [user] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
     return user;
   }
 

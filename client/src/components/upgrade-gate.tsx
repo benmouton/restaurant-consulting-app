@@ -6,6 +6,49 @@ import { Lock, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { isNativeApp } from "@/lib/native";
 
+const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
+  hr: {
+    headline: "Stop Writing HR Documents from Scratch",
+    sub: "Generate TWC-compliant warnings, write-ups, and termination letters in seconds. One document saves more than a year of this subscription."
+  },
+  staffing: {
+    headline: "Your Labor Cost Is Either Under Control or It Isn't",
+    sub: "Track scheduled vs. actual labor %, get AI scheduling recommendations, and know your shift cost before service starts."
+  },
+  costs: {
+    headline: "Know Your Food Cost Before the Week Is Over",
+    sub: "Plate costing, yield tracking, and variance alerts. If you're running blind on food cost, you're losing money you can't see."
+  },
+  training: {
+    headline: "Six Training Manuals. One Generate Button.",
+    sub: "Server, Kitchen, Bartender, Host, Busser, and Manager manuals — personalized to your restaurant, printable, and shareable in minutes."
+  },
+  service: {
+    headline: "The Standard Only Holds If It's Written Down",
+    sub: "Build, store, and share SOPs for every position. Stop retraining because nobody remembered what you said."
+  },
+  sops: {
+    headline: "Training Without a Record Is Just a Conversation",
+    sub: "Track who was trained, what they scored, and when they were certified. Your TWC documentation lives here."
+  },
+  reviews: {
+    headline: "Every Negative Review Is a Conversion Opportunity",
+    sub: "Generate professional, on-brand responses to Google and Yelp reviews in seconds. Turn complaints into return visits."
+  },
+  "social-media": {
+    headline: "Consistent Social Presence Without the Time",
+    sub: "AI-generated posts in your restaurant's voice, scheduled across platforms. Stop starting from scratch every time."
+  },
+  consultant: {
+    headline: "A Consultant Who Knows Your Restaurant",
+    sub: "Not generic advice — advice based on your actual food cost, your labor percentage, and your specific operational challenges."
+  },
+  facilities: {
+    headline: "Build a Schedule That Hits Your Labor Target",
+    sub: "AI-assisted scheduling with live labor cost calculation. Know what the schedule costs before you publish it."
+  },
+};
+
 interface UpgradeGateProps {
   domain: string;
   children: React.ReactNode;
@@ -21,6 +64,7 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
   const domainInfo = DOMAIN_TIER_MAP[domain];
   const domainName = domainInfo?.name ?? "this feature";
   const domainDescription = domainInfo?.description ?? "Access premium tools and features.";
+  const domainCopy = upgradeGateCopy[domain];
 
   return (
     <div className="relative">
@@ -34,10 +78,10 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
               <Lock className="h-7 w-7 text-primary" />
             </div>
             <h2 className="text-xl font-bold mb-2" data-testid="text-upgrade-title">
-              Unlock {domainName}
+              {domainCopy ? domainCopy.headline : `Unlock ${domainName}`}
             </h2>
             <p className="text-sm text-muted-foreground mb-4">
-              {domainDescription}
+              {domainCopy ? domainCopy.sub : domainDescription}
             </p>
             {isNativeApp() ? (
               <p className="text-sm text-muted-foreground">
@@ -50,7 +94,7 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
                 </p>
                 <Link href="/pricing">
                   <Button className="w-full mb-3" data-testid="btn-upgrade-now">
-                    Upgrade Now
+                    Unlock for $10/month
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </Link>

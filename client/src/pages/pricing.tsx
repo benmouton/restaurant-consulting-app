@@ -288,6 +288,56 @@ export default function PricingPage() {
           })}
         </div>
 
+        <div className="mt-12 max-w-2xl mx-auto space-y-6">
+          <div
+            className="rounded-md p-6"
+            style={{ backgroundColor: '#1a1d2e', borderLeft: '3px solid #d4a853' }}
+            data-testid="card-math-payoff"
+          >
+            <h3 className="text-lg font-bold text-white mb-4">Does it pay for itself?</h3>
+            <ul className="space-y-3 text-white/90 text-sm">
+              <li className="flex items-start gap-2">
+                <Check className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#d4a853' }} />
+                <span>
+                  Catch <span className="font-semibold" style={{ color: '#d4a853' }}>one food cost mistake</span> per month and save{' '}
+                  <span className="font-semibold" style={{ color: '#d4a853' }}>$200–$500</span>
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#d4a853' }} />
+                <span>
+                  Reduce one bad hire with better onboarding — save{' '}
+                  <span className="font-semibold" style={{ color: '#d4a853' }}>$3,000+</span> in turnover costs
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#d4a853' }} />
+                <span>
+                  Skip one consulting session — that's{' '}
+                  <span className="font-semibold" style={{ color: '#d4a853' }}>$150–$300</span> saved instantly
+                </span>
+              </li>
+            </ul>
+            <p className="mt-4 text-white/70 text-xs">
+              At <span className="font-semibold" style={{ color: '#d4a853' }}>$10/month</span>, this tool pays for itself before the first week is over.
+            </p>
+          </div>
+
+          <div
+            className="rounded-md p-6"
+            style={{ backgroundColor: '#1a1d2e', borderLeft: '3px solid #d4a853' }}
+            data-testid="card-testimonial"
+          >
+            <p className="text-white/90 text-sm italic leading-relaxed">
+              "I was spending $400/month on a consultant who gave me a binder I never opened. This app gave me
+              the same systems — plus tools I actually use every day — for $10. It's not even close."
+            </p>
+            <p className="mt-3 text-white/50 text-xs">
+              — Independent restaurant operator, 85-seat casual dining
+            </p>
+          </div>
+        </div>
+
         <div className="mt-16 mb-12">
           <h2 className="text-2xl font-bold text-center mb-8 tracking-tight" data-testid="text-comparison-title">
             What's Included in Each Plan

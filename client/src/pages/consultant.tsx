@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { isNativeApp } from "@/lib/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -11,14 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ArrowLeft, ChefHat, Send, LogOut, Loader2, User, Plus, MessageSquare, Trash2,
-  Clock, ImagePlus, X, Lock, ArrowRight, Copy, Pin, RefreshCw, Share2,
+  Clock, ImagePlus, X, Copy, Pin, RefreshCw, Share2,
   ChevronDown, ChevronUp, Zap, BookOpen, CheckSquare, BarChart3,
   UtensilsCrossed, Users, CalendarDays, GraduationCap, DollarSign, Star,
   ClipboardList, AlertTriangle, Building, Smartphone, BookMarked, Package
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
-import { useTierAccess } from "@/hooks/use-tier-access";
 
 interface AttachedImage {
   base64: string;
@@ -187,7 +185,6 @@ const RESPONSE_MODES = [
 
 export default function ConsultantPage() {
   const { user, logout } = useAuth();
-  const { canAccessDomain } = useTierAccess();
   const queryClient = useQueryClient();
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
@@ -231,6 +228,18 @@ export default function ConsultantPage() {
   }>({
     queryKey: ["/api/consultant/context"],
   });
+
+  const { data: messageCount, refetch: refetchMessageCount } = useQuery<{
+    unlimited: boolean;
+    used: number;
+    limit: number;
+  }>({
+    queryKey: ["/api/consultant/message-count"],
+  });
+
+  const isFreeTier = !messageCount?.unlimited;
+  const messagesRemaining = isFreeTier ? Math.max(0, 3 - (messageCount?.used || 0)) : Infinity;
+  const messageLimitReached = isFreeTier && messagesRemaining <= 0;
 
   const sessionMetrics = useMemo(() => {
     const userMsgCount = messages.filter(m => m.role === "user").length;
@@ -486,6 +495,9 @@ export default function ConsultantPage() {
                   )
                 );
               }
+              if (data.limitReached && typeof window !== 'undefined') {
+                localStorage.setItem('consultantLimitReached', 'true');
+              }
               if (data.conversationId && !activeConversationId) {
                 setActiveConversationId(data.conversationId);
                 queryClient.invalidateQueries({ queryKey: ["/api/consultant/conversations"] });
@@ -495,6 +507,7 @@ export default function ConsultantPage() {
         }
       }
       queryClient.invalidateQueries({ queryKey: ["/api/consultant/conversations"] });
+      refetchMessageCount();
     } catch (error) {
       console.error("Error:", error);
       setMessages((prev) =>
@@ -582,7 +595,7 @@ export default function ConsultantPage() {
         </div>
       </header>
 
-      {consultantContext && canAccessDomain("consultant") && (
+      {consultantContext && (
         <div
           className="px-4 py-2 flex items-center justify-center gap-2 text-[12px]"
           style={{ background: "#12141f", borderBottom: "1px solid #1a1d2e" }}
@@ -624,60 +637,7 @@ export default function ConsultantPage() {
         </div>
       )}
 
-      {!canAccessDomain("consultant") ? (
-        <div className="flex-1 overflow-hidden relative">
-          <div className="absolute inset-0 pointer-events-none select-none" style={{ filter: "blur(6px)", opacity: 0.4 }}>
-            <div className="flex h-full flex-col" style={{ backgroundColor: '#0f1117' }}>
-              <div className="flex-1 overflow-auto">
-                <div className="max-w-3xl mx-auto px-4 py-8 sm:py-16">
-                  <div className="text-center mb-8">
-                    <ChefHat className="h-12 w-12 mx-auto mb-3" style={{ color: '#d4a017' }} />
-                    <h2 className="text-xl font-semibold mb-2 text-white">Ask the Consultant</h2>
-                    <p className="max-w-md mx-auto text-sm" style={{ color: '#9ca3af' }}>
-                      Ask anything about restaurant operations.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="absolute inset-0 flex items-start justify-center pt-20 z-10">
-            <Card className="max-w-md w-full shadow-xl mx-4" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }} data-testid="card-consultant-upgrade">
-              <CardContent className="p-8 text-center">
-                <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center mb-5" style={{ backgroundColor: 'rgba(212,160,23,0.1)' }}>
-                  <Lock className="h-7 w-7" style={{ color: '#d4a017' }} />
-                </div>
-                <h2 className="text-xl font-bold mb-2 text-white" data-testid="text-consultant-upgrade-title">
-                  Unlock the Operations Consultant
-                </h2>
-                <p className="text-sm mb-4" style={{ color: '#9ca3af' }}>
-                  Expert guidance on any restaurant operations challenge -- staffing, costs, service, leadership, and more.
-                </p>
-                {isNativeApp() ? (
-                  <p className="text-sm" style={{ color: '#9ca3af' }}>
-                    This feature requires a subscription. Subscribe at <span className="font-medium" style={{ color: '#d4a017' }}>restaurantai.consulting</span>
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium mb-6 text-white">
-                      All {TOTAL_DOMAIN_COUNT} domains + consultant starting at <span style={{ color: '#d4a017' }}>$10/month</span>
-                    </p>
-                    <Link href="/pricing">
-                      <Button className="w-full mb-3" style={{ backgroundColor: '#d4a017', color: '#0f1117' }} data-testid="btn-consultant-upgrade">
-                        Upgrade Now
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </Link>
-                    <Link href="/pricing" className="text-sm underline underline-offset-4" style={{ color: '#9ca3af' }} data-testid="link-consultant-plans">
-                      See all plans
-                    </Link>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      ) : (
+      {(
       <div className="flex-1 flex overflow-hidden">
         {/* History Sidebar */}
         {showHistory && (
@@ -1037,19 +997,34 @@ export default function ConsultantPage() {
                 </div>
               )}
 
+              {isFreeTier && (
+                <div className="flex items-center justify-between text-xs px-1 mb-2" data-testid="text-message-counter">
+                  <span style={{ color: messagesRemaining <= 1 ? '#f59e0b' : '#9ca3af' }}>
+                    {messageLimitReached
+                      ? "No free messages remaining this month"
+                      : `${messagesRemaining} free message${messagesRemaining === 1 ? '' : 's'} remaining this month`}
+                  </span>
+                  {!isNativeApp() && (
+                    <Link href="/pricing" style={{ color: '#d4a017' }} className="font-medium" data-testid="link-upgrade-unlimited">
+                      Upgrade for unlimited
+                    </Link>
+                  )}
+                </div>
+              )}
+
               {/* Input Row */}
               <form onSubmit={handleSubmit} className="flex gap-2 items-end relative">
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} data-testid="input-file-upload" />
                 <Button type="button" variant="ghost" size="icon" className="shrink-0 mb-0.5" style={{ color: '#9ca3af' }}
-                  onClick={() => fileInputRef.current?.click()} disabled={isLoading} data-testid="button-attach-image">
+                  onClick={() => fileInputRef.current?.click()} disabled={isLoading || messageLimitReached} data-testid="button-attach-image">
                   <ImagePlus className="h-5 w-5" />
                 </Button>
                 <div className="flex-1 relative">
                   <Textarea ref={textareaRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                    placeholder="Ask anything about restaurant operations..."
+                    placeholder={messageLimitReached ? "Upgrade to continue asking questions" : "Ask anything about restaurant operations..."}
                     className="min-h-[52px] max-h-[120px] resize-none pr-10"
                     style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e', color: 'white', borderRadius: '12px' }}
-                    disabled={isLoading} data-testid="input-consultant-message" />
+                    disabled={isLoading || messageLimitReached} data-testid="input-consultant-message" />
                   {input.length > 80 && (
                     <span className="absolute bottom-2 right-3 text-[10px]" style={{ color: '#6b7280' }}>{input.length}</span>
                   )}
@@ -1064,7 +1039,7 @@ export default function ConsultantPage() {
                 )}
                 <Button type="submit" size="icon" className="shrink-0 mb-0.5 font-semibold"
                   style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
-                  disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
+                  disabled={isLoading || messageLimitReached || (!input.trim() && attachedImages.length === 0)}
                   data-testid="button-send-message">
                   {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                 </Button>

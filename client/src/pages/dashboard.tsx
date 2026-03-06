@@ -52,6 +52,7 @@ import {
   ExternalLink,
   Scale,
   BookMarked,
+  X,
 } from "lucide-react";
 import type { Domain } from "@shared/schema";
 import { BrandLogoNav } from "@/components/BrandLogo";
@@ -259,6 +260,12 @@ export default function Dashboard() {
   const { isAdmin } = useAdmin();
   const { roleLabel, permissions } = useRole();
   const { isDomainLocked, isFreeTier, tier } = useTierAccess();
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const dismissedAt = localStorage.getItem('upgradeBannerDismissedAt');
+    if (!dismissedAt) return false;
+    return Date.now() - parseInt(dismissedAt) < 7 * 24 * 60 * 60 * 1000;
+  });
 
   const { data: domainsRaw, isLoading: domainsLoading } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
@@ -744,31 +751,58 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Upgrade nudge for free tier */}
-        {isFreeTier && !domainsLoading && !isNativeApp() && (
-          <div className="mb-8 sm:mb-10" style={{ animation: "playbookStaggerIn 0.4s ease 0.48s both" }}>
-            <Link href="/pricing">
+        {isFreeTier && !domainsLoading && !isNativeApp() && !bannerDismissed && (() => {
+          const hasExported = typeof window !== 'undefined' && localStorage.getItem('hasExportedManual');
+          const consultantUsedUp = typeof window !== 'undefined' && localStorage.getItem('consultantLimitReached');
+
+          let bannerText = `You're using ${FREE_DOMAIN_COUNT} of ${TOTAL_DOMAIN_COUNT} domains. Unlock everything starting at $10/month.`;
+          if (consultantUsedUp) {
+            bannerText = "You've used your free consultant messages this month. Unlock unlimited expert guidance.";
+          } else if (hasExported) {
+            bannerText = "You built your first training manual. Unlock all four role manuals and the full operations toolkit.";
+          }
+
+          return (
+            <div className="mb-8 sm:mb-10" style={{ animation: "playbookStaggerIn 0.4s ease 0.48s both" }}>
               <div
-                className="p-5 rounded-xl cursor-pointer flex items-center justify-between gap-4"
+                className="p-5 rounded-xl flex items-center justify-between gap-4"
                 style={{
                   background: "rgba(184,134,11,0.06)",
                   border: "1px solid rgba(184,134,11,0.2)",
                 }}
                 data-testid="card-upgrade-nudge"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <Link href="/pricing" className="flex items-center gap-3 min-w-0 cursor-pointer flex-1">
                   <div className="p-2 rounded-lg" style={{ background: "rgba(184,134,11,0.15)" }}>
                     <Sparkles className="h-5 w-5" style={{ color: "#d4a017" }} />
                   </div>
                   <p className="text-sm font-medium text-white">
-                    You're using {FREE_DOMAIN_COUNT} of {TOTAL_DOMAIN_COUNT} domains. Unlock everything with a paid plan.
+                    {bannerText}
                   </p>
+                </Link>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Link href="/pricing">
+                    <ArrowRight className="h-5 w-5 cursor-pointer" style={{ color: "#d4a017" }} />
+                  </Link>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('upgradeBannerDismissedAt', Date.now().toString());
+                      }
+                      setBannerDismissed(true);
+                    }}
+                    className="bg-transparent border-none cursor-pointer p-1"
+                    style={{ color: '#6b7280' }}
+                    data-testid="btn-dismiss-upgrade-banner"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <ArrowRight className="h-5 w-5 flex-shrink-0" style={{ color: "#d4a017" }} />
               </div>
-            </Link>
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
         {/* ALSTIG INC App Suite Banner */}
         <div
