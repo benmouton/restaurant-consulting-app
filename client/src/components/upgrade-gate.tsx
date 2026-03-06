@@ -43,6 +43,10 @@ const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
     headline: "A Consultant Who Knows Your Restaurant",
     sub: "Not generic advice — advice based on your actual food cost, your labor percentage, and your specific operational challenges."
   },
+  "training-log": {
+    headline: "Training Without a Record Is Just a Conversation",
+    sub: "Track every certification, every assessment score, every manager sign-off. Your TWC documentation lives here — and it's exportable when you need it."
+  },
   facilities: {
     headline: "Build a Schedule That Hits Your Labor Target",
     sub: "AI-assisted scheduling with live labor cost calculation. Know what the schedule costs before you publish it."

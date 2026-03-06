@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, restaurantStandards, certificationAttempts, trainingAssignments, trainingDayCompletions, conversations, messages, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings, type RestaurantStandards, type CertificationAttempt, type InsertRestaurantStandards, type InsertCertificationAttempt, type TrainingAssignment, type TrainingDayCompletion, type InsertTrainingAssignment, type InsertTrainingDayCompletion, type Conversation, type Message } from "@shared/schema";
-import { testAccessTokens, type TestAccessToken, type InsertTestAccessToken, primeCostEntries, type PrimeCostEntry, type InsertPrimeCostEntry } from "@shared/schema";
+import { testAccessTokens, type TestAccessToken, type InsertTestAccessToken, primeCostEntries, type PrimeCostEntry, type InsertPrimeCostEntry, trainingRecords, type TrainingRecord, type InsertTrainingRecord } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -232,6 +232,13 @@ export interface IStorage {
   createPrimeCostEntry(data: InsertPrimeCostEntry): Promise<PrimeCostEntry>;
   updatePrimeCostEntry(id: number, userId: string, data: Partial<InsertPrimeCostEntry>): Promise<PrimeCostEntry | undefined>;
   deletePrimeCostEntry(id: number, userId: string): Promise<void>;
+
+  getTrainingRecords(userId: string): Promise<TrainingRecord[]>;
+  getTrainingRecordsByStaff(userId: string, staffMemberId: number): Promise<TrainingRecord[]>;
+  getTrainingRecordById(id: number): Promise<TrainingRecord | undefined>;
+  createTrainingRecord(data: InsertTrainingRecord): Promise<TrainingRecord>;
+  updateTrainingRecord(id: number, userId: string, data: Partial<InsertTrainingRecord>): Promise<TrainingRecord | undefined>;
+  deleteTrainingRecord(id: number, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1854,6 +1861,39 @@ export class DatabaseStorage implements IStorage {
 
   async deletePrimeCostEntry(id: number, userId: string): Promise<void> {
     await db.delete(primeCostEntries).where(and(eq(primeCostEntries.id, id), eq(primeCostEntries.userId, userId)));
+  }
+
+  async getTrainingRecords(userId: string): Promise<TrainingRecord[]> {
+    return db.select().from(trainingRecords).where(eq(trainingRecords.userId, userId)).orderBy(desc(trainingRecords.createdAt));
+  }
+
+  async getTrainingRecordsByStaff(userId: string, staffMemberId: number): Promise<TrainingRecord[]> {
+    return db.select().from(trainingRecords).where(
+      and(eq(trainingRecords.userId, userId), eq(trainingRecords.staffMemberId, staffMemberId))
+    ).orderBy(desc(trainingRecords.createdAt));
+  }
+
+  async getTrainingRecordById(id: number): Promise<TrainingRecord | undefined> {
+    const [result] = await db.select().from(trainingRecords).where(eq(trainingRecords.id, id));
+    return result;
+  }
+
+  async createTrainingRecord(data: InsertTrainingRecord): Promise<TrainingRecord> {
+    const [record] = await db.insert(trainingRecords).values(data).returning();
+    return record;
+  }
+
+  async updateTrainingRecord(id: number, userId: string, data: Partial<InsertTrainingRecord>): Promise<TrainingRecord | undefined> {
+    const [result] = await db.update(trainingRecords).set({
+      ...data,
+      updatedAt: new Date(),
+    }).where(and(eq(trainingRecords.id, id), eq(trainingRecords.userId, userId))).returning();
+    return result;
+  }
+
+  async deleteTrainingRecord(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(trainingRecords).where(and(eq(trainingRecords.id, id), eq(trainingRecords.userId, userId))).returning();
+    return result.length > 0;
   }
 }
 

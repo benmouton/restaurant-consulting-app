@@ -23,6 +23,7 @@ import TemplatesPage from "@/pages/templates";
 import PlaybooksPage from "@/pages/playbooks";
 import FinancialPage from "@/pages/financial";
 import PrimeCostPage from "@/pages/prime-cost";
+import TrainingLogPage from "@/pages/training-log";
 import SchedulingPage from "@/pages/scheduling";
 import SubscriptionPage from "@/pages/subscription";
 import SubscriptionSuccessPage from "@/pages/subscription-success";
@@ -153,6 +154,9 @@ function Router() {
         </Route>
         <Route path="/consultant">
           {user ? <ProtectedPage component={ConsultantPage} /> : <Landing />}
+        </Route>
+        <Route path="/training-log">
+          {user ? <PaidProtectedPage component={TrainingLogPage} /> : <Landing />}
         </Route>
         <Route path="/templates">
           {user ? <ProtectedPage component={TemplatesPage} /> : <Landing />}

@@ -340,6 +340,15 @@ export default function Dashboard() {
     return `${pct.toFixed(1)}%`;
   }, [primeCostSummary]);
 
+  const { data: trainingSummary } = useQuery<{
+    totalStaff: number;
+    fullyCertified: number;
+    inTraining: number;
+    certsThisMonth: number;
+  }>({
+    queryKey: ["/api/training/summary"],
+  });
+
   const primeCostStatusColor = useMemo(() => {
     if (!primeCostSummary || primeCostSummary.totalEntries === 0) return undefined;
     const latest = primeCostSummary.entries[0];
@@ -627,6 +636,12 @@ export default function Dashboard() {
               icon: DollarSign,
               onClick: () => navigate("/financial/prime-cost"),
               statusColor: primeCostStatusColor,
+            },
+            {
+              label: "Certifications",
+              value: trainingSummary?.certsThisMonth ? `${trainingSummary.certsThisMonth} this month` : "0 this month",
+              icon: GraduationCap,
+              onClick: () => navigate("/training-log"),
             },
           ].map((card, idx) => (
             <div

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -899,3 +899,26 @@ export const primeCostEntries = pgTable("prime_cost_entries", {
 export const insertPrimeCostEntrySchema = createInsertSchema(primeCostEntries).omit({ id: true, createdAt: true, updatedAt: true });
 export type PrimeCostEntry = typeof primeCostEntries.$inferSelect;
 export type InsertPrimeCostEntry = z.infer<typeof insertPrimeCostEntrySchema>;
+
+export const trainingRecords = pgTable("training_records", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  staffMemberId: integer("staff_member_id").notNull(),
+  manualType: text("manual_type").notNull(),
+  trainingStartDate: text("training_start_date").notNull(),
+  certificationDate: text("certification_date"),
+  assessmentScore: integer("assessment_score"),
+  assessmentPassed: boolean("assessment_passed"),
+  certified: boolean("certified").default(false),
+  certifiedBy: text("certified_by"),
+  additionalTrainingDays: integer("additional_training_days").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueStaffManual: unique().on(table.staffMemberId, table.manualType),
+}));
+
+export const insertTrainingRecordSchema = createInsertSchema(trainingRecords).omit({ id: true, createdAt: true, updatedAt: true });
+export type TrainingRecord = typeof trainingRecords.$inferSelect;
+export type InsertTrainingRecord = z.infer<typeof insertTrainingRecordSchema>;

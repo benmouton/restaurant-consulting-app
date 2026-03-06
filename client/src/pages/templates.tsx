@@ -1333,6 +1333,7 @@ export default function TemplatesPage() {
         <div className="mb-6 overflow-x-auto">
           <div className="flex gap-1 min-w-max pb-2">
             {[
+              { value: "training-log", label: "Training Log", icon: ClipboardList, isLink: true },
               { value: "server", label: "Server", icon: Users },
               { value: "kitchen", label: "Kitchen", icon: ChefHat },
               { value: "host", label: "Host", icon: Users, comingSoon: true },
@@ -1343,6 +1344,24 @@ export default function TemplatesPage() {
             ].map((tab) => {
               const isActive = activeCategory === tab.value;
               const hasData = tabHasTemplates(tab.value);
+              if ((tab as any).isLink) {
+                return (
+                  <Link key={tab.value} href="/training-log">
+                    <button
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                      style={{
+                        backgroundColor: 'transparent',
+                        borderBottom: '2px solid transparent',
+                        color: '#d4a017',
+                      }}
+                      data-testid={`tab-${tab.value}`}
+                    >
+                      <tab.icon className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  </Link>
+                );
+              }
               return (
                 <button
                   key={tab.value}

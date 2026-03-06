@@ -4391,6 +4391,270 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
     }
   });
 
+  // ===== TRAINING LOG & CERTIFICATION TRACKER ROUTES =====
+
+  app.get("/api/training/staff", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const allStaff = await storage.getStaffMembers();
+      const myStaff = allStaff.filter(s => s.ownerId === userId);
+      res.json(myStaff);
+    } catch (err) {
+      console.error("Error fetching training staff:", err);
+      res.status(500).json({ message: "Failed to fetch staff" });
+    }
+  });
+
+  app.post("/api/training/staff", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName, positionId, hireDate, status, notes, email, phone, hourlyRate } = req.body;
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: "First and last name are required" });
+      }
+      const member = await storage.createStaffMember({
+        ownerId: userId,
+        firstName,
+        lastName,
+        positionId: positionId || null,
+        hireDate: hireDate || new Date().toISOString().split("T")[0],
+        status: status || "active",
+        email: email || null,
+        phone: phone || null,
+        hourlyRate: hourlyRate || null,
+      });
+      res.status(201).json(member);
+    } catch (err) {
+      console.error("Error creating training staff:", err);
+      res.status(500).json({ message: "Failed to create staff member" });
+    }
+  });
+
+  app.put("/api/training/staff/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const existing = await storage.getStaffMember(id);
+      if (!existing || existing.ownerId !== userId) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+      const updated = await storage.updateStaffMember(id, req.body);
+      res.json(updated);
+    } catch (err) {
+      console.error("Error updating training staff:", err);
+      res.status(500).json({ message: "Failed to update staff member" });
+    }
+  });
+
+  app.delete("/api/training/staff/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const existing = await storage.getStaffMember(id);
+      if (!existing || existing.ownerId !== userId) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+      await storage.updateStaffMember(id, { status: "inactive" });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deactivating staff:", err);
+      res.status(500).json({ message: "Failed to deactivate staff member" });
+    }
+  });
+
+  app.get("/api/training/records", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const records = await storage.getTrainingRecords(userId);
+      res.json(records);
+    } catch (err) {
+      console.error("Error fetching training records:", err);
+      res.status(500).json({ message: "Failed to fetch records" });
+    }
+  });
+
+  app.get("/api/training/records/by-staff/:staffId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const staffId = parseInt(req.params.staffId);
+      const existing = await storage.getStaffMember(staffId);
+      if (!existing || existing.ownerId !== userId) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+      const records = await storage.getTrainingRecordsByStaff(userId, staffId);
+      res.json(records);
+    } catch (err) {
+      console.error("Error fetching staff training records:", err);
+      res.status(500).json({ message: "Failed to fetch records" });
+    }
+  });
+
+  app.post("/api/training/records", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { staffMemberId, manualType, trainingStartDate, certificationDate, assessmentScore, assessmentPassed, certifiedBy, additionalTrainingDays, notes } = req.body;
+
+      if (!staffMemberId || !manualType || !trainingStartDate) {
+        return res.status(400).json({ message: "Staff member, manual type, and start date are required" });
+      }
+
+      const existing = await storage.getStaffMember(staffMemberId);
+      if (!existing || existing.ownerId !== userId) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+
+      const validManuals = ["server", "kitchen", "bartender", "host", "busser", "manager"];
+      if (!validManuals.includes(manualType)) {
+        return res.status(400).json({ message: "Invalid manual type" });
+      }
+
+      let passed = assessmentPassed;
+      if (assessmentScore !== null && assessmentScore !== undefined) {
+        passed = assessmentScore >= 90;
+      }
+
+      const certified = !!(certificationDate && certifiedBy && passed);
+
+      const record = await storage.createTrainingRecord({
+        userId,
+        staffMemberId,
+        manualType,
+        trainingStartDate,
+        certificationDate: certificationDate || null,
+        assessmentScore: assessmentScore ?? null,
+        assessmentPassed: passed ?? null,
+        certified,
+        certifiedBy: certifiedBy || null,
+        additionalTrainingDays: additionalTrainingDays || 0,
+        notes: notes || null,
+      });
+      res.status(201).json(record);
+    } catch (err: any) {
+      if (err.code === "23505") {
+        return res.status(409).json({ message: "A training record already exists for this employee and manual type" });
+      }
+      console.error("Error creating training record:", err);
+      res.status(500).json({ message: "Failed to create training record" });
+    }
+  });
+
+  app.put("/api/training/records/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { certificationDate, assessmentScore, assessmentPassed, certifiedBy, additionalTrainingDays, notes } = req.body;
+
+      let passed = assessmentPassed;
+      if (assessmentScore !== null && assessmentScore !== undefined) {
+        passed = assessmentScore >= 90;
+      }
+
+      const certified = !!(certificationDate && certifiedBy && passed);
+
+      const updated = await storage.updateTrainingRecord(id, userId, {
+        certificationDate: certificationDate || null,
+        assessmentScore: assessmentScore ?? null,
+        assessmentPassed: passed ?? null,
+        certified,
+        certifiedBy: certifiedBy || null,
+        additionalTrainingDays: additionalTrainingDays || 0,
+        notes: notes || null,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Training record not found" });
+      }
+      res.json(updated);
+    } catch (err) {
+      console.error("Error updating training record:", err);
+      res.status(500).json({ message: "Failed to update training record" });
+    }
+  });
+
+  app.delete("/api/training/records/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteTrainingRecord(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Training record not found" });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting training record:", err);
+      res.status(500).json({ message: "Failed to delete training record" });
+    }
+  });
+
+  app.get("/api/training/summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const allStaff = await storage.getStaffMembers();
+      const myStaff = allStaff.filter(s => s.ownerId === userId && s.status === "active");
+      const records = await storage.getTrainingRecords(userId);
+
+      const totalStaff = myStaff.length;
+      const staffWithCerts = new Set(records.filter(r => r.certified).map(r => r.staffMemberId));
+      const fullyCertified = staffWithCerts.size;
+      const inTraining = new Set(records.filter(r => !r.certified).map(r => r.staffMemberId)).size;
+
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+      const certsThisMonth = records.filter(r => r.certified && r.certificationDate && r.certificationDate >= monthStart).length;
+
+      res.json({ totalStaff, fullyCertified, inTraining, certsThisMonth });
+    } catch (err) {
+      console.error("Error fetching training summary:", err);
+      res.status(500).json({ message: "Failed to fetch summary" });
+    }
+  });
+
+  app.get("/api/training/export/all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const allStaff = await storage.getStaffMembers();
+      const myStaff = allStaff.filter(s => s.ownerId === userId);
+      const records = await storage.getTrainingRecords(userId);
+      const settings = await storage.getHandbookSettings(userId);
+
+      const exportData = myStaff.map(staff => ({
+        ...staff,
+        records: records.filter(r => r.staffMemberId === staff.id),
+      }));
+
+      res.json({
+        restaurantName: settings?.restaurantName || "Restaurant",
+        exportDate: new Date().toISOString().split("T")[0],
+        staff: exportData,
+      });
+    } catch (err) {
+      console.error("Error exporting all training records:", err);
+      res.status(500).json({ message: "Failed to export records" });
+    }
+  });
+
+  app.get("/api/training/export/:staffId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const staffId = parseInt(req.params.staffId);
+      const existing = await storage.getStaffMember(staffId);
+      if (!existing || existing.ownerId !== userId) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+      const records = await storage.getTrainingRecordsByStaff(userId, staffId);
+      const settings = await storage.getHandbookSettings(userId);
+
+      res.json({
+        restaurantName: settings?.restaurantName || "Restaurant",
+        exportDate: new Date().toISOString().split("T")[0],
+        staff: { ...existing, records },
+      });
+    } catch (err) {
+      console.error("Error exporting staff training record:", err);
+      res.status(500).json({ message: "Failed to export record" });
+    }
+  });
+
   // Financial Document Routes
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
