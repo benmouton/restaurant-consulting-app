@@ -322,6 +322,37 @@ export default function Dashboard() {
   const consultantSessions = useMemo(() => getConsultantSessionCount(), []);
   const facilityIssues = useMemo(() => getFacilityIssueCount(), []);
 
+  const { data: primeCostSummary } = useQuery<{
+    entries: any[];
+    targets: { primeCostTarget: number | null };
+    trendDirection: "up" | "down" | "flat" | null;
+    totalEntries: number;
+  }>({
+    queryKey: ["/api/prime-cost/summary"],
+  });
+
+  const primeCostValue = useMemo(() => {
+    if (!primeCostSummary || primeCostSummary.totalEntries === 0) return "Set up \u2192";
+    const latest = primeCostSummary.entries[0];
+    if (!latest) return "Set up \u2192";
+    const pct = parseFloat(latest.primeCostPct || "0");
+    if (isNaN(pct)) return "Set up \u2192";
+    return `${pct.toFixed(1)}%`;
+  }, [primeCostSummary]);
+
+  const primeCostStatusColor = useMemo(() => {
+    if (!primeCostSummary || primeCostSummary.totalEntries === 0) return undefined;
+    const latest = primeCostSummary.entries[0];
+    if (!latest) return undefined;
+    const pct = parseFloat(latest.primeCostPct);
+    const target = primeCostSummary.targets.primeCostTarget;
+    if (target === null) return "#d4a017";
+    const diff = pct - target;
+    if (diff <= 0) return "#22c55e";
+    if (diff <= 4) return "#d4a017";
+    return "#ef4444";
+  }, [primeCostSummary]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "#0f1117" }}>
@@ -590,6 +621,13 @@ export default function Dashboard() {
               icon: MessageSquare,
               onClick: () => navigate("/consultant"),
             },
+            {
+              label: "Prime Cost",
+              value: primeCostValue,
+              icon: DollarSign,
+              onClick: () => navigate("/financial/prime-cost"),
+              statusColor: primeCostStatusColor,
+            },
           ].map((card, idx) => (
             <div
               key={idx}
@@ -607,7 +645,12 @@ export default function Dashboard() {
                 <card.icon className="h-3.5 w-3.5" style={{ color: "#d4a017" }} />
                 <span className="text-[11px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>{card.label}</span>
               </div>
-              <p className="text-sm font-semibold text-white truncate">{card.value}</p>
+              <div className="flex items-center gap-1.5">
+                {(card as any).statusColor && (
+                  <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: (card as any).statusColor }} />
+                )}
+                <p className="text-sm font-semibold text-white truncate">{card.value}</p>
+              </div>
             </div>
           ))}
         </div>

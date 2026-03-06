@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { domains, frameworkContent, userBookmarks, trainingTemplates, financialDocuments, financialExtracts, financialMessages, users, staffPositions, staffMembers, shifts, shiftApplications, staffAnnouncements, announcementReads, restaurantHolidays, brandVoiceSettings, connectedAccounts, scheduledPosts, postResults, hrDocuments, savedIngredients, savedPlates, foodCostPeriods, organizations, organizationMembers, organizationInvites, internalMessages, restaurantProfiles, dailyTaskCompletions, repairVendors, facilityIssues, kitchenShiftData, playbooks, playbookSteps, playbookAssignments, playbookAcknowledgments, playbookAudits, handbookSettings, restaurantStandards, certificationAttempts, trainingAssignments, trainingDayCompletions, conversations, messages, type Domain, type FrameworkContent, type UserBookmark, type TrainingTemplate, type FinancialDocument, type FinancialExtract, type FinancialMessage, type User, type StaffPosition, type StaffMember, type Shift, type ShiftApplication, type StaffAnnouncement, type InsertStaffPosition, type InsertStaffMember, type InsertShift, type InsertShiftApplication, type InsertStaffAnnouncement, type RestaurantHoliday, type BrandVoiceSettings, type ConnectedAccount, type ScheduledPost, type PostResult, type HRDocument, type InsertHRDocument, type InsertConnectedAccount, type InsertScheduledPost, type InsertPostResult, type SavedIngredient, type SavedPlate, type FoodCostPeriod, type InsertSavedIngredient, type InsertSavedPlate, type InsertFoodCostPeriod, type Organization, type OrganizationMember, type OrganizationInvite, type InsertOrganization, type InsertOrganizationMember, type InsertOrganizationInvite, type InternalMessage, type InsertInternalMessage, type RestaurantProfile, type InsertRestaurantProfile, type DailyTaskCompletion, type InsertDailyTaskCompletion, type RepairVendor, type InsertRepairVendor, type FacilityIssue, type InsertFacilityIssue, type KitchenShiftData, type InsertKitchenShiftData, type Playbook, type PlaybookStep, type PlaybookAssignment, type PlaybookAcknowledgment, type PlaybookAudit, type InsertPlaybook, type InsertPlaybookStep, type InsertPlaybookAssignment, type InsertPlaybookAcknowledgment, type InsertPlaybookAudit, type HandbookSettings, type InsertHandbookSettings, type RestaurantStandards, type CertificationAttempt, type InsertRestaurantStandards, type InsertCertificationAttempt, type TrainingAssignment, type TrainingDayCompletion, type InsertTrainingAssignment, type InsertTrainingDayCompletion, type Conversation, type Message } from "@shared/schema";
-import { testAccessTokens, type TestAccessToken, type InsertTestAccessToken } from "@shared/schema";
+import { testAccessTokens, type TestAccessToken, type InsertTestAccessToken, primeCostEntries, type PrimeCostEntry, type InsertPrimeCostEntry } from "@shared/schema";
 import { eq, and, desc, sql, isNotNull, gte, lte, or, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -225,6 +225,13 @@ export interface IStorage {
   getTestAccessTokenById(id: number): Promise<TestAccessToken | undefined>;
   updateTestAccessToken(id: number, data: Partial<TestAccessToken>): Promise<TestAccessToken | undefined>;
   deleteTestAccessToken(id: number): Promise<void>;
+
+  // Prime Cost Entries
+  getPrimeCostEntries(userId: string): Promise<PrimeCostEntry[]>;
+  getPrimeCostEntryById(id: number): Promise<PrimeCostEntry | undefined>;
+  createPrimeCostEntry(data: InsertPrimeCostEntry): Promise<PrimeCostEntry>;
+  updatePrimeCostEntry(id: number, userId: string, data: Partial<InsertPrimeCostEntry>): Promise<PrimeCostEntry | undefined>;
+  deletePrimeCostEntry(id: number, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1811,6 +1818,42 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTestAccessToken(id: number): Promise<void> {
     await db.delete(testAccessTokens).where(eq(testAccessTokens.id, id));
+  }
+
+  async getPrimeCostEntries(userId: string): Promise<PrimeCostEntry[]> {
+    return db.select().from(primeCostEntries).where(eq(primeCostEntries.userId, userId)).orderBy(desc(primeCostEntries.weekEnding));
+  }
+
+  async getPrimeCostEntryById(id: number): Promise<PrimeCostEntry | undefined> {
+    const [result] = await db.select().from(primeCostEntries).where(eq(primeCostEntries.id, id));
+    return result;
+  }
+
+  async createPrimeCostEntry(data: InsertPrimeCostEntry): Promise<PrimeCostEntry> {
+    const existing = await db.select().from(primeCostEntries).where(
+      and(eq(primeCostEntries.userId, data.userId), eq(primeCostEntries.weekEnding, data.weekEnding))
+    );
+    if (existing.length > 0) {
+      const [updated] = await db.update(primeCostEntries).set({
+        ...data,
+        updatedAt: new Date(),
+      }).where(eq(primeCostEntries.id, existing[0].id)).returning();
+      return updated;
+    }
+    const [entry] = await db.insert(primeCostEntries).values(data).returning();
+    return entry;
+  }
+
+  async updatePrimeCostEntry(id: number, userId: string, data: Partial<InsertPrimeCostEntry>): Promise<PrimeCostEntry | undefined> {
+    const [result] = await db.update(primeCostEntries).set({
+      ...data,
+      updatedAt: new Date(),
+    }).where(and(eq(primeCostEntries.id, id), eq(primeCostEntries.userId, userId))).returning();
+    return result;
+  }
+
+  async deletePrimeCostEntry(id: number, userId: string): Promise<void> {
+    await db.delete(primeCostEntries).where(and(eq(primeCostEntries.id, id), eq(primeCostEntries.userId, userId)));
   }
 }
 

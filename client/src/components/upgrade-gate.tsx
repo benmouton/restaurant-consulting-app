@@ -16,8 +16,8 @@ const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
     sub: "Track scheduled vs. actual labor %, get AI scheduling recommendations, and know your shift cost before service starts."
   },
   costs: {
-    headline: "Know Your Food Cost Before the Week Is Over",
-    sub: "Plate costing, yield tracking, and variance alerts. If you're running blind on food cost, you're losing money you can't see."
+    headline: "Your Prime Cost Is Either Under Control or It Isn't",
+    sub: "Weekly tracking with 4-week trend, food and labor cost breakdown, target comparison, and plain-language status. Three numbers a week — that's all it takes to know where you stand."
   },
   training: {
     headline: "Six Training Manuals. One Generate Button.",

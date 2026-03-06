@@ -880,3 +880,22 @@ export const oauthStates = pgTable("oauth_states", {
 });
 
 export type OAuthState = typeof oauthStates.$inferSelect;
+
+export const primeCostEntries = pgTable("prime_cost_entries", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  weekEnding: text("week_ending").notNull(),
+  foodCost: text("food_cost").notNull(),
+  laborCost: text("labor_cost").notNull(),
+  totalSales: text("total_sales").notNull(),
+  foodCostPct: text("food_cost_pct"),
+  laborCostPct: text("labor_cost_pct"),
+  primeCostPct: text("prime_cost_pct"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPrimeCostEntrySchema = createInsertSchema(primeCostEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export type PrimeCostEntry = typeof primeCostEntries.$inferSelect;
+export type InsertPrimeCostEntry = z.infer<typeof insertPrimeCostEntrySchema>;

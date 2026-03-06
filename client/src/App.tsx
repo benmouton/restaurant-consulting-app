@@ -22,6 +22,7 @@ import ConsultantPage from "@/pages/consultant";
 import TemplatesPage from "@/pages/templates";
 import PlaybooksPage from "@/pages/playbooks";
 import FinancialPage from "@/pages/financial";
+import PrimeCostPage from "@/pages/prime-cost";
 import SchedulingPage from "@/pages/scheduling";
 import SubscriptionPage from "@/pages/subscription";
 import SubscriptionSuccessPage from "@/pages/subscription-success";
@@ -161,6 +162,15 @@ function Router() {
         </Route>
         <Route path="/scheduling">
           {user ? <PaidProtectedPage component={SchedulingPage} /> : <Landing />}
+        </Route>
+        <Route path="/financial/prime-cost">
+          {user ? (
+            <PaidProtectedPage component={() => (
+              <RoleGate requiredRole={USER_ROLES.OWNER}>
+                <PrimeCostPage />
+              </RoleGate>
+            )} />
+          ) : <Landing />}
         </Route>
         <Route path="/financial">
           {user ? (

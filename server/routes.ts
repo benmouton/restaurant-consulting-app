@@ -1758,6 +1758,156 @@ export async function registerRoutes(
     }
   });
 
+  // ===== PRIME COST TRACKER ROUTES =====
+
+  app.get("/api/prime-cost", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entries = await storage.getPrimeCostEntries(userId);
+      res.json(entries);
+    } catch (err) {
+      console.error("Error fetching prime cost entries:", err);
+      res.status(500).json({ message: "Failed to fetch entries" });
+    }
+  });
+
+  app.post("/api/prime-cost", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weekEnding, foodCost, laborCost, totalSales, notes } = req.body;
+
+      const food = parseFloat(foodCost);
+      const labor = parseFloat(laborCost);
+      const sales = parseFloat(totalSales);
+
+      if (!weekEnding || isNaN(food) || isNaN(labor) || isNaN(sales)) {
+        return res.status(400).json({ message: "Week ending date and valid numbers are required" });
+      }
+      if (food <= 0 || labor <= 0 || sales <= 0) {
+        return res.status(400).json({ message: "All values must be positive numbers" });
+      }
+      if ((food + labor) > sales * 1.5) {
+        return res.status(400).json({ message: "Prime cost exceeds 150% of sales — please check your numbers" });
+      }
+
+      const weekDate = new Date(weekEnding);
+      const nextSunday = new Date();
+      nextSunday.setDate(nextSunday.getDate() + (7 - nextSunday.getDay()) % 7 + 7);
+      if (weekDate > nextSunday) {
+        return res.status(400).json({ message: "Week ending date cannot be more than a week in the future" });
+      }
+
+      const foodCostPct = ((food / sales) * 100).toFixed(2);
+      const laborCostPct = ((labor / sales) * 100).toFixed(2);
+      const primeCostPct = (((food + labor) / sales) * 100).toFixed(2);
+
+      const entry = await storage.createPrimeCostEntry({
+        userId,
+        weekEnding,
+        foodCost: food.toFixed(2),
+        laborCost: labor.toFixed(2),
+        totalSales: sales.toFixed(2),
+        foodCostPct,
+        laborCostPct,
+        primeCostPct,
+        notes: notes?.substring(0, 200) || null,
+      });
+
+      res.json(entry);
+    } catch (err) {
+      console.error("Error creating prime cost entry:", err);
+      res.status(500).json({ message: "Failed to save entry" });
+    }
+  });
+
+  app.put("/api/prime-cost/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { foodCost, laborCost, totalSales, notes } = req.body;
+
+      const food = parseFloat(foodCost);
+      const labor = parseFloat(laborCost);
+      const sales = parseFloat(totalSales);
+
+      if (isNaN(food) || isNaN(labor) || isNaN(sales)) {
+        return res.status(400).json({ message: "Valid numbers are required" });
+      }
+      if (food <= 0 || labor <= 0 || sales <= 0) {
+        return res.status(400).json({ message: "All values must be positive numbers" });
+      }
+      if ((food + labor) > sales * 1.5) {
+        return res.status(400).json({ message: "Prime cost exceeds 150% of sales — please check your numbers" });
+      }
+
+      const foodCostPct = ((food / sales) * 100).toFixed(2);
+      const laborCostPct = ((labor / sales) * 100).toFixed(2);
+      const primeCostPct = (((food + labor) / sales) * 100).toFixed(2);
+
+      const updated = await storage.updatePrimeCostEntry(id, userId, {
+        foodCost: food.toFixed(2),
+        laborCost: labor.toFixed(2),
+        totalSales: sales.toFixed(2),
+        foodCostPct,
+        laborCostPct,
+        primeCostPct,
+        notes: notes?.substring(0, 200) || null,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Entry not found" });
+      }
+      res.json(updated);
+    } catch (err) {
+      console.error("Error updating prime cost entry:", err);
+      res.status(500).json({ message: "Failed to update entry" });
+    }
+  });
+
+  app.delete("/api/prime-cost/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      await storage.deletePrimeCostEntry(id, userId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting prime cost entry:", err);
+      res.status(500).json({ message: "Failed to delete entry" });
+    }
+  });
+
+  app.get("/api/prime-cost/summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entries = await storage.getPrimeCostEntries(userId);
+      const last4 = entries.slice(0, 4);
+
+      const setup = await storage.getHandbookSettings(userId);
+      const foodCostTarget = setup?.foodCostTarget ? parseFloat(setup.foodCostTarget) : null;
+      const laborTarget = setup?.laborTargetPct ? parseFloat(setup.laborTargetPct) : null;
+      const primeCostTarget = setup?.primeCostTarget ? parseFloat(setup.primeCostTarget) : (foodCostTarget !== null && laborTarget !== null ? foodCostTarget + laborTarget : null);
+
+      let trendDirection: "up" | "down" | "flat" | null = null;
+      if (last4.length >= 2 && last4[0].primeCostPct && last4[1].primeCostPct) {
+        const latest = parseFloat(last4[0].primeCostPct);
+        const previous = parseFloat(last4[1].primeCostPct);
+        const diff = latest - previous;
+        if (Math.abs(diff) < 0.1) trendDirection = "flat";
+        else trendDirection = diff > 0 ? "up" : "down";
+      }
+
+      res.json({
+        entries: last4,
+        targets: { foodCostTarget, laborTarget, primeCostTarget },
+        trendDirection,
+        totalEntries: entries.length,
+      });
+    } catch (err) {
+      console.error("Error fetching prime cost summary:", err);
+      res.status(500).json({ message: "Failed to fetch summary" });
+    }
+  });
+
   // ===== RESTAURANT PROFILE ROUTES =====
 
   // Get user's restaurant profile

@@ -578,6 +578,25 @@ export default function FinancialPage() {
           </p>
         </div>
 
+        <Link href="/financial/prime-cost">
+          <div
+            className="p-4 rounded-xl mb-6 flex items-center justify-between cursor-pointer transition-all"
+            style={{ backgroundColor: "#1a1d2e", border: "1px solid #b8860b" }}
+            data-testid="link-prime-cost-tracker"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ backgroundColor: "rgba(212,160,23,0.12)" }}>
+                <DollarSign className="h-5 w-5" style={{ color: "#d4a017" }} />
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">Weekly Prime Cost Tracker</p>
+                <p className="text-xs" style={{ color: "#9ca3af" }}>Track food cost + labor cost vs. sales every week</p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4" style={{ color: "#d4a017" }} />
+          </div>
+        </Link>
+
         {/* Intelligence Strip */}
         <div
           className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"
