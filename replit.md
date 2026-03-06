@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Living Playbooks**: SOP management system with various creation modes, mobile checklist view, audit capabilities.
 - **Employee Handbook Builder**: Customizable handbook generation.
 - **Reviews & Reputation**: `ReputationStatusStrip` and `ReviewResponseGenerator` for AI-powered review responses, including OCR for review text.
+- **Social Media**: `SocialPerformanceStrip` (5 gold-bordered metric cards: Posts This Month, Channels Active, Scheduled, Last Post, Best Time Today) and `SocialPostBuilder` with 6 tabs (Create, Schedule, Channels, Holidays, Sent, Voice). Features: gold shimmer composer card, character count with platform-specific limits (280 X, 2200 Instagram, amber at 80%, red at 100%), 2 new Post Generator fields (Promotion/Discount text + Call to Action dropdown injected into prompt), Holiday chip prefill (sets Post Type + Event Name + navigates to Create tab), Voice Preview section (generates sample post in configured brand voice via `/api/social-media/voice-preview`), failed post inline explanation on Sent tab, Schedule empty cell click navigates to Create with date prefilled, dark-themed cards across all tabs. CSS: `socialShimmer` keyframe in index.css.
 - **Marketing & Onboarding**: Conversion-optimized landing page and multi-step onboarding wizard.
 
 ## External Dependencies

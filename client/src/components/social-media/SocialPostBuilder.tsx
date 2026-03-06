@@ -48,6 +48,14 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
+  ArrowRight,
+  RefreshCw,
+  Plus,
+  FileText,
+  Info,
 } from "lucide-react";
 import { SiLinkedin, SiX, SiNextdoor, SiFacebook, SiInstagram, SiGoogle } from "react-icons/si";
 import type { RestaurantHoliday, BrandVoiceSettings, ConnectedAccount, ScheduledPost } from "@shared/schema";
@@ -108,6 +116,16 @@ const CTAS = [
   { value: "come_early", label: "Come Early / Limited Seating" },
 ];
 
+const CTA_OPTIONS = [
+  { value: "reserve_table", label: "Reserve a table" },
+  { value: "order_online", label: "Order online" },
+  { value: "visit_us", label: "Visit us today" },
+  { value: "call_now", label: "Call now" },
+  { value: "limited_time", label: "Limited time only" },
+  { value: "tag_friend", label: "Tag a friend" },
+  { value: "share_post", label: "Share this post" },
+];
+
 const PLATFORM_LIMITS: Record<string, { chars: number; label: string }> = {
   instagram: { chars: 2200, label: "Instagram" },
   facebook: { chars: 63206, label: "Facebook" },
@@ -124,6 +142,85 @@ interface GeneratedPost {
   hashtags: string[];
   suggestedPostTime: string;
   replyPack: string[];
+}
+
+function SocialPerformanceStrip({
+  postHistory,
+  connectedAccounts,
+}: {
+  postHistory: ScheduledPost[] | undefined;
+  connectedAccounts: SafeConnectedAccount[] | undefined;
+}) {
+  const now = new Date();
+  const thisMonthPosts = (postHistory || []).filter(p => {
+    if (!p.createdAt) return false;
+    const d = new Date(p.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && (p.status === 'posted' || p.status === 'partial');
+  });
+
+  const activeChannels = (connectedAccounts || []).filter(a => a.status === 'active');
+  const scheduledPosts = (postHistory || []).filter(p => p.status === 'scheduled');
+
+  const lastPost = (postHistory || [])
+    .filter(p => p.status === 'posted' && p.createdAt)
+    .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime())[0];
+
+  const getTimeAgo = (dateStr: string) => {
+    const diff = now.getTime() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  };
+
+  const metrics = [
+    {
+      label: "Posts This Month",
+      value: `${thisMonthPosts.length} post${thisMonthPosts.length !== 1 ? 's' : ''}`,
+      color: thisMonthPosts.length > 0 ? "text-white" : "text-gray-400",
+    },
+    {
+      label: "Channels Active",
+      value: activeChannels.length > 0 ? `${activeChannels.length}` : "--",
+      color: activeChannels.length < 4 && activeChannels.length > 0 ? "text-amber-400" : "text-white",
+      sub: activeChannels.length > 0 && activeChannels.length < 4 ? `${activeChannels.length} of 4 connected` : undefined,
+    },
+    {
+      label: "Scheduled",
+      value: `${scheduledPosts.length} scheduled`,
+      color: scheduledPosts.length > 0 ? "text-white" : "text-gray-400",
+    },
+    {
+      label: "Last Post",
+      value: lastPost ? (lastPost.caption || "").substring(0, 30) + (lastPost.caption && lastPost.caption.length > 30 ? "..." : "") : "No posts yet",
+      color: lastPost ? "text-white" : "text-gray-400",
+      sub: lastPost?.createdAt ? getTimeAgo(lastPost.createdAt) : undefined,
+    },
+    {
+      label: "Best Time Today",
+      value: "4:30 PM",
+      color: "text-white",
+    },
+  ];
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 mb-4 scrollbar-thin" data-testid="social-performance-strip">
+      {metrics.map((m, i) => (
+        <div
+          key={i}
+          className="min-w-[160px] flex-shrink-0 rounded-lg p-3 border-l-[3px]"
+          style={{ backgroundColor: '#1a1d2e', borderLeftColor: '#b8860b' }}
+          data-testid={`metric-card-${i}`}
+        >
+          <div className="text-[11px] text-gray-400 uppercase tracking-wider mb-1">{m.label}</div>
+          <div className={`text-sm font-bold ${m.color} truncate`}>{m.value}</div>
+          {m.sub && <div className="text-[10px] text-amber-400 mt-0.5">{m.sub}</div>}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function SocialPostBuilder() {
@@ -145,9 +242,12 @@ export default function SocialPostBuilder() {
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("12:00");
+  const [uploadedFileName, setUploadedFileName] = useState("");
+  const [uploadedFileSize, setUploadedFileSize] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
+  const [prefillDate, setPrefillDate] = useState<string | null>(null);
 
   const [aiFormData, setAiFormData] = useState({
     postType: "",
@@ -162,6 +262,8 @@ export default function SocialPostBuilder() {
     cta: "reserve_now",
     selectedHoliday: "",
     postTypeData: {} as any,
+    promotionDiscount: "",
+    callToAction: "",
   });
 
   const { data: holidays, isLoading: holidaysLoading } = useQuery<RestaurantHoliday[]>({
@@ -259,7 +361,7 @@ export default function SocialPostBuilder() {
   });
 
   const publishMutation = useMutation({
-    mutationFn: async (data: { caption: string; platformTargets: number[]; postNow: boolean; generatedContent?: object; mediaUrls?: string[] }) => {
+    mutationFn: async (data: { caption: string; platformTargets: number[]; postNow: boolean; generatedContent?: object; mediaUrls?: string[]; scheduledFor?: string }) => {
       const response = await apiRequest("POST", "/api/social-media/posts", data);
       return response.json();
     },
@@ -308,6 +410,8 @@ export default function SocialPostBuilder() {
       return;
     }
     setIsUploading(true);
+    setUploadedFileName(file.name);
+    setUploadedFileSize(`${(file.size / 1024).toFixed(1)} KB`);
     try {
       const formData = new FormData();
       formData.append("image", file);
@@ -323,6 +427,8 @@ export default function SocialPostBuilder() {
       toast({ title: "Image uploaded", description: "Your image is ready." });
     } catch {
       toast({ title: "Upload failed", description: "Could not upload the image. Try again.", variant: "destructive" });
+      setUploadedFileName("");
+      setUploadedFileSize("");
     } finally {
       setIsUploading(false);
     }
@@ -614,8 +720,57 @@ export default function SocialPostBuilder() {
     return `In ${diffDays} days`;
   };
 
+  const handleHolidayPrefill = (holidayName: string, holidayDate?: string) => {
+    setAiFormData(prev => ({
+      ...prev,
+      postType: "holiday",
+      eventName: holidayName,
+      selectedHoliday: holidayName,
+      eventDate: holidayDate || format(new Date(), "yyyy-MM-dd"),
+    }));
+    setShowAiPanel(true);
+    setActiveTab("create");
+  };
+
+  const handleScheduleEmptyCellClick = (day: Date) => {
+    setPrefillDate(format(day, "yyyy-MM-dd"));
+    setAiFormData(prev => ({
+      ...prev,
+      eventDate: format(day, "yyyy-MM-dd"),
+    }));
+    setActiveTab("create");
+    setShowAiPanel(true);
+  };
+
+  const getCharLimitInfo = () => {
+    const selectedProviders = selectedAccountIds.map(id => {
+      const acct = activeAccounts.find(a => a.id === id);
+      return acct?.provider || '';
+    }).filter(Boolean);
+    const uniqueProviders = Array.from(new Set(selectedProviders));
+
+    if (uniqueProviders.length === 0) return null;
+
+    let mostRestrictive = { chars: Infinity, label: "" };
+    uniqueProviders.forEach(p => {
+      const limit = PLATFORM_LIMITS[p];
+      if (limit && limit.chars < mostRestrictive.chars) {
+        mostRestrictive = limit;
+      }
+    });
+
+    if (mostRestrictive.chars === Infinity) return null;
+    return mostRestrictive;
+  };
+
+  const charLimit = getCharLimitInfo();
+  const charPercent = charLimit ? (caption.length / charLimit.chars) * 100 : 0;
+  const charColor = charPercent >= 100 ? "text-red-500" : charPercent >= 80 ? "text-amber-400" : "text-gray-400";
+
   return (
     <div className="space-y-4">
+      <SocialPerformanceStrip postHistory={postHistory} connectedAccounts={connectedAccounts} />
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <TabsList>
@@ -646,28 +801,28 @@ export default function SocialPostBuilder() {
           </TabsList>
         </div>
 
+        {/* ═══ CREATE TAB ═══ */}
         <TabsContent value="create">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* Left: Compose Panel */}
             <div className="lg:col-span-3 space-y-4">
               <Card
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`transition-colors ${isDragging ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                className="transition-colors"
+                style={{ animation: 'socialShimmer 3s ease-in-out infinite' }}
               >
                 <CardContent className="p-4 space-y-4">
-                  {/* Full-card drag overlay */}
                   {isDragging && (
-                    <div className="flex items-center justify-center p-6 border-2 border-dashed border-primary rounded-md bg-primary/5">
+                    <div className="flex items-center justify-center p-6 border-2 border-dashed rounded-md" style={{ borderColor: '#b8860b', backgroundColor: 'rgba(184,134,11,0.05)' }}>
                       <div className="flex flex-col items-center gap-2 text-center">
-                        <Upload className="h-8 w-8 text-primary" />
-                        <span className="text-sm font-medium text-primary">Drop your image here</span>
+                        <Upload className="h-8 w-8" style={{ color: '#b8860b' }} />
+                        <span className="text-sm font-medium" style={{ color: '#b8860b' }}>Drop your image here</span>
                       </div>
                     </div>
                   )}
-                  {/* Channel selector row */}
+
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm font-medium text-muted-foreground">
@@ -676,9 +831,14 @@ export default function SocialPostBuilder() {
                           : 'Select channels'}
                       </span>
                       {activeAccounts.length > 1 && (
-                        <Button variant="ghost" size="sm" onClick={selectAllAccounts} data-testid="button-select-all-accounts">
+                        <button
+                          onClick={selectAllAccounts}
+                          className="text-xs px-3 py-1 rounded-full border font-medium transition-colors"
+                          style={{ borderColor: '#b8860b', color: '#d4a017' }}
+                          data-testid="button-select-all-accounts"
+                        >
                           {selectedAccountIds.length === activeAccounts.length ? 'Deselect All' : 'Select All'}
-                        </Button>
+                        </button>
                       )}
                     </div>
 
@@ -690,7 +850,8 @@ export default function SocialPostBuilder() {
                             <button
                               key={account.id}
                               onClick={() => toggleAccountSelection(account.id)}
-                              className={`relative rounded-full transition-all ${isSelected ? 'ring-2 ring-primary ring-offset-2' : 'opacity-50 hover:opacity-80'}`}
+                              className="relative rounded-full transition-all"
+                              style={isSelected ? { boxShadow: '0 0 0 2px #b8860b', borderRadius: '9999px' } : { opacity: 0.5 }}
                               title={`${account.displayName} (${account.provider.replace('_', ' ')})`}
                               data-testid={`channel-avatar-${account.id}`}
                             >
@@ -733,7 +894,6 @@ export default function SocialPostBuilder() {
                     )}
                   </div>
 
-                  {/* Large textarea */}
                   <Textarea
                     placeholder="What would you like to share?"
                     value={caption}
@@ -743,9 +903,15 @@ export default function SocialPostBuilder() {
                     data-testid="textarea-caption"
                   />
 
-                  {caption && (
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>{caption.length} characters</span>
+                  {(caption || charLimit) && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className={charColor}>{caption.length} characters</span>
+                      {charLimit && (
+                        <span className={`font-medium ${charColor}`}>
+                          / {charLimit.chars} ({charLimit.label})
+                          {charPercent >= 100 && " -- over limit"}
+                        </span>
+                      )}
                       {isShorteningLinks && (
                         <span className="flex items-center gap-1 text-primary">
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -762,14 +928,16 @@ export default function SocialPostBuilder() {
                           const limit = PLATFORM_LIMITS[ch];
                           if (!limit) return null;
                           const isOver = caption.length > limit.chars;
+                          const pct = (caption.length / limit.chars) * 100;
+                          const badgeColor = isOver ? "text-red-500 border-red-500/30 bg-red-500/10" : pct >= 80 ? "text-amber-400 border-amber-400/30 bg-amber-400/10" : "";
                           return (
                             <Badge
                               key={ch}
                               variant="outline"
-                              className={`text-xs ${isOver ? "text-red-600 border-red-500/30 bg-red-500/10" : ""}`}
+                              className={`text-xs ${badgeColor}`}
                               data-testid={`badge-char-limit-${ch}`}
                             >
-                              {limit.label}: {caption.length}/{limit.chars} {isOver ? "-- over limit" : ""}
+                              {limit.label}: {caption.length}/{limit.chars}
                             </Badge>
                           );
                         });
@@ -777,7 +945,6 @@ export default function SocialPostBuilder() {
                     </div>
                   )}
 
-                  {/* Image area */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -787,18 +954,23 @@ export default function SocialPostBuilder() {
                     data-testid="input-file-upload"
                   />
                   {generatingHolidayId && !mediaUrl ? (
-                    <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center gap-2 text-center">
-                      <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                    <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center gap-2 text-center" style={{ borderColor: '#b8860b' }}>
+                      <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#b8860b' }} />
                       <div className="text-sm text-muted-foreground">Generating holiday image...</div>
                     </div>
                   ) : mediaUrl ? (
                     <div className="relative rounded-md border overflow-hidden">
                       <img key={imageKey} src={mediaUrl} alt="Post media" className="w-full max-h-64 object-cover" />
+                      {uploadedFileName && (
+                        <div className="px-3 py-1.5 text-xs text-gray-400 border-t" style={{ backgroundColor: '#0f1117' }}>
+                          {uploadedFileName} ({uploadedFileSize})
+                        </div>
+                      )}
                       <Button
                         size="icon"
                         variant="secondary"
                         className="absolute top-2 right-2"
-                        onClick={() => setMediaUrl("")}
+                        onClick={() => { setMediaUrl(""); setUploadedFileName(""); setUploadedFileSize(""); }}
                         data-testid="button-remove-image"
                       >
                         <X className="h-4 w-4" />
@@ -812,17 +984,14 @@ export default function SocialPostBuilder() {
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
                       onClick={() => fileInputRef.current?.click()}
-                      className={`border-2 border-dashed rounded-md p-6 cursor-pointer transition-colors ${
-                        isDragging
-                          ? 'border-primary bg-primary/5'
-                          : 'border-muted-foreground/20 hover:border-muted-foreground/40'
-                      }`}
+                      className="border-2 border-dashed rounded-md p-6 cursor-pointer transition-colors"
+                      style={isDragging ? { borderColor: '#b8860b', backgroundColor: 'rgba(184,134,11,0.05)' } : { borderColor: 'rgba(255,255,255,0.1)' }}
                       data-testid="dropzone-image"
                     >
                       <div className="flex flex-col items-center gap-2 text-center">
                         {isUploading ? (
                           <>
-                            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                            <Loader2 className="h-6 w-6 animate-spin" style={{ color: '#b8860b' }} />
                             <div className="text-sm text-muted-foreground">Uploading...</div>
                           </>
                         ) : (
@@ -830,9 +999,9 @@ export default function SocialPostBuilder() {
                             <Upload className="h-6 w-6 text-muted-foreground/50" />
                             <div className="text-sm text-muted-foreground">
                               {isDragging ? (
-                                <span className="text-primary font-medium">Drop your image here</span>
+                                <span className="font-medium" style={{ color: '#b8860b' }}>Drop your image here</span>
                               ) : (
-                                <>Drag & drop an image, or <span className="text-primary">click to browse</span></>
+                                <>Drag & drop an image, or <span style={{ color: '#d4a017' }}>click to browse</span></>
                               )}
                             </div>
                             <div className="text-xs text-muted-foreground/60">JPEG, PNG, GIF, WebP up to 10MB</div>
@@ -842,13 +1011,13 @@ export default function SocialPostBuilder() {
                     </div>
                   )}
 
-                  {/* Bottom toolbar */}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                     <div className="flex flex-wrap items-center gap-1">
                       <Button
                         variant={showAiPanel ? "default" : "outline"}
                         size="sm"
                         onClick={() => setShowAiPanel(!showAiPanel)}
+                        style={showAiPanel ? { backgroundColor: '#b8860b', color: 'white' } : {}}
                         data-testid="button-ai-assistant"
                       >
                         <Sparkles className="h-4 w-4 mr-1" />
@@ -869,6 +1038,7 @@ export default function SocialPostBuilder() {
                       <Button
                         onClick={handlePublish}
                         disabled={!caption.trim() || selectedAccountIds.length === 0 || publishMutation.isPending}
+                        style={{ borderColor: '#b8860b' }}
                         data-testid="button-publish-now"
                       >
                         {publishMutation.isPending ? (
@@ -936,18 +1106,22 @@ export default function SocialPostBuilder() {
                 </CardContent>
               </Card>
 
-              {/* Post Assistant panel (collapsible below compose) */}
+              {/* ═══ POST GENERATOR PANEL ═══ */}
               {showAiPanel && (
-                <Card>
+                <Card style={{ borderTop: '2px solid #b8860b' }}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="flex flex-wrap items-center justify-between gap-2" style={{ fontSize: '16px', fontWeight: 600 }}>
                       <span className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
+                        <Sparkles className="h-4 w-4" style={{ color: '#d4a017' }} />
                         Post Generator
                       </span>
-                      <Button size="icon" variant="ghost" onClick={() => setShowAiPanel(false)}>
+                      <button
+                        onClick={() => setShowAiPanel(false)}
+                        className="h-7 w-7 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
+                        data-testid="button-close-generator"
+                      >
                         <X className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -955,7 +1129,7 @@ export default function SocialPostBuilder() {
                       <div className="space-y-1">
                         <Label className="text-xs">Post Type</Label>
                         <Select value={aiFormData.postType} onValueChange={(v) => setAiFormData({ ...aiFormData, postType: v })}>
-                          <SelectTrigger data-testid="select-post-type">
+                          <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-post-type">
                             <SelectValue placeholder="What are you posting about?" />
                           </SelectTrigger>
                           <SelectContent>
@@ -968,7 +1142,7 @@ export default function SocialPostBuilder() {
                       <div className="space-y-1">
                         <Label className="text-xs">Style</Label>
                         <Select value={aiFormData.outputStyle} onValueChange={(v) => setAiFormData({ ...aiFormData, outputStyle: v })}>
-                          <SelectTrigger data-testid="select-output-style">
+                          <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-output-style">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -987,6 +1161,8 @@ export default function SocialPostBuilder() {
                           placeholder="e.g., Jazz Night, Wagyu Ribeye"
                           value={aiFormData.eventName}
                           onChange={(e) => setAiFormData({ ...aiFormData, eventName: e.target.value })}
+                          className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]"
+                          style={{ backgroundColor: '#0f1117' }}
                           data-testid="input-event-name"
                         />
                       </div>
@@ -996,10 +1172,11 @@ export default function SocialPostBuilder() {
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-start text-left font-normal"
+                              className="w-full justify-start text-left font-normal border-0 border-b border-gray-700 rounded-none"
+                              style={{ backgroundColor: '#0f1117' }}
                               data-testid="input-event-date"
                             >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              <CalendarIcon className="mr-2 h-4 w-4" style={{ color: '#d4a017' }} />
                               {aiFormData.eventDate
                                 ? format(parse(aiFormData.eventDate, "yyyy-MM-dd", new Date()), "MMM d, yyyy")
                                 : "Pick a date"}
@@ -1022,7 +1199,7 @@ export default function SocialPostBuilder() {
                       <div className="space-y-1">
                         <Label className="text-xs">Target Audience</Label>
                         <Select value={aiFormData.targetAudience} onValueChange={(v) => setAiFormData({ ...aiFormData, targetAudience: v })}>
-                          <SelectTrigger data-testid="select-target-audience">
+                          <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-target-audience">
                             <SelectValue placeholder="Who is this for?" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1035,12 +1212,39 @@ export default function SocialPostBuilder() {
                       <div className="space-y-1">
                         <Label className="text-xs">Tone</Label>
                         <Select value={aiFormData.tone} onValueChange={(v) => setAiFormData({ ...aiFormData, tone: v })}>
-                          <SelectTrigger data-testid="select-tone">
+                          <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-tone">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {TONES.map((tone) => (
                               <SelectItem key={tone.value} value={tone.value}>{tone.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Promotion / Discount</Label>
+                        <Input
+                          placeholder="e.g., 15% off, buy one get one, free dessert"
+                          value={aiFormData.promotionDiscount}
+                          onChange={(e) => setAiFormData({ ...aiFormData, promotionDiscount: e.target.value })}
+                          className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]"
+                          style={{ backgroundColor: '#0f1117' }}
+                          data-testid="input-promotion-discount"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Call to Action</Label>
+                        <Select value={aiFormData.callToAction} onValueChange={(v) => setAiFormData({ ...aiFormData, callToAction: v })}>
+                          <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-call-to-action">
+                            <SelectValue placeholder="Select CTA" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CTA_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1054,6 +1258,8 @@ export default function SocialPostBuilder() {
                         value={aiFormData.promotionDetails}
                         onChange={(e) => setAiFormData({ ...aiFormData, promotionDetails: e.target.value })}
                         rows={2}
+                        className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]"
+                        style={{ backgroundColor: '#0f1117' }}
                         data-testid="textarea-promotion-details"
                       />
                     </div>
@@ -1062,61 +1268,82 @@ export default function SocialPostBuilder() {
                       <div className="flex flex-wrap gap-1">
                         <span className="text-xs text-muted-foreground mr-1">Upcoming:</span>
                         {holidays.slice(0, 5).map((holiday) => (
-                          <Badge
+                          <button
                             key={holiday.id}
-                            variant={aiFormData.selectedHoliday === holiday.name ? "default" : "outline"}
-                            className="cursor-pointer text-xs"
-                            onClick={() =>
-                              setAiFormData({
-                                ...aiFormData,
-                                selectedHoliday: aiFormData.selectedHoliday === holiday.name ? "" : holiday.name,
-                              })
+                            className="text-xs px-2 py-0.5 rounded-full border transition-colors cursor-pointer"
+                            style={
+                              aiFormData.selectedHoliday === holiday.name
+                                ? { backgroundColor: '#b8860b', borderColor: '#b8860b', color: 'white' }
+                                : { backgroundColor: '#1a1d2e', borderColor: '#b8860b', color: '#d4a017' }
                             }
+                            onClick={() => handleHolidayPrefill(holiday.name)}
                             data-testid={`badge-holiday-${holiday.id}`}
                           >
                             {holiday.name}
-                          </Badge>
+                          </button>
                         ))}
                       </div>
                     )}
 
-                    <Button
+                    <button
                       onClick={handleAiGenerate}
                       disabled={generateMutation.isPending || !aiFormData.postType}
-                      className="w-full"
+                      className="w-full py-2.5 rounded-md text-sm font-bold uppercase tracking-wider text-white transition-colors disabled:opacity-50"
+                      style={{ backgroundColor: '#b8860b' }}
                       data-testid="button-generate-post"
                     >
                       {generateMutation.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating your post...
+                        </span>
                       ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
+                        <span className="flex items-center justify-center gap-2">
+                          <Sparkles className="h-4 w-4" />
                           Generate Post
-                        </>
+                        </span>
                       )}
-                    </Button>
+                    </button>
                   </CardContent>
                 </Card>
               )}
             </div>
 
-            {/* Right: Preview Panel */}
+            {/* ═══ PREVIEW PANEL ═══ */}
             <div className={`lg:col-span-2 ${showPreview ? '' : 'hidden lg:block'}`}>
-              <Card className="sticky top-4">
+              <Card className="sticky top-4" style={{ borderTop: '2px solid #b8860b' }}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex flex-wrap items-center gap-2">
-                    <Eye className="h-4 w-4" />
+                  <CardTitle className="text-sm flex flex-wrap items-center gap-2 font-semibold">
+                    <Eye className="h-4 w-4" style={{ color: '#d4a017' }} />
                     Post Preview
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {caption ? (
+                  {generateMutation.isPending ? (
+                    <div className="space-y-3 py-4">
+                      <div className="h-4 rounded animate-pulse" style={{ backgroundColor: '#1a1d2e', width: '80%' }} />
+                      <div className="h-4 rounded animate-pulse" style={{ backgroundColor: '#1a1d2e', width: '100%' }} />
+                      <div className="h-4 rounded animate-pulse" style={{ backgroundColor: '#1a1d2e', width: '60%' }} />
+                      <div className="flex gap-2 mt-4">
+                        <div className="h-6 w-20 rounded-full animate-pulse" style={{ backgroundColor: '#1a1d2e' }} />
+                        <div className="h-6 w-16 rounded-full animate-pulse" style={{ backgroundColor: '#1a1d2e' }} />
+                        <div className="h-6 w-24 rounded-full animate-pulse" style={{ backgroundColor: '#1a1d2e' }} />
+                      </div>
+                    </div>
+                  ) : caption ? (
                     <>
-                      {/* Preview mock */}
-                      <div className="border rounded-md overflow-hidden">
+                      <div className="border rounded-md overflow-hidden relative">
+                        {selectedAccountIds.length > 0 && (() => {
+                          const firstAcct = activeAccounts.find(a => a.id === selectedAccountIds[0]);
+                          if (!firstAcct) return null;
+                          return (
+                            <div className="absolute top-2 right-2 z-10">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#1a1d2e', color: '#d4a017', border: '1px solid rgba(184,134,11,0.3)' }}>
+                                {firstAcct.provider === 'google_business' ? 'Google Business' : firstAcct.provider.charAt(0).toUpperCase() + firstAcct.provider.slice(1)}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         <div className="p-3 flex items-center gap-2 border-b bg-muted/30">
                           <div className="h-8 w-8 rounded-full bg-muted" />
                           <div>
@@ -1133,57 +1360,74 @@ export default function SocialPostBuilder() {
                         {generatedPost?.hashtags && generatedPost.hashtags.length > 0 && (
                           <div className="px-3 pb-3 flex flex-wrap gap-1">
                             {generatedPost.hashtags.map((tag, i) => (
-                              <span key={i} className="text-xs text-primary">{tag}</span>
+                              <span
+                                key={i}
+                                className="text-xs px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: '#1a1d2e', color: '#d4a017' }}
+                              >
+                                {tag}
+                              </span>
                             ))}
                           </div>
                         )}
                       </div>
 
-                      {/* Copy actions */}
                       <div className="flex flex-wrap gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
+                        <button
                           onClick={() => copyToClipboard(caption, "caption")}
+                          className="text-xs px-3 py-1 rounded-full border transition-colors"
+                          style={{ borderColor: '#b8860b', color: '#d4a017' }}
                           data-testid="button-copy-caption"
                         >
-                          {copiedField === "caption" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                          {copiedField === "caption" ? <Check className="h-3 w-3 inline mr-1" /> : <Copy className="h-3 w-3 inline mr-1" />}
                           Copy Caption
-                        </Button>
+                        </button>
                         {generatedPost?.hashtags && (
-                          <Button
-                            size="sm"
-                            variant="outline"
+                          <button
                             onClick={() => copyToClipboard(generatedPost.hashtags.join(" "), "hashtags")}
+                            className="text-xs px-3 py-1 rounded-full border transition-colors"
+                            style={{ borderColor: '#b8860b', color: '#d4a017' }}
                             data-testid="button-copy-hashtags"
                           >
-                            {copiedField === "hashtags" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                            {copiedField === "hashtags" ? <Check className="h-3 w-3 inline mr-1" /> : <Copy className="h-3 w-3 inline mr-1" />}
                             Hashtags
-                          </Button>
+                          </button>
                         )}
                       </div>
 
-                      {/* Short caption and story overlays */}
                       {generatedPost?.shortCaption && (
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center justify-between gap-1">
                             <Label className="text-xs">Short Caption</Label>
-                            <Button size="icon" variant="ghost" onClick={() => copyToClipboard(generatedPost.shortCaption, "short")} data-testid="button-copy-short">
+                            <button
+                              onClick={() => copyToClipboard(generatedPost.shortCaption, "short")}
+                              className="h-6 w-6 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
+                              data-testid="button-copy-short"
+                            >
                               {copiedField === "short" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                            </Button>
+                            </button>
                           </div>
-                          <p className="text-xs bg-muted rounded p-2" data-testid="text-short-caption">{generatedPost.shortCaption}</p>
+                          <p
+                            className="text-xs rounded p-2 italic text-gray-400 border-l-2"
+                            style={{ backgroundColor: '#0f1117', borderLeftColor: '#b8860b' }}
+                            data-testid="text-short-caption"
+                          >
+                            {generatedPost.shortCaption}
+                          </p>
                         </div>
                       )}
 
                       {generatedPost?.suggestedPostTime && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2" data-testid="text-suggested-time">
-                          <Clock className="h-3 w-3" />
-                          Best time: <strong>{generatedPost.suggestedPostTime}</strong>
+                        <div
+                          className="flex items-center gap-2 text-xs rounded p-2"
+                          style={{ backgroundColor: 'rgba(184,134,11,0.1)' }}
+                          data-testid="text-suggested-time"
+                        >
+                          <Clock className="h-3 w-3" style={{ color: '#d4a017' }} />
+                          <span className="text-amber-400">Best time: <strong>{generatedPost.suggestedPostTime}</strong></span>
                         </div>
                       )}
 
-                      {/* Selected channels summary */}
                       {selectedAccountIds.length > 0 && (
                         <div className="space-y-1">
                           <Label className="text-xs">Publishing to</Label>
@@ -1220,7 +1464,7 @@ export default function SocialPostBuilder() {
           </div>
         </TabsContent>
 
-        {/* Schedule Calendar Tab */}
+        {/* ═══ SCHEDULE TAB ═══ */}
         <TabsContent value="schedule">
           <ScheduleCalendar
             posts={postHistory || []}
@@ -1230,54 +1474,84 @@ export default function SocialPostBuilder() {
               setActiveTab("create");
               toast({ title: "Post content loaded", description: "Edit and repost!" });
             }}
+            onEmptyCellClick={handleScheduleEmptyCellClick}
           />
         </TabsContent>
 
-        {/* Channels / Accounts Tab */}
+        {/* ═══ CHANNELS TAB ═══ */}
         <TabsContent value="accounts">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base">Channels</CardTitle>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleConnectMeta} variant="outline" size="sm" data-testid="button-connect-meta">
-                    <Facebook className="h-4 w-4 mr-2 text-blue-600" />
-                    Connect Facebook / Instagram
-                  </Button>
-                  <Button onClick={handleConnectGoogle} variant="outline" size="sm" data-testid="button-connect-google">
-                    <MapPin className="h-4 w-4 mr-2 text-red-500" />
-                    Google Business
-                  </Button>
-                  <Button onClick={handleConnectLinkedIn} variant="outline" size="sm" data-testid="button-connect-linkedin">
-                    <SiLinkedin className="h-4 w-4 mr-2 text-blue-700" />
-                    Connect LinkedIn
-                  </Button>
-                  <Button onClick={handleConnectX} variant="outline" size="sm" data-testid="button-connect-x">
-                    <SiX className="h-4 w-4 mr-2" />
-                    Connect X
-                  </Button>
-                  <Button variant="outline" size="sm" disabled className="opacity-60" data-testid="button-connect-nextdoor">
-                    <SiNextdoor className="h-4 w-4 mr-2 text-green-600" />
-                    Nextdoor
-                    <span className="ml-2 text-[10px] uppercase font-semibold bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
-                  </Button>
-                </div>
+                {connectedAccounts && connectedAccounts.filter(a => a.status === 'active').length > 0 && (
+                  <span
+                    className="text-xs px-2.5 py-1 rounded-full font-medium"
+                    style={{ backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017', border: '1px solid rgba(184,134,11,0.3)' }}
+                    data-testid="badge-channels-connected"
+                  >
+                    {connectedAccounts.filter(a => a.status === 'active').length}/{connectedAccounts.length} Channels connected
+                  </span>
+                )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[
+                  { label: "Facebook / Instagram", icon: <Facebook className="h-5 w-5 text-blue-600" />, handler: handleConnectMeta, testId: "button-connect-meta", connected: activeAccounts.some(a => a.provider === 'facebook' || a.provider === 'instagram') },
+                  { label: "Google Business", icon: <SiGoogle className="h-5 w-5 text-red-500" />, handler: handleConnectGoogle, testId: "button-connect-google", connected: activeAccounts.some(a => a.provider === 'google_business') },
+                  { label: "LinkedIn", icon: <SiLinkedin className="h-5 w-5 text-blue-700" />, handler: handleConnectLinkedIn, testId: "button-connect-linkedin", connected: activeAccounts.some(a => a.provider === 'linkedin') },
+                  { label: "X (Twitter)", icon: <SiX className="h-5 w-5" />, handler: handleConnectX, testId: "button-connect-x", connected: activeAccounts.some(a => a.provider === 'x') },
+                ].map((ch) => (
+                  <div
+                    key={ch.testId}
+                    className="rounded-lg p-4 border flex items-center justify-between gap-3"
+                    style={{ backgroundColor: '#1a1d2e' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      {ch.icon}
+                      <span className="text-sm font-medium">{ch.label}</span>
+                    </div>
+                    {ch.connected ? (
+                      <span className="flex items-center gap-1 text-xs text-green-400 font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                        Connected
+                      </span>
+                    ) : (
+                      <button
+                        onClick={ch.handler}
+                        className="text-xs px-3 py-1 rounded-full font-medium"
+                        style={{ backgroundColor: '#b8860b', color: 'white' }}
+                        data-testid={ch.testId}
+                      >
+                        Connect
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div
+                  className="rounded-lg p-4 border flex items-center justify-between gap-3 opacity-60"
+                  style={{ backgroundColor: '#1a1d2e' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <SiNextdoor className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium">Nextdoor</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Coming Soon</span>
+                </div>
+              </div>
+
               {accountsLoading ? (
                 <div className="space-y-3">
                   {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
                 </div>
               ) : connectedAccounts && connectedAccounts.length > 0 ? (
                 <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground mb-3">
-                    {connectedAccounts.filter(a => a.status === 'active').length}/{connectedAccounts.length} Channels connected
-                  </div>
                   {connectedAccounts.map((account) => (
                     <div
                       key={account.id}
-                      className="flex flex-wrap items-center justify-between gap-3 p-3 border rounded-md"
+                      className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border"
+                      style={{ backgroundColor: '#1a1d2e' }}
                       data-testid={`card-account-${account.id}`}
                     >
                       <div className="flex items-center gap-3">
@@ -1313,18 +1587,26 @@ export default function SocialPostBuilder() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={account.status === 'active' ? 'default' : 'destructive'} data-testid={`badge-account-status-${account.id}`}>
-                          {account.status}
-                        </Badge>
-                        <Button
-                          size="icon"
-                          variant="ghost"
+                        {account.status === 'active' ? (
+                          <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                            Inactive
+                          </span>
+                        )}
+                        <button
                           onClick={() => disconnectMutation.mutate(account.id)}
                           disabled={disconnectMutation.isPending}
+                          className="h-7 w-7 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
+                          style={{ color: '#d4a017' }}
+                          title="Reconnect"
                           data-testid={`button-disconnect-${account.id}`}
                         >
-                          <Unlink className="h-4 w-4" />
-                        </Button>
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1340,11 +1622,14 @@ export default function SocialPostBuilder() {
           </Card>
         </TabsContent>
 
-        {/* Holidays Tab */}
+        {/* ═══ HOLIDAYS TAB ═══ */}
         <TabsContent value="holidays">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Upcoming Holidays</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4" style={{ color: '#d4a017' }} />
+                Upcoming Holidays
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
@@ -1355,11 +1640,12 @@ export default function SocialPostBuilder() {
                   {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
                 </div>
               ) : holidays && holidays.length > 0 ? (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-3">
                   {holidays.map((holiday) => (
                     <div
                       key={holiday.id}
-                      className="p-3 border rounded-md hover-elevate cursor-pointer"
+                      className="p-4 rounded-lg border border-l-[3px] cursor-pointer transition-colors hover:bg-white/[0.02]"
+                      style={{ backgroundColor: '#1a1d2e', borderLeftColor: '#b8860b' }}
                       onClick={() => {
                         const curated = getCuratedPost(
                           holiday.name,
@@ -1372,30 +1658,38 @@ export default function SocialPostBuilder() {
                       }}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-medium text-sm">{holiday.name}</div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span>{formatHolidayDate(holiday.date)}</span>
-                            <Badge variant="secondary" className="text-xs">{getDaysUntilHoliday(holiday.date)}</Badge>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm mb-1">{holiday.name}</div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">{formatHolidayDate(holiday.date)}</span>
+                            <span
+                              className="px-2 py-0.5 rounded-full text-xs font-medium"
+                              style={{ backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017' }}
+                            >
+                              {getDaysUntilHoliday(holiday.date)}
+                            </span>
+                            <span
+                              className="px-2 py-0.5 rounded-full text-xs"
+                              style={
+                                holiday.category === 'food'
+                                  ? { backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017' }
+                                  : { backgroundColor: 'rgba(34,197,94,0.15)', color: '#4ade80' }
+                              }
+                            >
+                              {holiday.category}
+                            </span>
                           </div>
-                          {holiday.suggestedAngle && <div className="text-sm mt-1">{holiday.suggestedAngle}</div>}
+                          {holiday.suggestedAngle && <div className="text-sm text-gray-400 mt-2 italic">{holiday.suggestedAngle}</div>}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs"
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            className="text-xs px-3 py-1.5 rounded-full border transition-colors font-medium"
+                            style={{ borderColor: '#b8860b', color: '#d4a017' }}
                             disabled={generatingHolidayId === holiday.id}
                             onClick={async (e) => {
                               e.stopPropagation();
-                              const curated = getCuratedPost(
-                                holiday.name,
-                                holiday.category,
-                                holiday.suggestedAngle ?? undefined,
-                                holiday.suggestedTags ?? undefined
-                              );
-                              setCaption(curated.caption);
-                              setActiveTab("create");
+                              handleHolidayPrefill(holiday.name);
+                              setShowAiPanel(true);
                               setGeneratingHolidayId(holiday.id);
                               setMediaUrl("");
                               try {
@@ -1418,10 +1712,12 @@ export default function SocialPostBuilder() {
                                   setMediaUrl(fullUrl);
                                   setImageKey(data.imageId || Date.now().toString());
                                 } else {
+                                  const curated = getCuratedPost(holiday.name, holiday.category, holiday.suggestedAngle ?? undefined, holiday.suggestedTags ?? undefined);
                                   const fallbackUrl = window.location.origin + curated.imageUrl;
                                   setMediaUrl(fallbackUrl);
                                 }
                               } catch {
+                                const curated = getCuratedPost(holiday.name, holiday.category, holiday.suggestedAngle ?? undefined, holiday.suggestedTags ?? undefined);
                                 const fallbackUrl = window.location.origin + curated.imageUrl;
                                 setMediaUrl(fallbackUrl);
                               } finally {
@@ -1431,18 +1727,25 @@ export default function SocialPostBuilder() {
                             data-testid={`btn-draft-holiday-${holiday.id}`}
                           >
                             {generatingHolidayId === holiday.id ? (
-                              <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generating...</>
+                              <span className="flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" /> Generating...
+                              </span>
                             ) : (
                               "Draft Post"
                             )}
-                          </Button>
-                          <Badge variant="outline">{holiday.category}</Badge>
+                          </button>
                         </div>
                       </div>
                       {holiday.suggestedTags && holiday.suggestedTags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {holiday.suggestedTags.map((tag, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                            <span
+                              key={i}
+                              className="text-xs px-2 py-0.5 rounded-full border"
+                              style={{ borderColor: '#b8860b', color: '#d4a017' }}
+                            >
+                              {tag}
+                            </span>
                           ))}
                         </div>
                       )}
@@ -1456,7 +1759,7 @@ export default function SocialPostBuilder() {
           </Card>
         </TabsContent>
 
-        {/* History / Sent Tab */}
+        {/* ═══ SENT TAB ═══ */}
         <TabsContent value="history">
           <Card>
             <CardHeader className="pb-3">
@@ -1464,7 +1767,7 @@ export default function SocialPostBuilder() {
             </CardHeader>
             <CardContent>
               {postHistory && postHistory.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {(() => {
                     const thisMonth = postHistory.filter(p => {
                       if (!p.createdAt) return false;
@@ -1481,57 +1784,44 @@ export default function SocialPostBuilder() {
                       });
                     });
                     return (
-                      <div className="p-3 bg-muted/50 rounded-md mb-4" data-testid="monthly-post-summary">
-                        <p className="text-sm font-medium">This Month: {thisMonth.length} posts</p>
+                      <div className="rounded-lg p-3 mb-2" style={{ backgroundColor: '#1a1d2e' }} data-testid="monthly-post-summary">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="text-sm font-semibold">This Month: {thisMonth.length} posts</p>
+                          {thisMonth.length > 0 && <TrendingUp className="h-3 w-3 text-green-400" />}
+                        </div>
                         {Object.keys(channelCounts).length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {Object.entries(channelCounts).map(([ch, count]) => (
-                              <Badge key={ch} variant="secondary" className="text-xs">{ch}: {count}</Badge>
-                            ))}
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.entries(channelCounts).map(([ch, count]) => {
+                              const colors: Record<string, string> = {
+                                facebook: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+                                instagram: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
+                                google_business: 'bg-red-500/15 text-red-400 border-red-500/30',
+                                x: 'bg-gray-500/15 text-gray-300 border-gray-500/30',
+                                linkedin: 'bg-blue-700/15 text-blue-300 border-blue-700/30',
+                              };
+                              return (
+                                <span key={ch} className={`text-xs px-2 py-0.5 rounded-full border ${colors[ch] || ''}`}>
+                                  {ch}: {count}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
                     );
                   })()}
                   {postHistory.slice(0, 20).map((post) => (
-                    <div key={post.id} className="p-3 border rounded-md">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm line-clamp-2">{post.caption}</p>
-                          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Unknown'}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() => {
-                              setCaption(post.caption);
-                              setActiveTab("create");
-                              toast({ title: "Post content loaded", description: "Edit and repost!" });
-                            }}
-                            data-testid={`btn-reuse-post-${post.id}`}
-                          >
-                            Reuse
-                          </Button>
-                          <Badge
-                            variant={
-                              post.status === 'posted' ? 'default' :
-                              post.status === 'failed' ? 'destructive' :
-                              post.status === 'partial' ? 'secondary' :
-                              'outline'
-                            }
-                          >
-                            {post.status === 'posted' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                            {post.status === 'failed' && <AlertCircle className="h-3 w-3 mr-1" />}
-                            {post.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
+                    <SentPostItem
+                      key={post.id}
+                      post={post}
+                      connectedAccounts={connectedAccounts || []}
+                      onReuse={() => {
+                        setCaption(post.caption);
+                        setActiveTab("create");
+                        toast({ title: "Post content loaded", description: "Edit and repost!" });
+                      }}
+                      getProviderIcon={getProviderIcon}
+                    />
                   ))}
                 </div>
               ) : (
@@ -1545,11 +1835,11 @@ export default function SocialPostBuilder() {
           </Card>
         </TabsContent>
 
-        {/* Brand Voice Settings Tab */}
+        {/* ═══ VOICE TAB ═══ */}
         <TabsContent value="settings">
-          <Card>
+          <Card style={{ animation: 'socialShimmer 3s ease-in-out infinite' }}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Brand Voice Settings</CardTitle>
+              <CardTitle className="text-base font-semibold">Brand Voice Settings</CardTitle>
             </CardHeader>
             <CardContent>
               <BrandVoiceSettingsPanel settings={brandSettings} />
@@ -1561,20 +1851,119 @@ export default function SocialPostBuilder() {
   );
 }
 
+function SentPostItem({
+  post,
+  connectedAccounts,
+  onReuse,
+  getProviderIcon,
+}: {
+  post: ScheduledPost;
+  connectedAccounts: SafeConnectedAccount[];
+  onReuse: () => void;
+  getProviderIcon: (provider: string) => JSX.Element;
+}) {
+  const [showFailedNote, setShowFailedNote] = useState(false);
+
+  const getAccountProviders = () => {
+    return (post.platformTargets || []).map(targetId => {
+      const acct = connectedAccounts.find(a => a.id === targetId);
+      return acct?.provider || 'unknown';
+    });
+  };
+
+  const providers = getAccountProviders();
+
+  const statusStyle = post.status === 'posted'
+    ? { backgroundColor: 'rgba(34,197,94,0.15)', color: '#4ade80', borderColor: 'rgba(34,197,94,0.3)' }
+    : post.status === 'failed'
+    ? { backgroundColor: 'rgba(239,68,68,0.15)', color: '#f87171', borderColor: 'rgba(239,68,68,0.3)' }
+    : { backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017', borderColor: 'rgba(184,134,11,0.3)' };
+
+  return (
+    <div
+      className="rounded-lg p-3 border"
+      style={{ backgroundColor: '#1a1d2e' }}
+      data-testid={`sent-post-${post.id}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm line-clamp-2 mb-2">{post.caption}</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {providers.map((p, i) => (
+              <span key={i}>{getProviderIcon(p)}</span>
+            ))}
+            <span
+              className="px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017' }}
+            >
+              {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Unknown'}
+            </span>
+            {post.status === 'scheduled' && post.scheduledFor && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {new Date(post.scheduledFor).toLocaleString()}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={onReuse}
+            className="text-xs px-3 py-1 rounded-full border transition-colors"
+            style={{ borderColor: '#b8860b', color: '#d4a017' }}
+            data-testid={`btn-reuse-post-${post.id}`}
+          >
+            Reuse
+          </button>
+          <span
+            className="text-xs px-2 py-0.5 rounded-full border flex items-center gap-1"
+            style={statusStyle}
+          >
+            {post.status === 'posted' && <CheckCircle2 className="h-3 w-3" />}
+            {post.status === 'failed' && <AlertCircle className="h-3 w-3" />}
+            {post.status}
+          </span>
+        </div>
+      </div>
+      {post.status === 'failed' && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowFailedNote(!showFailedNote)}
+            className="text-xs flex items-center gap-1 transition-colors"
+            style={{ color: '#d4a017' }}
+            data-testid={`btn-why-failed-${post.id}`}
+          >
+            {showFailedNote ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            Why did this fail?
+          </button>
+          {showFailedNote && (
+            <div className="mt-1.5 p-2 rounded text-xs text-gray-400 border" style={{ backgroundColor: '#0f1117', borderColor: 'rgba(239,68,68,0.2)' }}>
+              {(post as any).errorMessage || (post as any).error || "Post failed -- check channel connection and try again"}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ScheduleCalendar({
   posts,
   connectedAccounts,
   onReuse,
+  onEmptyCellClick,
 }: {
   posts: ScheduledPost[];
   connectedAccounts: SafeConnectedAccount[];
   onReuse: (caption: string) => void;
+  onEmptyCellClick: (day: Date) => void;
 }) {
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 0 })
   );
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
-  const [viewMode, setViewMode] = useState<"week" | "list">("week");
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [viewMode, setViewMode] = useState<"week" | "list">(isMobile ? "list" : "week");
   const [listFilter, setListFilter] = useState<"all" | "upcoming" | "past">("all");
 
   const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
@@ -1620,14 +2009,13 @@ function ScheduleCalendar({
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusStyle = (status: string) => {
     switch (status) {
-      case "posted": return "bg-green-500/15 border-green-500/30 text-green-700 dark:text-green-400";
-      case "scheduled": return "bg-primary/15 border-primary/30 text-primary";
-      case "draft": return "bg-muted border-border text-muted-foreground";
-      case "failed": return "bg-red-500/15 border-red-500/30 text-red-700 dark:text-red-400";
-      case "partial": return "bg-yellow-500/15 border-yellow-500/30 text-yellow-700 dark:text-yellow-400";
-      default: return "bg-muted border-border";
+      case "posted": return { backgroundColor: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.3)', color: '#4ade80' };
+      case "scheduled": return { backgroundColor: 'rgba(184,134,11,0.15)', borderColor: 'rgba(184,134,11,0.3)', color: '#d4a017' };
+      case "failed": return { backgroundColor: 'rgba(239,68,68,0.15)', borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' };
+      case "partial": return { backgroundColor: 'rgba(234,179,8,0.15)', borderColor: 'rgba(234,179,8,0.3)', color: '#facc15' };
+      default: return { backgroundColor: '#1a1d2e', borderColor: 'rgba(255,255,255,0.1)' };
     }
   };
 
@@ -1647,25 +2035,23 @@ function ScheduleCalendar({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Post Schedule</CardTitle>
             <div className="flex items-center gap-2">
-              <div className="flex items-center bg-muted rounded-md p-0.5">
-                <Button
-                  variant={viewMode === "week" ? "secondary" : "ghost"}
-                  size="sm"
+              <div className="flex items-center rounded-full p-0.5" style={{ backgroundColor: '#1a1d2e' }}>
+                <button
                   onClick={() => setViewMode("week")}
+                  className="text-xs px-3 py-1 rounded-full transition-colors font-medium"
+                  style={viewMode === "week" ? { backgroundColor: '#b8860b', color: '#0f1117' } : { color: '#888' }}
                   data-testid="btn-view-week"
                 >
-                  <CalendarDays className="h-3 w-3 mr-1" />
                   Week
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "secondary" : "ghost"}
-                  size="sm"
+                </button>
+                <button
                   onClick={() => setViewMode("list")}
+                  className="text-xs px-3 py-1 rounded-full transition-colors font-medium"
+                  style={viewMode === "list" ? { backgroundColor: '#b8860b', color: '#0f1117' } : { color: '#888' }}
                   data-testid="btn-view-list"
                 >
-                  <History className="h-3 w-3 mr-1" />
                   List
-                </Button>
+                </button>
               </div>
             </div>
           </div>
@@ -1683,23 +2069,25 @@ function ScheduleCalendar({
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="text-center">
-                  <p className="text-sm font-medium" data-testid="text-week-range">
+                  <p className="text-sm font-semibold" data-testid="text-week-range">
                     {format(currentWeekStart, "MMM d")} – {format(weekEnd, "MMM d, yyyy")}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017' }}
+                  >
                     {totalThisWeek} post{totalThisWeek !== 1 ? "s" : ""} this week
-                  </p>
+                  </span>
                 </div>
                 <div className="flex gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
                     onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }))}
-                    className="text-xs px-2"
+                    className="text-xs px-2.5 py-1 rounded-full border font-medium"
+                    style={{ borderColor: '#b8860b', color: '#d4a017' }}
                     data-testid="btn-today"
                   >
                     Today
-                  </Button>
+                  </button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1718,20 +2106,28 @@ function ScheduleCalendar({
                   return (
                     <div key={day.toISOString()} className="min-h-[120px]">
                       <div
-                        className={`text-center py-1 rounded-t-md text-xs font-medium ${
-                          isToday
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                        }`}
+                        className="text-center py-1 rounded-t-md text-xs font-medium"
+                        style={isToday
+                          ? { backgroundColor: '#b8860b', color: '#0f1117' }
+                          : { backgroundColor: '#1a1d2e', color: '#888' }
+                        }
                       >
                         <div>{format(day, "EEE")}</div>
                         <div className={isToday ? "font-bold" : ""}>{format(day, "d")}</div>
                       </div>
-                      <div className="border border-t-0 rounded-b-md p-1 space-y-1 min-h-[88px]">
+                      <div
+                        className="border border-t-0 rounded-b-md p-1 space-y-1 min-h-[88px]"
+                        style={isToday ? { backgroundColor: 'rgba(184,134,11,0.04)' } : {}}
+                      >
                         {dayPosts.length === 0 && (
-                          <div className="text-[10px] text-muted-foreground/50 text-center pt-4">
-                            —
-                          </div>
+                          <button
+                            onClick={() => onEmptyCellClick(day)}
+                            className="w-full min-h-[72px] border border-dashed rounded flex items-center justify-center text-muted-foreground/30 transition-colors group"
+                            style={{ borderColor: 'rgba(255,255,255,0.05)' }}
+                            data-testid={`empty-cell-${format(day, 'yyyy-MM-dd')}`}
+                          >
+                            <Plus className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+                          </button>
                         )}
                         {dayPosts.slice(0, 3).map((post) => {
                           const providers = getAccountProviders(post);
@@ -1739,7 +2135,8 @@ function ScheduleCalendar({
                             <button
                               key={post.id}
                               onClick={() => setSelectedPost(selectedPost?.id === post.id ? null : post)}
-                              className={`w-full text-left p-1 rounded border text-[10px] leading-tight truncate cursor-pointer ${getStatusColor(post.status)}`}
+                              className="w-full text-left p-1 rounded border text-[10px] leading-tight truncate cursor-pointer"
+                              style={getStatusStyle(post.status)}
                               data-testid={`schedule-post-${post.id}`}
                             >
                               <div className="flex items-center gap-0.5 mb-0.5">
@@ -1755,9 +2152,12 @@ function ScheduleCalendar({
                           );
                         })}
                         {dayPosts.length > 3 && (
-                          <p className="text-[10px] text-muted-foreground text-center">
+                          <span
+                            className="text-[10px] text-center block px-1 py-0.5 rounded-full"
+                            style={{ backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017' }}
+                          >
                             +{dayPosts.length - 3} more
-                          </p>
+                          </span>
                         )}
                       </div>
                     </div>
@@ -1794,9 +2194,12 @@ function ScheduleCalendar({
                     <button
                       key={post.id}
                       onClick={() => setSelectedPost(selectedPost?.id === post.id ? null : post)}
-                      className={`w-full text-left p-3 rounded-md border transition-colors hover:bg-accent ${
-                        selectedPost?.id === post.id ? "ring-2 ring-primary bg-accent/50" : ""
-                      }`}
+                      className="w-full text-left p-3 rounded-lg border transition-colors"
+                      style={
+                        selectedPost?.id === post.id
+                          ? { backgroundColor: '#1a1d2e', borderColor: '#b8860b' }
+                          : { backgroundColor: '#1a1d2e' }
+                      }
                       data-testid={`list-post-${post.id}`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1813,12 +2216,12 @@ function ScheduleCalendar({
                             </span>
                           </div>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] shrink-0 ${getStatusColor(post.status)}`}
+                        <span
+                          className="text-[10px] shrink-0 px-2 py-0.5 rounded-full border"
+                          style={getStatusStyle(post.status)}
                         >
                           {post.status}
-                        </Badge>
+                        </span>
                       </div>
                     </button>
                   );
@@ -1828,28 +2231,30 @@ function ScheduleCalendar({
           )}
 
           {selectedPost && (
-            <div className="mt-4 p-4 border rounded-md bg-muted/30" data-testid="post-detail-panel">
+            <div className="mt-4 p-4 rounded-lg border" style={{ backgroundColor: '#1a1d2e' }} data-testid="post-detail-panel">
               <div className="flex items-start justify-between gap-2 mb-3">
-                <div>
-                  <Badge variant="outline" className={`text-xs ${getStatusColor(selectedPost.status)}`}>
-                    {selectedPost.status === "posted" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                    {selectedPost.status === "failed" && <AlertCircle className="h-3 w-3 mr-1" />}
+                <div className="flex gap-1">
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full border flex items-center gap-1"
+                    style={getStatusStyle(selectedPost.status)}
+                  >
+                    {selectedPost.status === "posted" && <CheckCircle2 className="h-3 w-3" />}
+                    {selectedPost.status === "failed" && <AlertCircle className="h-3 w-3" />}
                     {selectedPost.status}
-                  </Badge>
+                  </span>
                   {selectedPost.postType && (
-                    <Badge variant="secondary" className="text-xs ml-1">
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(184,134,11,0.15)', color: '#d4a017' }}>
                       {POST_TYPES.find((t) => t.value === selectedPost.postType)?.label || selectedPost.postType}
-                    </Badge>
+                    </span>
                   )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
                   onClick={() => setSelectedPost(null)}
+                  className="h-6 w-6 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
                   data-testid="btn-close-post-detail"
                 >
                   <X className="h-3 w-3" />
-                </Button>
+                </button>
               </div>
               <p className="text-sm mb-3 whitespace-pre-wrap">{selectedPost.caption || "No content"}</p>
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-3">
@@ -1859,7 +2264,7 @@ function ScheduleCalendar({
                   : selectedPost.createdAt
                   ? format(new Date(selectedPost.createdAt), "EEE, MMM d, yyyy 'at' h:mm a")
                   : "No date"}
-                <span className="mx-1">•</span>
+                <span className="mx-1">|</span>
                 <div className="flex items-center gap-1">
                   {getAccountProviders(selectedPost).map((p, i) => (
                     <span key={i}>{getProviderIcon(p)}</span>
@@ -1878,15 +2283,15 @@ function ScheduleCalendar({
                   ))}
                 </div>
               )}
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => onReuse(selectedPost.caption)}
+                className="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                style={{ borderColor: '#b8860b', color: '#d4a017' }}
                 data-testid="btn-reuse-from-schedule"
               >
-                <Copy className="h-3 w-3 mr-1" />
+                <Copy className="h-3 w-3 inline mr-1" />
                 Reuse Content
-              </Button>
+              </button>
             </div>
           )}
         </CardContent>
@@ -1897,6 +2302,12 @@ function ScheduleCalendar({
 
 function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }) {
   const { toast } = useToast();
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showVoicePreview, setShowVoicePreview] = useState(false);
+  const [voicePreviewInput, setVoicePreviewInput] = useState("");
+  const [voicePreviewResult, setVoicePreviewResult] = useState("");
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+
   const [formData, setFormData] = useState({
     voiceAdjectives: settings?.voiceAdjectives || ["warm", "welcoming"],
     defaultCta: settings?.defaultCta || "reserve",
@@ -1918,12 +2329,32 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/social-media/brand-settings"] });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 1500);
       toast({ title: "Saved!", description: "Brand voice settings updated." });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
     },
   });
+
+  const handleGeneratePreview = async () => {
+    if (!voicePreviewInput.trim()) {
+      toast({ title: "Enter a description", description: "Tell us what you want to post about.", variant: "destructive" });
+      return;
+    }
+    setIsGeneratingPreview(true);
+    setVoicePreviewResult("");
+    try {
+      const res = await apiRequest("POST", "/api/social-media/voice-preview", { description: voicePreviewInput });
+      const data = await res.json();
+      setVoicePreviewResult(data.preview || "");
+    } catch {
+      toast({ title: "Error", description: "Failed to generate preview.", variant: "destructive" });
+    } finally {
+      setIsGeneratingPreview(false);
+    }
+  };
 
   const voiceOptions = ["warm", "confident", "welcoming", "premium", "playful", "professional"];
 
@@ -1949,6 +2380,8 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
             value={formData.restaurantName}
             onChange={(e) => setFormData({ ...formData, restaurantName: e.target.value })}
             placeholder="Your restaurant name"
+            className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]"
+            style={{ backgroundColor: '#0f1117' }}
             data-testid="input-restaurant-name"
           />
         </div>
@@ -1958,6 +2391,8 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
             value={formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             placeholder="e.g., Cedar Park, TX"
+            className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]"
+            style={{ backgroundColor: '#0f1117' }}
             data-testid="input-location"
           />
         </div>
@@ -1966,17 +2401,24 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
       <div className="space-y-2">
         <Label>Voice Adjectives</Label>
         <div className="flex flex-wrap gap-2">
-          {voiceOptions.map((voice) => (
-            <Badge
-              key={voice}
-              variant={formData.voiceAdjectives.includes(voice) ? "default" : "outline"}
-              className="cursor-pointer"
-              onClick={() => toggleVoice(voice)}
-              data-testid={`badge-voice-${voice.toLowerCase().replace(/\s+/g, '-')}`}
-            >
-              {voice}
-            </Badge>
-          ))}
+          {voiceOptions.map((voice) => {
+            const isSelected = formData.voiceAdjectives.includes(voice);
+            return (
+              <button
+                key={voice}
+                className="text-xs px-3 py-1.5 rounded-full border transition-colors cursor-pointer"
+                style={
+                  isSelected
+                    ? { backgroundColor: '#b8860b', borderColor: '#b8860b', color: '#0f1117' }
+                    : { backgroundColor: '#1a1d2e', borderColor: 'rgba(184,134,11,0.3)', color: '#888' }
+                }
+                onClick={() => toggleVoice(voice)}
+                data-testid={`badge-voice-${voice.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                {voice}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1984,7 +2426,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
         <div className="space-y-2">
           <Label>Default CTA</Label>
           <Select value={formData.defaultCta} onValueChange={(v) => setFormData({ ...formData, defaultCta: v })}>
-            <SelectTrigger data-testid="select-default-cta">
+            <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-default-cta">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1997,7 +2439,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
         <div className="space-y-2">
           <Label>Emoji Level</Label>
           <Select value={formData.emojiLevel} onValueChange={(v) => setFormData({ ...formData, emojiLevel: v })}>
-            <SelectTrigger data-testid="select-emoji-level">
+            <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-emoji-level">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -2012,7 +2454,7 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
       <div className="space-y-2">
         <Label>Hashtag Style</Label>
         <Select value={formData.hashtagStyle} onValueChange={(v) => setFormData({ ...formData, hashtagStyle: v })}>
-          <SelectTrigger data-testid="select-hashtag-style">
+          <SelectTrigger className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]" style={{ backgroundColor: '#0f1117' }} data-testid="select-hashtag-style">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -2024,31 +2466,95 @@ function BrandVoiceSettingsPanel({ settings }: { settings?: BrandVoiceSettings }
       </div>
 
       <div className="space-y-2">
-        <Label>Never Say (comma-separated)</Label>
+        <div className="flex items-center gap-2">
+          <Label>Never Say (comma-separated)</Label>
+          <span className="text-xs text-muted-foreground" title="These words will be excluded from all generated posts">
+            <Info className="h-3 w-3" />
+          </span>
+        </div>
         <Input
           value={formData.neverSayList}
           onChange={(e) => setFormData({ ...formData, neverSayList: e.target.value })}
           placeholder="e.g., cheap, best ever, guaranteed"
+          className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]"
+          style={{ backgroundColor: '#0f1117' }}
           data-testid="input-never-say"
         />
-        <p className="text-xs text-muted-foreground">Words to avoid in generated content</p>
+        <p className="text-xs text-muted-foreground">These words will be excluded from all generated posts</p>
       </div>
 
-      <Button
+      <button
         onClick={() => saveMutation.mutate(formData)}
         disabled={saveMutation.isPending}
-        className="w-full"
+        className="w-full py-2.5 rounded-md text-sm font-bold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        style={saveSuccess ? { backgroundColor: '#22c55e' } : { backgroundColor: '#b8860b' }}
         data-testid="button-save-brand-settings"
       >
         {saveMutation.isPending ? (
           <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
             Saving...
+          </>
+        ) : saveSuccess ? (
+          <>
+            <Check className="h-4 w-4" />
+            Saved
           </>
         ) : (
           "Save Brand Voice Settings"
         )}
-      </Button>
+      </button>
+
+      <div className="border-t pt-4 mt-4">
+        <button
+          onClick={() => setShowVoicePreview(!showVoicePreview)}
+          className="flex items-center gap-2 text-sm font-semibold mb-3 w-full"
+          data-testid="button-toggle-voice-preview"
+        >
+          {showVoicePreview ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          Preview Your Voice
+        </button>
+        {showVoicePreview && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Describe a special or event in one sentence. We will generate a sample post using your configured voice settings.
+            </p>
+            <Input
+              value={voicePreviewInput}
+              onChange={(e) => setVoicePreviewInput(e.target.value)}
+              placeholder="e.g., Crawfish boil every Thursday"
+              className="border-0 border-b border-gray-700 rounded-none focus:border-[#b8860b]"
+              style={{ backgroundColor: '#0f1117' }}
+              data-testid="input-voice-preview"
+            />
+            <button
+              onClick={handleGeneratePreview}
+              disabled={isGeneratingPreview || !voicePreviewInput.trim()}
+              className="text-xs px-4 py-1.5 rounded-full border transition-colors disabled:opacity-50"
+              style={{ borderColor: '#b8860b', color: '#d4a017' }}
+              data-testid="button-generate-voice-preview"
+            >
+              {isGeneratingPreview ? (
+                <span className="flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Generating...
+                </span>
+              ) : (
+                "Generate Sample Post"
+              )}
+            </button>
+            {voicePreviewResult && (
+              <div
+                className="p-3 rounded-md text-sm border-l-2"
+                style={{ backgroundColor: '#0f1117', borderLeftColor: '#b8860b' }}
+                data-testid="text-voice-preview-result"
+              >
+                {voicePreviewResult}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

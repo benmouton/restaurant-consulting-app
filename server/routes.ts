@@ -2744,6 +2744,8 @@ export async function registerRoutes(
     tone: z.string().optional(),
     cta: z.string().optional(),
     selectedHoliday: z.string().optional(),
+    promotionDiscount: z.string().optional(),
+    callToAction: z.string().optional(),
   });
 
   app.post("/api/social-media/generate-post", isAuthenticated, async (req: any, res) => {
@@ -2751,7 +2753,7 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const validatedData = generatePostSchema.parse(req.body);
       const { postType, platforms, outputStyle, eventName, eventDate, startTime, endTime, 
-              promotionDetails, targetAudience, tone, cta, selectedHoliday } = validatedData;
+              promotionDetails, targetAudience, tone, cta, selectedHoliday, promotionDiscount, callToAction } = validatedData;
       
       const brandSettings = await storage.getBrandVoiceSettings(userId);
       
@@ -2772,10 +2774,11 @@ STYLE: ${outputStyle}
 ${eventName ? `EVENT NAME: ${eventName}` : ""}
 ${eventDate ? `DATE: ${eventDate}` : ""}
 ${startTime ? `TIME: ${startTime}${endTime ? ` - ${endTime}` : ""}` : ""}
-${promotionDetails ? `WHAT WE'RE PROMOTING: ${promotionDetails}` : ""}
+${promotionDetails ? `ADDITIONAL DETAILS: ${promotionDetails}` : ""}
+${promotionDiscount ? `PROMOTION / DISCOUNT: ${promotionDiscount}` : ""}
 ${targetAudience ? `TARGET AUDIENCE: ${targetAudience}` : ""}
 TONE: ${tone || "classy"}
-CALL TO ACTION: ${cta || "reserve"}
+${callToAction ? `PREFERRED CTA: ${callToAction}` : `CALL TO ACTION: ${cta || "reserve"}`}
 ${selectedHoliday ? `HOLIDAY TIE-IN: ${selectedHoliday}` : ""}
 ${brandSettings?.restaurantName ? `RESTAURANT: ${brandSettings.restaurantName}` : ""}
 ${brandSettings?.location ? `LOCATION: ${brandSettings.location}` : ""}
@@ -2816,6 +2819,41 @@ Generate JSON with:
       }
       console.error("Error generating post:", error);
       res.status(500).json({ message: "Failed to generate post" });
+    }
+  });
+
+  app.post("/api/social-media/voice-preview", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { description } = req.body;
+      if (!description || typeof description !== 'string') {
+        return res.status(400).json({ message: "Please provide a description" });
+      }
+      const brandSettings = await storage.getBrandVoiceSettings(userId);
+      const voiceAdj = brandSettings?.voiceAdjectives?.join(", ") || "warm, welcoming";
+      const neverSay = brandSettings?.neverSayList?.length ? `Never use these words: ${brandSettings.neverSayList.join(", ")}` : "";
+      const emojiGuidance = brandSettings?.emojiLevel === "none" 
+        ? "Do not use any emojis." 
+        : brandSettings?.emojiLevel === "light" 
+          ? "Use emojis sparingly, 1-2 max."
+          : "Use emojis naturally.";
+      const restaurantName = brandSettings?.restaurantName || "the restaurant";
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: `You are a social media copywriter for ${restaurantName}. Write in a ${voiceAdj} voice. ${neverSay} ${emojiGuidance} Keep it to 2-3 sentences suitable for a social media post. Do not include hashtags.` },
+          { role: "user", content: `Write a social media post about: ${description}` }
+        ],
+        max_tokens: 300,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("No content generated");
+      res.json({ preview: content });
+    } catch (error) {
+      console.error("Error generating voice preview:", error);
+      res.status(500).json({ message: "Failed to generate preview" });
     }
   });
 
