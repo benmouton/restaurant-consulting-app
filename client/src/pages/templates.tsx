@@ -53,6 +53,9 @@ import {
   HandMetal,
   StickyNote,
   Shield,
+  Download,
+  FileDown,
+  Upload,
 } from "lucide-react";
 import { isNativeApp, nativeShare, hapticTap, hapticSuccess } from "@/lib/native";
 import { useOfflineCache } from "@/hooks/use-native-features";
@@ -62,6 +65,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { TrainingTemplate, HandbookSettings } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import { printManual, downloadPDF, exportToDocx } from "@/lib/manualExport";
 
 function personalizeContent(content: string, restaurantName: string | null | undefined): string {
   if (!restaurantName) return content;
@@ -998,6 +1002,7 @@ export default function TemplatesPage() {
   const [showSetupCallout, setShowSetupCallout] = useState(false);
   const [showPersonalizedView, setShowPersonalizedView] = useState(false);
   const [personalizedMarkers, setPersonalizedMarkers] = useState<Record<number, boolean>>({});
+  const [exportState, setExportState] = useState<{ print: 'idle' | 'loading' | 'success' | 'error'; pdf: 'idle' | 'loading' | 'success' | 'error'; docx: 'idle' | 'loading' | 'success' | 'error' }>({ print: 'idle', pdf: 'idle', docx: 'idle' });
 
   const { data: templates, isLoading } = useQuery<TrainingTemplate[]>({
     queryKey: ["/api/templates"],
@@ -1068,6 +1073,72 @@ export default function TemplatesPage() {
     acc[template.section].push(template);
     return acc;
   }, {});
+
+  const getManualTitle = () => {
+    if (activeCategory === "server") return "Server Training Manual";
+    if (activeCategory === "bartender") return "Bartender Training Manual";
+    if (activeCategory === "manager") return "Manager Training Manual";
+    return "Kitchen Training Manual";
+  };
+
+  const getExportData = () => ({
+    restaurantName: handbookSettings?.restaurantName || user?.restaurantName || "Restaurant",
+    ownerName: handbookSettings?.ownerNames || user?.firstName || "Owner",
+    manualTitle: getManualTitle(),
+    templates: currentTemplates.map(t => ({
+      title: personalizeContent(t.title, user?.restaurantName),
+      section: t.section,
+      content: personalizeContent(t.content, user?.restaurantName),
+      keyPoints: t.keyPoints?.map(p => personalizeContent(p, user?.restaurantName)),
+      contentType: t.contentType,
+      sequenceOrder: t.sequenceOrder,
+    })),
+  });
+
+  const resetExportState = (key: 'print' | 'pdf' | 'docx', delay = 2000) => {
+    setTimeout(() => setExportState(prev => ({ ...prev, [key]: 'idle' })), delay);
+  };
+
+  const handlePrintManual = () => {
+    setExportState(prev => ({ ...prev, print: 'loading' }));
+    try {
+      printManual(getExportData());
+      setExportState(prev => ({ ...prev, print: 'success' }));
+      resetExportState('print');
+    } catch {
+      setExportState(prev => ({ ...prev, print: 'error' }));
+      toast({ title: "Print failed. Please try again.", variant: "destructive" });
+      resetExportState('print', 3000);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setExportState(prev => ({ ...prev, pdf: 'loading' }));
+    try {
+      await downloadPDF(getExportData());
+      setExportState(prev => ({ ...prev, pdf: 'success' }));
+      toast({ title: "In the print dialog, select 'Save as PDF' as your destination" });
+      resetExportState('pdf');
+    } catch {
+      setExportState(prev => ({ ...prev, pdf: 'error' }));
+      toast({ title: "PDF generation failed. Please try again.", variant: "destructive" });
+      resetExportState('pdf', 3000);
+    }
+  };
+
+  const handleExportDocx = async () => {
+    setExportState(prev => ({ ...prev, docx: 'loading' }));
+    try {
+      await exportToDocx(getExportData());
+      setExportState(prev => ({ ...prev, docx: 'success' }));
+      toast({ title: "Document exported successfully" });
+      resetExportState('docx');
+    } catch {
+      setExportState(prev => ({ ...prev, docx: 'error' }));
+      toast({ title: "Export failed. Please try again.", variant: "destructive" });
+      resetExportState('docx', 3000);
+    }
+  };
 
   const handleRegenerate = async () => {
     if (!selectedTemplate || isPersonalizing) return;
@@ -1315,6 +1386,68 @@ export default function TemplatesPage() {
                 >
                   Go to Setup
                 </Button>
+              </div>
+            )}
+
+            {currentTemplates.length > 0 && (
+              <div
+                className="rounded-lg flex flex-wrap items-center gap-3 mb-6 sticky z-30"
+                style={{
+                  backgroundColor: '#1a1d2e',
+                  borderBottom: '1px solid #b8860b',
+                  padding: '12px 24px',
+                  top: '73px',
+                }}
+                data-testid="manual-action-bar"
+              >
+                <span className="text-sm font-semibold text-white mr-2 hidden sm:inline">{getManualTitle()}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePrintManual}
+                    disabled={exportState.print === 'loading'}
+                    style={{
+                      borderColor: exportState.print === 'error' ? '#d4a017' : exportState.print === 'success' ? '#22c55e' : '#b8860b',
+                      color: exportState.print === 'error' ? '#d4a017' : exportState.print === 'success' ? '#22c55e' : '#d4a017',
+                      backgroundColor: 'transparent',
+                    }}
+                    data-testid="btn-print-full-manual"
+                  >
+                    {exportState.print === 'loading' ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Printer className="h-3.5 w-3.5 mr-1.5" />}
+                    {exportState.print === 'loading' ? 'Preparing...' : exportState.print === 'success' ? 'Done' : exportState.print === 'error' ? 'Try Again' : 'Print'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDownloadPDF}
+                    disabled={exportState.pdf === 'loading'}
+                    style={{
+                      borderColor: exportState.pdf === 'error' ? '#d4a017' : exportState.pdf === 'success' ? '#22c55e' : '#b8860b',
+                      color: exportState.pdf === 'error' ? '#d4a017' : exportState.pdf === 'success' ? '#22c55e' : '#d4a017',
+                      backgroundColor: 'transparent',
+                    }}
+                    data-testid="btn-download-pdf"
+                  >
+                    {exportState.pdf === 'loading' ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1.5" />}
+                    {exportState.pdf === 'loading' ? 'Generating...' : exportState.pdf === 'success' ? 'Done' : exportState.pdf === 'error' ? 'Try Again' : 'Download PDF'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportDocx}
+                    disabled={exportState.docx === 'loading'}
+                    style={{
+                      borderColor: exportState.docx === 'error' ? '#d4a017' : exportState.docx === 'success' ? '#22c55e' : '#b8860b',
+                      color: exportState.docx === 'error' ? '#d4a017' : exportState.docx === 'success' ? '#22c55e' : '#d4a017',
+                      backgroundColor: 'transparent',
+                    }}
+                    data-testid="btn-export-docx"
+                  >
+                    {exportState.docx === 'loading' ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                    {exportState.docx === 'loading' ? 'Preparing...' : exportState.docx === 'success' ? 'Done' : exportState.docx === 'error' ? 'Try Again' : 'Share / Export'}
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -1642,40 +1775,19 @@ export default function TemplatesPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            const printContent = personalizeContent(selectedTemplate.content, user?.restaurantName);
-                            const printWindow = window.open('', '_blank');
-                            if (printWindow) {
-                              printWindow.document.write(`
-                                <!DOCTYPE html>
-                                <html>
-                                <head>
-                                  <title>${personalizeContent(selectedTemplate.title, user?.restaurantName)}</title>
-                                  <style>
-                                    body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
-                                    h1 { margin-bottom: 8px; font-size: 24px; }
-                                    .section { color: #666; margin-bottom: 16px; font-size: 14px; }
-                                    .badge { display: inline-block; background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-right: 8px; margin-bottom: 8px; }
-                                    .key-points { margin-bottom: 24px; }
-                                    .content { white-space: pre-wrap; font-family: monospace; background: #f9fafb; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 13px; }
-                                    @media print { body { padding: 20px; } .no-print { display: none; } }
-                                  </style>
-                                </head>
-                                <body>
-                                  <h1>${escapeHtml(personalizeContent(selectedTemplate.title, user?.restaurantName))}</h1>
-                                  <div class="section">${escapeHtml(selectedTemplate.section)} | ${escapeHtml(selectedTemplate.contentType)}</div>
-                                  ${selectedTemplate.keyPoints?.length ? `
-                                    <div class="key-points">
-                                      <strong>Key Points:</strong><br/>
-                                      ${selectedTemplate.keyPoints.map(p => `<span class="badge">${escapeHtml(personalizeContent(p, user?.restaurantName))}</span>`).join('')}
-                                    </div>
-                                  ` : ''}
-                                  <div class="content">${escapeHtml(printContent)}</div>
-                                </body>
-                                </html>
-                              `);
-                              printWindow.document.close();
-                              printWindow.print();
-                            }
+                            printManual({
+                              restaurantName: handbookSettings?.restaurantName || user?.restaurantName || "Restaurant",
+                              ownerName: handbookSettings?.ownerNames || user?.firstName || "Owner",
+                              manualTitle: getManualTitle(),
+                              templates: [{
+                                title: personalizeContent(selectedTemplate.title, user?.restaurantName),
+                                section: selectedTemplate.section,
+                                content: personalizeContent(selectedTemplate.content, user?.restaurantName),
+                                keyPoints: selectedTemplate.keyPoints?.map(p => personalizeContent(p, user?.restaurantName)),
+                                contentType: selectedTemplate.contentType,
+                                sequenceOrder: 1,
+                              }],
+                            });
                           }}
                           style={{ borderColor: '#2a2d3e', color: '#9ca3af' }}
                           data-testid="btn-print-template"
