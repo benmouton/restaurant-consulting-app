@@ -610,7 +610,7 @@ export default function Dashboard() {
 
         {/* Operator Command Strip */}
         <div
-          className="flex gap-3 mb-8 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0"
+          className="flex flex-wrap gap-3 mb-8 -mx-4 px-4 sm:mx-0 sm:px-0"
           style={{ animation: "playbookStaggerIn 0.4s ease 0.08s both" }}
         >
           {[
@@ -668,11 +668,10 @@ export default function Dashboard() {
           ].map((card, idx) => (
             <div
               key={idx}
-              className="flex-shrink-0 p-3 rounded-lg cursor-pointer transition-all"
+              className="flex-1 min-w-[140px] max-w-[200px] p-3 rounded-lg cursor-pointer transition-all"
               style={{
                 background: "#1a1d2e",
                 borderLeft: "3px solid #b8860b",
-                minWidth: "160px",
                 animation: `playbookStaggerIn 0.4s ease ${0.08 + idx * 0.04}s both`,
               }}
               onClick={card.onClick}
