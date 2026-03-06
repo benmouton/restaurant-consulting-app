@@ -44,6 +44,9 @@ import {
   Coffee,
   Wine,
   Briefcase,
+  DollarSign,
+  TrendingUp,
+  Pencil,
 } from "lucide-react";
 import type { HandbookSettings } from "@shared/schema";
 
@@ -96,6 +99,15 @@ const tippingOptions = [
 
 const servicePeriodOptions = ["Breakfast", "Brunch", "Lunch", "Happy Hour", "Dinner", "Late Night", "Catering", "Events"];
 
+const serviceModelOptions = [
+  { value: "full_service", label: "Full Service (sit-down, server-attended)" },
+  { value: "fast_casual", label: "Fast Casual (counter order, table delivery)" },
+  { value: "bar_forward", label: "Bar-Forward (bar revenue > 40% of sales)" },
+  { value: "fine_dining", label: "Fine Dining" },
+  { value: "cafe", label: "Café" },
+  { value: "other", label: "Other" },
+];
+
 const allergenOptionsList = ["Gluten-Free", "Vegetarian", "Vegan", "Dairy-Free", "Nut-Free", "Halal", "Kosher"];
 
 const CUSTOM_POLICIES_KEY = "handbook-custom-policies";
@@ -128,12 +140,23 @@ const REQUIRED_FIELDS: (keyof HandbookSettings)[] = [
   "brandVoice",
 ];
 
+const FINANCIAL_FIELDS: (keyof HandbookSettings)[] = [
+  "weeklyRevenue", "avgCheck", "weeklyCovers", "foodCostTarget", "foodCostActual",
+  "laborTargetPct", "laborCostActual", "serviceModel", "topChallenge",
+];
+
 function getOverallCompleteness(formData: Partial<HandbookSettings>): number {
-  const filled = REQUIRED_FIELDS.filter(k => {
+  const isFilled = (k: keyof HandbookSettings) => {
     const v = formData[k];
-    return v && String(v).trim().length > 0;
-  }).length;
-  return Math.round((filled / REQUIRED_FIELDS.length) * 100);
+    return v !== null && v !== undefined && String(v).trim().length > 0;
+  };
+  const basicFilled = REQUIRED_FIELDS.filter(isFilled).length;
+  const financialFilled = FINANCIAL_FIELDS.filter(isFilled).length;
+  const basicWeight = 0.4;
+  const financialWeight = 0.6;
+  const basicScore = basicFilled / REQUIRED_FIELDS.length;
+  const financialScore = financialFilled / FINANCIAL_FIELDS.length;
+  return Math.round((basicScore * basicWeight + financialScore * financialWeight) * 100);
 }
 
 function getFilledRequiredCount(formData: Partial<HandbookSettings>): number {
@@ -377,6 +400,14 @@ export function HandbookBuilder({ user }: { user?: any }) {
     signatureCocktail3: "",
     draftBeerCount: undefined,
     closingTime: "",
+    weeklyRevenue: "",
+    avgCheck: "",
+    weeklyCovers: undefined,
+    foodCostActual: "",
+    laborCostActual: "",
+    operatingDays: undefined,
+    serviceModel: "",
+    topChallenge: "",
   });
 
   useEffect(() => {
@@ -507,6 +538,7 @@ export function HandbookBuilder({ user }: { user?: any }) {
     saveCustomPolicies(updated);
   };
 
+  const [primeCostOverride, setPrimeCostOverride] = useState(false);
   const overallCompleteness = useMemo(() => getOverallCompleteness(formData), [formData]);
 
   const updateField = (key: keyof HandbookSettings, value: any) => {
@@ -1097,7 +1129,7 @@ Date: ________________________________
               </div>
               <p className="text-[12px] mt-1.5" style={{ color: "#64748b" }}>
                 {overallCompleteness < 100
-                  ? "Complete your setup to unlock personalized training documents."
+                  ? "Complete your Financial Profile to unlock personalized financial advice from the Consultant."
                   : "All required fields are complete."}
               </p>
             </div>
@@ -1214,6 +1246,290 @@ Date: ________________________________
                       className={focusClass}
                       style={inputStyle}
                       data-testid="input-social-media-handles"
+                    />
+                  </FieldWrapper>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={TrendingUp} title="Financial Profile" subtitle="These numbers power your Consultant. The more accurate they are, the more specific the advice." />
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.weeklyRevenue)} label="Average Weekly Revenue" helper="Your typical total sales in a 7-day period. Use a 4-week rolling average if revenue varies seasonally.">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#64748b" }}>$</span>
+                      <Input
+                        placeholder="e.g. 18,500"
+                        value={formData.weeklyRevenue || ""}
+                        onChange={(e) => updateField("weeklyRevenue", e.target.value)}
+                        className={focusClass}
+                        style={{ ...inputStyle, paddingLeft: 24 }}
+                        data-testid="input-weekly-revenue"
+                      />
+                    </div>
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.avgCheck)} label="Average Guest Check (per person)" helper="Total revenue divided by total covers for a typical week. Includes food and beverage.">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#64748b" }}>$</span>
+                      <Input
+                        placeholder="e.g. 28"
+                        value={formData.avgCheck || ""}
+                        onChange={(e) => updateField("avgCheck", e.target.value)}
+                        className={focusClass}
+                        style={{ ...inputStyle, paddingLeft: 24 }}
+                        data-testid="input-avg-check"
+                      />
+                    </div>
+                  </FieldWrapper>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.weeklyCovers)} label="Average Weekly Covers" helper="Total number of guests served in a typical week across all dayparts and days.">
+                    <Input
+                      type="number"
+                      placeholder="e.g. 650"
+                      value={formData.weeklyCovers ?? ""}
+                      onChange={(e) => updateField("weeklyCovers", e.target.value ? Number(e.target.value) : undefined)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-weekly-covers"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.operatingDays)} label="Days Open Per Week" helper="How many days per week the restaurant operates.">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={7}
+                      placeholder="e.g. 6"
+                      value={formData.operatingDays ?? ""}
+                      onChange={(e) => updateField("operatingDays", e.target.value ? Number(e.target.value) : undefined)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-operating-days"
+                    />
+                  </FieldWrapper>
+                </div>
+
+                <div style={{ height: 1, background: "rgba(184,134,11,0.15)", margin: "4px 0" }} />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.foodCostTarget)} label="Target Food Cost %" helper="Your goal for food cost as a percentage of food sales. Industry standard for full-service: 28-32%.">
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        placeholder="e.g. 30"
+                        value={formData.foodCostTarget || ""}
+                        onChange={(e) => updateField("foodCostTarget", e.target.value)}
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="input-food-cost-target"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#64748b" }}>%</span>
+                    </div>
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.foodCostActual)} label="Current Actual Food Cost %" helper="Your food cost percentage from your most recent full week or accounting period.">
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        placeholder="e.g. 33"
+                        value={formData.foodCostActual || ""}
+                        onChange={(e) => updateField("foodCostActual", e.target.value)}
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="input-food-cost-actual"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#64748b" }}>%</span>
+                    </div>
+                    {formData.foodCostActual && formData.foodCostTarget && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium mt-1"
+                        style={{
+                          background: Number(formData.foodCostActual) > Number(formData.foodCostTarget) ? "rgba(245,158,11,0.15)" : "rgba(34,197,94,0.15)",
+                          color: Number(formData.foodCostActual) > Number(formData.foodCostTarget) ? "#f59e0b" : "#22c55e",
+                          border: `1px solid ${Number(formData.foodCostActual) > Number(formData.foodCostTarget) ? "rgba(245,158,11,0.3)" : "rgba(34,197,94,0.3)"}`,
+                        }}
+                        data-testid="badge-food-cost-status"
+                      >
+                        {Number(formData.foodCostActual) > Number(formData.foodCostTarget) ? "Over target" : "On target"}
+                      </span>
+                    )}
+                  </FieldWrapper>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.laborTargetPct)} label="Target Labor Cost %" helper="Your goal for total labor (FOH + BOH + management) as a percentage of total sales. Full-service target: 28-35%.">
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        placeholder="e.g. 30"
+                        value={formData.laborTargetPct || ""}
+                        onChange={(e) => updateField("laborTargetPct", e.target.value)}
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="input-labor-cost-target"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#64748b" }}>%</span>
+                    </div>
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.laborCostActual)} label="Current Actual Labor Cost %" helper="Your labor cost percentage from your most recent full week or accounting period.">
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        placeholder="e.g. 32"
+                        value={formData.laborCostActual || ""}
+                        onChange={(e) => updateField("laborCostActual", e.target.value)}
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="input-labor-cost-actual"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#64748b" }}>%</span>
+                    </div>
+                    {formData.laborCostActual && formData.laborTargetPct && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium mt-1"
+                        style={{
+                          background: Number(formData.laborCostActual) > Number(formData.laborTargetPct) ? "rgba(245,158,11,0.15)" : "rgba(34,197,94,0.15)",
+                          color: Number(formData.laborCostActual) > Number(formData.laborTargetPct) ? "#f59e0b" : "#22c55e",
+                          border: `1px solid ${Number(formData.laborCostActual) > Number(formData.laborTargetPct) ? "rgba(245,158,11,0.3)" : "rgba(34,197,94,0.3)"}`,
+                        }}
+                        data-testid="badge-labor-cost-status"
+                      >
+                        {Number(formData.laborCostActual) > Number(formData.laborTargetPct) ? "Over target" : "On target"}
+                      </span>
+                    )}
+                  </FieldWrapper>
+                </div>
+
+                <div style={{ height: 1, background: "rgba(184,134,11,0.15)", margin: "4px 0" }} />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.primeCostTarget)} label="Target Prime Cost %" helper="Food cost + labor cost combined. The single most important number in your restaurant. Target: 55-62% for full-service.">
+                    {primeCostOverride ? (
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          placeholder="e.g. 60"
+                          value={formData.primeCostTarget || ""}
+                          onChange={(e) => updateField("primeCostTarget", e.target.value)}
+                          className={focusClass}
+                          style={inputStyle}
+                          data-testid="input-prime-cost-target"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#64748b" }}>%</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex-1 h-9 px-3 flex items-center text-sm rounded-lg"
+                          style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8" }}
+                          data-testid="display-prime-cost-target"
+                        >
+                          {formData.foodCostTarget && formData.laborTargetPct
+                            ? `${formData.foodCostTarget}% + ${formData.laborTargetPct}% = ${(Number(formData.foodCostTarget) + Number(formData.laborTargetPct)).toFixed(0)}%`
+                            : "Enter food cost & labor targets above"}
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (formData.foodCostTarget && formData.laborTargetPct) {
+                              updateField("primeCostTarget", String(Number(formData.foodCostTarget) + Number(formData.laborTargetPct)));
+                            }
+                            setPrimeCostOverride(true);
+                          }}
+                          className="text-[11px] flex items-center gap-1"
+                          style={{ color: "#b8860b" }}
+                          data-testid="button-edit-prime-cost"
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </button>
+                      </div>
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper filled={!!(formData.foodCostActual && formData.laborCostActual)} label="Current Actual Prime Cost %" helper="Auto-calculated from your actual food cost + labor cost above.">
+                    <div
+                      className="h-9 px-3 flex items-center text-sm rounded-lg"
+                      style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8" }}
+                      data-testid="display-prime-cost-actual"
+                    >
+                      {formData.foodCostActual && formData.laborCostActual
+                        ? `${(Number(formData.foodCostActual) + Number(formData.laborCostActual)).toFixed(1)}%`
+                        : "Enter actual food cost & labor cost above"}
+                    </div>
+                    {formData.foodCostActual && formData.laborCostActual && (formData.primeCostTarget || (formData.foodCostTarget && formData.laborTargetPct)) && (() => {
+                      const actual = Number(formData.foodCostActual) + Number(formData.laborCostActual);
+                      const target = formData.primeCostTarget
+                        ? Number(formData.primeCostTarget)
+                        : Number(formData.foodCostTarget) + Number(formData.laborTargetPct);
+                      const over = actual > target;
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium mt-1"
+                          style={{
+                            background: over ? "rgba(245,158,11,0.15)" : "rgba(34,197,94,0.15)",
+                            color: over ? "#f59e0b" : "#22c55e",
+                            border: `1px solid ${over ? "rgba(245,158,11,0.3)" : "rgba(34,197,94,0.3)"}`,
+                          }}
+                          data-testid="badge-prime-cost-status"
+                        >
+                          {over ? `${(actual - target).toFixed(1)} pts over target` : "On target"}
+                        </span>
+                      );
+                    })()}
+                  </FieldWrapper>
+                </div>
+
+                <div style={{ height: 1, background: "rgba(184,134,11,0.15)", margin: "4px 0" }} />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.serviceModel)} label="Service Model" helper="Your primary service format — affects labor benchmarks and ticket time standards.">
+                    <Select
+                      value={formData.serviceModel || ""}
+                      onValueChange={(val) => updateField("serviceModel", val)}
+                    >
+                      <SelectTrigger className={focusClass} style={inputStyle} data-testid="select-service-model">
+                        <SelectValue placeholder="Select service type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceModelOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.conceptCuisine)} label="Cuisine & Concept" helper="A brief description of your restaurant's food identity. Used by the Consultant to give relevant menu and food cost advice.">
+                    <Input
+                      placeholder='e.g. "Southern Cajun bistro and bar, full liquor, dinner service"'
+                      value={formData.conceptCuisine || ""}
+                      onChange={(e) => updateField("conceptCuisine", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-cuisine-concept"
+                    />
+                  </FieldWrapper>
+                </div>
+
+                <FieldWrapper filled={isFieldFilled(formData.topChallenge)} label="Biggest Operational Challenge Right Now" helper="Be specific. The Consultant uses this as a starting point for every conversation.">
+                  <Textarea
+                    rows={3}
+                    placeholder={'e.g. "Food cost is running 4 points over target. I think it\'s portion control on the line but I\'m not sure."'}
+                    value={formData.topChallenge || ""}
+                    onChange={(e) => updateField("topChallenge", e.target.value)}
+                    className={focusClass}
+                    style={{ ...inputStyle, resize: "vertical" }}
+                    data-testid="input-top-challenge"
+                  />
+                </FieldWrapper>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.totalStaff)} label="Total Staff Count" helper="Approximate total number of employees across all roles and shifts.">
+                    <Input
+                      type="number"
+                      placeholder="e.g. 24"
+                      value={formData.totalStaff ?? ""}
+                      onChange={(e) => updateField("totalStaff", e.target.value ? Number(e.target.value) : undefined)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-total-staff"
                     />
                   </FieldWrapper>
                 </div>

@@ -222,6 +222,16 @@ export default function ConsultantPage() {
     queryKey: ["/api/restaurant-profile"],
   });
 
+  const { data: consultantContext } = useQuery<{
+    complete: boolean;
+    restaurantName: string | null;
+    primeCostActual: number | null;
+    primeCostTarget: number | null;
+    variance: number | null;
+  }>({
+    queryKey: ["/api/consultant/context"],
+  });
+
   const sessionMetrics = useMemo(() => {
     const userMsgCount = messages.filter(m => m.role === "user").length;
     const domainsUsed = new Set(messages.filter(m => m.domainTag).map(m => m.domainTag));
@@ -571,6 +581,48 @@ export default function ConsultantPage() {
           </div>
         </div>
       </header>
+
+      {consultantContext && canAccessDomain("consultant") && (
+        <div
+          className="px-4 py-2 flex items-center justify-center gap-2 text-[12px]"
+          style={{ background: "#12141f", borderBottom: "1px solid #1a1d2e" }}
+          data-testid="consultant-context-bar"
+        >
+          {consultantContext.complete && consultantContext.restaurantName ? (
+            <>
+              <span style={{ color: "#64748b" }}>Consulting for:</span>
+              <span className="font-medium" style={{ color: "#d4a017" }} data-testid="text-context-restaurant">
+                {consultantContext.restaurantName}
+              </span>
+              {consultantContext.primeCostActual !== null && (
+                <>
+                  <span style={{ color: "#334155" }}>|</span>
+                  <span style={{ color: "#64748b" }}>Prime Cost:</span>
+                  <span className="font-medium" style={{ color: "#fff" }}>
+                    {consultantContext.primeCostActual}%
+                  </span>
+                  {consultantContext.variance !== null && (
+                    <span
+                      className="font-medium"
+                      style={{ color: consultantContext.variance > 0 ? "#f59e0b" : "#22c55e" }}
+                      data-testid="text-context-variance"
+                    >
+                      ({consultantContext.variance > 0 ? `+${consultantContext.variance}pts over target` : "on target"})
+                    </span>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <span style={{ color: "#f59e0b" }}>Complete your Financial Profile in Setup for personalized advice</span>
+              <Link href="/templates" style={{ color: "#d4a017", fontWeight: 600 }} data-testid="link-go-to-setup">
+                Go to Setup
+              </Link>
+            </>
+          )}
+        </div>
+      )}
 
       {!canAccessDomain("consultant") ? (
         <div className="flex-1 overflow-hidden relative">

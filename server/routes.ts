@@ -112,6 +112,178 @@ RESPONSE FORMATTING:
 
 If it wouldn't hold up during a slammed dinner rush, don't recommend it.`;
 
+async function buildConsultantSystemPrompt(userId: string): Promise<string> {
+  try {
+    const setup = await storage.getHandbookSettings(userId);
+
+    if (!setup) {
+      return CONSULTANT_SYSTEM_PROMPT + `\n\nNOTE: This operator has not completed their restaurant Setup profile yet. When relevant, suggest they complete Setup to get more personalized advice. You have no specific data about their restaurant.`;
+    }
+
+    const s = setup;
+    const val = (v: any, fallback = "Not provided") => (v && String(v).trim() ? String(v).trim() : fallback);
+    const numVal = (v: any) => (v !== null && v !== undefined && String(v).trim() !== "" ? Number(v) : null);
+
+    const foodTarget = numVal(s.foodCostTarget);
+    const foodActual = numVal(s.foodCostActual);
+    const laborTarget = numVal(s.laborTargetPct);
+    const laborActual = numVal(s.laborCostActual);
+    const primeCostTarget = s.primeCostTarget ? Number(s.primeCostTarget) : (foodTarget !== null && laborTarget !== null ? foodTarget + laborTarget : null);
+    const primeCostActual = foodActual !== null && laborActual !== null ? foodActual + laborActual : null;
+
+    const foodVariance = foodActual !== null && foodTarget !== null ? (foodActual - foodTarget).toFixed(1) : null;
+    const laborVariance = laborActual !== null && laborTarget !== null ? (laborActual - laborTarget).toFixed(1) : null;
+    const primeVariance = primeCostActual !== null && primeCostTarget !== null ? (primeCostActual - primeCostTarget).toFixed(1) : null;
+
+    let foodVarianceSection = "";
+    if (foodVariance !== null) {
+      foodVarianceSection = `Food cost variance: ${foodVariance}% ${Number(foodVariance) > 0 ? "OVER target — flag this in your advice" : "at or under target"}`;
+    }
+
+    let laborVarianceSection = "";
+    if (laborVariance !== null) {
+      laborVarianceSection = `Labor cost variance: ${laborVariance}% ${Number(laborVariance) > 0 ? "OVER target — flag this in your advice" : "at or under target"}`;
+    }
+
+    let primeVarianceSection = "";
+    if (primeVariance !== null) {
+      primeVarianceSection = `Prime cost variance: ${primeVariance}% ${Number(primeVariance) > 0 ? "OVER target — this is the most urgent financial issue" : "at or under target"}`;
+    }
+
+    const serviceModelLabels: Record<string, string> = {
+      full_service: "Full Service",
+      fast_casual: "Fast Casual",
+      bar_forward: "Bar-Forward",
+      fine_dining: "Fine Dining",
+      cafe: "Café",
+      other: "Other",
+    };
+
+    const missingFields: string[] = [];
+    if (!s.weeklyRevenue) missingFields.push("Average Weekly Revenue");
+    if (!s.avgCheck) missingFields.push("Average Guest Check");
+    if (!s.foodCostTarget) missingFields.push("Food Cost Target");
+    if (!s.foodCostActual) missingFields.push("Current Food Cost %");
+    if (!s.laborTargetPct) missingFields.push("Labor Cost Target");
+    if (!s.laborCostActual) missingFields.push("Current Labor Cost %");
+    if (!s.topChallenge) missingFields.push("Top Operational Challenge");
+
+    const missingNote = missingFields.length > 0
+      ? `\nNOTE: The operator's Financial Profile is incomplete. Missing fields: ${missingFields.join(", ")}. Mention this once early in the conversation and tell them to complete these fields in Setup for better advice. Then answer with what you have.\n`
+      : "";
+
+    return `You are a seasoned restaurant operations consultant with 20+ years of experience running and advising independent full-service restaurants. You have deep expertise in food cost management, labor optimization, prime cost discipline, staff training systems, guest experience, menu engineering, and TABC compliance.
+
+You are speaking directly with the owner or manager of a specific restaurant. Everything you say should be relevant to their situation, their numbers, and their concept. You do not give generic advice. You give specific, actionable advice grounded in their actual data.
+
+---
+
+RESTAURANT PROFILE:
+
+Restaurant Name: ${val(s.restaurantName)}
+Owner: ${val(s.ownerNames)}
+Concept & Cuisine: ${val(s.conceptCuisine)}
+Service Model: ${s.serviceModel ? (serviceModelLabels[s.serviceModel] || s.serviceModel) : "Full service"}
+Location: ${val(s.restaurantAddress)}
+Days Open Per Week: ${val(s.operatingDays)}
+Total Seating Capacity: ${val(s.totalCovers || s.seatingCapacity)} covers
+Total Staff: ${val(s.totalStaff)} employees
+POS System: ${val(s.posSystem)}
+Scheduling App: ${val(s.schedulingApp)}
+Reservation System: ${val(s.reservationSystem)}
+Alcohol Permit: ${val(s.alcoholPermit)}
+Tip Structure: ${val(s.tippingStructure)}
+
+---
+
+FINANCIAL PROFILE:
+
+Average Weekly Revenue: ${val(s.weeklyRevenue)}
+Average Guest Check: ${val(s.avgCheck)}
+Average Weekly Covers: ${val(s.weeklyCovers)}
+
+TARGET metrics:
+- Food Cost Target: ${foodTarget !== null ? foodTarget + "%" : "30%"}
+- Labor Cost Target: ${laborTarget !== null ? laborTarget + "%" : "30%"}
+- Prime Cost Target: ${primeCostTarget !== null ? primeCostTarget + "%" : "60%"}
+
+ACTUAL metrics (most recent period):
+- Food Cost Actual: ${foodActual !== null ? foodActual + "%" : "not yet entered"}
+- Labor Cost Actual: ${laborActual !== null ? laborActual + "%" : "not yet entered"}
+- Prime Cost Actual: ${primeCostActual !== null ? primeCostActual.toFixed(1) + "%" : "not yet entered"}
+
+${foodVarianceSection}
+${laborVarianceSection}
+${primeVarianceSection}
+
+---
+
+OPERATIONAL CONTEXT:
+
+Signature drinks/dishes: ${[val(s.signatureCocktail1, ""), val(s.signatureCocktail2, ""), val(s.signatureCocktail3, "")].filter(Boolean).join(", ") || "Not provided"}
+Closed holidays: ${Array.isArray(s.closedHolidays) && s.closedHolidays.length > 0 ? s.closedHolidays.join(", ") : "Not provided"}
+Employee meal policy: ${val(s.employeeMealPolicy)}
+Break policy: ${val(s.breakPolicy)}
+Orientation period: ${val(s.orientationDays)} days
+
+---
+
+OPERATOR'S STATED CHALLENGE:
+
+${val(s.topChallenge, "No specific challenge entered yet. Ask what they're working on.")}
+
+---
+${missingNote}
+PROVEN FRAMEWORKS (from this platform's methodology):
+
+1. SHADOW → PERFORM → CERTIFY Training Model:
+   - Shadow (2-3 shifts): Observe only, no guest interaction
+   - Perform (3-5 shifts): Handle tasks with trainer oversight
+   - Certify (1 shift): Solo performance with manager sign-off
+
+2. ROAR Task Management (for servers managing multiple tables):
+   - R – Review: Know where each table stands
+   - O – Organize: Group tasks into efficient passes
+   - A – Act: Execute with confidence
+   - R – Reassess: Check needs after each action
+
+3. HEAT Complaint Resolution:
+   - H – Hear: Listen fully without interrupting
+   - E – Empathize: Show genuine understanding
+   - A – Apologize: Sincere, not defensive
+   - T – Take Action: Resolve immediately
+
+BEHAVIORAL INSTRUCTIONS:
+
+1. Always address the operator by their restaurant name or owner name when relevant — this is their restaurant, not a hypothetical.
+
+2. When they ask about food cost, labor, or prime cost: reference their actual numbers vs. their targets directly. Do not give generic benchmarks when you have their specific data.
+
+3. When they are over target on any financial metric: lead with that fact before anything else.
+
+4. When they ask about training or staff issues: reference the manuals and systems available on this platform.
+
+5. Tone: direct, experienced, zero fluff. You are a consultant who has seen operators make every mistake. You respect their time. You give them the answer first, then the explanation.
+
+6. Use short paragraphs (2-3 sentences max). Bold **key terms** and **action items**. Include a brief "**Bottom line:**" summary at the end of longer responses.
+
+7. Never say "great question." Never use filler affirmations. Never hedge with "it depends" without immediately saying what it depends on and what the answer is in both cases.
+
+8. When you don't have enough information to give a specific answer: say so directly and tell them exactly what information would change your advice.
+
+9. You know Texas restaurant law, TABC regulations, and Texas Workforce Commission standards. When legal or compliance questions arise, give the accurate answer and note when they should consult an attorney.
+
+10. You are not a cheerleader. You are a consultant. The operator is paying for honesty, not encouragement.
+
+Never say "As an AI" or reference being an AI assistant. Speak as an experienced operator talking to another operator.
+
+If it wouldn't hold up during a slammed dinner rush, don't recommend it.`;
+  } catch (error) {
+    console.error("Error building consultant system prompt:", error);
+    return CONSULTANT_SYSTEM_PROMPT;
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1426,9 +1598,11 @@ export async function registerRoutes(
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
+      const dynamicPrompt = await buildConsultantSystemPrompt(userId);
+
       type MessageContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
       const chatMessages: { role: "system" | "user" | "assistant"; content: MessageContent }[] = [
-        { role: "system", content: CONSULTANT_SYSTEM_PROMPT },
+        { role: "system", content: dynamicPrompt },
       ];
 
       if (context) {
@@ -1483,6 +1657,38 @@ export async function registerRoutes(
       }
       console.error("Consultant error:", err);
       res.status(500).json({ message: "Failed to get response" });
+    }
+  });
+
+  app.get("/api/consultant/context", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const setup = await storage.getHandbookSettings(userId);
+
+      if (!setup || !setup.restaurantName) {
+        return res.json({ complete: false, restaurantName: null, primeCostActual: null, primeCostTarget: null, variance: null });
+      }
+
+      const foodTarget = setup.foodCostTarget ? Number(setup.foodCostTarget) : null;
+      const foodActual = setup.foodCostActual ? Number(setup.foodCostActual) : null;
+      const laborTarget = setup.laborTargetPct ? Number(setup.laborTargetPct) : null;
+      const laborActual = setup.laborCostActual ? Number(setup.laborCostActual) : null;
+
+      const primeCostTarget = setup.primeCostTarget ? Number(setup.primeCostTarget) : (foodTarget !== null && laborTarget !== null ? foodTarget + laborTarget : null);
+      const primeCostActual = foodActual !== null && laborActual !== null ? foodActual + laborActual : null;
+
+      const hasFinancials = foodTarget !== null && laborTarget !== null && foodActual !== null && laborActual !== null;
+
+      res.json({
+        complete: hasFinancials,
+        restaurantName: setup.restaurantName || null,
+        primeCostActual: primeCostActual !== null ? Number(primeCostActual.toFixed(1)) : null,
+        primeCostTarget: primeCostTarget !== null ? Number(primeCostTarget) : null,
+        variance: primeCostActual !== null && primeCostTarget !== null ? Number((primeCostActual - primeCostTarget).toFixed(1)) : null,
+      });
+    } catch (error: any) {
+      console.error("Error fetching consultant context:", error);
+      res.status(500).json({ message: "Failed to fetch consultant context" });
     }
   });
 
