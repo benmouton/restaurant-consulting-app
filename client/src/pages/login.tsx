@@ -2,9 +2,9 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { BrandLogoNav } from "@/components/BrandLogo";
-import { Button } from "@/components/ui/button";
 import { isNativeApp } from "@/lib/native";
 import { Link } from "wouter";
+import { SiGoogle, SiFacebook, SiLinkedin, SiX } from "react-icons/si";
 
 const AppleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -60,6 +60,53 @@ export default function LoginPage() {
               <AppleIcon />
               Sign in with Apple
             </button>
+
+            <button
+              onClick={() => { window.location.href = "/api/auth/google"; }}
+              className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors border border-gray-300"
+              data-testid="button-signin-google"
+            >
+              <SiGoogle className="h-5 w-5" />
+              Sign in with Google
+            </button>
+
+            <button
+              onClick={() => { window.location.href = "/api/auth/meta"; }}
+              className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-colors border border-transparent"
+              style={{ backgroundColor: '#1877F2' }}
+              data-testid="button-signin-meta"
+            >
+              <SiFacebook className="h-5 w-5" />
+              Sign in with Facebook
+            </button>
+
+            <button
+              onClick={() => { window.location.href = "/api/auth/x"; }}
+              className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 bg-black text-white rounded-lg text-sm font-medium hover:bg-black/90 transition-colors border border-black"
+              data-testid="button-signin-x"
+            >
+              <SiX className="h-5 w-5" />
+              Sign in with X
+            </button>
+
+            <button
+              onClick={() => { window.location.href = "/api/auth/linkedin"; }}
+              className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-colors border border-transparent"
+              style={{ backgroundColor: '#0A66C2' }}
+              data-testid="button-signin-linkedin"
+            >
+              <SiLinkedin className="h-5 w-5" />
+              Sign in with LinkedIn
+            </button>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border"></div>
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-background px-2 text-muted-foreground">or</span>
+              </div>
+            </div>
 
             <button
               onClick={() => { window.location.href = "/api/login"; }}

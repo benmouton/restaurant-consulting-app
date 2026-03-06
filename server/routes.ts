@@ -1497,6 +1497,358 @@ export async function registerRoutes(
     }
   });
 
+  // ========== GOOGLE OAUTH ==========
+  app.get("/api/auth/google", (req: any, res) => {
+    try {
+      const state = crypto.randomBytes(32).toString('hex');
+      req.session.googleOAuthState = state;
+      const redirectUri = `https://${req.hostname}/api/auth/google/callback`;
+      const params = new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        state,
+        access_type: 'offline',
+        prompt: 'select_account',
+      });
+      res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+    } catch (error: any) {
+      console.error("[GOOGLE] Failed to start OAuth:", error);
+      res.redirect("/login?error=google_auth_failed");
+    }
+  });
+
+  app.get("/api/auth/google/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!state || state !== req.session?.googleOAuthState) {
+        console.error("[GOOGLE] State mismatch");
+        return res.redirect("/login?error=google_invalid_state");
+      }
+      delete req.session.googleOAuthState;
+
+      if (!code) {
+        return res.redirect("/login?error=google_missing_code");
+      }
+
+      const redirectUri = `https://${req.hostname}/api/auth/google/callback`;
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          code: code as string,
+          grant_type: "authorization_code",
+          redirect_uri: redirectUri,
+        }),
+      });
+
+      const tokenData = await tokenRes.json() as any;
+      if (!tokenData.access_token) {
+        console.error("[GOOGLE] Token exchange failed:", tokenData.error);
+        return res.redirect("/login?error=google_token_failed");
+      }
+
+      const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const userInfo = await userInfoRes.json() as any;
+
+      const googleUserId = `google_${userInfo.id}`;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      await authStorage.upsertUser({
+        id: googleUserId,
+        email: userInfo.email || null,
+        firstName: userInfo.given_name || null,
+        lastName: userInfo.family_name || null,
+        profileImageUrl: userInfo.picture || null,
+      });
+
+      const sessionUser: any = {
+        claims: { sub: googleUserId },
+        expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      };
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(sessionUser, (err: any) => {
+          if (err) reject(err); else resolve();
+        });
+      });
+
+      console.log("[GOOGLE] Login successful:", googleUserId);
+      res.redirect("/");
+    } catch (error: any) {
+      console.error("[GOOGLE] Callback error:", error.message);
+      res.redirect("/login?error=google_auth_failed");
+    }
+  });
+
+  // ========== META (FACEBOOK) OAUTH ==========
+  app.get("/api/auth/meta", (req: any, res) => {
+    try {
+      const state = crypto.randomBytes(32).toString('hex');
+      req.session.metaOAuthState = state;
+      const redirectUri = `https://${req.hostname}/api/auth/meta/callback`;
+      const params = new URLSearchParams({
+        client_id: process.env.META_APP_ID!,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'public_profile,email',
+        state,
+      });
+      res.redirect(`https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`);
+    } catch (error: any) {
+      console.error("[META] Failed to start OAuth:", error);
+      res.redirect("/login?error=meta_auth_failed");
+    }
+  });
+
+  app.get("/api/auth/meta/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!state || state !== req.session?.metaOAuthState) {
+        console.error("[META] State mismatch");
+        return res.redirect("/login?error=meta_invalid_state");
+      }
+      delete req.session.metaOAuthState;
+
+      if (!code) {
+        return res.redirect("/login?error=meta_missing_code");
+      }
+
+      const redirectUri = `https://${req.hostname}/api/auth/meta/callback`;
+      const tokenRes = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?${new URLSearchParams({
+        client_id: process.env.META_APP_ID!,
+        client_secret: process.env.META_APP_SECRET!,
+        redirect_uri: redirectUri,
+        code: code as string,
+      })}`);
+
+      const tokenData = await tokenRes.json() as any;
+      if (!tokenData.access_token) {
+        console.error("[META] Token exchange failed:", tokenData.error);
+        return res.redirect("/login?error=meta_token_failed");
+      }
+
+      const userInfoRes = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,first_name,last_name,email,picture.type(large)&access_token=${tokenData.access_token}`);
+      const userInfo = await userInfoRes.json() as any;
+
+      const metaUserId = `meta_${userInfo.id}`;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      await authStorage.upsertUser({
+        id: metaUserId,
+        email: userInfo.email || null,
+        firstName: userInfo.first_name || null,
+        lastName: userInfo.last_name || null,
+        profileImageUrl: userInfo.picture?.data?.url || null,
+      });
+
+      const sessionUser: any = {
+        claims: { sub: metaUserId },
+        expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      };
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(sessionUser, (err: any) => {
+          if (err) reject(err); else resolve();
+        });
+      });
+
+      console.log("[META] Login successful:", metaUserId);
+      res.redirect("/");
+    } catch (error: any) {
+      console.error("[META] Callback error:", error.message);
+      res.redirect("/login?error=meta_auth_failed");
+    }
+  });
+
+  // ========== LINKEDIN OAUTH ==========
+  app.get("/api/auth/linkedin", (req: any, res) => {
+    try {
+      const state = crypto.randomBytes(32).toString('hex');
+      req.session.linkedinOAuthState = state;
+      const redirectUri = `https://${req.hostname}/api/auth/linkedin/callback`;
+      const params = new URLSearchParams({
+        client_id: process.env.LINKEDIN_CLIENT_ID!,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid profile email',
+        state,
+      });
+      res.redirect(`https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`);
+    } catch (error: any) {
+      console.error("[LINKEDIN] Failed to start OAuth:", error);
+      res.redirect("/login?error=linkedin_auth_failed");
+    }
+  });
+
+  app.get("/api/auth/linkedin/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!state || state !== req.session?.linkedinOAuthState) {
+        console.error("[LINKEDIN] State mismatch");
+        return res.redirect("/login?error=linkedin_invalid_state");
+      }
+      delete req.session.linkedinOAuthState;
+
+      if (!code) {
+        return res.redirect("/login?error=linkedin_missing_code");
+      }
+
+      const redirectUri = `https://${req.hostname}/api/auth/linkedin/callback`;
+      const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: process.env.LINKEDIN_CLIENT_ID!,
+          client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+          code: code as string,
+          grant_type: "authorization_code",
+          redirect_uri: redirectUri,
+        }),
+      });
+
+      const tokenData = await tokenRes.json() as any;
+      if (!tokenData.access_token) {
+        console.error("[LINKEDIN] Token exchange failed:", tokenData.error);
+        return res.redirect("/login?error=linkedin_token_failed");
+      }
+
+      const userInfoRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const userInfo = await userInfoRes.json() as any;
+
+      const linkedinUserId = `linkedin_${userInfo.sub}`;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      await authStorage.upsertUser({
+        id: linkedinUserId,
+        email: userInfo.email || null,
+        firstName: userInfo.given_name || null,
+        lastName: userInfo.family_name || null,
+        profileImageUrl: userInfo.picture || null,
+      });
+
+      const sessionUser: any = {
+        claims: { sub: linkedinUserId },
+        expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      };
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(sessionUser, (err: any) => {
+          if (err) reject(err); else resolve();
+        });
+      });
+
+      console.log("[LINKEDIN] Login successful:", linkedinUserId);
+      res.redirect("/");
+    } catch (error: any) {
+      console.error("[LINKEDIN] Callback error:", error.message);
+      res.redirect("/login?error=linkedin_auth_failed");
+    }
+  });
+
+  // ========== X (TWITTER) OAUTH 2.0 ==========
+  app.get("/api/auth/x", (req: any, res) => {
+    try {
+      const state = crypto.randomBytes(32).toString('hex');
+      const codeVerifier = crypto.randomBytes(32).toString('base64url');
+      const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+      req.session.xOAuthState = state;
+      req.session.xCodeVerifier = codeVerifier;
+      const redirectUri = `https://${req.hostname}/api/auth/x/callback`;
+      const params = new URLSearchParams({
+        client_id: process.env.X_CLIENT_ID!,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'tweet.read users.read offline.access',
+        state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+      });
+      res.redirect(`https://twitter.com/i/oauth2/authorize?${params.toString()}`);
+    } catch (error: any) {
+      console.error("[X] Failed to start OAuth:", error);
+      res.redirect("/login?error=x_auth_failed");
+    }
+  });
+
+  app.get("/api/auth/x/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!state || state !== req.session?.xOAuthState) {
+        console.error("[X] State mismatch");
+        return res.redirect("/login?error=x_invalid_state");
+      }
+      const codeVerifier = req.session.xCodeVerifier;
+      delete req.session.xOAuthState;
+      delete req.session.xCodeVerifier;
+
+      if (!code) {
+        return res.redirect("/login?error=x_missing_code");
+      }
+
+      const redirectUri = `https://${req.hostname}/api/auth/x/callback`;
+      const basicAuth = Buffer.from(`${process.env.X_CLIENT_ID!}:${process.env.X_CLIENT_SECRET!}`).toString('base64');
+      const tokenRes = await fetch("https://api.x.com/2/oauth2/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${basicAuth}`,
+        },
+        body: new URLSearchParams({
+          code: code as string,
+          grant_type: "authorization_code",
+          redirect_uri: redirectUri,
+          code_verifier: codeVerifier,
+        }),
+      });
+
+      const tokenData = await tokenRes.json() as any;
+      if (!tokenData.access_token) {
+        console.error("[X] Token exchange failed:", tokenData.error);
+        return res.redirect("/login?error=x_token_failed");
+      }
+
+      const userInfoRes = await fetch("https://api.x.com/2/users/me?user.fields=profile_image_url,name,username", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const userInfoData = await userInfoRes.json() as any;
+      const userInfo = userInfoData.data;
+
+      if (!userInfo?.id) {
+        console.error("[X] Could not fetch user info");
+        return res.redirect("/login?error=x_user_failed");
+      }
+
+      const xUserId = `x_${userInfo.id}`;
+      const nameParts = (userInfo.name || "").split(" ");
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      await authStorage.upsertUser({
+        id: xUserId,
+        email: null,
+        firstName: nameParts[0] || null,
+        lastName: nameParts.slice(1).join(" ") || null,
+        profileImageUrl: userInfo.profile_image_url || null,
+      });
+
+      const sessionUser: any = {
+        claims: { sub: xUserId },
+        expires_at: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+      };
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(sessionUser, (err: any) => {
+          if (err) reject(err); else resolve();
+        });
+      });
+
+      console.log("[X] Login successful:", xUserId);
+      res.redirect("/");
+    } catch (error: any) {
+      console.error("[X] Callback error:", error.message);
+      res.redirect("/login?error=x_auth_failed");
+    }
+  });
+
   // Session logout for native app (no external redirect)
   app.post("/api/auth/logout", (req: any, res) => {
     if (req.session?.testAccess) {

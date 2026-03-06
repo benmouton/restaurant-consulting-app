@@ -21,7 +21,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript with ES modules
 - **API Style**: RESTful endpoints
-- **Authentication**: Replit Auth (OpenID Connect) with Passport.js
+- **Authentication**: Multi-provider OAuth (Apple, Google, Facebook/Meta, X/Twitter, LinkedIn) + Replit Auth (OpenID Connect) with Passport.js. User IDs prefixed by provider (e.g., `google_`, `meta_`, `linkedin_`, `x_`, `apple_`).
 - **Session Management**: PostgreSQL-backed sessions (`connect-pg-simple`)
 - **Key Design Decisions**: Modular integration pattern, custom build scripts.
 
