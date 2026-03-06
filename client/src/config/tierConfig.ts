@@ -56,6 +56,12 @@ export const DOMAIN_TIER_MAP: Record<string, DomainTierInfo> = {
     name: "Training Log & Certifications",
     description: "Track staff certifications, assessment scores, and training history.",
   },
+  "sop-generator": {
+    slug: "sop-generator",
+    requiredTier: "basic",
+    name: "SOP Generator",
+    description: "16 standard operating procedures personalized to your restaurant.",
+  },
   service: {
     slug: "service",
     requiredTier: "basic",
@@ -103,7 +109,7 @@ export const GATED_DOMAINS = Object.values(DOMAIN_TIER_MAP).filter(
 );
 
 export const FREE_DOMAIN_COUNT = FREE_DOMAINS.length;
-export const TOTAL_DOMAIN_COUNT = Object.keys(DOMAIN_TIER_MAP).filter(k => k !== "consultant" && k !== "training-log").length;
+export const TOTAL_DOMAIN_COUNT = Object.keys(DOMAIN_TIER_MAP).filter(k => k !== "consultant" && k !== "training-log" && k !== "sop-generator").length;
 
 export function isDomainFree(slug: string): boolean {
   return DOMAIN_TIER_MAP[slug]?.requiredTier === "free";

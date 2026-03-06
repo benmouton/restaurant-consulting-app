@@ -47,6 +47,10 @@ const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
     headline: "Training Without a Record Is Just a Conversation",
     sub: "Track every certification, every assessment score, every manager sign-off. Your TWC documentation lives here — and it's exportable when you need it."
   },
+  "sop-generator": {
+    headline: "Your Operations Manual — Generated, Not Written",
+    sub: "16 SOPs personalized to your restaurant. Bar, kitchen, front of house, and management procedures — all using your actual settings, staff, and policies."
+  },
   facilities: {
     headline: "Build a Schedule That Hits Your Labor Target",
     sub: "AI-assisted scheduling with live labor cost calculation. Know what the schedule costs before you publish it."

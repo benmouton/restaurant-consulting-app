@@ -24,6 +24,7 @@ import PlaybooksPage from "@/pages/playbooks";
 import FinancialPage from "@/pages/financial";
 import PrimeCostPage from "@/pages/prime-cost";
 import TrainingLogPage from "@/pages/training-log";
+import SopGeneratorPage from "@/pages/sop-generator";
 import SchedulingPage from "@/pages/scheduling";
 import SubscriptionPage from "@/pages/subscription";
 import SubscriptionSuccessPage from "@/pages/subscription-success";
@@ -157,6 +158,9 @@ function Router() {
         </Route>
         <Route path="/training-log">
           {user ? <PaidProtectedPage component={TrainingLogPage} /> : <Landing />}
+        </Route>
+        <Route path="/sop-generator">
+          {user ? <PaidProtectedPage component={SopGeneratorPage} /> : <Landing />}
         </Route>
         <Route path="/templates">
           {user ? <ProtectedPage component={TemplatesPage} /> : <Landing />}

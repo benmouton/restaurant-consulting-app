@@ -94,6 +94,7 @@ import {
   UtensilsCrossed,
   CloudSun,
   ChevronDown,
+  ChevronRight,
   Gauge,
   Timer,
   BookOpen,
@@ -11883,7 +11884,21 @@ export default function DomainPage() {
         {slug === "kitchen" && <KitchenStatusStrip />}
         {slug === "kitchen" && <KitchenComplianceEngine />}
 
-        {/* SOP Health Strip + SOP Capture Engine - only show for sops domain */}
+        {/* SOP Generator link + SOP Health Strip + SOP Capture Engine - only show for sops domain */}
+        {slug === "sops" && (
+          <Link href="/sop-generator">
+            <div className="flex items-center gap-3 p-4 rounded-lg mb-4 cursor-pointer" style={{ background: 'linear-gradient(135deg, #1a1d2e 0%, #252840 100%)', border: '1px solid #b8860b' }} data-testid="link-sop-generator">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(212,160,23,0.15)' }}>
+                <ClipboardList className="h-5 w-5" style={{ color: '#d4a017' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm">SOP Generator</p>
+                <p className="text-xs" style={{ color: '#9ca3af' }}>16 pre-built SOPs personalized to your restaurant. Generate, print, and export your complete operations manual.</p>
+              </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0" style={{ color: '#d4a017' }} />
+            </div>
+          </Link>
+        )}
         {slug === "sops" && <SOPHealthStrip />}
         {slug === "sops" && <SOPCaptureEngine />}
 

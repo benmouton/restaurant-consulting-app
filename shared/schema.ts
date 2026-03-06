@@ -922,3 +922,21 @@ export const trainingRecords = pgTable("training_records", {
 export const insertTrainingRecordSchema = createInsertSchema(trainingRecords).omit({ id: true, createdAt: true, updatedAt: true });
 export type TrainingRecord = typeof trainingRecords.$inferSelect;
 export type InsertTrainingRecord = z.infer<typeof insertTrainingRecordSchema>;
+
+export const generatedSops = pgTable("generated_sops", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  sopKey: text("sop_key").notNull(),
+  sopTitle: text("sop_title").notNull(),
+  sopCategory: text("sop_category").notNull(),
+  content: text("content").notNull(),
+  version: integer("version").default(1),
+  lastGeneratedAt: timestamp("last_generated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueUserSop: unique().on(table.userId, table.sopKey),
+}));
+
+export const insertGeneratedSopSchema = createInsertSchema(generatedSops).omit({ id: true, lastGeneratedAt: true, createdAt: true });
+export type GeneratedSop = typeof generatedSops.$inferSelect;
+export type InsertGeneratedSop = z.infer<typeof insertGeneratedSopSchema>;

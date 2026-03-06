@@ -4655,6 +4655,127 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
     }
   });
 
+  // ===== SOP GENERATOR ROUTES =====
+
+  app.get("/api/sops", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sops = await storage.getGeneratedSops(userId);
+      res.json(sops);
+    } catch (err) {
+      console.error("Error fetching SOPs:", err);
+      res.status(500).json({ message: "Failed to fetch SOPs" });
+    }
+  });
+
+  app.post("/api/sops/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sopKey } = req.body;
+      if (!sopKey) {
+        return res.status(400).json({ message: "SOP key is required" });
+      }
+
+      const { SOP_TEMPLATES, renderSop } = await import("./sopTemplates");
+      const meta = SOP_TEMPLATES.find(t => t.key === sopKey);
+      if (!meta) {
+        return res.status(400).json({ message: "Invalid SOP key" });
+      }
+
+      const settings = await storage.getHandbookSettings(userId);
+      const user = await storage.getUser(userId);
+      const existing = await storage.getGeneratedSopByKey(userId, sopKey);
+      const version = existing ? (existing.version || 1) + 1 : 1;
+
+      const rendered = renderSop(sopKey, settings, user, version);
+      if (!rendered) {
+        return res.status(500).json({ message: "Failed to render SOP" });
+      }
+
+      const sop = await storage.createOrUpdateSop(userId, {
+        userId,
+        sopKey,
+        sopTitle: rendered.title,
+        sopCategory: rendered.category,
+        content: rendered.content,
+        version,
+      });
+
+      res.status(201).json(sop);
+    } catch (err) {
+      console.error("Error generating SOP:", err);
+      res.status(500).json({ message: "Failed to generate SOP" });
+    }
+  });
+
+  app.delete("/api/sops/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteSop(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "SOP not found" });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error deleting SOP:", err);
+      res.status(500).json({ message: "Failed to delete SOP" });
+    }
+  });
+
+  app.get("/api/sops/export/all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sops = await storage.getGeneratedSops(userId);
+      const settings = await storage.getHandbookSettings(userId);
+      res.json({
+        restaurantName: settings?.restaurantName || "Restaurant",
+        sops,
+        exportDate: new Date().toISOString().split("T")[0],
+      });
+    } catch (err) {
+      console.error("Error exporting all SOPs:", err);
+      res.status(500).json({ message: "Failed to export SOPs" });
+    }
+  });
+
+  app.get("/api/sops/export/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const sops = await storage.getGeneratedSops(userId);
+      const sop = sops.find(s => s.id === id);
+      if (!sop) {
+        return res.status(404).json({ message: "SOP not found" });
+      }
+      const settings = await storage.getHandbookSettings(userId);
+      res.json({
+        restaurantName: settings?.restaurantName || "Restaurant",
+        sop,
+      });
+    } catch (err) {
+      console.error("Error exporting SOP:", err);
+      res.status(500).json({ message: "Failed to export SOP" });
+    }
+  });
+
+  app.get("/api/sops/variables", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getHandbookSettings(userId);
+      const user = await storage.getUser(userId);
+      const { SOP_TEMPLATES, checkVariableStatus } = await import("./sopTemplates");
+      const result: Record<string, { set: string[]; missing: string[] }> = {};
+      for (const t of SOP_TEMPLATES) {
+        result[t.key] = checkVariableStatus(t.requiredVariables, settings, user);
+      }
+      res.json(result);
+    } catch (err) {
+      console.error("Error checking SOP variables:", err);
+      res.status(500).json({ message: "Failed to check variables" });
+    }
+  });
+
   // Financial Document Routes
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
