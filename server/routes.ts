@@ -2673,6 +2673,94 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/scheduling/labor-analysis", isAuthenticated, async (req: any, res) => {
+    try {
+      const { weeklyRevenue, idealLaborPercent, shifts: shiftData, staff: staffData } = req.body;
+      if (!weeklyRevenue || !idealLaborPercent || !shiftData) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const prompt = `Analyze this restaurant's weekly schedule:
+
+Weekly Revenue Target: $${weeklyRevenue}
+Ideal Labor %: ${idealLaborPercent}%
+
+Scheduled Shifts:
+${JSON.stringify(shiftData, null, 2)}
+
+Staff Members:
+${JSON.stringify(staffData, null, 2)}
+
+Return a JSON object with these exact fields:
+- laborCostTotal (number): total estimated labor cost for the week
+- laborPercentProjected (number): projected labor % based on revenue target
+- overUnderTarget (string): e.g. "+2.3% over target" or "-1.5% under target"
+- topRiskDay (string): e.g. "Saturday — 6 shifts, $420 est. cost"
+- coverageGaps (array of strings): any days or positions with coverage issues
+- recommendations (array of strings, max 3): prioritized actionable recommendations`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a restaurant labor cost advisor. Given a week's schedule data and targets, provide a structured labor analysis. Always respond with valid JSON only." },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 800,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("No content generated");
+      const analysis = JSON.parse(content);
+      res.json(analysis);
+    } catch (error) {
+      console.error("Error analyzing labor:", error);
+      res.status(500).json({ message: "Failed to analyze labor impact" });
+    }
+  });
+
+  app.post("/api/scheduling/build-schedule", isAuthenticated, async (req: any, res) => {
+    try {
+      const { prompt: userPrompt, staff: staffData, positions: positionData } = req.body;
+      if (!userPrompt) {
+        return res.status(400).json({ message: "Please describe your scheduling needs" });
+      }
+
+      const prompt = `The operator wants to build a schedule: "${userPrompt}"
+
+Available Staff:
+${JSON.stringify(staffData || [], null, 2)}
+
+Available Positions:
+${JSON.stringify(positionData || [], null, 2)}
+
+Generate a structured weekly schedule based on their request. Match staff to positions where possible. If no staff are available, use placeholder names.
+
+Return a JSON object with:
+- shifts (array of objects): each with { day: string (e.g. "Monday"), staffName: string, position: string, startTime: string (HH:MM 24hr), endTime: string (HH:MM 24hr), estimatedHours: number }
+- totalEstimatedHours (number)
+- notes (string): brief explanation of the schedule logic`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a restaurant scheduling assistant. Generate practical, cost-effective schedules based on the operator's request and available staff. Always respond with valid JSON only." },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1500,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("No content generated");
+      const schedule = JSON.parse(content);
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error building schedule:", error);
+      res.status(500).json({ message: "Failed to build schedule" });
+    }
+  });
+
   // Scheduling Stats (for dashboard)
   app.get("/api/scheduling/stats", isAuthenticated, async (req, res) => {
     try {
