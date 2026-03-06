@@ -190,10 +190,15 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-50" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <header className="sticky top-0 z-50" style={{ backgroundColor: '#0f1117', borderBottom: '1px solid #2a2d3e', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <BrandLogoNav linkTo="/" />
-          <Button onClick={() => { window.location.href = "/login"; }} data-testid="button-login-header">
+          <Button
+            onClick={() => { window.location.href = "/login"; }}
+            data-testid="button-login-header"
+            style={{ backgroundColor: '#b8860b', color: '#0f1117', fontWeight: 600, border: 'none' }}
+            className="hover:opacity-90"
+          >
             Sign In
           </Button>
         </div>
@@ -214,7 +219,13 @@ export default function Landing() {
             Used by independent restaurant owners to cut labor costs, protect margins, and stop firefighting every shift.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={() => { window.location.href = "/login"; }} data-testid="button-get-started">
+            <Button
+              size="lg"
+              onClick={() => { window.location.href = "/login"; }}
+              data-testid="button-get-started"
+              style={{ backgroundColor: '#b8860b', color: '#0f1117', fontWeight: 600, border: 'none', padding: '14px 28px', borderRadius: '6px' }}
+              className="hover:opacity-90"
+            >
               Get Started Free
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
@@ -232,15 +243,15 @@ export default function Landing() {
       </section>
 
       {/* Consultant Feature - Interactive */}
-      <section className="py-16 md:py-20 px-4 bg-card border-y border-border">
+      <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#0f1117' }}>
         <div className="container mx-auto max-w-4xl">
           <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-start">
             <div>
-              <MessageSquare className="h-10 w-10 text-primary mb-4" />
-              <h2 className="text-3xl font-bold mb-4">
+              <MessageSquare className="h-10 w-10 mb-4" style={{ color: '#b8860b' }} />
+              <h2 className="text-3xl font-bold mb-4 text-white">
                 Ask Anything. Get Real Answers.
               </h2>
-              <p className="text-muted-foreground mb-6">
+              <p className="mb-6" style={{ color: '#6b7280' }}>
                 An operations consultant built on decades of real restaurant experience. 
                 Ask anything — from handling a walkout to structuring your comp policy.
                 No fluff. Direct, actionable guidance.
@@ -250,15 +261,17 @@ export default function Landing() {
                   <button
                     key={i}
                     onClick={() => handleExampleClick(i)}
-                    className={`w-full flex items-start gap-2 p-3 rounded-md text-left transition-colors ${
-                      activeExample === i 
-                        ? "bg-primary/10 border border-primary/20" 
-                        : "hover-elevate"
-                    }`}
+                    className="w-full flex items-start gap-2 p-3 rounded-md text-left transition-all"
+                    style={{
+                      backgroundColor: '#1a1d2e',
+                      border: activeExample === i ? '1px solid #d4a017' : '1px solid #b8860b',
+                      borderRadius: '6px',
+                      color: activeExample === i ? '#d4a017' : 'white',
+                    }}
                     data-testid={`btn-example-${i}`}
                   >
-                    <MessageSquare className={`h-4 w-4 mt-0.5 shrink-0 ${activeExample === i ? "text-primary" : "text-muted-foreground"}`} />
-                    <span className={`text-sm ${activeExample === i ? "font-medium" : "text-muted-foreground"}`}>
+                    <MessageSquare className="h-4 w-4 mt-0.5 shrink-0" style={{ color: activeExample === i ? '#d4a017' : '#6b7280' }} />
+                    <span className={`text-sm ${activeExample === i ? "font-medium" : ""}`}>
                       "{ex.question}"
                     </span>
                   </button>
@@ -271,52 +284,55 @@ export default function Landing() {
                 </Button>
               </div>
             </div>
-            <Card className="p-4 bg-background md:sticky md:top-20 z-50">
+            <div
+              className="p-4 rounded-lg md:sticky md:top-20 z-50"
+              style={{ backgroundColor: '#1a1d2e', border: '1px solid #b8860b', borderRadius: '8px' }}
+            >
               <div className="space-y-4">
-                <div className="bg-muted p-3 rounded-md">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">You:</p>
-                  <p className="text-sm">{consultantExamples[activeExample].question}</p>
+                <div className="p-3 rounded-md" style={{ backgroundColor: '#12141f' }}>
+                  <p className="text-xs font-medium uppercase mb-1" style={{ color: '#6b7280' }}>You:</p>
+                  <p className="text-sm text-white" style={{ padding: '0' }}>{consultantExamples[activeExample].question}</p>
                 </div>
                 <div className="p-3 min-h-[120px]">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Consultant:</p>
+                  <p className="text-xs font-medium uppercase mb-1" style={{ color: '#6b7280' }}>Consultant:</p>
                   {isTyping ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-sm" style={{ color: '#6b7280' }}>
                       <TypingDots /> Thinking...
                     </div>
                   ) : showAnswer ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-white">
                       <TypewriterText text={consultantExamples[activeExample].answer} />
                     </p>
                   ) : null}
                 </div>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Philosophy */}
-      <section className="py-12 md:py-16 px-4">
+      <section className="py-12 md:py-16 px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
         <div className="container mx-auto max-w-4xl">
           <div className="grid md:grid-cols-3 gap-6 md:gap-8 text-center">
             <div className="p-4">
-              <Shield className="h-8 w-8 text-primary mx-auto mb-3" />
-              <h3 className="font-semibold text-lg mb-2">Structure Over Motivation</h3>
-              <p className="text-muted-foreground text-sm">
+              <Shield className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
+              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Structure Over Motivation</h3>
+              <p className="text-sm" style={{ color: '#6b7280' }}>
                 I don't sell inspiration. I sell systems that work when you're not there.
               </p>
             </div>
             <div className="p-4">
-              <TrendingUp className="h-8 w-8 text-primary mx-auto mb-3" />
-              <h3 className="font-semibold text-lg mb-2">Systems Over Heroics</h3>
-              <p className="text-muted-foreground text-sm">
+              <TrendingUp className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
+              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Systems Over Heroics</h3>
+              <p className="text-sm" style={{ color: '#6b7280' }}>
                 If one person has to save every shift, you don't have a business — you have a dependency.
               </p>
             </div>
             <div className="p-4">
-              <Flame className="h-8 w-8 text-primary mx-auto mb-3" />
-              <h3 className="font-semibold text-lg mb-2">Clarity Over Chaos</h3>
-              <p className="text-muted-foreground text-sm">
+              <Flame className="h-8 w-8 mx-auto mb-3" style={{ color: '#b8860b' }} />
+              <h3 className="font-semibold text-white mb-2" style={{ fontSize: '20px', fontWeight: 600 }}>Clarity Over Chaos</h3>
+              <p className="text-sm" style={{ color: '#6b7280' }}>
                 Every recommendation is tested against a slammed dinner rush. If it doesn't hold up, it doesn't belong.
               </p>
             </div>
@@ -325,12 +341,12 @@ export default function Landing() {
       </section>
 
       {/* See It In Action - Product Screenshots */}
-      <section className="py-16 md:py-20 px-4 bg-card border-y border-border">
+      <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#0f1117' }}>
         <div className="container mx-auto max-w-5xl">
-          <h2 className="text-3xl font-bold text-center mb-3" data-testid="text-screenshots-heading">
+          <h2 className="text-3xl font-bold text-center mb-3 text-white" data-testid="text-screenshots-heading">
             See It In Action
           </h2>
-          <p className="text-muted-foreground text-center mb-10 max-w-2xl mx-auto">
+          <p className="text-center mb-10 max-w-2xl mx-auto" style={{ color: '#6b7280' }}>
             Real tools, real dashboards. Not mockups — this is what you get on day one.
           </p>
           <div className="grid md:grid-cols-2 gap-6">
@@ -340,8 +356,20 @@ export default function Landing() {
               { img: screenshotFoodcost, caption: "Build plates, track costs, protect margins — all in one place.", label: "Food Cost Tools" },
               { img: screenshotHr, caption: "Generate proper documentation in seconds. Protect yourself legally.", label: "HR & Compliance" },
             ].map((item, i) => (
-              <div key={i} className="group" data-testid={`screenshot-${i}`}>
-                <div className="rounded-md overflow-hidden border border-border bg-background">
+              <div
+                key={i}
+                className="group transition-all"
+                style={{
+                  backgroundColor: '#1a1d2e',
+                  border: '1px solid #2a2d3e',
+                  borderRadius: '8px',
+                  padding: '16px',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#b8860b'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#2a2d3e'; }}
+                data-testid={`screenshot-${i}`}
+              >
+                <div className="overflow-hidden" style={{ borderRadius: '6px' }}>
                   <img 
                     src={item.img} 
                     alt={item.label} 
@@ -349,9 +377,9 @@ export default function Landing() {
                     loading="lazy"
                   />
                 </div>
-                <div className="mt-3 px-1">
-                  <p className="text-sm font-medium">{item.label}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{item.caption}</p>
+                <div className="mt-3">
+                  <p className="font-semibold text-white" style={{ fontSize: '16px' }}>{item.label}</p>
+                  <p className="mt-1" style={{ color: '#6b7280', fontSize: '14px' }}>{item.caption}</p>
                 </div>
               </div>
             ))}
@@ -393,7 +421,7 @@ export default function Landing() {
       </section>
 
       {/* 12 Domains - Expandable */}
-      <section className="py-16 md:py-20 px-4 bg-card border-y border-border">
+      <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
         <div className="container mx-auto max-w-5xl">
           <h2 className="text-3xl font-bold text-center mb-3">
             12 Operational Domains
@@ -470,7 +498,13 @@ export default function Landing() {
               <p className="text-sm text-muted-foreground">
                 No credit card required. No contracts. Cancel anytime.
               </p>
-              <Button size="lg" onClick={() => { window.location.href = "/login"; }} className="mt-4" data-testid="button-pricing-cta">
+              <Button
+                size="lg"
+                onClick={() => { window.location.href = "/login"; }}
+                className="mt-4 hover:opacity-90"
+                style={{ backgroundColor: '#b8860b', color: '#0f1117', fontWeight: 600, border: 'none' }}
+                data-testid="button-pricing-cta"
+              >
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -480,7 +514,7 @@ export default function Landing() {
       </section>
 
       {/* Who It's For */}
-      <section className="py-16 md:py-20 px-4 bg-card border-y border-border">
+      <section className="py-16 md:py-20 px-4" style={{ backgroundColor: '#1a1d2e', borderTop: '1px solid #2a2d3e', borderBottom: '1px solid #2a2d3e' }}>
         <div className="container mx-auto max-w-4xl">
           <h2 className="text-3xl font-bold text-center mb-3">Built for Operators, Not Theorists</h2>
           <p className="text-muted-foreground text-center mb-8 max-w-2xl mx-auto">
@@ -566,7 +600,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-10 px-4 border-t border-border">
+      <footer className="py-10 px-4" style={{ borderTop: '1px solid #2a2d3e' }}>
         <div className="container mx-auto flex flex-col items-center gap-4 text-sm text-muted-foreground">
           <BrandLogoNav linkTo="/" />
           <p className="italic text-xs text-muted-foreground">Systems that work on your worst night.</p>
