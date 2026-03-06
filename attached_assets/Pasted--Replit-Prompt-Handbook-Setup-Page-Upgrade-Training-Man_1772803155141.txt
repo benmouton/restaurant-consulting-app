@@ -1,0 +1,312 @@
+# Replit Prompt — Handbook Setup Page Upgrade + Training Manual Field Completion
+
+Paste this directly into Replit chat:
+
+---
+
+I need to upgrade the **Handbook Setup tab** in two ways:
+1. Add missing fields that the training manuals reference but Setup doesn't currently collect
+2. Visual upgrade to match the platform's established dark/gold design system
+
+The core flow is: **operators complete Setup → click Generate on each training manual tab → the manual fills in with their restaurant's specific information → they print a completed document.**
+
+Setup must collect EVERYTHING the templates need. Right now it's missing critical fields.
+
+**DO NOT CHANGE:**
+- Any existing field data already saved (restaurant name, owner, address, phone, email, scheduling app, holidays, dress codes, meal policy, parking policy)
+- The Setup / Policies / Preview sub-tab structure
+- Save Settings button logic
+- Print button logic
+- Page routing or file structure
+- Any other pages
+
+---
+
+## PART 1 — MISSING FIELDS TO ADD
+
+### Section: Restaurant Information (existing — add to it)
+Add these fields after Website:
+
+**Concept & Cuisine Type** (text input)
+- Label: "Concept & Cuisine Type"
+- Placeholder: "e.g., Southern Cajun Bistro, Fast-Casual Mexican, Fine Dining Italian"
+- Used in: training manual intros, handbook welcome letter tone
+- Helper text (muted, `12px`): "Describes your concept in 2–5 words. Used throughout your training documents."
+
+**Year Established** (text input, short — 1/4 width)
+- Label: "Year Established"
+- Placeholder: "e.g., 2019"
+
+**Social Media Handles** (text input)
+- Label: "Social Media (optional)"
+- Placeholder: "@moutonsbistrobar"
+- Helper text: "Used in the Social Media Policy section of your handbook."
+
+---
+
+### NEW SECTION: "Your Team" (add between Restaurant Information and Operations)
+
+This section collects the key management names that appear in the training manuals (Server Day 1 says "Meet the Team: Introductions to GM, Kitchen Manager, Executive Chef, Floor Manager").
+
+Section header: 👥 **Your Team** with subtitle "Key names used in your training manuals and handbook."
+
+Fields (2-column grid where appropriate):
+
+**General Manager / Owner** (text input)
+- Label: "General Manager / Owner"
+- Placeholder: "e.g., Ben Mouton"
+- Pre-fill from Owner Name field if blank
+
+**Kitchen Manager** (text input)
+- Label: "Kitchen Manager"
+- Placeholder: "e.g., Chef Marcus"
+
+**Executive Chef** (text input)
+- Label: "Executive Chef"
+- Placeholder: "e.g., Chef Daniel"
+
+**Floor Manager / Shift Lead** (text input)
+- Label: "Floor Manager / Shift Lead"
+- Placeholder: "e.g., Sarah"
+
+**Support Email / HR Contact** (text input)
+- Label: "HR / Support Contact Email"
+- Placeholder: "e.g., hr@moutonsbistro.com"
+- Pre-fill from main Email field if blank
+
+**Total Staff Count** (number input, short)
+- Label: "Total Staff (approx.)"
+- Placeholder: "e.g., 24"
+
+**Staff Per Dinner Shift** (number input, short)
+- Label: "Staff Per Dinner Shift"
+- Placeholder: "e.g., 5"
+- Helper text: "Used in kitchen training materials."
+
+---
+
+### NEW SECTION: "Operations Detail" (add to existing Operations section)
+
+These fields currently live in Operations but are MISSING:
+
+**POS System** (dropdown + "Other" text input)
+- Label: "POS System"
+- Options: Toast / Square / Clover / Lightspeed / TouchBistro / Aloha / Other
+- "Other" selection reveals a text input: "Specify POS system..."
+- Used in: Server Training Day 4 & 5 (POS basics, Happy Hour buttons, check splitting)
+- Helper text: "Referenced in server training for POS-specific procedures."
+
+**Service Periods** (multi-select chip input)
+- Label: "Service Periods"
+- Options (chips, multi-select): Breakfast / Brunch / Lunch / Happy Hour / Dinner / Late Night / Catering / Events
+- Pre-selected based on restaurant type
+- Used in: training schedule context, priority engine on dashboard
+
+**Operating Hours** (text input)
+- Label: "Operating Hours"
+- Placeholder: "e.g., Tue–Thu 11am–10pm, Fri–Sat 11am–11pm, Sun 10am–9pm, Closed Mon"
+
+**Seating Capacity** (number input, short)
+- Label: "Seating Capacity"
+- Placeholder: "e.g., 85"
+
+**Tipping Structure** (dropdown)
+- Label: "Tipping Structure"
+- Options: Individual Tips / Tip Pool (all staff) / Tip Pool (FOH only) / Service Charge Included / No Tips
+- Used in: handbook policies, new hire expectations
+
+**Break Policy** (text input)
+- Label: "Break Policy"
+- Placeholder: "e.g., 30-min unpaid break for shifts over 6 hours"
+- Used in: handbook employee benefits section
+
+---
+
+### NEW SECTION: "Menu & Kitchen" (add after Operations)
+
+These fields are needed for training manual menu knowledge days.
+
+Section header: 🍳 **Menu & Kitchen** with subtitle "Used to personalize kitchen and server training content."
+
+**Signature Dishes — Front of House** (textarea)
+- Label: "Signature / Featured Dishes (FOH)"
+- Placeholder: "e.g., Shrimp & Grits (Cajun sauce), Chicken Fried Steak (white gravy), Gumbo Fridays special"
+- Helper text: "Server training Day 2 references your actual menu items."
+- Pre-fill suggestion (muted below field): "These already appear in your Server Manual — confirm they're correct."
+
+**Signature Dishes — Back of House** (textarea)
+- Label: "Signature / Featured Dishes (BOH)"
+- Placeholder: "e.g., Grillades & Grits, Maque Choux, Jambalaya Pasta"
+- Helper text: "Kitchen training Day 2 (Prep) and Day 3 (Stations) reference these."
+
+**Kitchen Stations** (tag/chip input — same as Closed Holidays)
+- Label: "Kitchen Stations"
+- Default chips pre-filled: Grill · Sauté · Fry · Salad · Expo · Dish
+- Operator can add/remove chips
+- Helper text: "Kitchen training materials reference your specific stations."
+
+**Allergen / Dietary Options** (multi-select chips)
+- Label: "Dietary Options Available"
+- Options: Gluten-Free / Vegetarian / Vegan / Dairy-Free / Nut-Free / Halal / Kosher
+- Used in: server training (Day 2 allergen awareness), kitchen training (Day 4 dietary modifications)
+
+**Cultural / Brand Voice** (text input)
+- Label: "Brand Voice / Cultural Identity"
+- Placeholder: "e.g., Southern hospitality, Fast and Flavorful, Louisiana roots"
+- Helper text: "Used in training manual welcome language and service standards tone."
+- Pre-fill: "Fast and Flavorful" (already present in the training content)
+
+---
+
+### NEW SECTION: "Signature Events & Specials" (add after Menu & Kitchen)
+
+Section header: ⭐ **Events & Specials** with subtitle "Used in training materials for event prep days."
+
+**Weekly Specials / Recurring Events** (textarea)
+- Label: "Weekly Specials / Recurring Events"
+- Placeholder: "e.g., Gumbo Fridays, Crawfish Boil Thursdays, Happy Hour Tue–Fri 3–6pm"
+- Helper text: "Server Day 2 and Kitchen Day 5 reference your specific events."
+
+**Happy Hour Details** (text input)
+- Label: "Happy Hour (if applicable)"
+- Placeholder: "e.g., Tue–Fri 3–6pm, $2 off drinks, half-price appetizers"
+- Used in: Server Day 5 (Happy Hour POS codes), Kitchen Day 5 (batch appetizers)
+
+---
+
+## PART 2 — SETUP PAGE VISUAL UPGRADE
+
+Match the established platform dark/gold design system exactly.
+
+### Page-Level Completeness Progress Bar
+At the top of the Setup sub-tab (below the sub-tab bar), add a horizontal progress bar showing Setup completion:
+
+- Label: "Setup Completion" in muted gray `12px` — right-aligned percentage (e.g., "72% complete")
+- Gold fill progress bar (full width, `6px` height, `border-radius: 3px`, dark track `#1a1d2e`)
+- Below bar: muted text `12px` "Complete your setup to unlock personalized training documents."
+- When 100%: bar turns solid gold + label changes to "✓ Setup Complete — Ready to Generate" in gold
+- Calculation: count of filled required fields / total required fields × 100
+
+### Section Headers
+Current: plain icon + label text.
+
+Upgrade all section headers (Restaurant Information, Your Team, Operations, Menu & Kitchen, Events & Specials, Uniform Policy, Employee Benefits):
+- Gold icon (matching the section's concept — building for Restaurant Info, people for Team, clock for Operations, chef hat for Menu, star for Events, shirt for Uniform, person for Benefits)
+- Section name: white bold `16px`
+- Subtitle: muted gray `13px`
+- Gold rule below header: `1px solid rgba(184,134,11,0.2)`, full width, `8px` margin-top — matches section divider treatment across the platform
+
+### Input Fields
+All text inputs and textareas:
+- Background: `#0f1117`
+- Border: `1px solid rgba(255,255,255,0.1)`
+- Border-radius: `8px`
+- Gold focus ring: `outline: 1.5px solid #b8860b`, `box-shadow: 0 0 0 3px rgba(184,134,11,0.1)`
+- White text, muted placeholder `#64748b`
+- Label: muted gray `12px` uppercase tracking-widest above each field (small caps label style)
+- Helper text: muted gray italic `12px` below field
+
+### Field Completeness Indicators
+Each required field gets a subtle status indicator:
+- Empty required field: muted left border `2px` (no color — neutral)
+- Filled field: `2px solid rgba(184,134,11,0.4)` left border (subtle gold — "done")
+- No red error states — this is a builder, not a form validator
+
+### Closed Holidays Chips
+Current: plain chips with × buttons.
+
+Upgrade:
+- Chip style: `#1a1d2e` background, `1px solid rgba(184,134,11,0.4)` border, white text `13px`, `border-radius: 20px`
+- × button: muted gold, turns red on hover
+- "Add a holiday" input: gold focus ring, "Add" button as gold outlined ghost button
+- Chips animate in (scale 0.8→1, 150ms ease) when added
+
+### Kitchen Stations Chips (new field)
+Same chip style as Closed Holidays. Pre-fill with: Grill · Sauté · Fry · Salad · Expo · Dish
+
+### Service Periods Multi-Select (new field)
+Chips that toggle on/off:
+- Unselected: `#1a1d2e` background, muted border, muted text
+- Selected: `rgba(184,134,11,0.12)` background, `1px solid #b8860b` border, white text, gold checkmark to the left
+- Toggle animation: 150ms ease
+
+### Dropdown Menus
+Current: browser-default dropdowns.
+
+Upgrade all dropdowns (Scheduling App, POS System, Tipping Structure):
+- Background: `#0f1117`, border `rgba(255,255,255,0.1)`, border-radius `8px`
+- Gold chevron `▾` right-aligned
+- Gold focus ring on open
+- Option list: dark `#1a1d2e` background, white text, gold checkmark on selected item, hover = `rgba(184,134,11,0.08)` background
+
+### Save Settings Button
+Current: gold button (correct). 
+
+Upgrade:
+- Full gold gradient `#b8860b` → `#d4a017`
+- Shimmer on hover (diagonal light sweep — matches all other gold buttons across platform)
+- Save icon (floppy disk or checkmark) + "Save Settings" label
+- Loading state: spinner replaces icon, "Saving..." label, briefly disabled
+
+### Print Button
+Current: plain outlined button.
+
+Upgrade:
+- Dark background `#1a1d2e`, white border `1px solid rgba(255,255,255,0.2)`, white text, printer icon
+- Hover: gold border `rgba(184,134,11,0.5)`, gold text
+
+### Section Spacing
+- `32px` gap between sections (currently feels cramped)
+- `20px` gap between field rows within a section
+- `12px` gap between label and input
+
+---
+
+## PART 3 — GENERATE BUTTON ON TRAINING MANUAL TABS
+
+Each training manual tab (Server, Kitchen, and future tabs) needs a **Generate** button that uses the Setup data to personalize the template content.
+
+Add to the top of the Server and Kitchen manual left panels (above the TOC, below the role header):
+
+**"✨ Regenerate with My Restaurant Info"** gold ghost button (outlined, shimmer on hover)
+
+On click:
+1. Check if Setup has minimum required fields (Restaurant Name + at least one of: POS System, Management Names, Signature Dishes)
+2. If missing: show a gold-bordered callout: "Complete your Setup first to personalize this manual. Missing: [list of empty required fields as gold chips]" with "Go to Setup" button
+3. If sufficient: call Claude API with system prompt:
+   ```
+   You are a restaurant training expert. Personalize this training manual section for [Restaurant Name], a [Concept] restaurant. 
+   Owner: [Owner Name]. Kitchen Manager: [Kitchen Manager]. Executive Chef: [Executive Chef]. 
+   POS System: [POS]. Signature dishes: [Signature Dishes]. 
+   Stations: [Kitchen Stations]. Brand voice: [Brand Voice].
+   Keep the same 7-day structure and section format. Replace generic references with this restaurant's specific information.
+   Current section content: [section content]
+   ```
+4. Stream the personalized result into the right panel content viewer
+5. "Save Personalized Version" gold button appears below the output — saves to localStorage and marks this section as personalized (small gold "✓ Personalized" chip appears on the TOC item)
+
+**Setup Completeness Gate:**
+If Setup has fewer than 5 required fields filled when operator visits Server or Kitchen tab:
+- Show a non-blocking gold callout banner at the top of the tab:
+  > "✨ **Personalize this manual** — complete your Setup to generate training content specific to Mouton's Bistro & Bar."
+  > "Complete Setup →" gold button
+
+---
+
+## IMPLEMENTATION ORDER
+
+1. Add all new fields to Setup (Your Team section, POS System, Service Periods, Operating Hours, Seating Capacity, Tipping Structure, Break Policy, Concept & Cuisine, Year, Social Media)
+2. Add Menu & Kitchen section (Signature Dishes FOH/BOH, Kitchen Stations chips, Allergens, Brand Voice)
+3. Add Events & Specials section (Weekly Specials, Happy Hour)
+4. Setup completeness progress bar
+5. Section header visual upgrades (gold icons, rules)
+6. Input field upgrades (focus rings, completeness borders)
+7. Holiday + Station chips upgrade
+8. Service Periods multi-select chips
+9. Dropdown upgrades (Scheduling App, POS, Tipping)
+10. Save Settings button shimmer + loading state
+11. Print button upgrade
+12. Generate button on Server and Kitchen tabs + Claude API personalization
+13. Setup completeness gate banner on training tabs
+
+Make changes to the Handbook Setup sub-tab and the Server/Kitchen tab panel headers only. Preserve all existing saved field data and Save Settings logic exactly.

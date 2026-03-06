@@ -330,3 +330,13 @@
 @keyframes financialScoreArc {
   from { stroke-dashoffset: 283; }
 }
+
+@keyframes chipScaleIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes handbookSaveShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

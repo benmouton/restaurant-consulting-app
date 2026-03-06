@@ -60,7 +60,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { HandbookBuilder } from "@/components/handbook/HandbookBuilder";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { TrainingTemplate } from "@shared/schema";
+import type { TrainingTemplate, HandbookSettings } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 
 function personalizeContent(content: string, restaurantName: string | null | undefined): string {
@@ -735,6 +735,67 @@ function ComingSoonTab({ role }: { role: string }) {
   );
 }
 
+const SETUP_REQUIRED_FIELDS: (keyof HandbookSettings)[] = [
+  "restaurantName", "ownerNames", "restaurantAddress", "restaurantPhone", "restaurantEmail",
+  "missionStatement", "conceptCuisine", "generalManager", "posSystem", "operatingHours",
+  "uniformDiningRoom", "uniformKitchen", "employeeMealPolicy", "signatureDishesFoh",
+  "brandVoice",
+];
+
+function getSetupFilledCount(settings: HandbookSettings | null | undefined): number {
+  if (!settings) return 0;
+  return SETUP_REQUIRED_FIELDS.filter(k => {
+    const v = settings[k];
+    return v && String(v).trim().length > 0;
+  }).length;
+}
+
+function buildPersonalizationPrompt(settings: HandbookSettings, template: TrainingTemplate): string {
+  const parts: string[] = [];
+  if (settings.restaurantName) parts.push(`Restaurant Name: ${settings.restaurantName}`);
+  if (settings.conceptCuisine) parts.push(`Concept/Cuisine: ${settings.conceptCuisine}`);
+  if (settings.missionStatement) parts.push(`Mission: ${settings.missionStatement}`);
+  if (settings.brandVoice) parts.push(`Brand Voice: ${settings.brandVoice}`);
+  if (settings.operatingHours) parts.push(`Operating Hours: ${settings.operatingHours}`);
+  if (settings.posSystem) parts.push(`POS System: ${settings.posSystem}`);
+  if (settings.schedulingApp) parts.push(`Scheduling App: ${settings.schedulingApp}`);
+  if (settings.uniformDiningRoom) parts.push(`Dining Room Uniform: ${settings.uniformDiningRoom}`);
+  if (settings.uniformKitchen) parts.push(`Kitchen Uniform: ${settings.uniformKitchen}`);
+  if (settings.employeeMealPolicy) parts.push(`Meal Policy: ${settings.employeeMealPolicy}`);
+  if (settings.tippingStructure) parts.push(`Tipping: ${settings.tippingStructure}`);
+  if (settings.signatureDishesFoh) parts.push(`Signature Dishes (FOH): ${settings.signatureDishesFoh}`);
+  if (settings.signatureDishesBoh) parts.push(`Signature Dishes (BOH): ${settings.signatureDishesBoh}`);
+  if (settings.breakPolicy) parts.push(`Break Policy: ${settings.breakPolicy}`);
+  if (settings.alcoholPolicy) parts.push(`Alcohol Policy: ${settings.alcoholPolicy}`);
+  if (settings.kitchenStations?.length) parts.push(`Kitchen Stations: ${settings.kitchenStations.join(", ")}`);
+  if (settings.servicePeriods?.length) parts.push(`Service Periods: ${settings.servicePeriods.join(", ")}`);
+  if (settings.allergenOptions?.length) parts.push(`Allergen Options: ${settings.allergenOptions.join(", ")}`);
+
+  const restaurantInfo = parts.join("\n");
+
+  return `You are a restaurant training consultant. Rewrite the following training content so it is fully personalized for this specific restaurant. Replace all generic references with the restaurant's actual details. Keep the same structure and training objectives but make every example, policy reference, and procedure specific to this restaurant.
+
+RESTAURANT INFO:
+${restaurantInfo}
+
+ORIGINAL TRAINING CONTENT (Title: "${template.title}", Section: "${template.section}"):
+${template.content}
+
+Rewrite this content personalized for ${settings.restaurantName || "this restaurant"}. Output in markdown format.`;
+}
+
+function getPersonalizedStorageKey(templateId: number): string {
+  return `personalized-template-${templateId}`;
+}
+
+function hasPersonalizedVersion(templateId: number): boolean {
+  return !!localStorage.getItem(getPersonalizedStorageKey(templateId));
+}
+
+function getPersonalizedVersion(templateId: number): string | null {
+  return localStorage.getItem(getPersonalizedStorageKey(templateId));
+}
+
 function CustomizePanel({ template, restaurantName, onClose }: { template: TrainingTemplate; restaurantName?: string | null; onClose: () => void }) {
   const { toast } = useToast();
   const [customPrompt, setCustomPrompt] = useState("");
@@ -909,10 +970,45 @@ export default function TemplatesPage() {
   const [showEditNotes, setShowEditNotes] = useState(false);
   const [editNotesContent, setEditNotesContent] = useState("");
   const [showCustomize, setShowCustomize] = useState(false);
+  const [isPersonalizing, setIsPersonalizing] = useState(false);
+  const [personalizedContent, setPersonalizedContent] = useState("");
+  const [showSetupCallout, setShowSetupCallout] = useState(false);
+  const [showPersonalizedView, setShowPersonalizedView] = useState(false);
+  const [personalizedMarkers, setPersonalizedMarkers] = useState<Record<number, boolean>>({});
 
   const { data: templates, isLoading } = useQuery<TrainingTemplate[]>({
     queryKey: ["/api/templates"],
   });
+
+  const { data: handbookSettings } = useQuery<HandbookSettings | null>({
+    queryKey: ["/api/handbook-settings"],
+  });
+
+  const setupFilledCount = getSetupFilledCount(handbookSettings);
+  const hasEnoughSetup = setupFilledCount >= 5;
+
+  useEffect(() => {
+    const markers: Record<number, boolean> = {};
+    templates?.forEach(t => {
+      if (hasPersonalizedVersion(t.id)) {
+        markers[t.id] = true;
+      }
+    });
+    setPersonalizedMarkers(markers);
+  }, [templates]);
+
+  useEffect(() => {
+    if (selectedTemplate) {
+      const saved = getPersonalizedVersion(selectedTemplate.id);
+      if (saved) {
+        setPersonalizedContent(saved);
+        setShowPersonalizedView(true);
+      } else {
+        setPersonalizedContent("");
+        setShowPersonalizedView(false);
+      }
+    }
+  }, [selectedTemplate]);
 
   const serverTemplates = templates?.filter(t => t.category === "server") || [];
   const kitchenTemplates = templates?.filter(t => t.category === "kitchen") || [];
@@ -947,6 +1043,83 @@ export default function TemplatesPage() {
     acc[template.section].push(template);
     return acc;
   }, {});
+
+  const handleRegenerate = async () => {
+    if (!selectedTemplate || isPersonalizing) return;
+
+    if (!hasEnoughSetup) {
+      setShowSetupCallout(true);
+      return;
+    }
+
+    setShowSetupCallout(false);
+    setIsPersonalizing(true);
+    setPersonalizedContent("");
+    setShowPersonalizedView(true);
+
+    try {
+      const prompt = buildPersonalizationPrompt(handbookSettings!, selectedTemplate);
+      const response = await fetch("/api/consultant/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ question: prompt }),
+      });
+
+      if (!response.ok) throw new Error("Failed to generate");
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader");
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                fullContent += data.content;
+                setPersonalizedContent(fullContent);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch {
+      toast({ title: "Failed to personalize content", variant: "destructive" });
+      setShowPersonalizedView(false);
+    } finally {
+      setIsPersonalizing(false);
+    }
+  };
+
+  const handleSavePersonalized = () => {
+    if (!selectedTemplate || !personalizedContent) return;
+    localStorage.setItem(getPersonalizedStorageKey(selectedTemplate.id), personalizedContent);
+    setPersonalizedMarkers(prev => ({ ...prev, [selectedTemplate.id]: true }));
+    toast({ title: "Personalized version saved" });
+  };
+
+  const handleClearPersonalized = () => {
+    if (!selectedTemplate) return;
+    localStorage.removeItem(getPersonalizedStorageKey(selectedTemplate.id));
+    setPersonalizedMarkers(prev => {
+      const next = { ...prev };
+      delete next[selectedTemplate.id];
+      return next;
+    });
+    setPersonalizedContent("");
+    setShowPersonalizedView(false);
+    toast({ title: "Personalized version removed" });
+  };
 
   const handleSaveNotes = () => {
     if (!selectedTemplate) return;
@@ -1089,6 +1262,35 @@ export default function TemplatesPage() {
         ) : (
           <div>
             <TrainingProgressPanel activeCategory={activeCategory} />
+
+            {!hasEnoughSetup && (
+              <div
+                className="rounded-lg p-4 mb-6 flex flex-wrap items-center justify-between gap-3"
+                style={{ backgroundColor: 'rgba(212,160,23,0.08)', border: '1px solid rgba(212,160,23,0.25)' }}
+                data-testid="setup-completeness-gate"
+              >
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5 shrink-0" style={{ color: '#d4a017' }} />
+                  <div>
+                    <p className="text-sm font-medium text-white">Complete Your Restaurant Setup</p>
+                    <p className="text-xs" style={{ color: '#9ca3af' }}>
+                      Fill in at least 5 required fields in the Handbook Setup tab to unlock personalized training content.
+                      Currently {setupFilledCount} of {SETUP_REQUIRED_FIELDS.length} fields completed.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveCategory("handbook")}
+                  style={{ borderColor: '#d4a017', color: '#d4a017' }}
+                  data-testid="button-go-to-setup-banner"
+                >
+                  Go to Setup
+                </Button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
                 <div className="rounded-lg" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
@@ -1102,6 +1304,53 @@ export default function TemplatesPage() {
                     <p className="text-sm mt-1" style={{ color: '#9ca3af' }}>
                       7-day training program with structured daily objectives
                     </p>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRegenerate}
+                      disabled={isPersonalizing || !selectedTemplate}
+                      className="mt-3 w-full"
+                      style={{ borderColor: '#d4a017', color: '#d4a017', border: '1px solid rgba(212,160,23,0.4)' }}
+                      data-testid="button-regenerate-personalized"
+                    >
+                      {isPersonalizing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Personalizing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Regenerate with My Restaurant Info
+                        </>
+                      )}
+                    </Button>
+
+                    {showSetupCallout && (
+                      <div
+                        className="mt-3 rounded-lg p-3"
+                        style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
+                        data-testid="setup-callout"
+                      >
+                        <p className="text-xs mb-2" style={{ color: '#f87171' }}>
+                          You need at least 5 required fields filled in the Handbook Setup to personalize content.
+                          Currently {setupFilledCount} of {SETUP_REQUIRED_FIELDS.length} completed.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowSetupCallout(false);
+                            setActiveCategory("handbook");
+                          }}
+                          style={{ borderColor: '#d4a017', color: '#d4a017' }}
+                          data-testid="button-go-to-setup-callout"
+                        >
+                          Go to Setup
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <ScrollArea className="h-[60vh]">
                     {isLoading ? (
@@ -1121,6 +1370,7 @@ export default function TemplatesPage() {
                               const Icon = contentTypeIcons[template.contentType] || FileText;
                               const isSelected = selectedTemplate?.id === template.id;
                               const typeColor = contentTypeColors[template.contentType] || contentTypeColors.overview;
+                              const isPersonalized = personalizedMarkers[template.id];
                               return (
                                 <button
                                   key={template.id}
@@ -1135,8 +1385,13 @@ export default function TemplatesPage() {
                                   <div className="flex items-start gap-2">
                                     <span style={{ color: isSelected ? '#d4a017' : '#9ca3af' }}><Icon className="h-4 w-4 mt-0.5" /></span>
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-sm truncate" style={{ color: isSelected ? '#ffffff' : '#c0c0c0' }}>
-                                        {template.title}
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-medium text-sm truncate" style={{ color: isSelected ? '#ffffff' : '#c0c0c0' }}>
+                                          {template.title}
+                                        </span>
+                                        {isPersonalized && (
+                                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: '#d4a017' }} data-testid={`personalized-check-${template.id}`} />
+                                        )}
                                       </div>
                                       <span
                                         className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded"
@@ -1210,13 +1465,108 @@ export default function TemplatesPage() {
                         </div>
                       )}
 
-                      <div
-                        className="whitespace-pre-wrap text-sm p-4 rounded-lg"
-                        style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e', color: '#c0c0c0', fontFamily: 'monospace' }}
-                        data-testid="template-content"
-                      >
-                        {personalizeContent(selectedTemplate.content, user?.restaurantName)}
-                      </div>
+                      {showPersonalizedView && personalizedContent ? (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" style={{ backgroundColor: 'rgba(212,160,23,0.15)', color: '#d4a017' }}>
+                              <Sparkles className="h-3 w-3 mr-1" />
+                              Personalized
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowPersonalizedView(false)}
+                              style={{ color: '#9ca3af' }}
+                              data-testid="button-show-original"
+                            >
+                              View Original
+                            </Button>
+                          </div>
+                          <div
+                            className="text-sm p-4 rounded-lg"
+                            style={{
+                              backgroundColor: '#0f1117',
+                              border: '1px solid #2a2d3e',
+                              borderLeftWidth: '3px',
+                              borderLeftColor: '#d4a017',
+                              animation: isPersonalizing ? 'goldStreamBorder 2s ease-in-out infinite' : 'none',
+                            }}
+                            data-testid="personalized-content"
+                          >
+                            <div className="prose prose-sm prose-invert max-w-none">
+                              <ReactMarkdown>{personalizedContent}</ReactMarkdown>
+                            </div>
+                          </div>
+                          {!isPersonalizing && personalizedContent && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              <Button
+                                size="sm"
+                                onClick={handleSavePersonalized}
+                                style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+                                data-testid="button-save-personalized"
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Save Personalized Version
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(personalizedContent);
+                                  toast({ title: "Copied to clipboard" });
+                                }}
+                                style={{ borderColor: '#2a2d3e', color: '#9ca3af' }}
+                                data-testid="button-copy-personalized"
+                              >
+                                <Copy className="h-3 w-3 mr-1" />
+                                Copy
+                              </Button>
+                              {personalizedMarkers[selectedTemplate.id] && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleClearPersonalized}
+                                  style={{ color: '#9ca3af' }}
+                                  data-testid="button-clear-personalized"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Remove Saved
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          {personalizedMarkers[selectedTemplate.id] && (
+                            <div className="flex items-center gap-2 mb-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const saved = getPersonalizedVersion(selectedTemplate.id);
+                                  if (saved) {
+                                    setPersonalizedContent(saved);
+                                    setShowPersonalizedView(true);
+                                  }
+                                }}
+                                style={{ color: '#d4a017' }}
+                                data-testid="button-show-personalized"
+                              >
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                View Personalized Version
+                              </Button>
+                            </div>
+                          )}
+                          <div
+                            className="whitespace-pre-wrap text-sm p-4 rounded-lg"
+                            style={{ backgroundColor: '#0f1117', border: '1px solid #2a2d3e', color: '#c0c0c0', fontFamily: 'monospace' }}
+                            data-testid="template-content"
+                          >
+                            {personalizeContent(selectedTemplate.content, user?.restaurantName)}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap items-center gap-2 mt-4" style={{ borderTop: '1px solid #2a2d3e', paddingTop: '1rem' }}>
                         <Button

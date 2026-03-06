@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -37,10 +36,17 @@ import {
   Download,
   Copy,
   Plus,
+  ChefHat,
+  Star,
+  Heart,
+  UserCircle,
+  Monitor,
+  Coffee,
 } from "lucide-react";
 import type { HandbookSettings } from "@shared/schema";
 
 const defaultHolidays = ["Thanksgiving Day", "Christmas Day", "Easter Sunday"];
+const defaultStations = ["Grill", "Sauté", "Fry", "Salad", "Expo", "Dish"];
 
 const STANDARD_POLICIES = [
   { key: "attendance", label: "Attendance & Punctuality", desc: "Late policy, no-call/no-show consequences, call-in procedures" },
@@ -68,6 +74,28 @@ const schedulingApps = [
   { value: "none", label: "None / Paper Schedule" },
 ];
 
+const posSystems = [
+  { value: "toast", label: "Toast" },
+  { value: "square", label: "Square" },
+  { value: "clover", label: "Clover" },
+  { value: "lightspeed", label: "Lightspeed" },
+  { value: "touchbistro", label: "TouchBistro" },
+  { value: "aloha", label: "Aloha" },
+  { value: "other", label: "Other" },
+];
+
+const tippingOptions = [
+  { value: "individual", label: "Individual Tips" },
+  { value: "pool_all", label: "Tip Pool (all staff)" },
+  { value: "pool_foh", label: "Tip Pool (FOH only)" },
+  { value: "service_charge", label: "Service Charge Included" },
+  { value: "no_tips", label: "No Tips" },
+];
+
+const servicePeriodOptions = ["Breakfast", "Brunch", "Lunch", "Happy Hour", "Dinner", "Late Night", "Catering", "Events"];
+
+const allergenOptionsList = ["Gluten-Free", "Vegetarian", "Vegan", "Dairy-Free", "Nut-Free", "Halal", "Kosher"];
+
 const CUSTOM_POLICIES_KEY = "handbook-custom-policies";
 
 interface CustomPolicy {
@@ -79,6 +107,7 @@ interface CustomPolicy {
 
 function getStoredCustomPolicies(): CustomPolicy[] {
   try {
+    if (typeof window === 'undefined') return [];
     const stored = localStorage.getItem(CUSTOM_POLICIES_KEY);
     return stored ? JSON.parse(stored) : [];
   } catch {
@@ -90,48 +119,188 @@ function saveCustomPolicies(policies: CustomPolicy[]) {
   localStorage.setItem(CUSTOM_POLICIES_KEY, JSON.stringify(policies));
 }
 
-function getSectionCompleteness(formData: Partial<HandbookSettings>): Record<string, number> {
-  const restaurantFields = [
-    formData.restaurantName,
-    formData.ownerNames,
-    formData.restaurantAddress,
-    formData.restaurantPhone,
-    formData.restaurantEmail,
-    formData.missionStatement,
-  ];
-  const restaurantFilled = restaurantFields.filter(f => f && String(f).trim().length > 0).length;
+const REQUIRED_FIELDS: (keyof HandbookSettings)[] = [
+  "restaurantName", "ownerNames", "restaurantAddress", "restaurantPhone", "restaurantEmail",
+  "missionStatement", "conceptCuisine", "generalManager", "posSystem", "operatingHours",
+  "uniformDiningRoom", "uniformKitchen", "employeeMealPolicy", "signatureDishesFoh",
+  "brandVoice",
+];
 
-  const operationsFields = [
-    formData.schedulingApp,
-    formData.orientationDays,
-    formData.evaluationSchedule,
-  ];
-  const operationsFilled = operationsFields.filter(f => f && String(f).trim().length > 0).length;
-
-  const uniformFields = [
-    formData.uniformDiningRoom,
-    formData.uniformKitchen,
-  ];
-  const uniformFilled = uniformFields.filter(f => f && String(f).trim().length > 0).length;
-
-  const benefitsFields = [
-    formData.employeeMealPolicy,
-    formData.parkingPolicy,
-  ];
-  const benefitsFilled = benefitsFields.filter(f => f && String(f).trim().length > 0).length;
-
-  return {
-    restaurant: Math.round((restaurantFilled / restaurantFields.length) * 100),
-    operations: Math.round((operationsFilled / operationsFields.length) * 100),
-    uniform: Math.round((uniformFilled / uniformFields.length) * 100),
-    benefits: Math.round((benefitsFilled / benefitsFields.length) * 100),
-  };
+function getOverallCompleteness(formData: Partial<HandbookSettings>): number {
+  const filled = REQUIRED_FIELDS.filter(k => {
+    const v = formData[k];
+    return v && String(v).trim().length > 0;
+  }).length;
+  return Math.round((filled / REQUIRED_FIELDS.length) * 100);
 }
+
+function getFilledRequiredCount(formData: Partial<HandbookSettings>): number {
+  return REQUIRED_FIELDS.filter(k => {
+    const v = formData[k];
+    return v && String(v).trim().length > 0;
+  }).length;
+}
+
+function isFieldFilled(value: any): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "number") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  return String(value).trim().length > 0;
+}
+
+function SectionHeader({ icon: Icon, title, subtitle }: { icon: any; title: string; subtitle: string }) {
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className="h-5 w-5 shrink-0" style={{ color: "#b8860b" }} />
+        <h3 className="font-bold text-white text-[16px]">{title}</h3>
+      </div>
+      <p className="text-[13px] mb-2" style={{ color: "#64748b" }}>{subtitle}</p>
+      <div style={{ height: 1, background: "rgba(184,134,11,0.2)", marginTop: 8 }} />
+    </div>
+  );
+}
+
+function FieldWrapper({ children, filled, label, helper, required }: { children: React.ReactNode; filled: boolean; label?: string; helper?: string; required?: boolean }) {
+  return (
+    <div
+      className="space-y-1"
+      style={{ borderLeft: filled ? "2px solid rgba(184,134,11,0.4)" : "2px solid transparent", paddingLeft: 10 }}
+    >
+      {label && (
+        <label className="block text-[11px] uppercase tracking-widest font-medium" style={{ color: "#94a3b8", letterSpacing: "0.08em" }}>
+          {label}{required && <span style={{ color: "#b8860b" }}> *</span>}
+        </label>
+      )}
+      {children}
+      {helper && <p className="text-[12px] italic" style={{ color: "#64748b" }}>{helper}</p>}
+    </div>
+  );
+}
+
+function ChipInput({ items, onAdd, onRemove, placeholder, addLabel, chipId }: {
+  items: string[];
+  onAdd: (item: string) => void;
+  onRemove: (item: string) => void;
+  placeholder: string;
+  addLabel?: string;
+  chipId: string;
+}) {
+  const [newItem, setNewItem] = useState("");
+  const handleAdd = () => {
+    if (newItem.trim() && !items.includes(newItem.trim())) {
+      onAdd(newItem.trim());
+      setNewItem("");
+    }
+  };
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {items.map((item) => (
+          <span
+            key={item}
+            className="inline-flex items-center gap-1 px-3 py-1 text-[13px] text-white"
+            style={{
+              background: "#1a1d2e",
+              border: "1px solid rgba(184,134,11,0.4)",
+              borderRadius: 20,
+              animation: "chipScaleIn 150ms ease",
+            }}
+          >
+            {item}
+            <button
+              onClick={() => onRemove(item)}
+              className="ml-1 transition-colors"
+              style={{ color: "#b8860b" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#b8860b")}
+              data-testid={`button-remove-chip-${item.replace(/\s+/g, '-').toLowerCase()}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          placeholder={placeholder}
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAdd())}
+          className="flex-1 h-9 px-3 text-sm text-white rounded-lg"
+          style={{
+            background: "#0f1117",
+            border: "1px solid rgba(255,255,255,0.1)",
+            outline: "none",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.outline = "1.5px solid #b8860b";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(184,134,11,0.1)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.outline = "none";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+          data-testid={`input-add-${chipId}`}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAdd}
+          className="border-[rgba(184,134,11,0.4)] text-[#b8860b]"
+          style={{ background: "transparent" }}
+          data-testid={`button-add-${chipId}`}
+        >
+          {addLabel || "Add"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ToggleChips({ options, selected, onToggle }: {
+  options: string[];
+  selected: string[];
+  onToggle: (item: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const isSelected = selected.includes(option);
+        return (
+          <button
+            key={option}
+            onClick={() => onToggle(option)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] transition-all"
+            style={{
+              background: isSelected ? "rgba(184,134,11,0.12)" : "#1a1d2e",
+              border: isSelected ? "1px solid #b8860b" : "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20,
+              color: isSelected ? "#fff" : "#64748b",
+            }}
+            data-testid={`toggle-chip-${option.replace(/\s+/g, '-').toLowerCase()}`}
+          >
+            {isSelected && <Check className="h-3 w-3" style={{ color: "#b8860b" }} />}
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  background: "#0f1117",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 8,
+  color: "#fff",
+};
+
+const focusClass = "focus-visible:outline-[1.5px] focus-visible:outline-[#b8860b] focus-visible:shadow-[0_0_0_3px_rgba(184,134,11,0.1)]";
 
 export function HandbookBuilder({ user }: { user?: any }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("setup");
-  const [newHoliday, setNewHoliday] = useState("");
   const [showAddCustomPolicy, setShowAddCustomPolicy] = useState(false);
   const [customPolicyLabel, setCustomPolicyLabel] = useState("");
   const [customPolicyDesc, setCustomPolicyDesc] = useState("");
@@ -163,14 +332,38 @@ export function HandbookBuilder({ user }: { user?: any }) {
     restaurantWebsite: "",
     ownerNames: "",
     missionStatement: "",
+    conceptCuisine: "",
+    yearEstablished: "",
+    socialMediaHandles: "",
+    generalManager: "",
+    kitchenManager: "",
+    executiveChef: "",
+    floorManager: "",
+    hrContactEmail: "",
+    totalStaff: undefined,
+    staffPerDinnerShift: undefined,
     uniformDiningRoom: "Shoes - non-slip, close-toed shoes\nPants - jeans, black, or khaki pants, shorts, or skirt with solid color belt\nShirts - clean restaurant-branded t-shirt\nAppearance - Clean and well-groomed hair, pulled back off shoulder. Well-groomed hands and fingernails.\nAccessories - No excessive cologne, perfume, make-up or jewelry. No earrings longer than 1 inch.",
     uniformKitchen: "Shoes - Black work shoes with non-slip soles, no tennis shoes\nPants - Black pants or jeans, no shorts\nShirts - Black t-shirt or restaurant-branded shirt\nAppearance - Clean, well-groomed hair, hands and fingernails\nHats - A hat or hair net required at all times when working with food",
     employeeMealPolicy: "Employees receive a $5 discount off the regular price of all menu items during each shift. Employee meals can be purchased either before or after your shift or on a scheduled break.",
     parkingPolicy: "Park in employee designated parking areas only.",
     schedulingApp: "homebase",
+    posSystem: "",
+    posSystemOther: "",
+    servicePeriods: [],
+    operatingHours: "",
+    seatingCapacity: undefined,
+    tippingStructure: "",
+    breakPolicy: "",
     evaluationSchedule: "January and June",
     orientationDays: 30,
     closedHolidays: defaultHolidays,
+    signatureDishesFoh: "",
+    signatureDishesBoh: "",
+    kitchenStations: defaultStations,
+    allergenOptions: [],
+    brandVoice: "",
+    weeklySpecials: "",
+    happyHourDetails: "",
     alcoholPolicy: "",
     socialMediaPolicy: "",
     additionalPolicies: "",
@@ -194,6 +387,8 @@ export function HandbookBuilder({ user }: { user?: any }) {
         restaurantAddress: prev.restaurantAddress || user.address || "",
         restaurantPhone: prev.restaurantPhone || user.phone || "",
         ownerNames: prev.ownerNames || (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : ""),
+        generalManager: prev.generalManager || (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : ""),
+        hrContactEmail: prev.hrContactEmail || user.email || "",
       }));
     }
   }, [settings, user]);
@@ -223,13 +418,12 @@ export function HandbookBuilder({ user }: { user?: any }) {
     saveMutation.mutate(formData);
   };
 
-  const addHoliday = () => {
-    if (newHoliday.trim() && !formData.closedHolidays?.includes(newHoliday.trim())) {
+  const addHoliday = (holiday: string) => {
+    if (holiday.trim() && !formData.closedHolidays?.includes(holiday.trim())) {
       setFormData({
         ...formData,
-        closedHolidays: [...(formData.closedHolidays || []), newHoliday.trim()],
+        closedHolidays: [...(formData.closedHolidays || []), holiday.trim()],
       });
-      setNewHoliday("");
     }
   };
 
@@ -237,6 +431,38 @@ export function HandbookBuilder({ user }: { user?: any }) {
     setFormData({
       ...formData,
       closedHolidays: formData.closedHolidays?.filter(h => h !== holiday) || [],
+    });
+  };
+
+  const addStation = (station: string) => {
+    if (station.trim() && !formData.kitchenStations?.includes(station.trim())) {
+      setFormData({
+        ...formData,
+        kitchenStations: [...(formData.kitchenStations || []), station.trim()],
+      });
+    }
+  };
+
+  const removeStation = (station: string) => {
+    setFormData({
+      ...formData,
+      kitchenStations: formData.kitchenStations?.filter(s => s !== station) || [],
+    });
+  };
+
+  const toggleServicePeriod = (period: string) => {
+    const current = formData.servicePeriods || [];
+    setFormData({
+      ...formData,
+      servicePeriods: current.includes(period) ? current.filter(p => p !== period) : [...current, period],
+    });
+  };
+
+  const toggleAllergen = (allergen: string) => {
+    const current = formData.allergenOptions || [];
+    setFormData({
+      ...formData,
+      allergenOptions: current.includes(allergen) ? current.filter(a => a !== allergen) : [...current, allergen],
     });
   };
 
@@ -271,6 +497,12 @@ export function HandbookBuilder({ user }: { user?: any }) {
     saveCustomPolicies(updated);
   };
 
+  const overallCompleteness = useMemo(() => getOverallCompleteness(formData), [formData]);
+
+  const updateField = (key: keyof HandbookSettings, value: any) => {
+    setFormData({ ...formData, [key]: value });
+  };
+
   const generateHandbook = (): string => {
     const name = formData.restaurantName || "[Restaurant Name]";
     const address = formData.restaurantAddress || "[Address]";
@@ -287,15 +519,20 @@ export function HandbookBuilder({ user }: { user?: any }) {
     const kitchenUniform = formData.uniformKitchen || "";
     const mealPolicy = formData.employeeMealPolicy || "";
     const parkingPolicy = formData.parkingPolicy || "";
+    const concept = formData.conceptCuisine ? `, a ${formData.conceptCuisine} restaurant` : "";
+    const year = formData.yearEstablished ? ` (Est. ${formData.yearEstablished})` : "";
+    const tipping = tippingOptions.find(t => t.value === formData.tippingStructure)?.label || "";
+    const breakPol = formData.breakPolicy || "";
+    const hours = formData.operatingHours || "";
 
-    return `${name.toUpperCase()}
+    return `${name.toUpperCase()}${year}
 EMPLOYEE HANDBOOK
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 WELCOME TO OUR TEAM!
 
-We welcome you to ${name} and look forward to the opportunity to work with you. We want you to know that we recognize our employees as our most valuable asset. Our continued success in providing the highest quality of food, beverages, and service to our customers depends on having quality people like yourself and your fellow employees.
+We welcome you to ${name}${concept} and look forward to the opportunity to work with you. We want you to know that we recognize our employees as our most valuable asset. Our continued success in providing the highest quality of food, beverages, and service to our customers depends on having quality people like yourself and your fellow employees.
 
 We want you to enjoy your time here and are committed to helping you succeed in your new job. We have prepared this handbook to answer some of the questions that you may have concerning ${name} and its policies. This handbook is intended solely as a guide. Read it thoroughly. If you have questions about anything, contact a manager for assistance.
 
@@ -304,7 +541,7 @@ We hope you find your time with us to be an enjoyable and rewarding experience!
 Sincerely,
 ${owners}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 COMPANY INFORMATION
 
@@ -313,14 +550,15 @@ ${address}
 Phone: ${phone}
 Email: ${email}
 Website: ${website}
+${hours ? `\nOperating Hours: ${hours}` : ""}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 MISSION STATEMENT
 
 ${mission}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 OUR WAY OF DOING BUSINESS
 
@@ -328,13 +566,13 @@ ${name}'s success depends on our people. Our restaurant can only prosper and pro
 
 We believe that a commitment to uncompromising values and integrity should always guide our decisions and actions as we pursue our goals. Following are the core values that form the foundation of our success:
 
-• We believe in providing all customers with exceptional service
-• We believe in honesty and trust
-• We believe in ongoing training and development of our people
-• We believe our continued success depends on teamwork
-• We believe in doing business in a professional and orderly manner
+\u2022 We believe in providing all customers with exceptional service
+\u2022 We believe in honesty and trust
+\u2022 We believe in ongoing training and development of our people
+\u2022 We believe our continued success depends on teamwork
+\u2022 We believe in doing business in a professional and orderly manner
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 EMPLOYMENT POLICIES
 
@@ -348,7 +586,7 @@ AGE REQUIREMENTS
 
 All servers and bartenders must be at least 18 years of age. Employees under the age of 18 must comply with all federal wage and hour guidelines. No employees under 18 years can take orders for or serve alcoholic beverages.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 ORIENTATION PERIOD
 
@@ -362,21 +600,22 @@ EVALUATIONS
 
 All employees receive written and verbal performance evaluations ${evalSchedule}. The evaluation process is intended to let you know how well you're performing and help you be more effective and productive.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 SCHEDULES
 
 Schedules are prepared to meet the work demands of the restaurant. Schedules are posted weekly through ${schedApp}. Each employee is responsible for working their shifts.
 
-• Arrive 10-15 minutes before your shift begins
-• Clock in when your shift begins and be ready to start work immediately
-• Schedule changes may be allowed only if you find a replacement and get manager approval
+\u2022 Arrive 10-15 minutes before your shift begins
+\u2022 Clock in when your shift begins and be ready to start work immediately
+\u2022 Schedule changes may be allowed only if you find a replacement and get manager approval
 
 OVERTIME
 
 In accordance with Federal Minimum Wage Law, employees are paid overtime when they work more than 40 hours in one week at one and one-half times their basic straight time rate.
+${breakPol ? `\nBREAK POLICY\n\n${breakPol}` : ""}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 STANDARDS OF CONDUCT
 
@@ -403,7 +642,7 @@ In order to work together as a team and maintain a positive working environment,
 19. Rude or improper behavior with customers
 20. Smoking or eating in unapproved areas
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 HARASSMENT POLICY
 
@@ -413,15 +652,15 @@ SEXUAL HARASSMENT
 
 All employees have a right to be free from sexual harassment. ${name} does not condone actions, words, jokes, or comments that a reasonable person would regard as sexually harassing or coercive. Anyone who experiences harassment should report it promptly to management.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 ATTENDANCE & ABSENCES
 
 All employees are expected to work on a regular, consistent basis. Excessive absenteeism may result in disciplinary action.
 
-• Call and talk to a manager at least 2 hours before your scheduled shift if you will be late or absent
-• Any employee who does not call or report to work for two consecutive shifts will be considered to have voluntarily resigned
-• Submit leave requests at least two weeks prior to the scheduled leave date
+\u2022 Call and talk to a manager at least 2 hours before your scheduled shift if you will be late or absent
+\u2022 Any employee who does not call or report to work for two consecutive shifts will be considered to have voluntarily resigned
+\u2022 Submit leave requests at least two weeks prior to the scheduled leave date
 
 TARDINESS
 
@@ -431,23 +670,24 @@ RESIGNATIONS
 
 You are requested to give a two-week notice of your plans to leave. This is a professional courtesy that ensures you are eligible for re-hire.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 TIME CLOCK & PAYROLL
 
-• Arrive 10-15 minutes before your scheduled start time
-• You may clock in within 5 minutes of the start of your shift
-• Tampering or falsifying time records may result in termination
+\u2022 Arrive 10-15 minutes before your scheduled start time
+\u2022 You may clock in within 5 minutes of the start of your shift
+\u2022 Tampering or falsifying time records may result in termination
 
 TIP REPORTING
 
 All tips you receive are taxable income. You are required by federal law to report and record your actual tips for each shift. We strongly encourage you to accurately report your tip income.
+${tipping ? `\nTipping Structure: ${tipping}` : ""}
 
 PAYROLL
 
 Paychecks are available every other week. Federal and state withholding taxes are authorized based on your W-4 form.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 HOLIDAYS & VACATIONS
 
@@ -457,13 +697,13 @@ VACATIONS
 
 Full-time salaried employees who have been with the restaurant for 12 consecutive months are eligible for one week paid vacation. Vacation requests should be submitted at least one month in advance.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 EMPLOYEE MEALS
 
 ${mealPolicy}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 DRESS CODE
 
@@ -473,37 +713,37 @@ ${diningUniform}
 KITCHEN DRESS CODE:
 ${kitchenUniform}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 PARKING
 
 ${parkingPolicy}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 SAFETY & SANITATION
 
 ${name} is committed to maintaining a safe workplace for all employees. Safety is everyone's responsibility.
 
 Basic Safety Guidelines:
-• Wipe up spills immediately
-• Never run in hallways or kitchen
-• Wear shoes with non-slip soles
-• Report defective equipment to management immediately
-• Never operate equipment without proper training
-• Let people know when carrying anything hot
-• Use proper lifting techniques
+\u2022 Wipe up spills immediately
+\u2022 Never run in hallways or kitchen
+\u2022 Wear shoes with non-slip soles
+\u2022 Report defective equipment to management immediately
+\u2022 Never operate equipment without proper training
+\u2022 Let people know when carrying anything hot
+\u2022 Use proper lifting techniques
 
 SANITATION
 
 We are committed to sanitation and food safety. Follow safe food handling procedures at all times:
-• Keep your hands washed
-• Sanitize everything
-• Prevent cross-contamination
-• Keep food at proper temperatures (below 45°F or above 140°F)
-• Store food correctly
+\u2022 Keep your hands washed
+\u2022 Sanitize everything
+\u2022 Prevent cross-contamination
+\u2022 Keep food at proper temperatures (below 45\u00b0F or above 140\u00b0F)
+\u2022 Store food correctly
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 ALCOHOL SERVICE POLICY
 
@@ -517,43 +757,43 @@ As a restaurant that sells alcoholic beverages, we are committed to responsible 
 
 ${formData.alcoholPolicy || ""}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 SOCIAL MEDIA POLICY
 
 Employees may use social media in any way they choose as long as it does not:
-• Impair the work of any employee
-• Harass or demean any employee
-• Disrupt the flow of work
-• Disclose confidential or proprietary information
-• Harm the goodwill and reputation of ${name}
+\u2022 Impair the work of any employee
+\u2022 Harass or demean any employee
+\u2022 Disrupt the flow of work
+\u2022 Disclose confidential or proprietary information
+\u2022 Harm the goodwill and reputation of ${name}
 
 ${formData.socialMediaPolicy || ""}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 CUSTOMER SERVICE
 
 Our restaurant exists only because of customers. Taking care of our customers is our highest priority. At ${name}, the customer always comes first!
 
 HANDLING COMPLAINTS
-• Don't get defensive
-• Remove the offending item immediately
-• Apologize and tell the customer you will take care of the problem
-• Don't hesitate to ask a manager for assistance
+\u2022 Don't get defensive
+\u2022 Remove the offending item immediately
+\u2022 Apologize and tell the customer you will take care of the problem
+\u2022 Don't hesitate to ask a manager for assistance
 
 TELEPHONE COURTESY
-• Answer the phone promptly, within two rings
-• Always answer in a friendly, polite manner
-• Thank the person for calling
+\u2022 Answer the phone promptly, within two rings
+\u2022 Always answer in a friendly, polite manner
+\u2022 Thank the person for calling
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 TEAMWORK
 
 We cannot achieve our goals without working together as a team. If a co-worker is overloaded and you're not, help them. Pitch in to help a customer whether they are technically yours or not. Genuine teamwork makes for a much more enjoyable work experience.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 EMERGENCY PROCEDURES
 
@@ -566,13 +806,13 @@ DO NOT RESIST. Your safety is our highest priority. Always cooperate fully.
 FIRE
 Know the location of fire extinguishers. If the fire alarm sounds, assist guests to the nearest exit immediately.
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 ${formData.additionalPolicies ? `ADDITIONAL POLICIES
 
 ${formData.additionalPolicies}
 
-═══════════════════════════════════════════════════════════════════
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 ` : ""}ACKNOWLEDGMENT
 
@@ -731,12 +971,10 @@ Date: ________________________________
     });
   };
 
-  const completeness = getSectionCompleteness(formData);
-
   if (isLoading) {
     return (
       <div className="rounded-md p-8 flex items-center justify-center" style={{ background: "#0f1117", minHeight: 256 }}>
-        <Loader2 className="h-8 w-8 animate-spin gold-text" />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#b8860b" }} />
       </div>
     );
   }
@@ -756,10 +994,10 @@ Date: ________________________________
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="flex flex-wrap items-center gap-2 text-lg font-bold text-white">
-              <BookOpen className="h-5 w-5 gold-text" />
+              <BookOpen className="h-5 w-5" style={{ color: "#b8860b" }} />
               Employee Handbook Builder
             </h3>
-            <p className="text-sm mt-1" style={{ color: "hsl(220,10%,55%)" }}>
+            <p className="text-sm mt-1" style={{ color: "#64748b" }}>
               Create a customized employee handbook for your restaurant
             </p>
           </div>
@@ -768,24 +1006,36 @@ Date: ________________________________
               variant="outline"
               size="sm"
               onClick={handlePrint}
+              className="transition-colors"
+              style={{
+                background: "#1a1d2e",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "#fff",
+              }}
               data-testid="button-print-handbook"
             >
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
-            <Button
-              size="sm"
+            <button
               onClick={handleSave}
               disabled={saveMutation.isPending}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md text-white transition-all"
+              style={{
+                background: saveMutation.isPending ? "#b8860b" : "linear-gradient(135deg, #b8860b, #d4a017)",
+                backgroundImage: saveMutation.isPending ? undefined : "linear-gradient(135deg, #b8860b 0%, #d4a017 100%)",
+                opacity: saveMutation.isPending ? 0.7 : 1,
+                cursor: saveMutation.isPending ? "not-allowed" : "pointer",
+              }}
               data-testid="button-save-handbook"
             >
               {saveMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Save className="h-4 w-4 mr-2" />
+                <Save className="h-4 w-4" />
               )}
-              Save Settings
-            </Button>
+              {saveMutation.isPending ? "Saving..." : "Save Settings"}
+            </button>
           </div>
         </div>
 
@@ -804,11 +1054,11 @@ Date: ________________________________
                 }`}
                 style={{
                   background: isActive ? "#0f1117" : "transparent",
-                  borderBottom: isActive ? "2px solid hsl(38,55%,52%)" : "2px solid transparent",
+                  borderBottom: isActive ? "2px solid #b8860b" : "2px solid transparent",
                 }}
                 data-testid={`tab-handbook-${tab.id}`}
               >
-                <TabIcon className={`h-4 w-4 ${isActive ? "gold-text" : ""}`} />
+                <TabIcon className="h-4 w-4" style={isActive ? { color: "#b8860b" } : {}} />
                 {tab.label}
               </button>
             );
@@ -816,300 +1066,523 @@ Date: ________________________________
         </div>
 
         {activeTab === "setup" && (
-          <div className="space-y-6" style={{ animation: "scheduleStaggerIn 0.3s ease-out" }}>
-            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
-                  <Building2 className="h-4 w-4 gold-text" />
-                  Restaurant Information
-                </h3>
-                <div className="flex items-center gap-2 min-w-[120px]">
-                  <Progress value={completeness.restaurant} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
-                  <span className="text-xs gold-text">{completeness.restaurant}%</span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="restaurantName" className="text-sm text-gray-300">Restaurant Name</Label>
-                  <Input
-                    id="restaurantName"
-                    placeholder="e.g., The Golden Fork"
-                    value={formData.restaurantName || ""}
-                    onChange={(e) => setFormData({ ...formData, restaurantName: e.target.value })}
-                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-restaurant-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ownerNames" className="text-sm text-gray-300">Owner Name(s)</Label>
-                  <Input
-                    id="ownerNames"
-                    placeholder="e.g., John and Jane Smith"
-                    value={formData.ownerNames || ""}
-                    onChange={(e) => setFormData({ ...formData, ownerNames: e.target.value })}
-                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-owner-names"
-                  />
-                </div>
-              </div>
+          <div className="space-y-8" style={{ animation: "scheduleStaggerIn 0.3s ease-out" }}>
 
-              <div className="space-y-2">
-                <Label htmlFor="restaurantAddress" className="text-sm text-gray-300">Address</Label>
-                <Input
-                  id="restaurantAddress"
-                  placeholder="e.g., 123 Main Street, Austin, TX 78701"
-                  value={formData.restaurantAddress || ""}
-                  onChange={(e) => setFormData({ ...formData, restaurantAddress: e.target.value })}
-                  className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                  style={{ background: "#0f1117" }}
-                  data-testid="input-restaurant-address"
+            <div className="rounded-md p-3" style={{ background: "#0f1117" }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px]" style={{ color: "#64748b" }}>Setup Completion</span>
+                <span className="text-[12px] font-medium" style={{ color: overallCompleteness === 100 ? "#b8860b" : "#94a3b8" }}>
+                  {overallCompleteness === 100 ? "Setup Complete — Ready to Generate" : `${overallCompleteness}% complete`}
+                </span>
+              </div>
+              <div className="w-full rounded-full" style={{ height: 6, background: "#1a1d2e" }}>
+                <div
+                  className="rounded-full transition-all duration-500"
+                  style={{
+                    height: 6,
+                    width: `${overallCompleteness}%`,
+                    background: overallCompleteness === 100 ? "#b8860b" : "linear-gradient(90deg, #b8860b, #d4a017)",
+                  }}
                 />
               </div>
+              <p className="text-[12px] mt-1.5" style={{ color: "#64748b" }}>
+                {overallCompleteness < 100
+                  ? "Complete your setup to unlock personalized training documents."
+                  : "All required fields are complete."}
+              </p>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="restaurantPhone" className="flex flex-wrap items-center gap-1 text-sm text-gray-300">
-                    <Phone className="h-3 w-3 gold-text" />
-                    Phone
-                  </Label>
-                  <Input
-                    id="restaurantPhone"
-                    placeholder="(512) 555-1234"
-                    value={formData.restaurantPhone || ""}
-                    onChange={(e) => setFormData({ ...formData, restaurantPhone: e.target.value })}
-                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-restaurant-phone"
-                  />
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Building2} title="Restaurant Information" subtitle="Basic details about your restaurant" />
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.restaurantName)} label="Restaurant Name" required>
+                    <Input
+                      placeholder="e.g., The Golden Fork"
+                      value={formData.restaurantName || ""}
+                      onChange={(e) => updateField("restaurantName", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-restaurant-name"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.ownerNames)} label="Owner Name(s)" required>
+                    <Input
+                      placeholder="e.g., John and Jane Smith"
+                      value={formData.ownerNames || ""}
+                      onChange={(e) => updateField("ownerNames", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-owner-names"
+                    />
+                  </FieldWrapper>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="restaurantEmail" className="flex flex-wrap items-center gap-1 text-sm text-gray-300">
-                    <Mail className="h-3 w-3 gold-text" />
-                    Email
-                  </Label>
-                  <Input
-                    id="restaurantEmail"
-                    placeholder="manager@restaurant.com"
-                    value={formData.restaurantEmail || ""}
-                    onChange={(e) => setFormData({ ...formData, restaurantEmail: e.target.value })}
-                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-restaurant-email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="restaurantWebsite" className="flex flex-wrap items-center gap-1 text-sm text-gray-300">
-                    <Globe className="h-3 w-3 gold-text" />
-                    Website
-                  </Label>
-                  <Input
-                    id="restaurantWebsite"
-                    placeholder="www.restaurant.com"
-                    value={formData.restaurantWebsite || ""}
-                    onChange={(e) => setFormData({ ...formData, restaurantWebsite: e.target.value })}
-                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-restaurant-website"
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="missionStatement" className="text-sm text-gray-300">Mission Statement</Label>
-                <Textarea
-                  id="missionStatement"
-                  placeholder="Your restaurant's mission and values..."
-                  value={formData.missionStatement || ""}
-                  onChange={(e) => setFormData({ ...formData, missionStatement: e.target.value })}
-                  className="min-h-[100px] border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                  style={{ background: "#0f1117" }}
-                  data-testid="textarea-mission-statement"
-                />
+                <FieldWrapper filled={isFieldFilled(formData.restaurantAddress)} label="Address" required>
+                  <Input
+                    placeholder="e.g., 123 Main Street, Austin, TX 78701"
+                    value={formData.restaurantAddress || ""}
+                    onChange={(e) => updateField("restaurantAddress", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-restaurant-address"
+                  />
+                </FieldWrapper>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.restaurantPhone)} label="Phone" required>
+                    <Input
+                      placeholder="(512) 555-1234"
+                      value={formData.restaurantPhone || ""}
+                      onChange={(e) => updateField("restaurantPhone", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-restaurant-phone"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.restaurantEmail)} label="Email" required>
+                    <Input
+                      placeholder="manager@restaurant.com"
+                      value={formData.restaurantEmail || ""}
+                      onChange={(e) => updateField("restaurantEmail", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-restaurant-email"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.restaurantWebsite)} label="Website">
+                    <Input
+                      placeholder="www.restaurant.com"
+                      value={formData.restaurantWebsite || ""}
+                      onChange={(e) => updateField("restaurantWebsite", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-restaurant-website"
+                    />
+                  </FieldWrapper>
+                </div>
+
+                <FieldWrapper filled={isFieldFilled(formData.missionStatement)} label="Mission Statement" required>
+                  <Textarea
+                    placeholder="Your restaurant's mission and values..."
+                    value={formData.missionStatement || ""}
+                    onChange={(e) => updateField("missionStatement", e.target.value)}
+                    className={`min-h-[100px] ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-mission-statement"
+                  />
+                </FieldWrapper>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                  <div className="md:col-span-2">
+                    <FieldWrapper filled={isFieldFilled(formData.conceptCuisine)} label="Concept & Cuisine Type" required helper="Describes your concept in 2-5 words. Used throughout your training documents.">
+                      <Input
+                        placeholder="e.g., Southern Cajun Bistro, Fast-Casual Mexican, Fine Dining Italian"
+                        value={formData.conceptCuisine || ""}
+                        onChange={(e) => updateField("conceptCuisine", e.target.value)}
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="input-concept-cuisine"
+                      />
+                    </FieldWrapper>
+                  </div>
+                  <FieldWrapper filled={isFieldFilled(formData.yearEstablished)} label="Year Established">
+                    <Input
+                      placeholder="e.g., 2019"
+                      value={formData.yearEstablished || ""}
+                      onChange={(e) => updateField("yearEstablished", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-year-established"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.socialMediaHandles)} label="Social Media (optional)" helper="Used in the Social Media Policy section of your handbook.">
+                    <Input
+                      placeholder="@moutonsbistrobar"
+                      value={formData.socialMediaHandles || ""}
+                      onChange={(e) => updateField("socialMediaHandles", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-social-media-handles"
+                    />
+                  </FieldWrapper>
+                </div>
               </div>
             </div>
 
-            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
-                  <Clock className="h-4 w-4 gold-text" />
-                  Operations
-                </h3>
-                <div className="flex items-center gap-2 min-w-[120px]">
-                  <Progress value={completeness.operations} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
-                  <span className="text-xs gold-text">{completeness.operations}%</span>
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Users} title="Your Team" subtitle="Key names used in your training manuals and handbook." />
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.generalManager)} label="General Manager / Owner" required>
+                    <Input
+                      placeholder="e.g., Ben Mouton"
+                      value={formData.generalManager || ""}
+                      onChange={(e) => updateField("generalManager", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-general-manager"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.kitchenManager)} label="Kitchen Manager">
+                    <Input
+                      placeholder="e.g., Chef Marcus"
+                      value={formData.kitchenManager || ""}
+                      onChange={(e) => updateField("kitchenManager", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-kitchen-manager"
+                    />
+                  </FieldWrapper>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.executiveChef)} label="Executive Chef">
+                    <Input
+                      placeholder="e.g., Chef Daniel"
+                      value={formData.executiveChef || ""}
+                      onChange={(e) => updateField("executiveChef", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-executive-chef"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.floorManager)} label="Floor Manager / Shift Lead">
+                    <Input
+                      placeholder="e.g., Sarah"
+                      value={formData.floorManager || ""}
+                      onChange={(e) => updateField("floorManager", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-floor-manager"
+                    />
+                  </FieldWrapper>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.hrContactEmail)} label="HR / Support Contact Email">
+                    <Input
+                      placeholder="e.g., hr@moutonsbistro.com"
+                      value={formData.hrContactEmail || ""}
+                      onChange={(e) => updateField("hrContactEmail", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-hr-contact-email"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.totalStaff)} label="Total Staff (approx.)">
+                    <Input
+                      type="number"
+                      placeholder="e.g., 24"
+                      value={formData.totalStaff ?? ""}
+                      onChange={(e) => updateField("totalStaff", e.target.value ? parseInt(e.target.value) : undefined)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-total-staff"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.staffPerDinnerShift)} label="Staff Per Dinner Shift" helper="Used in kitchen training materials.">
+                    <Input
+                      type="number"
+                      placeholder="e.g., 5"
+                      value={formData.staffPerDinnerShift ?? ""}
+                      onChange={(e) => updateField("staffPerDinnerShift", e.target.value ? parseInt(e.target.value) : undefined)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-staff-per-dinner-shift"
+                    />
+                  </FieldWrapper>
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="schedulingApp" className="text-sm text-gray-300">Scheduling App</Label>
-                  <Select
-                    value={formData.schedulingApp || ""}
-                    onValueChange={(value) => setFormData({ ...formData, schedulingApp: value })}
-                  >
-                    <SelectTrigger
-                      id="schedulingApp"
-                      className="border-[hsl(232,15%,20%)] focus:ring-[hsl(38,55%,52%)]"
-                      style={{ background: "#0f1117" }}
-                      data-testid="select-scheduling-app"
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Clock} title="Operations" subtitle="Scheduling, service periods, and operational details." />
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.schedulingApp)} label="Scheduling App">
+                    <Select
+                      value={formData.schedulingApp || ""}
+                      onValueChange={(value) => updateField("schedulingApp", value)}
                     >
-                      <SelectValue placeholder="Select app" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {schedulingApps.map((app) => (
-                        <SelectItem key={app.value} value={app.value}>
-                          {app.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="orientationDays" className="text-sm text-gray-300">Orientation Period (days)</Label>
-                  <Input
-                    id="orientationDays"
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={formData.orientationDays || 30}
-                    onChange={(e) => setFormData({ ...formData, orientationDays: parseInt(e.target.value) || 30 })}
-                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-orientation-days"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="evaluationSchedule" className="text-sm text-gray-300">Evaluation Schedule</Label>
-                  <Input
-                    id="evaluationSchedule"
-                    placeholder="e.g., January and June"
-                    value={formData.evaluationSchedule || ""}
-                    onChange={(e) => setFormData({ ...formData, evaluationSchedule: e.target.value })}
-                    className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-evaluation-schedule"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
-                  <Calendar className="h-4 w-4 gold-text" />
-                  Closed Holidays
-                </Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {formData.closedHolidays?.map((holiday) => (
-                    <Badge
-                      key={holiday}
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
-                      {holiday}
-                      <button
-                        onClick={() => removeHoliday(holiday)}
-                        className="ml-1"
-                        data-testid={`button-remove-holiday-${holiday.replace(/\s+/g, '-').toLowerCase()}`}
+                      <SelectTrigger
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="select-scheduling-app"
                       >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
+                        <SelectValue placeholder="Select app" />
+                      </SelectTrigger>
+                      <SelectContent style={{ background: "#1a1d2e", border: "1px solid rgba(255,255,255,0.1)" }}>
+                        {schedulingApps.map((app) => (
+                          <SelectItem key={app.value} value={app.value}>{app.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.orientationDays)} label="Orientation Period (days)">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={90}
+                      value={formData.orientationDays || 30}
+                      onChange={(e) => updateField("orientationDays", parseInt(e.target.value) || 30)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-orientation-days"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.evaluationSchedule)} label="Evaluation Schedule">
+                    <Input
+                      placeholder="e.g., January and June"
+                      value={formData.evaluationSchedule || ""}
+                      onChange={(e) => updateField("evaluationSchedule", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-evaluation-schedule"
+                    />
+                  </FieldWrapper>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Input
-                    placeholder="Add a holiday..."
-                    value={newHoliday}
-                    onChange={(e) => setNewHoliday(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addHoliday())}
-                    className="flex-1 border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                    style={{ background: "#0f1117" }}
-                    data-testid="input-new-holiday"
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.posSystem)} label="POS System" required helper="Referenced in server training for POS-specific procedures.">
+                    <Select
+                      value={formData.posSystem || ""}
+                      onValueChange={(value) => updateField("posSystem", value)}
+                    >
+                      <SelectTrigger
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="select-pos-system"
+                      >
+                        <SelectValue placeholder="Select POS system" />
+                      </SelectTrigger>
+                      <SelectContent style={{ background: "#1a1d2e", border: "1px solid rgba(255,255,255,0.1)" }}>
+                        {posSystems.map((pos) => (
+                          <SelectItem key={pos.value} value={pos.value}>{pos.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formData.posSystem === "other" && (
+                      <Input
+                        placeholder="Specify POS system..."
+                        value={formData.posSystemOther || ""}
+                        onChange={(e) => updateField("posSystemOther", e.target.value)}
+                        className={`mt-2 ${focusClass}`}
+                        style={inputStyle}
+                        data-testid="input-pos-system-other"
+                      />
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.tippingStructure)} label="Tipping Structure">
+                    <Select
+                      value={formData.tippingStructure || ""}
+                      onValueChange={(value) => updateField("tippingStructure", value)}
+                    >
+                      <SelectTrigger
+                        className={focusClass}
+                        style={inputStyle}
+                        data-testid="select-tipping-structure"
+                      >
+                        <SelectValue placeholder="Select tipping structure" />
+                      </SelectTrigger>
+                      <SelectContent style={{ background: "#1a1d2e", border: "1px solid rgba(255,255,255,0.1)" }}>
+                        {tippingOptions.map((tip) => (
+                          <SelectItem key={tip.value} value={tip.value}>{tip.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FieldWrapper>
+                </div>
+
+                <FieldWrapper filled={isFieldFilled(formData.servicePeriods)} label="Service Periods">
+                  <ToggleChips
+                    options={servicePeriodOptions}
+                    selected={formData.servicePeriods || []}
+                    onToggle={toggleServicePeriod}
                   />
-                  <Button variant="outline" size="sm" onClick={addHoliday} data-testid="button-add-holiday">
-                    Add
-                  </Button>
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.operatingHours)} label="Operating Hours" required>
+                  <Input
+                    placeholder="e.g., Tue-Thu 11am-10pm, Fri-Sat 11am-11pm, Sun 10am-9pm, Closed Mon"
+                    value={formData.operatingHours || ""}
+                    onChange={(e) => updateField("operatingHours", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-operating-hours"
+                  />
+                </FieldWrapper>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FieldWrapper filled={isFieldFilled(formData.seatingCapacity)} label="Seating Capacity">
+                    <Input
+                      type="number"
+                      placeholder="e.g., 85"
+                      value={formData.seatingCapacity ?? ""}
+                      onChange={(e) => updateField("seatingCapacity", e.target.value ? parseInt(e.target.value) : undefined)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-seating-capacity"
+                    />
+                  </FieldWrapper>
+                  <FieldWrapper filled={isFieldFilled(formData.breakPolicy)} label="Break Policy">
+                    <Input
+                      placeholder="e.g., 30-min unpaid break for shifts over 6 hours"
+                      value={formData.breakPolicy || ""}
+                      onChange={(e) => updateField("breakPolicy", e.target.value)}
+                      className={focusClass}
+                      style={inputStyle}
+                      data-testid="input-break-policy"
+                    />
+                  </FieldWrapper>
                 </div>
+
+                <FieldWrapper filled={(formData.closedHolidays || []).length > 0} label="Closed Holidays">
+                  <ChipInput
+                    items={formData.closedHolidays || []}
+                    onAdd={addHoliday}
+                    onRemove={removeHoliday}
+                    placeholder="Add a holiday..."
+                    addLabel="Add"
+                    chipId="holiday"
+                  />
+                </FieldWrapper>
               </div>
             </div>
 
-            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
-                  <Shirt className="h-4 w-4 gold-text" />
-                  Uniform Policy
-                </h3>
-                <div className="flex items-center gap-2 min-w-[120px]">
-                  <Progress value={completeness.uniform} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
-                  <span className="text-xs gold-text">{completeness.uniform}%</span>
-                </div>
-              </div>
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={ChefHat} title="Menu & Kitchen" subtitle="Used to personalize kitchen and server training content." />
+              <div className="space-y-5">
+                <FieldWrapper filled={isFieldFilled(formData.signatureDishesFoh)} label="Signature / Featured Dishes (FOH)" required helper="Server training Day 2 references your actual menu items.">
+                  <Textarea
+                    placeholder="e.g., Shrimp & Grits (Cajun sauce), Chicken Fried Steak (white gravy), Gumbo Fridays special"
+                    value={formData.signatureDishesFoh || ""}
+                    onChange={(e) => updateField("signatureDishesFoh", e.target.value)}
+                    className={`min-h-[80px] ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-signature-dishes-foh"
+                  />
+                </FieldWrapper>
 
-              <div className="space-y-2">
-                <Label htmlFor="uniformDiningRoom" className="text-sm text-gray-300">Dining Room Dress Code</Label>
-                <Textarea
-                  id="uniformDiningRoom"
-                  placeholder="Describe the uniform requirements for dining room staff..."
-                  value={formData.uniformDiningRoom || ""}
-                  onChange={(e) => setFormData({ ...formData, uniformDiningRoom: e.target.value })}
-                  className="min-h-[120px] font-mono text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                  style={{ background: "#0f1117" }}
-                  data-testid="textarea-uniform-dining"
-                />
-              </div>
+                <FieldWrapper filled={isFieldFilled(formData.signatureDishesBoh)} label="Signature / Featured Dishes (BOH)" helper="Kitchen training Day 2 (Prep) and Day 3 (Stations) reference these.">
+                  <Textarea
+                    placeholder="e.g., Grillades & Grits, Maque Choux, Jambalaya Pasta"
+                    value={formData.signatureDishesBoh || ""}
+                    onChange={(e) => updateField("signatureDishesBoh", e.target.value)}
+                    className={`min-h-[80px] ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-signature-dishes-boh"
+                  />
+                </FieldWrapper>
 
-              <div className="space-y-2">
-                <Label htmlFor="uniformKitchen" className="text-sm text-gray-300">Kitchen Dress Code</Label>
-                <Textarea
-                  id="uniformKitchen"
-                  placeholder="Describe the uniform requirements for kitchen staff..."
-                  value={formData.uniformKitchen || ""}
-                  onChange={(e) => setFormData({ ...formData, uniformKitchen: e.target.value })}
-                  className="min-h-[120px] font-mono text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                  style={{ background: "#0f1117" }}
-                  data-testid="textarea-uniform-kitchen"
-                />
+                <FieldWrapper filled={(formData.kitchenStations || []).length > 0} label="Kitchen Stations" helper="Kitchen training materials reference your specific stations.">
+                  <ChipInput
+                    items={formData.kitchenStations || []}
+                    onAdd={addStation}
+                    onRemove={removeStation}
+                    placeholder="Add a station..."
+                    addLabel="Add"
+                    chipId="station"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={(formData.allergenOptions || []).length > 0} label="Dietary Options Available">
+                  <ToggleChips
+                    options={allergenOptionsList}
+                    selected={formData.allergenOptions || []}
+                    onToggle={toggleAllergen}
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.brandVoice)} label="Brand Voice / Cultural Identity" required helper="Used in training manual welcome language and service standards tone.">
+                  <Input
+                    placeholder="e.g., Southern hospitality, Fast and Flavorful, Louisiana roots"
+                    value={formData.brandVoice || ""}
+                    onChange={(e) => updateField("brandVoice", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-brand-voice"
+                  />
+                </FieldWrapper>
               </div>
             </div>
 
-            <div className="rounded-md p-4 space-y-4" style={{ background: "#0f1117" }}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
-                  <Users className="h-4 w-4 gold-text" />
-                  Employee Benefits
-                </h3>
-                <div className="flex items-center gap-2 min-w-[120px]">
-                  <Progress value={completeness.benefits} className="h-1.5 flex-1 [&>div]:bg-[hsl(38,55%,52%)]" />
-                  <span className="text-xs gold-text">{completeness.benefits}%</span>
-                </div>
-              </div>
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Star} title="Events & Specials" subtitle="Used in training materials for event prep days." />
+              <div className="space-y-5">
+                <FieldWrapper filled={isFieldFilled(formData.weeklySpecials)} label="Weekly Specials / Recurring Events" helper="Server Day 2 and Kitchen Day 5 reference your specific events.">
+                  <Textarea
+                    placeholder="e.g., Gumbo Fridays, Crawfish Boil Thursdays, Happy Hour Tue-Fri 3-6pm"
+                    value={formData.weeklySpecials || ""}
+                    onChange={(e) => updateField("weeklySpecials", e.target.value)}
+                    className={`min-h-[80px] ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-weekly-specials"
+                  />
+                </FieldWrapper>
 
-              <div className="space-y-2">
-                <Label htmlFor="employeeMealPolicy" className="text-sm text-gray-300">Employee Meal Policy</Label>
-                <Textarea
-                  id="employeeMealPolicy"
-                  placeholder="Describe your employee meal discount or policy..."
-                  value={formData.employeeMealPolicy || ""}
-                  onChange={(e) => setFormData({ ...formData, employeeMealPolicy: e.target.value })}
-                  className="min-h-[80px] border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                  style={{ background: "#0f1117" }}
-                  data-testid="textarea-meal-policy"
-                />
+                <FieldWrapper filled={isFieldFilled(formData.happyHourDetails)} label="Happy Hour (if applicable)" helper="Used in Server Day 5 (Happy Hour POS codes) and Kitchen Day 5 (batch appetizers).">
+                  <Input
+                    placeholder="e.g., Tue-Fri 3-6pm, $2 off drinks, half-price appetizers"
+                    value={formData.happyHourDetails || ""}
+                    onChange={(e) => updateField("happyHourDetails", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-happy-hour-details"
+                  />
+                </FieldWrapper>
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="parkingPolicy" className="text-sm text-gray-300">Parking Policy</Label>
-                <Input
-                  id="parkingPolicy"
-                  placeholder="e.g., Park in employee designated areas only"
-                  value={formData.parkingPolicy || ""}
-                  onChange={(e) => setFormData({ ...formData, parkingPolicy: e.target.value })}
-                  className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                  style={{ background: "#0f1117" }}
-                  data-testid="input-parking-policy"
-                />
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Shirt} title="Uniform Policy" subtitle="Dress code requirements for front and back of house." />
+              <div className="space-y-5">
+                <FieldWrapper filled={isFieldFilled(formData.uniformDiningRoom)} label="Dining Room Dress Code" required>
+                  <Textarea
+                    placeholder="Describe the uniform requirements for dining room staff..."
+                    value={formData.uniformDiningRoom || ""}
+                    onChange={(e) => updateField("uniformDiningRoom", e.target.value)}
+                    className={`min-h-[120px] font-mono text-sm ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-uniform-dining"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.uniformKitchen)} label="Kitchen Dress Code" required>
+                  <Textarea
+                    placeholder="Describe the uniform requirements for kitchen staff..."
+                    value={formData.uniformKitchen || ""}
+                    onChange={(e) => updateField("uniformKitchen", e.target.value)}
+                    className={`min-h-[120px] font-mono text-sm ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-uniform-kitchen"
+                  />
+                </FieldWrapper>
+              </div>
+            </div>
+
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Heart} title="Employee Benefits" subtitle="Meal policies, parking, and other employee benefits." />
+              <div className="space-y-5">
+                <FieldWrapper filled={isFieldFilled(formData.employeeMealPolicy)} label="Employee Meal Policy" required>
+                  <Textarea
+                    placeholder="Describe your employee meal discount or policy..."
+                    value={formData.employeeMealPolicy || ""}
+                    onChange={(e) => updateField("employeeMealPolicy", e.target.value)}
+                    className={`min-h-[80px] ${focusClass}`}
+                    style={inputStyle}
+                    data-testid="textarea-meal-policy"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.parkingPolicy)} label="Parking Policy">
+                  <Input
+                    placeholder="e.g., Park in employee designated areas only"
+                    value={formData.parkingPolicy || ""}
+                    onChange={(e) => updateField("parkingPolicy", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-parking-policy"
+                  />
+                </FieldWrapper>
               </div>
             </div>
           </div>
@@ -1119,14 +1592,14 @@ Date: ________________________________
           <div className="space-y-5" style={{ animation: "scheduleStaggerIn 0.3s ease-out" }}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold text-white flex flex-wrap items-center gap-2">
-                <Shield className="h-4 w-4 gold-text" />
+                <Shield className="h-4 w-4" style={{ color: "#b8860b" }} />
                 Standard Policies
               </h3>
               <Badge variant="secondary" data-testid="badge-policy-count">
                 {enabledStandardCount + enabledCustomCount} of {STANDARD_POLICIES.length + customPolicies.length} included
               </Badge>
             </div>
-            <p className="text-sm" style={{ color: "hsl(220,10%,55%)" }}>
+            <p className="text-sm" style={{ color: "#64748b" }}>
               Toggle policies on or off to include them in your handbook. Add custom notes where needed.
             </p>
 
@@ -1139,7 +1612,7 @@ Date: ________________________________
                     className="rounded-md p-3 space-y-2 transition-colors"
                     style={{
                       background: "#0f1117",
-                      border: "1px solid hsl(232,15%,20%)",
+                      border: "1px solid rgba(255,255,255,0.1)",
                     }}
                     data-testid={`policy-section-${policy.key}`}
                   >
@@ -1149,9 +1622,9 @@ Date: ________________________________
                         style={{
                           width: 28,
                           height: 28,
-                          background: isOn ? "hsl(38,55%,52%)" : "transparent",
-                          border: isOn ? "none" : "1px solid hsl(232,15%,25%)",
-                          color: isOn ? "#0f1117" : "hsl(220,10%,55%)",
+                          background: isOn ? "#b8860b" : "transparent",
+                          border: isOn ? "none" : "1px solid rgba(255,255,255,0.15)",
+                          color: isOn ? "#0f1117" : "#64748b",
                         }}
                         onClick={() =>
                           setPolicyToggles((prev) => ({
@@ -1169,22 +1642,22 @@ Date: ________________________________
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-white">{policy.label}</div>
-                        <div className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>{policy.desc}</div>
+                        <div className="text-xs" style={{ color: "#64748b" }}>{policy.desc}</div>
                       </div>
                     </div>
 
                     {isOn && policy.key === "alcohol" && (
                       <div className="pl-10 space-y-1">
-                        <Label htmlFor="alcoholPolicy" className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>
+                        <Label htmlFor="alcoholPolicy" className="text-xs" style={{ color: "#64748b" }}>
                           Custom notes (optional)
                         </Label>
                         <Textarea
                           id="alcoholPolicy"
                           placeholder="Any additional alcohol service policies specific to your restaurant..."
                           value={formData.alcoholPolicy || ""}
-                          onChange={(e) => setFormData({ ...formData, alcoholPolicy: e.target.value })}
-                          className="min-h-[80px] text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                          style={{ background: "#0f1117" }}
+                          onChange={(e) => updateField("alcoholPolicy", e.target.value)}
+                          className={`min-h-[80px] text-sm ${focusClass}`}
+                          style={inputStyle}
                           data-testid="textarea-alcohol-policy"
                         />
                       </div>
@@ -1192,16 +1665,16 @@ Date: ________________________________
 
                     {isOn && policy.key === "socialMedia" && (
                       <div className="pl-10 space-y-1">
-                        <Label htmlFor="socialMediaPolicy" className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>
+                        <Label htmlFor="socialMediaPolicy" className="text-xs" style={{ color: "#64748b" }}>
                           Custom notes (optional)
                         </Label>
                         <Textarea
                           id="socialMediaPolicy"
                           placeholder="Any additional social media guidelines specific to your restaurant..."
                           value={formData.socialMediaPolicy || ""}
-                          onChange={(e) => setFormData({ ...formData, socialMediaPolicy: e.target.value })}
-                          className="min-h-[80px] text-sm border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                          style={{ background: "#0f1117" }}
+                          onChange={(e) => updateField("socialMediaPolicy", e.target.value)}
+                          className={`min-h-[80px] text-sm ${focusClass}`}
+                          style={inputStyle}
                           data-testid="textarea-social-media-policy"
                         />
                       </div>
@@ -1214,7 +1687,7 @@ Date: ________________________________
             {customPolicies.length > 0 && (
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <Plus className="h-3 w-3 gold-text" />
+                  <Plus className="h-3 w-3" style={{ color: "#b8860b" }} />
                   Custom Policies
                 </h4>
                 {customPolicies.map((policy) => (
@@ -1223,7 +1696,7 @@ Date: ________________________________
                     className="rounded-md p-3 space-y-2 transition-colors"
                     style={{
                       background: "#0f1117",
-                      border: "1px solid hsl(232,15%,20%)",
+                      border: "1px solid rgba(255,255,255,0.1)",
                     }}
                     data-testid={`policy-section-${policy.id}`}
                   >
@@ -1233,9 +1706,9 @@ Date: ________________________________
                         style={{
                           width: 28,
                           height: 28,
-                          background: policy.enabled ? "hsl(38,55%,52%)" : "transparent",
-                          border: policy.enabled ? "none" : "1px solid hsl(232,15%,25%)",
-                          color: policy.enabled ? "#0f1117" : "hsl(220,10%,55%)",
+                          background: policy.enabled ? "#b8860b" : "transparent",
+                          border: policy.enabled ? "none" : "1px solid rgba(255,255,255,0.15)",
+                          color: policy.enabled ? "#0f1117" : "#64748b",
                         }}
                         onClick={() => toggleCustomPolicy(policy.id)}
                         data-testid={`toggle-custom-policy-${policy.id}`}
@@ -1245,7 +1718,7 @@ Date: ________________________________
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-white">{policy.label}</div>
                         {policy.desc && (
-                          <div className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>{policy.desc}</div>
+                          <div className="text-xs" style={{ color: "#64748b" }}>{policy.desc}</div>
                         )}
                       </div>
                       <Button
@@ -1266,7 +1739,7 @@ Date: ________________________________
               {showAddCustomPolicy ? (
                 <div
                   className="rounded-md p-4 space-y-3"
-                  style={{ background: "#0f1117", border: "1px solid hsl(38,55%,52%)" }}
+                  style={{ background: "#0f1117", border: "1px solid #b8860b" }}
                 >
                   <h4 className="text-sm font-semibold text-white">Add Custom Policy</h4>
                   <div className="space-y-2">
@@ -1275,8 +1748,8 @@ Date: ________________________________
                       placeholder="e.g., Technology Usage"
                       value={customPolicyLabel}
                       onChange={(e) => setCustomPolicyLabel(e.target.value)}
-                      className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                      style={{ background: "#0f1117" }}
+                      className={focusClass}
+                      style={inputStyle}
                       data-testid="input-custom-policy-name"
                     />
                   </div>
@@ -1286,8 +1759,8 @@ Date: ________________________________
                       placeholder="Brief description of the policy..."
                       value={customPolicyDesc}
                       onChange={(e) => setCustomPolicyDesc(e.target.value)}
-                      className="border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                      style={{ background: "#0f1117" }}
+                      className={focusClass}
+                      style={inputStyle}
                       data-testid="input-custom-policy-desc"
                     />
                   </div>
@@ -1315,7 +1788,7 @@ Date: ________________________________
                   variant="outline"
                   size="sm"
                   onClick={() => setShowAddCustomPolicy(true)}
-                  className="gold-text"
+                  style={{ color: "#b8860b", borderColor: "rgba(184,134,11,0.4)" }}
                   data-testid="button-add-custom-policy"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -1324,19 +1797,19 @@ Date: ________________________________
               )}
             </div>
 
-            <div className="border-t pt-4" style={{ borderColor: "hsl(232,15%,20%)" }}>
+            <div className="border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
               <div className="space-y-2">
                 <Label htmlFor="additionalPolicies" className="text-sm text-gray-300">Other Policies</Label>
-                <p className="text-xs" style={{ color: "hsl(220,10%,55%)" }}>
+                <p className="text-xs" style={{ color: "#64748b" }}>
                   Any other policies you want to include in your handbook.
                 </p>
                 <Textarea
                   id="additionalPolicies"
                   placeholder="Any other policies you want to include in your handbook..."
                   value={formData.additionalPolicies || ""}
-                  onChange={(e) => setFormData({ ...formData, additionalPolicies: e.target.value })}
-                  className="min-h-[120px] border-[hsl(232,15%,20%)] focus-visible:ring-[hsl(38,55%,52%)]"
-                  style={{ background: "#0f1117" }}
+                  onChange={(e) => updateField("additionalPolicies", e.target.value)}
+                  className={`min-h-[120px] ${focusClass}`}
+                  style={inputStyle}
                   data-testid="textarea-additional-policies"
                 />
               </div>
@@ -1350,7 +1823,7 @@ Date: ________________________________
               className="rounded-md p-6"
               style={{
                 background: "#ffffff",
-                border: "2px solid hsl(38,55%,52%)",
+                border: "2px solid #b8860b",
               }}
             >
               <ScrollArea className="h-[60vh]">
@@ -1365,15 +1838,33 @@ Date: ________________________________
               style={{ background: "#0f1117" }}
               data-testid="preview-action-bar"
             >
-              <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-preview-print">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                style={{ background: "#1a1d2e", border: "1px solid rgba(255,255,255,0.2)", color: "#fff" }}
+                data-testid="button-preview-print"
+              >
                 <Printer className="h-4 w-4 mr-2" />
                 Print
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownloadPdf} data-testid="button-preview-download">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                style={{ background: "#1a1d2e", border: "1px solid rgba(255,255,255,0.2)", color: "#fff" }}
+                data-testid="button-preview-download"
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Download PDF
               </Button>
-              <Button variant="outline" size="sm" onClick={handleCopyAll} data-testid="button-preview-copy">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyAll}
+                style={{ background: "#1a1d2e", border: "1px solid rgba(255,255,255,0.2)", color: "#fff" }}
+                data-testid="button-preview-copy"
+              >
                 <Copy className="h-4 w-4 mr-2" />
                 Copy All Text
               </Button>
