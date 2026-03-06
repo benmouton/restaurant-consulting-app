@@ -42,6 +42,7 @@ import {
   UserCircle,
   Monitor,
   Coffee,
+  Wine,
 } from "lucide-react";
 import type { HandbookSettings } from "@shared/schema";
 
@@ -367,6 +368,14 @@ export function HandbookBuilder({ user }: { user?: any }) {
     alcoholPolicy: "",
     socialMediaPolicy: "",
     additionalPolicies: "",
+    barManager: "",
+    headBartender: "",
+    alcoholPermit: "",
+    signatureCocktail1: "",
+    signatureCocktail2: "",
+    signatureCocktail3: "",
+    draftBeerCount: undefined,
+    closingTime: "",
   });
 
   useEffect(() => {
@@ -1527,6 +1536,103 @@ Date: ________________________________
                     className={focusClass}
                     style={inputStyle}
                     data-testid="input-happy-hour-details"
+                  />
+                </FieldWrapper>
+              </div>
+            </div>
+
+            <div className="rounded-md p-5" style={{ background: "#0f1117" }}>
+              <SectionHeader icon={Wine} title="Bar Program" subtitle="Used in the Bartender Training Manual for bar operations, cocktails, and compliance." />
+              <div className="space-y-5">
+                <FieldWrapper filled={isFieldFilled(formData.barManager)} label="Bar Manager / GM Name" helper="Referenced in Bartender Day 1 orientation and chain of command.">
+                  <Input
+                    placeholder="e.g., Sarah Mitchell"
+                    value={formData.barManager || ""}
+                    onChange={(e) => updateField("barManager", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-bar-manager"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.headBartender)} label="Head Bartender" helper="Lead trainer for bartender onboarding and Day 7 certification.">
+                  <Input
+                    placeholder="e.g., Jake Rivera"
+                    value={formData.headBartender || ""}
+                    onChange={(e) => updateField("headBartender", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-head-bartender"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.alcoholPermit)} label="Alcohol License / Permit Type" helper="Displayed on Bartender Day 1 TABC compliance section.">
+                  <Select value={formData.alcoholPermit || ""} onValueChange={(val) => updateField("alcoholPermit", val)}>
+                    <SelectTrigger className={focusClass} style={inputStyle} data-testid="select-alcohol-permit">
+                      <SelectValue placeholder="Select permit type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tabc_mixed">TABC Mixed Beverage Permit</SelectItem>
+                      <SelectItem value="beer_wine">Beer & Wine Only</SelectItem>
+                      <SelectItem value="full_liquor">Full Liquor License</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.signatureCocktail1)} label="Signature Cocktail #1" helper="Featured in Bartender Day 3 and assessment questions.">
+                  <Input
+                    placeholder="e.g., Smoky Old Fashioned"
+                    value={formData.signatureCocktail1 || ""}
+                    onChange={(e) => updateField("signatureCocktail1", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-signature-cocktail-1"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.signatureCocktail2)} label="Signature Cocktail #2">
+                  <Input
+                    placeholder="e.g., House Margarita"
+                    value={formData.signatureCocktail2 || ""}
+                    onChange={(e) => updateField("signatureCocktail2", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-signature-cocktail-2"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.signatureCocktail3)} label="Signature Cocktail #3">
+                  <Input
+                    placeholder="e.g., Bourbon Peach Smash"
+                    value={formData.signatureCocktail3 || ""}
+                    onChange={(e) => updateField("signatureCocktail3", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-signature-cocktail-3"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.draftBeerCount)} label="Number of Draft Lines" helper="Used in Bartender Day 2 beer knowledge section.">
+                  <Input
+                    type="number"
+                    placeholder="e.g., 12"
+                    value={formData.draftBeerCount ?? ""}
+                    onChange={(e) => updateField("draftBeerCount", e.target.value ? parseInt(e.target.value) : undefined)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-draft-beer-count"
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper filled={isFieldFilled(formData.closingTime)} label="Bar Closing Time" helper="Used in Bartender Day 6 close checklist and last call timing.">
+                  <Input
+                    placeholder="e.g., 12:00 AM, 2:00 AM"
+                    value={formData.closingTime || ""}
+                    onChange={(e) => updateField("closingTime", e.target.value)}
+                    className={focusClass}
+                    style={inputStyle}
+                    data-testid="input-closing-time"
                   />
                 </FieldWrapper>
               </div>
