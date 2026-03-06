@@ -433,6 +433,10 @@ export default function Dashboard() {
                     <Sparkles className="mr-2 h-4 w-4" />
                     Certification
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/menu-engineering")} className="cursor-pointer" data-testid="button-menu-engineering-nav">
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Menu Engineering
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -471,6 +475,10 @@ export default function Dashboard() {
                 <DropdownMenuItem onClick={() => navigate("/certification")} className="cursor-pointer">
                   <Sparkles className="mr-2 h-4 w-4" />
                   Certification
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/menu-engineering")} className="cursor-pointer">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Menu Engineering
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/consultant")} className="cursor-pointer">
