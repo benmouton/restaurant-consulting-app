@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useOnboarding } from "@/hooks/use-onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -325,6 +327,12 @@ const focusClass = "focus-visible:outline-[1.5px] focus-visible:outline-[#b8860b
 
 export function HandbookBuilder({ user }: { user?: any }) {
   const { toast } = useToast();
+  const { onboardingStep, isOnboarding, advanceStep } = useOnboarding();
+  const [, navigate] = useLocation();
+  const [onboardingRedirectTimer, setOnboardingRedirectTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => { if (onboardingRedirectTimer) clearTimeout(onboardingRedirectTimer); };
+  }, [onboardingRedirectTimer]);
   const [activeTab, setActiveTab] = useState("setup");
   const [showAddCustomPolicy, setShowAddCustomPolicy] = useState(false);
   const [customPolicyLabel, setCustomPolicyLabel] = useState("");
@@ -439,12 +447,29 @@ export function HandbookBuilder({ user }: { user?: any }) {
       const response = await apiRequest("POST", "/api/handbook-settings", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/handbook-settings"] });
-      toast({
-        title: "Settings saved",
-        description: "Your handbook settings have been saved.",
-      });
+      if (isOnboarding && onboardingStep === 0) {
+        try {
+          await advanceStep(1);
+          toast({
+            title: "Setup saved. Your restaurant is personalized.",
+            description: "Next: Generate your first training manual.",
+          });
+          const timer = setTimeout(() => navigate("/templates"), 4000);
+          setOnboardingRedirectTimer(timer);
+        } catch {
+          toast({
+            title: "Settings saved",
+            description: "Fill in Restaurant Name, Owner Name, and at least one manager to continue.",
+          });
+        }
+      } else {
+        toast({
+          title: "Settings saved",
+          description: "Your handbook settings have been saved.",
+        });
+      }
     },
     onError: () => {
       toast({
@@ -1109,6 +1134,22 @@ Date: ________________________________
 
         {activeTab === "setup" && (
           <div className="space-y-8" style={{ animation: "scheduleStaggerIn 0.3s ease-out" }}>
+
+            {isOnboarding && onboardingStep === 0 && (
+              <div
+                className="rounded-lg p-5"
+                style={{ background: "#12141f", borderLeft: "3px solid #b8860b" }}
+                data-testid="onboarding-setup-banner"
+              >
+                <p className="text-sm font-semibold text-white mb-1">Step 1 of 3 — Tell us about your restaurant</p>
+                <p className="text-xs leading-relaxed" style={{ color: "#9ca3af" }}>
+                  The more you fill in here, the more your training manuals, financial tools, and Consultant advice will be personalized to your specific operation.
+                </p>
+                <p className="text-xs mt-2" style={{ color: "#d4a017" }}>
+                  Required to continue: Restaurant Name, Owner Name, and at least one management contact.
+                </p>
+              </div>
+            )}
 
             <div className="rounded-md p-3" style={{ background: "#0f1117" }}>
               <div className="flex items-center justify-between mb-2">

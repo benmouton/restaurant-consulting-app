@@ -59,6 +59,7 @@ import {
 } from "lucide-react";
 import { isNativeApp, nativeShare, hapticTap, hapticSuccess } from "@/lib/native";
 import { useTierAccess } from "@/hooks/use-tier-access";
+import { useOnboarding } from "@/hooks/use-onboarding";
 import { TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { useOfflineCache } from "@/hooks/use-native-features";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -995,6 +996,7 @@ export default function TemplatesPage() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const { isFreeTier } = useTierAccess();
+  const { onboardingStep, isOnboarding, advanceStep } = useOnboarding();
   const [showPostGenModal, setShowPostGenModal] = useState(false);
   const [postGenManualName, setPostGenManualName] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<TrainingTemplate | null>(null);
@@ -1104,7 +1106,15 @@ export default function TemplatesPage() {
     setTimeout(() => setExportState(prev => ({ ...prev, [key]: 'idle' })), delay);
   };
 
-  const triggerPostGenModal = (manualName: string) => {
+  const triggerPostGenModal = async (manualName: string) => {
+    if (isOnboarding && onboardingStep === 1) {
+      try {
+        await advanceStep(2);
+      } catch {}
+      setPostGenManualName(manualName);
+      setShowPostGenModal(true);
+      return;
+    }
     if (!isFreeTier || isNativeApp()) return;
     if (typeof window !== 'undefined' && localStorage.getItem('hasSeenPostGenerationModal')) return;
     setPostGenManualName(manualName);
@@ -1327,6 +1337,28 @@ export default function TemplatesPage() {
             )}
           </p>
         </div>
+
+        {isOnboarding && onboardingStep === 1 && (
+          <div
+            className="mb-6 rounded-lg p-5"
+            style={{ background: "#12141f", borderLeft: "3px solid #b8860b" }}
+            data-testid="onboarding-step2-spotlight"
+          >
+            <p className="text-sm font-semibold text-white mb-1">Step 2 of 3 — Generate your first training manual</p>
+            <p className="text-xs leading-relaxed mb-3" style={{ color: "#9ca3af" }}>
+              Pick any manual below and click Generate. It will be personalized to {user?.restaurantName || "your restaurant"} automatically.
+              Most operators start with the Server Manual. It's the most used and takes about 30 seconds.
+            </p>
+            <Button
+              size="sm"
+              style={{ backgroundColor: "#b8860b", color: "white" }}
+              onClick={() => setActiveCategory("server")}
+              data-testid="button-goto-server-manual"
+            >
+              Go to Server Manual
+            </Button>
+          </div>
+        )}
 
         <TrainingIntelligenceStrip />
 
@@ -1914,29 +1946,61 @@ export default function TemplatesPage() {
             <div className="mx-auto w-14 h-14 rounded-full flex items-center justify-center mb-5" style={{ backgroundColor: 'rgba(212,160,23,0.1)' }}>
               <BookOpen className="h-7 w-7" style={{ color: '#d4a017' }} />
             </div>
-            <h2 className="text-xl font-bold mb-2 text-white" data-testid="text-post-gen-title">
-              Nice work on your {postGenManualName}
-            </h2>
-            <p className="text-sm mb-6" style={{ color: '#9ca3af' }}>
-              You just built one manual. Paid members get all four role manuals, the full operations consultant, staff scheduling, food costing, and {TOTAL_DOMAIN_COUNT} operational domains.
-            </p>
-            <Link href="/pricing">
-              <Button
-                className="w-full mb-4 font-semibold"
-                style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
-                data-testid="btn-post-gen-upgrade"
-              >
-                See what's included — $10/month
-              </Button>
-            </Link>
-            <button
-              onClick={() => setShowPostGenModal(false)}
-              className="text-xs underline underline-offset-4 bg-transparent border-none cursor-pointer"
-              style={{ color: '#6b7280' }}
-              data-testid="btn-post-gen-dismiss"
-            >
-              Not right now
-            </button>
+            {isOnboarding && onboardingStep === 2 ? (
+              <>
+                <h2 className="text-xl font-bold mb-2 text-white" data-testid="text-post-gen-title">
+                  Your {postGenManualName} is ready.
+                </h2>
+                <p className="text-sm mb-2" style={{ color: '#9ca3af' }}>
+                  It's personalized to {user?.restaurantName || "your restaurant"} and ready to print.
+                </p>
+                <p className="text-sm mb-6" style={{ color: '#d4a017' }}>
+                  One more step — meet your Consultant. The Consultant knows your restaurant now. Ask it anything.
+                </p>
+                <Button
+                  className="w-full mb-4 font-semibold"
+                  style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+                  onClick={() => { setShowPostGenModal(false); navigate("/consultant"); }}
+                  data-testid="btn-post-gen-consultant"
+                >
+                  Ask the Consultant
+                </Button>
+                <button
+                  onClick={() => setShowPostGenModal(false)}
+                  className="text-xs underline underline-offset-4 bg-transparent border-none cursor-pointer"
+                  style={{ color: '#6b7280' }}
+                  data-testid="btn-post-gen-stay"
+                >
+                  Stay here
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold mb-2 text-white" data-testid="text-post-gen-title">
+                  Nice work on your {postGenManualName}
+                </h2>
+                <p className="text-sm mb-6" style={{ color: '#9ca3af' }}>
+                  You just built one manual. Paid members get all four role manuals, the full operations consultant, staff scheduling, food costing, and {TOTAL_DOMAIN_COUNT} operational domains.
+                </p>
+                <Link href="/pricing">
+                  <Button
+                    className="w-full mb-4 font-semibold"
+                    style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+                    data-testid="btn-post-gen-upgrade"
+                  >
+                    See what's included — $10/month
+                  </Button>
+                </Link>
+                <button
+                  onClick={() => setShowPostGenModal(false)}
+                  className="text-xs underline underline-offset-4 bg-transparent border-none cursor-pointer"
+                  style={{ color: '#6b7280' }}
+                  data-testid="btn-post-gen-dismiss"
+                >
+                  Not right now
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -1981,6 +1981,55 @@ export async function registerRoutes(
     }
   });
 
+  // ===== ONBOARDING ROUTES =====
+
+  app.get("/api/onboarding/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const status = await storage.getOnboardingStatus(userId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error getting onboarding status:", error);
+      res.status(500).json({ message: "Failed to get onboarding status" });
+    }
+  });
+
+  app.post("/api/onboarding/step", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { step } = req.body;
+      if (typeof step !== "number" || step < 1 || step > 3) {
+        return res.status(400).json({ message: "Invalid step" });
+      }
+      const current = await storage.getOnboardingStatus(userId);
+      if (step !== current.onboardingStep + 1) {
+        return res.status(400).json({ message: "Steps must be completed in order" });
+      }
+      if (step === 1) {
+        const hasMinSetup = await storage.checkOnboardingMinSetup(userId);
+        if (!hasMinSetup) {
+          return res.status(400).json({ message: "Minimum setup fields not complete" });
+        }
+      }
+      await storage.updateOnboardingStep(userId, step);
+      res.json({ onboardingStep: step });
+    } catch (error: any) {
+      console.error("Error advancing onboarding step:", error);
+      res.status(500).json({ message: "Failed to advance onboarding step" });
+    }
+  });
+
+  app.post("/api/onboarding/dismiss", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.dismissOnboarding(userId);
+      res.json({ dismissed: true });
+    } catch (error: any) {
+      console.error("Error dismissing onboarding:", error);
+      res.status(500).json({ message: "Failed to dismiss onboarding" });
+    }
+  });
+
   app.post("/api/handbook-settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

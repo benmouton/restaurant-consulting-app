@@ -13,6 +13,7 @@ import { USER_ROLES } from "@shared/models/auth";
 import { isNativeApp } from "@/lib/native";
 import { useBiometric } from "@/hooks/use-native-features";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { OnboardingProgressBar } from "@/components/onboarding/OnboardingProgressBar";
 import { Shield, Fingerprint } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Landing from "@/pages/landing";
@@ -140,6 +141,7 @@ function Router() {
     <>
       <OfflineBanner />
       <TestAccessBanner />
+      {user && <OnboardingProgressBar />}
       <Switch>
         <Route path="/">
           {user ? <Dashboard /> : <Landing />}

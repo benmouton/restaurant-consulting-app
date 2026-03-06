@@ -5,6 +5,8 @@ import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
 import { useRole } from "@/hooks/use-role";
+import { useOnboarding } from "@/hooks/use-onboarding";
+import { WelcomeOverlay } from "@/components/onboarding/WelcomeOverlay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -276,6 +278,7 @@ export default function Dashboard() {
 
   const timeContext = useMemo(() => getTimeContext(), []);
   const [recentlyVisited, setRecentlyVisited] = useState<string[]>([]);
+  const [onboardingNudgeDismissed, setOnboardingNudgeDismissed] = useState(false);
 
   useEffect(() => {
     setRecentlyVisited(getRecentlyVisited());
@@ -300,17 +303,7 @@ export default function Dashboard() {
     return result;
   }, [domains]);
 
-  const needsOnboarding = user && !user.restaurantName;
-  const [skippedOnboarding, setSkippedOnboarding] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("onboarding-skipped");
-  });
-
-  useEffect(() => {
-    if (needsOnboarding && !skippedOnboarding) {
-      navigate("/onboarding");
-    }
-  }, [needsOnboarding, skippedOnboarding, navigate]);
+  const { onboardingStep, isOnboarding, showWelcome, onboardingDismissed } = useOnboarding();
 
   const handleDomainClick = useCallback((slug: string) => {
     hapticTap();
@@ -574,20 +567,7 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 sm:py-10">
-        {needsOnboarding && skippedOnboarding && (
-          <div
-            className="mb-4 p-3 rounded-lg flex items-center justify-between gap-4 flex-wrap"
-            style={{ background: "rgba(184,134,11,0.06)", border: "1px solid rgba(184,134,11,0.2)" }}
-            data-testid="banner-complete-setup"
-          >
-            <p className="text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>
-              Complete your restaurant setup to personalize templates and tools.
-            </p>
-            <Button size="sm" variant="outline" onClick={() => navigate("/onboarding")} data-testid="btn-complete-setup-banner">
-              Complete Setup
-            </Button>
-          </div>
-        )}
+        {showWelcome && <WelcomeOverlay />}
 
         {/* Greeting Section */}
         <div className="mb-6 sm:mb-8" style={{ animation: "playbookStaggerIn 0.4s ease both" }}>
@@ -882,6 +862,66 @@ export default function Dashboard() {
             </div>
           );
         })()}
+
+        {isOnboarding && onboardingStep === 1 && !onboardingNudgeDismissed && (
+          <div
+            className="mb-6 p-4 rounded-lg flex items-center justify-between gap-4"
+            style={{ background: "#1a1d2e", borderLeft: "3px solid #b8860b" }}
+            data-testid="nudge-step2"
+          >
+            <div>
+              <p className="text-sm text-white font-medium">You're one step from having a personalized training system.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                style={{ backgroundColor: "#b8860b", color: "white" }}
+                onClick={() => navigate("/templates")}
+                data-testid="button-nudge-generate"
+              >
+                Generate your first manual
+              </Button>
+              <button
+                className="p-1 bg-transparent border-none cursor-pointer"
+                style={{ color: "#4b5563" }}
+                onClick={() => setOnboardingNudgeDismissed(true)}
+                data-testid="button-nudge-dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isOnboarding && onboardingStep === 2 && !onboardingNudgeDismissed && (
+          <div
+            className="mb-6 p-4 rounded-lg flex items-center justify-between gap-4"
+            style={{ background: "#1a1d2e", borderLeft: "3px solid #b8860b" }}
+            data-testid="nudge-step3"
+          >
+            <div>
+              <p className="text-sm text-white font-medium">Your Consultant knows your restaurant. It's waiting for your first question.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                style={{ backgroundColor: "#b8860b", color: "white" }}
+                onClick={() => navigate("/consultant")}
+                data-testid="button-nudge-consultant"
+              >
+                Ask the Consultant
+              </Button>
+              <button
+                className="p-1 bg-transparent border-none cursor-pointer"
+                style={{ color: "#4b5563" }}
+                onClick={() => setOnboardingNudgeDismissed(true)}
+                data-testid="button-nudge-dismiss-2"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ALSTIG INC App Suite Banner */}
         <div

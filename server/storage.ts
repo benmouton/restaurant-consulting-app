@@ -245,6 +245,11 @@ export interface IStorage {
   createOrUpdateSop(userId: string, data: InsertGeneratedSop): Promise<GeneratedSop>;
   deleteSop(id: number, userId: string): Promise<boolean>;
 
+  updateOnboardingStep(userId: string, step: number): Promise<void>;
+  dismissOnboarding(userId: string): Promise<void>;
+  getOnboardingStatus(userId: string): Promise<{ onboardingStep: number; onboardingDismissed: boolean; activatedAt: Date | null }>;
+  checkOnboardingMinSetup(userId: string): Promise<boolean>;
+
   getMenuCategories(userId: string): Promise<MenuCategory[]>;
   createMenuCategory(data: InsertMenuCategory): Promise<MenuCategory>;
   updateMenuCategory(id: number, userId: string, data: Partial<InsertMenuCategory>): Promise<MenuCategory | undefined>;
@@ -1944,6 +1949,45 @@ export class DatabaseStorage implements IStorage {
   async deleteSop(id: number, userId: string): Promise<boolean> {
     const result = await db.delete(generatedSops).where(and(eq(generatedSops.id, id), eq(generatedSops.userId, userId))).returning();
     return result.length > 0;
+  }
+
+  async updateOnboardingStep(userId: string, step: number): Promise<void> {
+    const updateData: any = { onboardingStep: step, updatedAt: new Date() };
+    if (step === 3) {
+      updateData.activatedAt = new Date();
+    }
+    await db.update(users).set(updateData).where(eq(users.id, userId));
+  }
+
+  async dismissOnboarding(userId: string): Promise<void> {
+    await db.update(users).set({ onboardingDismissed: true, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async getOnboardingStatus(userId: string): Promise<{ onboardingStep: number; onboardingDismissed: boolean; activatedAt: Date | null }> {
+    const [user] = await db.select({
+      onboardingStep: users.onboardingStep,
+      onboardingDismissed: users.onboardingDismissed,
+      activatedAt: users.activatedAt,
+    }).from(users).where(eq(users.id, userId));
+    return {
+      onboardingStep: user?.onboardingStep ?? 0,
+      onboardingDismissed: user?.onboardingDismissed ?? false,
+      activatedAt: user?.activatedAt ?? null,
+    };
+  }
+
+  async checkOnboardingMinSetup(userId: string): Promise<boolean> {
+    const settings = await this.getHandbookSettings(userId);
+    if (!settings) return false;
+    const hasRestaurantName = !!(settings.restaurantName && String(settings.restaurantName).trim());
+    const hasOwnerName = !!(settings.ownerNames && String(settings.ownerNames).trim());
+    const hasManager = !!(
+      (settings.generalManager && String(settings.generalManager).trim()) ||
+      (settings.floorManager && String(settings.floorManager).trim()) ||
+      (settings.barManager && String(settings.barManager).trim()) ||
+      (settings.kitchenManager && String(settings.kitchenManager).trim())
+    );
+    return hasRestaurantName && hasOwnerName && hasManager;
   }
 
   async getMenuCategories(userId: string): Promise<MenuCategory[]> {

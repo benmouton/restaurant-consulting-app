@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
+import { useOnboarding } from "@/hooks/use-onboarding";
 
 interface AttachedImage {
   base64: string;
@@ -210,6 +211,8 @@ export default function ConsultantPage() {
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const { toast } = useToast();
+  const { onboardingStep, isOnboarding, advanceStep } = useOnboarding();
+  const [onboardingAdvanced, setOnboardingAdvanced] = useState(false);
 
   const { data: conversationList } = useQuery<Conversation[]>({
     queryKey: ["/api/consultant/conversations"],
@@ -465,6 +468,11 @@ export default function ConsultantPage() {
       });
 
       if (!response.ok) throw new Error("Failed to get response");
+
+      if (isOnboarding && onboardingStep === 2 && !onboardingAdvanced) {
+        setOnboardingAdvanced(true);
+        advanceStep(3).catch(() => {});
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error("No reader available");
@@ -748,39 +756,72 @@ export default function ConsultantPage() {
               {/* Empty State + Starters */}
               {messages.length === 0 ? (
                 <div className="py-8 sm:py-12">
-                  <div className="text-center mb-8" style={{ animation: 'scheduleStaggerIn 0.3s ease-out both' }}>
-                    <ChefHat className="h-12 w-12 mx-auto mb-3" style={{ color: '#d4a017' }} />
-                    <h2 className="text-xl font-semibold mb-2 text-white" data-testid="text-empty-title">
-                      Ask Anything. Get Operator-Grade Answers.
-                    </h2>
-                    <p className="max-w-md mx-auto text-sm" style={{ color: '#9ca3af' }}>
-                      Built by operators, for operators. No generic advice.
-                    </p>
-                    {restaurantProfile?.restaurantName && (
-                      <p className="text-xs mt-2" style={{ color: '#6b7280' }} data-testid="text-personalized">
-                        Tailored for <span className="font-medium text-white">{restaurantProfile.restaurantName}</span>
-                      </p>
-                    )}
-                  </div>
+                  {isOnboarding && onboardingStep === 2 ? (
+                    <>
+                      <div className="text-center mb-8" style={{ animation: 'scheduleStaggerIn 0.3s ease-out both' }}>
+                        <ChefHat className="h-12 w-12 mx-auto mb-3" style={{ color: '#d4a017' }} />
+                        <h2 className="text-xl font-semibold mb-2 text-white" data-testid="text-empty-title">
+                          Step 3 of 3 — Ask your first question
+                        </h2>
+                        <p className="max-w-md mx-auto text-sm" style={{ color: '#9ca3af' }}>
+                          Your Consultant already knows {restaurantProfile?.restaurantName || "your restaurant"}.
+                          It has your setup details, your financial profile, and your menu data. Ask it anything about your operation.
+                        </p>
+                      </div>
 
-                  {/* Prompt Starters */}
-                  {!input && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto" data-testid="section-prompt-starters"
-                      style={{ animation: 'scheduleStaggerIn 0.3s ease-out 80ms both' }}>
-                      {activeDomainLabel && (
-                        <div className="col-span-full text-xs font-medium mb-1" style={{ color: '#d4a017' }}>
-                          {activeDomainLabel} questions:
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto" data-testid="section-onboarding-chips"
+                        style={{ animation: 'scheduleStaggerIn 0.3s ease-out 80ms both' }}>
+                        {[
+                          "We're struggling with food cost. Where do I start?",
+                          "What should I look for when interviewing a new server?",
+                          "How do I set up a pre-shift lineup that actually works?",
+                          "My prime cost is over target. What are the first three things to check?",
+                        ].map((chip, i) => (
+                          <div key={chip} className="p-3 rounded-lg cursor-pointer transition-transform active:scale-[0.97]"
+                            style={{ backgroundColor: '#1a1d2e', border: '1px solid rgba(212,160,23,0.3)', animation: `scheduleStaggerIn 0.3s ease-out ${(i + 2) * 80}ms both` }}
+                            onClick={() => { setInput(chip); textareaRef.current?.focus(); }}
+                            data-testid={`onboarding-chip-${i}`}>
+                            <p className="text-sm" style={{ color: '#d4a017' }}>{chip}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-center mb-8" style={{ animation: 'scheduleStaggerIn 0.3s ease-out both' }}>
+                        <ChefHat className="h-12 w-12 mx-auto mb-3" style={{ color: '#d4a017' }} />
+                        <h2 className="text-xl font-semibold mb-2 text-white" data-testid="text-empty-title">
+                          Ask Anything. Get Operator-Grade Answers.
+                        </h2>
+                        <p className="max-w-md mx-auto text-sm" style={{ color: '#9ca3af' }}>
+                          Built by operators, for operators. No generic advice.
+                        </p>
+                        {restaurantProfile?.restaurantName && (
+                          <p className="text-xs mt-2" style={{ color: '#6b7280' }} data-testid="text-personalized">
+                            Tailored for <span className="font-medium text-white">{restaurantProfile.restaurantName}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {!input && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto" data-testid="section-prompt-starters"
+                          style={{ animation: 'scheduleStaggerIn 0.3s ease-out 80ms both' }}>
+                          {activeDomainLabel && (
+                            <div className="col-span-full text-xs font-medium mb-1" style={{ color: '#d4a017' }}>
+                              {activeDomainLabel} questions:
+                            </div>
+                          )}
+                          {getActiveStarters().map((q, i) => (
+                            <div key={q} className="p-3 rounded-lg cursor-pointer transition-transform active:scale-[0.97]"
+                              style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e', animation: `scheduleStaggerIn 0.3s ease-out ${(i + 2) * 80}ms both` }}
+                              onClick={() => { setInput(q); textareaRef.current?.focus(); }}
+                              data-testid={`starter-${i}`}>
+                              <p className="text-sm" style={{ color: '#9ca3af' }}>{q}</p>
+                            </div>
+                          ))}
                         </div>
                       )}
-                      {getActiveStarters().map((q, i) => (
-                        <div key={q} className="p-3 rounded-lg cursor-pointer transition-transform active:scale-[0.97]"
-                          style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e', animation: `scheduleStaggerIn 0.3s ease-out ${(i + 2) * 80}ms both` }}
-                          onClick={() => { setInput(q); textareaRef.current?.focus(); }}
-                          data-testid={`starter-${i}`}>
-                          <p className="text-sm" style={{ color: '#9ca3af' }}>{q}</p>
-                        </div>
-                      ))}
-                    </div>
+                    </>
                   )}
                 </div>
               ) : (

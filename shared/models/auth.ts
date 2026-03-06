@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
 // Session storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
@@ -41,6 +41,9 @@ export const users = pgTable("users", {
   isAdmin: varchar("is_admin").default("false"),
   consultantMessagesUsed: integer("consultant_messages_used").default(0),
   consultantMessagesResetDate: varchar("consultant_messages_reset_date"),
+  onboardingStep: integer("onboarding_step").default(0),
+  onboardingDismissed: boolean("onboarding_dismissed").default(false),
+  activatedAt: timestamp("activated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
