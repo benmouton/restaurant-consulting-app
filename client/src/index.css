@@ -316,3 +316,12 @@
   from { opacity: 0; transform: translateY(-20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes financialDragPulse {
+  0%, 100% { border-color: rgba(184,134,11,0.4); }
+  50% { border-color: rgba(184,134,11,0.9); }
+}
+
+@keyframes financialScoreArc {
+  from { stroke-dashoffset: 283; }
+}

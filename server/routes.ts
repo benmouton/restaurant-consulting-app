@@ -4068,6 +4068,70 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
     res.status(204).send();
   });
 
+  app.post("/api/financial/extract-text", isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const filePath = req.file.path;
+      const mimeType = req.file.mimetype;
+      let extractedText = "";
+
+      if (mimeType === "application/pdf") {
+        const pdfParse = (await import("pdf-parse")).default;
+        const dataBuffer = fs.readFileSync(filePath);
+        const pdfData = await pdfParse(dataBuffer);
+        extractedText = pdfData.text || "";
+
+        if (!extractedText.trim()) {
+          const imageBase64 = dataBuffer.toString("base64");
+          const visionResponse = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: "Extract all text from this financial document. Return only the raw extracted text, preserving numbers, column headers, and line items exactly as they appear." },
+                { type: "image_url", image_url: { url: `data:application/pdf;base64,${imageBase64}` } }
+              ]
+            }],
+            max_tokens: 4000,
+          });
+          extractedText = visionResponse.choices[0]?.message?.content || "";
+        }
+      } else if (mimeType.startsWith("image/")) {
+        const imageBuffer = fs.readFileSync(filePath);
+        const imageBase64 = imageBuffer.toString("base64");
+        const ext = mimeType.split("/")[1] || "png";
+        const visionResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: "Extract all text from this financial document. Return only the raw extracted text, preserving numbers, column headers, and line items exactly as they appear." },
+              { type: "image_url", image_url: { url: `data:image/${ext};base64,${imageBase64}` } }
+            ]
+          }],
+          max_tokens: 4000,
+        });
+        extractedText = visionResponse.choices[0]?.message?.content || "";
+      } else if (mimeType === "text/csv" || req.file.originalname.endsWith(".csv")) {
+        extractedText = fs.readFileSync(filePath, "utf-8");
+      } else {
+        extractedText = fs.readFileSync(filePath, "utf-8");
+      }
+
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      res.json({ text: extractedText });
+    } catch (err) {
+      console.error("Financial text extraction error:", err);
+      res.status(500).json({ message: "Failed to extract text" });
+    }
+  });
+
   // =============================================
   // HR DOCUMENTS ROUTES
   // =============================================
