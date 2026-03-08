@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { useTierAccess } from "@/hooks/use-tier-access";
 import { DOMAIN_TIER_MAP, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lock, ArrowRight } from "lucide-react";
+import { Lock, ArrowRight, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { isNativeApp } from "@/lib/native";
+import { getOfferings, purchasePackage, getCustomerInfo, getEntitlementTier } from "@/lib/revenuecat";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
   hr: {
@@ -13,7 +17,7 @@ const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
   },
   staffing: {
     headline: "Your Labor Cost Is Either Under Control or It Isn't",
-    sub: "Track scheduled vs. actual labor %, get AI scheduling recommendations, and know your shift cost before service starts."
+    sub: "Track scheduled vs. actual labor %, get scheduling recommendations, and know your shift cost before service starts."
   },
   costs: {
     headline: "Your Prime Cost Is Either Under Control or It Isn't",
@@ -37,7 +41,7 @@ const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
   },
   "social-media": {
     headline: "Consistent Social Presence Without the Time",
-    sub: "AI-generated posts in your restaurant's voice, scheduled across platforms. Stop starting from scratch every time."
+    sub: "Posts in your restaurant's voice, scheduled across platforms. Stop starting from scratch every time."
   },
   consultant: {
     headline: "A Consultant Who Knows Your Restaurant",
@@ -57,7 +61,7 @@ const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
   },
   facilities: {
     headline: "Build a Schedule That Hits Your Labor Target",
-    sub: "AI-assisted scheduling with live labor cost calculation. Know what the schedule costs before you publish it."
+    sub: "Scheduling with live labor cost calculation. Know what the schedule costs before you publish it."
   },
 };
 
@@ -68,6 +72,8 @@ interface UpgradeGateProps {
 
 export function UpgradeGate({ domain, children }: UpgradeGateProps) {
   const { canAccessDomain } = useTierAccess();
+  const { toast } = useToast();
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   if (canAccessDomain(domain)) {
     return <>{children}</>;
@@ -77,6 +83,46 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
   const domainName = domainInfo?.name ?? "this feature";
   const domainDescription = domainInfo?.description ?? "Access premium tools and features.";
   const domainCopy = upgradeGateCopy[domain];
+
+  const handleNativePurchase = async () => {
+    setIsPurchasing(true);
+    try {
+      const offerings = await getOfferings();
+      if (!offerings?.offerings?.current?.availablePackages?.length) {
+        toast({ title: "No subscription packages available right now. Please try again later.", variant: "destructive" });
+        return;
+      }
+
+      const packages = offerings.offerings.current.availablePackages;
+      const targetPackage = packages.find((p: any) =>
+        p.identifier?.toLowerCase().includes('basic')
+      ) || packages[0];
+
+      const purchaseResult = await purchasePackage(targetPackage);
+      if (!purchaseResult) {
+        return;
+      }
+
+      const customerInfo = await getCustomerInfo();
+      const tier = getEntitlementTier(customerInfo);
+
+      await apiRequest("POST", "/api/subscription/native-verify", {
+        tier,
+        platform: "ios",
+      });
+
+      toast({ title: "Subscription Active", description: `Your ${tier} plan is now active.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+    } catch (e: any) {
+      if (e?.message === "PURCHASE_CANCELLED" || e?.code === 1) {
+        return;
+      }
+      console.error("Native purchase error:", e);
+      toast({ title: "Something went wrong. Please try again.", variant: "destructive" });
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   return (
     <div className="relative">
@@ -96,9 +142,29 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
               {domainCopy ? domainCopy.sub : domainDescription}
             </p>
             {isNativeApp() ? (
-              <p className="text-sm text-muted-foreground">
-                This domain requires a subscription. Subscribe at <span className="font-medium text-primary">restaurantai.consulting</span>
-              </p>
+              <>
+                <p className="text-sm font-medium mb-6">
+                  Unlock all {TOTAL_DOMAIN_COUNT} domains + tools with a subscription
+                </p>
+                <Button
+                  className="w-full mb-3"
+                  onClick={handleNativePurchase}
+                  disabled={isPurchasing}
+                  data-testid="btn-native-subscribe"
+                >
+                  {isPurchasing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Subscribe Now
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </>
             ) : (
               <>
                 <p className="text-sm font-medium mb-6">
