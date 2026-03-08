@@ -1,6 +1,5 @@
 import { Link } from "wouter";
-import { ArrowLeft, Mail, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Mail, ChevronRight } from "lucide-react";
 import { BrandLogoNav } from "@/components/BrandLogo";
 
 const faqs = [
@@ -28,12 +27,12 @@ export default function SupportPage() {
       <header style={{ borderBottom: '1px solid #1a1a1a', padding: '16px 0' }}>
         <div className="container mx-auto px-4 flex items-center justify-between">
           <BrandLogoNav linkTo="/" />
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="text-white hover:text-white/80" data-testid="button-back-home">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          </Link>
+          <nav className="flex items-center gap-4">
+            <Link href="/apps" className="text-sm hover:underline" style={{ color: '#999' }} data-testid="link-nav-apps">Apps</Link>
+            <Link href="/">
+              <span className="text-sm hover:underline" style={{ color: '#999' }} data-testid="link-nav-home">Home</span>
+            </Link>
+          </nav>
         </div>
       </header>
 

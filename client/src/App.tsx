@@ -42,6 +42,7 @@ import PrivacyPolicy from "@/pages/privacy";
 import DataDeletion from "@/pages/data-deletion";
 import TermsOfService from "@/pages/terms";
 import SupportPage from "@/pages/support";
+import AppsPage from "@/pages/apps";
 import CertificationPage from "@/pages/certification";
 import TestAccessPage from "@/pages/test-access";
 import ReviewLoginPage from "@/pages/review-login";
@@ -217,6 +218,7 @@ function Router() {
         <Route path="/data-deletion" component={DataDeletion} />
         <Route path="/terms" component={TermsOfService} />
         <Route path="/support" component={SupportPage} />
+        <Route path="/apps" component={AppsPage} />
         {/* Organization invite acceptance */}
         <Route path="/accept-invite/:token" component={AcceptInvitePage} />
         {/* Employee Portal Routes - separate from main app auth */}
