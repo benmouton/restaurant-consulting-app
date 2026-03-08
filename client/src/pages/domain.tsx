@@ -7490,42 +7490,31 @@ Generate ONLY the response text, nothing else.`,
         )}
 
         <div>
-          {isNative ? (
-            <>
-              <Label className="text-white">Or Upload a Screenshot of the Review</Label>
-              <div
-                className="mt-1 rounded-lg p-4 text-center cursor-pointer transition-colors"
-                style={{ border: '2px dashed rgba(212,160,23,0.4)', background: screenshotPreview ? '#111827' : 'transparent' }}
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="screenshot-drop-zone"
-              >
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImageUpload(file); }} data-testid="input-screenshot" />
-                {screenshotPreview ? (
-                  <div className="relative inline-block">
-                    <img src={screenshotPreview} alt="Review screenshot" className="max-h-48 mx-auto rounded-md" />
-                    <button onClick={(e) => { e.stopPropagation(); removeScreenshot(); }} className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: '#ef4444' }} data-testid="btn-remove-screenshot">
-                      <X className="h-3 w-3 text-white" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="py-4">
-                    <Upload className="h-8 w-8 mx-auto mb-2" style={{ color: '#d4a017' }} />
-                    <p className="text-sm" style={{ color: '#9ca3af' }}>Drag & drop a screenshot here, or click to upload</p>
-                    <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Works best with Google, Yelp, and TripAdvisor review screenshots</p>
-                  </div>
-                )}
+          <Label className="text-white">Or Upload a Screenshot of the Review</Label>
+          <div
+            className="mt-1 rounded-lg p-4 text-center cursor-pointer transition-colors"
+            style={{ border: '2px dashed rgba(212,160,23,0.4)', background: screenshotPreview ? '#111827' : 'transparent' }}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            data-testid="screenshot-drop-zone"
+          >
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImageUpload(file); }} data-testid="input-screenshot" />
+            {screenshotPreview ? (
+              <div className="relative inline-block">
+                <img src={screenshotPreview} alt="Review screenshot" className="max-h-48 mx-auto rounded-md" />
+                <button onClick={(e) => { e.stopPropagation(); removeScreenshot(); }} className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: '#ef4444' }} data-testid="btn-remove-screenshot">
+                  <X className="h-3 w-3 text-white" />
+                </button>
               </div>
-            </>
-          ) : (
-            <div className="rounded-lg p-3 mt-1" style={{ background: '#111827', border: '1px solid #2a2d3e' }}>
-              <div className="flex items-center gap-2">
-                <Upload className="h-4 w-4 shrink-0" style={{ color: '#6b7280' }} />
-                <p className="text-xs" style={{ color: '#6b7280' }}>Screenshot upload and OCR available in the iOS app. On web, paste the review text directly above.</p>
+            ) : (
+              <div className="py-4">
+                <Upload className="h-8 w-8 mx-auto mb-2" style={{ color: '#d4a017' }} />
+                <p className="text-sm" style={{ color: '#9ca3af' }}>Drag & drop a screenshot here, or click to upload</p>
+                <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Works best with Google, Yelp, and TripAdvisor review screenshots</p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <Button
