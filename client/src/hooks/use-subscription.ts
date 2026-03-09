@@ -17,7 +17,7 @@ export function useSubscription() {
   const { user, isLoading: authLoading } = useAuth();
   const { isAdmin, isLoading: adminLoading, error: adminError } = useAdmin();
   const { toast } = useToast();
-  
+
   const { data, isLoading, error, refetch: refetchStatus } = useQuery<SubscriptionStatus>({
     queryKey: ["/api/subscription/status"],
     staleTime: 30000,
@@ -29,18 +29,24 @@ export function useSubscription() {
     mutationFn: async (params?: { tier?: string; interval?: string }) => {
       if (isNativeApp()) {
         const offerings = await getOfferings();
-        if (!offerings?.offerings?.current?.availablePackages?.length) {
-          throw new Error("No packages available. Please try again later.");
-        }
+        const offering = offerings?.all?.default;
 
         const targetTier = params?.tier || 'basic';
-        const packages = offerings.offerings.current.availablePackages;
+        let targetPackage: any = null;
 
-        let targetPackage = packages.find((p: any) =>
-          p.identifier?.toLowerCase().includes(targetTier)
-        );
+        if (offering?.availablePackages?.length) {
+          targetPackage = offering.availablePackages.find((p: any) =>
+            p.identifier?.toLowerCase().includes(targetTier)
+          ) || offering.availablePackages[0];
+        }
+
         if (!targetPackage) {
-          targetPackage = packages[0];
+          const interval = params?.interval || 'monthly';
+          targetPackage = offering?.[interval] || offering?.monthly || offering?.annual;
+        }
+
+        if (!targetPackage) {
+          throw new Error("No packages available. Please try again later.");
         }
 
         const purchaseResult = await purchasePackage(targetPackage);
