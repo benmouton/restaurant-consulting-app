@@ -6,7 +6,7 @@ const apps = [
     name: "The Restaurant Consultant",
     category: "Business / Food & Drink",
     description: "Consulting for independent restaurant owners. Get expert guidance on operations, financials, menu strategy, and staff management — on demand.",
-    link: "#",
+    link: "https://restaurantai.consulting/",
   },
   {
     name: "MyCookbook",
