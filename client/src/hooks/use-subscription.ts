@@ -40,7 +40,7 @@ export function useSubscription() {
     mutationFn: async (params?: { tier?: string; interval?: string }) => {
       if (isNativeApp()) {
         const offerings = await getOfferings();
-        const offering = offerings?.current; // ✅ correct: top-level .current
+        const offering = offerings?.all?.default; // ✅ correct: top-level .current
 
         const targetTier = params?.tier || "basic";
         let targetPackage: any = null;
