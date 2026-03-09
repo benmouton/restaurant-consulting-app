@@ -12,13 +12,13 @@ const apps = [
     name: "MyCookbook",
     category: "Food & Drink",
     description: "Build and organize your personal recipe collection. Save recipes, scale ingredients, and keep your culinary creations in one place.",
-    link: "#",
+    link: "https://apps.apple.com/us/app/mycookbook-recipe-box/id6759684127",
   },
   {
     name: "ChefScale",
     category: "Food & Drink / Utilities",
     description: "Professional recipe scaling for chefs and home cooks. Instantly scale any recipe up or down with precision — perfect for meal prep, catering, and batch cooking.",
-    link: "#",
+    link: "https://apps.apple.com/us/app/chefscale/id6759728525",
   },
   {
     name: "Review Responder",
