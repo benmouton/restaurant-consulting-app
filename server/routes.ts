@@ -1416,6 +1416,13 @@ export async function registerRoutes(
         });
       });
 
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
       console.log("[APPLE_WEB] Login successful, redirecting to /");
       res.redirect("/");
     } catch (error: any) {
@@ -1487,9 +1494,17 @@ export async function registerRoutes(
         });
       });
 
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      console.log("[APPLE_NATIVE] Login successful for:", appleUserId);
       res.json({ success: true, userId: appleUserId });
     } catch (error: any) {
-      console.error("Apple auth error:", error);
+      console.error("[APPLE_NATIVE] Auth error:", error);
       if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
         return res.status(401).json({ error: "Invalid or expired Apple token" });
       }

@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChefHat, Apple, Loader2 } from "lucide-react";
 
 export default function NativeLoginPage() {
-  const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -45,7 +43,20 @@ export default function NativeLoginPage() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation(returnTo);
+
+      const maxAttempts = 10;
+      for (let i = 0; i < maxAttempts; i++) {
+        try {
+          const authRes = await fetch("/api/auth/user", { credentials: "include" });
+          if (authRes.ok) {
+            window.location.href = returnTo;
+            return;
+          }
+        } catch {}
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      window.location.href = returnTo;
     } catch (err: any) {
       const msg = err?.message || "";
 
@@ -130,4 +141,3 @@ export default function NativeLoginPage() {
     </div>
   );
 }
-function useQueryClient()    
