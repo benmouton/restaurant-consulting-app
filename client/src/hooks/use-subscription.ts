@@ -4,7 +4,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAdmin } from "@/hooks/use-admin";
 import { useToast } from "@/hooks/use-toast";
 import { startLogin, isNativeApp } from "@/lib/native";
-import { getOfferings, purchasePackage, getCustomerInfo, getEntitlementTier, restorePurchases } from "@/lib/revenuecat";
+import {
+  getOfferings,
+  purchasePackage,
+  getCustomerInfo,
+  getEntitlementTier,
+  restorePurchases,
+} from "@/lib/revenuecat";
 
 interface SubscriptionStatus {
   hasSubscription: boolean;
@@ -18,7 +24,12 @@ export function useSubscription() {
   const { isAdmin, isLoading: adminLoading, error: adminError } = useAdmin();
   const { toast } = useToast();
 
-  const { data, isLoading, error, refetch: refetchStatus } = useQuery<SubscriptionStatus>({
+  const {
+    data,
+    isLoading,
+    error,
+    refetch: refetchStatus,
+  } = useQuery<SubscriptionStatus>({
     queryKey: ["/api/subscription/status"],
     staleTime: 30000,
     retry: false,
@@ -29,20 +40,22 @@ export function useSubscription() {
     mutationFn: async (params?: { tier?: string; interval?: string }) => {
       if (isNativeApp()) {
         const offerings = await getOfferings();
-        const offering = offerings?.all?.default;
+        const offering = offerings?.current; // ✅ correct: top-level .current
 
-        const targetTier = params?.tier || 'basic';
+        const targetTier = params?.tier || "basic";
         let targetPackage: any = null;
 
         if (offering?.availablePackages?.length) {
-          targetPackage = offering.availablePackages.find((p: any) =>
-            p.identifier?.toLowerCase().includes(targetTier)
-          ) || offering.availablePackages[0];
+          targetPackage =
+            offering.availablePackages.find((p: any) =>
+              p.identifier?.toLowerCase().includes(targetTier),
+            ) || offering.availablePackages[0];
         }
 
         if (!targetPackage) {
-          const interval = params?.interval || 'monthly';
-          targetPackage = offering?.[interval] || offering?.monthly || offering?.annual;
+          const interval = params?.interval || "monthly";
+          targetPackage =
+            offering?.[interval] || offering?.monthly || offering?.annual;
         }
 
         if (!targetPackage) {
@@ -65,7 +78,11 @@ export function useSubscription() {
         return { tier, success: true };
       }
 
-      const res = await apiRequest("POST", "/api/subscription/checkout", params || {});
+      const res = await apiRequest(
+        "POST",
+        "/api/subscription/checkout",
+        params || {},
+      );
       if (res.status === 401) {
         throw new Error("SESSION_EXPIRED");
       }
@@ -78,7 +95,9 @@ export function useSubscription() {
             title: "Subscription Active",
             description: `Your ${data.tier} plan is now active.`,
           });
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+          queryClient.invalidateQueries({
+            queryKey: ["/api/subscription/status"],
+          });
         }
         return;
       }
@@ -109,7 +128,8 @@ export function useSubscription() {
       } else {
         toast({
           title: "Checkout Failed",
-          description: error.message || "Unable to start checkout. Please try again.",
+          description:
+            error.message || "Unable to start checkout. Please try again.",
           variant: "destructive",
         });
       }
@@ -131,11 +151,14 @@ export function useSubscription() {
       if (isNativeApp()) {
         toast({
           title: "Purchases Restored",
-          description: data?.tier !== 'free'
-            ? `Your ${data.tier} plan has been restored.`
-            : "No active subscriptions found.",
+          description:
+            data?.tier !== "free"
+              ? `Your ${data.tier} plan has been restored.`
+              : "No active subscriptions found.",
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+        queryClient.invalidateQueries({
+          queryKey: ["/api/subscription/status"],
+        });
         return;
       }
       if (data.url) {
@@ -159,7 +182,8 @@ export function useSubscription() {
     isCheckingOut: checkoutMutation.isPending,
     openPortal: portalMutation.mutate,
     isOpeningPortal: portalMutation.isPending,
-    refetch: () => queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] }),
+    refetch: () =>
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] }),
     isAdmin,
   };
 }
