@@ -51,6 +51,7 @@ import NativeLoginPage from "@/pages/native-login";
 import PricingPage from "@/pages/pricing";
 import NotFound from "@/pages/not-found";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
+import { initRevenueCat, getOfferings } from '@/lib/revenuecat';
 import { TestAccessBanner } from "@/components/TestAccessBanner";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
@@ -236,6 +237,13 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+  const init = async () => {
+    await initRevenueCat();
+    await getOfferings();
+  };
+  init();
+}, []);
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

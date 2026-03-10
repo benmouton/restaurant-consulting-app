@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>The Restaurant Consultant</string>
+	<string>The Restaurant Consultant</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +45,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>LSApplicationCategoryType</key>
+	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+<string>The Restaurant Consultant uses your photo library to attach images to your restaurant documents.</string>
+<key>NSCameraUsageDescription</key>
+<string>The Restaurant Consultant uses your camera to capture photos for your restaurant documents.</string>
 </dict>
 </plist>

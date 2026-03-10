@@ -1,0 +1,93 @@
+PODS:
+  - Capacitor (8.1.0):
+    - CapacitorCordova
+  - CapacitorBrowser (8.0.1):
+    - Capacitor
+  - CapacitorCamera (8.0.1):
+    - Capacitor
+  - CapacitorCommunityAppleSignIn (7.1.0):
+    - Capacitor
+  - CapacitorCordova (8.1.0)
+  - CapacitorHaptics (8.0.1):
+    - Capacitor
+  - CapacitorNativeBiometric (0.0.1):
+    - Capacitor
+  - CapacitorNetwork (8.0.1):
+    - Capacitor
+  - CapacitorPreferences (8.0.1):
+    - Capacitor
+  - CapacitorPushNotifications (8.0.1):
+    - Capacitor
+  - CapacitorShare (8.0.1):
+    - Capacitor
+  - PurchasesHybridCommon (17.41.1):
+    - RevenueCat (= 5.59.2)
+  - RevenueCat (5.59.2)
+  - RevenuecatPurchasesCapacitor (12.2.1):
+    - Capacitor
+    - PurchasesHybridCommon (= 17.41.1)
+
+DEPENDENCIES:
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
+  - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
+  - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorHaptics (from `../../node_modules/@capacitor/haptics`)"
+  - CapacitorNativeBiometric (from `../../node_modules/capacitor-native-biometric`)
+  - "CapacitorNetwork (from `../../node_modules/@capacitor/network`)"
+  - "CapacitorPreferences (from `../../node_modules/@capacitor/preferences`)"
+  - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
+  - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
+  - "RevenuecatPurchasesCapacitor (from `../../node_modules/@revenuecat/purchases-capacitor`)"
+
+SPEC REPOS:
+  trunk:
+    - PurchasesHybridCommon
+    - RevenueCat
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorBrowser:
+    :path: "../../node_modules/@capacitor/browser"
+  CapacitorCamera:
+    :path: "../../node_modules/@capacitor/camera"
+  CapacitorCommunityAppleSignIn:
+    :path: "../../node_modules/@capacitor-community/apple-sign-in"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorHaptics:
+    :path: "../../node_modules/@capacitor/haptics"
+  CapacitorNativeBiometric:
+    :path: "../../node_modules/capacitor-native-biometric"
+  CapacitorNetwork:
+    :path: "../../node_modules/@capacitor/network"
+  CapacitorPreferences:
+    :path: "../../node_modules/@capacitor/preferences"
+  CapacitorPushNotifications:
+    :path: "../../node_modules/@capacitor/push-notifications"
+  CapacitorShare:
+    :path: "../../node_modules/@capacitor/share"
+  RevenuecatPurchasesCapacitor:
+    :path: "../../node_modules/@revenuecat/purchases-capacitor"
+
+SPEC CHECKSUMS:
+  Capacitor: 47b825120c6b8b6d6f9f053e9350a8960d436710
+  CapacitorBrowser: e72e572d5dbdbb854fda5950586a2451e981f2d6
+  CapacitorCamera: fcacb82cc319e62f8d8c93e20f3f70e2464efe5e
+  CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
+  CapacitorCordova: e8b76fd95fc1e157775abc484c59cc0de464095d
+  CapacitorHaptics: 4df2c625445cef39b67ea635a21802bc92df3b82
+  CapacitorNativeBiometric: 78cf21304251a512e4597437325b5e9b0cd9f7b3
+  CapacitorNetwork: 8812ce60d11fb63d8f2e4ba51a49b2e59892ebe2
+  CapacitorPreferences: cca2021f386efb75947c850334447d9ff22b14f1
+  CapacitorPushNotifications: 99644101c6a82036e459929b6d897ee1cb27d97f
+  CapacitorShare: 0c58305114538568059bfc07111f22dcb9cb2a82
+  PurchasesHybridCommon: 8eb130ab98f8dab600dea932a2599dee79304bb5
+  RevenueCat: f352b3661288080bd8bf30bbb96e331940e73c88
+  RevenuecatPurchasesCapacitor: a8d45cdd64bc736647718a2bdf764fa17b01a028
+
+PODFILE CHECKSUM: 48347aa4c3a47d7052117282b1349f1c5a31fc8b
+
+COCOAPODS: 1.16.2
