@@ -484,6 +484,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "imageBase64 is required" });
       }
 
+      const imageUrl = imageBase64.startsWith('data:')
+        ? imageBase64
+        : `data:image/jpeg;base64,${imageBase64}`;
+
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -491,7 +495,7 @@ export async function registerRoutes(
             role: "user",
             content: [
               { type: "text", text: "Extract only the customer review text from this screenshot. Ignore the reviewer's name, date, star rating, profile stats, navigation elements, and any UI buttons. Return only the actual review body text that the customer wrote, nothing else." },
-              { type: "image_url", image_url: { url: imageBase64 } },
+              { type: "image_url", image_url: { url: imageUrl } },
             ],
           },
         ],
