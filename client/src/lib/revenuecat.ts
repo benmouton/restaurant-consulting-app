@@ -69,7 +69,7 @@ export async function getCustomerInfo() {
 export function getEntitlementTier(customerInfo: any): string {
   const entitlements = customerInfo?.customerInfo?.entitlements?.active;
   if (!entitlements) return 'free';
-  if (entitlements['pro']) return 'pro';
-  if (entitlements['basic']) return 'basic';
+  if (entitlements['Pro']) return 'pro';
+  if (entitlements['Basic']) return 'basic';
   return 'free';
 }
