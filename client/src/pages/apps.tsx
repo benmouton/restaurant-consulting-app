@@ -24,7 +24,7 @@ const apps = [
     name: "Review Responder",
     category: "Business",
     description: "Turn every review into a reputation win. Generate professional, on-brand responses to Google and Yelp reviews in seconds.",
-    link: "#",
+    link: "https://apps.apple.com/us/app/review-responder/id6759874324",
   },
 ];
 
