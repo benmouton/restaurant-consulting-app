@@ -1,0 +1,159 @@
+Replit Prompt — "Our Apps" Page Upgrade
+The Restaurant Consultant
+Paste this entire prompt into Replit. Do not modify authentication, routing, Stripe, RevenueCat, or any other module outside the files listed below.
+
+OBJECTIVE
+Upgrade the Our Apps page (client/src/pages/OurApps.tsx or equivalent) to be visually dramatic, on-brand, and dynamic — matching The Restaurant Consultant's established design system. The current version is flat and generic. The new version should feel premium, operator-built, and unmistakably part of this platform.
+Do not modify any other files. Preserve all existing routing, auth, and navigation logic.
+
+DESIGN SYSTEM (strictly match — do not deviate)
+Background:        #0f1117
+Card backgrounds:  #1a1d2e
+Gold accent dark:  #b8860b
+Gold accent light: #d4a017
+White primary:     #ffffff
+Muted text:        #9ca3af
+Border radius:     12px
+Gold shimmer border animation: slow-pulse gold glow
+Shimmer sweep hover: left-to-right gold sheen on buttons
+
+PAGE REQUIREMENTS
+Hero Section
+
+Large centered heading: "Built for the Floor. Built for the Office. Built for You."
+Sub-copy (replace "Powered by ALSTIG INC."): "Four tools from The Restaurant Consultant — built by operators, for operators."
+No company name attribution on screen (remove "ALSTIG INC." entirely)
+Add a subtle animated gold divider line below the subheading (width expands on load, 2px height, gold gradient)
+
+App Cards (4 total — 2×2 grid, responsive to 1-col on mobile)
+Each card must include:
+
+Gold shimmer border animation (slow-pulse glow on card border, same as other module cards in the platform)
+App category badge (pill, gold bg at 20% opacity, gold text, existing categories preserved)
+App name in large white bold text
+Description (updated copy — see below)
+"Download on the App Store" button — styled as a pill button with gold border, transparent background, white text, shimmer sweep on hover. Clicking opens the correct App Store URL (use # as placeholder if URLs are not yet live)
+Subtle entrance animation: cards stagger-fade in from below on page load (use CSS animation-delay, 0.1s increments)
+On hover: card lifts slightly (transform: translateY(-4px)), gold border brightens
+
+Updated App Descriptions
+The Restaurant Consultant — Business / Food & Drink
+
+Operations. Financials. Staffing. Training. All in one place — built by a working restaurant owner who's been in the weeds with you.
+
+MyCookbook — Food & Drink
+
+Your recipes. Your way. Build and organize your personal cookbook, scale ingredients by cover count, and keep every recipe you've ever created in one place.
+
+ChefScale — Food & Drink / Utilities
+
+Scale any recipe instantly — from a single portion to a full catering run. Precision scaling built for professional kitchens and serious home cooks.
+
+Review Responder — Business
+
+Turn every review into a reputation win. Generate professional, on-brand responses to Google and Yelp reviews in seconds.
+
+Section Below Cards
+Add a full-width dark banner below the card grid:
+
+Background: #1a1d2e
+Gold shimmer border top and bottom (1px)
+Centered text: "All four apps. One team. One mission."
+Sub-text: "The Restaurant Consultant exists to help independent operators run tighter, smarter, and more profitable restaurants."
+Font: large, white, slightly spaced letter-spacing on the headline
+No button needed
+
+
+ANIMATIONS TO IMPLEMENT
+css/* Gold shimmer border — apply to cards */
+@keyframes goldPulse {
+  0%, 100% { box-shadow: 0 0 0px rgba(212, 160, 23, 0.0); border-color: rgba(184, 134, 11, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(212, 160, 23, 0.25); border-color: rgba(212, 160, 23, 0.7); }
+}
+.app-card {
+  animation: goldPulse 4s ease-in-out infinite;
+  border: 1px solid rgba(184, 134, 11, 0.3);
+}
+
+/* Stagger entrance */
+.app-card:nth-child(1) { animation-delay: 0s; }
+.app-card:nth-child(2) { animation-delay: 0.1s; }
+.app-card:nth-child(3) { animation-delay: 0.2s; }
+.app-card:nth-child(4) { animation-delay: 0.3s; }
+
+/* Divider line */
+@keyframes expandWidth {
+  from { width: 0; }
+  to { width: 80px; }
+}
+.gold-divider {
+  height: 2px;
+  background: linear-gradient(90deg, #b8860b, #d4a017, #b8860b);
+  animation: expandWidth 0.8s ease-out forwards;
+  margin: 16px auto 0;
+}
+
+/* Button shimmer sweep */
+.app-store-btn {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #b8860b;
+  background: transparent;
+  color: white;
+  border-radius: 999px;
+  padding: 8px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.app-store-btn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(212, 160, 23, 0.25), transparent);
+  transition: left 0.4s ease;
+}
+.app-store-btn:hover::after { left: 160%; }
+.app-store-btn:hover { border-color: #d4a017; transform: scale(1.02); }
+
+/* Card hover lift */
+.app-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.app-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(212, 160, 23, 0.15);
+}
+
+/* Fade-up entrance */
+@keyframes fadeUpIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.app-card {
+  opacity: 0;
+  animation: fadeUpIn 0.5s ease forwards, goldPulse 4s ease-in-out 0.6s infinite;
+}
+
+IMPLEMENTATION ORDER
+
+Locate the Our Apps page component file
+Replace the hero headline and subheading copy (remove ALSTIG INC. reference)
+Add the animated gold divider element below the subheading
+Update all four card descriptions with the copy above
+Apply card styling: #1a1d2e background, 12px radius, gold shimmer border, stagger fade-up entrance, hover lift
+Style the App Store buttons: pill shape, gold border, shimmer sweep hover
+Add the full-width dark banner section below the card grid
+Confirm mobile responsive: cards collapse to 1-column on screens < 768px
+Do not modify navigation, header, footer, auth, or any other component
+
+
+IMPORTANT RULES
+
+Do not add any "AI-powered" language anywhere on this page
+Do not use the name "ALSTIG INC." anywhere — the brand is The Restaurant Consultant
+Match the exact color values above — do not substitute
+Do not touch: routing, auth, Stripe, RevenueCat, any other page or module
+Keep existing App Store button href logic; if no URLs exist yet, use href="#"
