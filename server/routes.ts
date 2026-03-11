@@ -503,7 +503,7 @@ export async function registerRoutes(
             content: [
               {
                 type: "text",
-                text: "Extract all line items from this invoice or delivery receipt. Return a JSON array only, no markdown, no explanation. Each object: { \"description\": string, \"quantity\": number, \"unit\": string, \"unitPrice\": number, \"totalPrice\": number }. If a field is unknown, use null.",
+                text: "Extract all line items from this invoice or delivery receipt. Some items may have handwritten corrections where the driver adjusted quantities, unit prices, or totals due to returns or shortages — handwritten values override printed values. If a value is crossed out and replaced, use the replacement value. If a line item is fully crossed out with no replacement, omit it entirely. Return a JSON array only, no markdown, no explanation. Each object: { \"description\": string, \"quantity\": number, \"unit\": string, \"unitPrice\": number, \"totalPrice\": number, \"adjusted\": boolean }. Set adjusted to true if any value on that line was handwritten or differs from the printed original. If a field is unknown, use null.",
               },
               { type: "image_url", image_url: { url: imageUrl } },
             ],
