@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { useTierAccess } from "@/hooks/use-tier-access";
+import { useSubscription } from "@/hooks/use-subscription";
 import { DOMAIN_TIER_MAP, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock, ArrowRight, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { isNativeApp } from "@/lib/native";
-import { getOfferings, purchasePackage, getCustomerInfo, getEntitlementTier } from "@/lib/revenuecat";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 
 const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
   hr: {
@@ -72,8 +70,9 @@ interface UpgradeGateProps {
 
 export function UpgradeGate({ domain, children }: UpgradeGateProps) {
   const { canAccessDomain } = useTierAccess();
-  const { toast } = useToast();
+  const { purchaseSubscription, restoreNativePurchases } = useSubscription();
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   if (canAccessDomain(domain)) {
     return <>{children}</>;
@@ -83,46 +82,6 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
   const domainName = domainInfo?.name ?? "this feature";
   const domainDescription = domainInfo?.description ?? "Access premium tools and features.";
   const domainCopy = upgradeGateCopy[domain];
-
-  const handleNativePurchase = async () => {
-    setIsPurchasing(true);
-    try {
-      const offerings = await getOfferings();
-      if (!offerings?.offerings?.current?.availablePackages?.length) {
-        toast({ title: "No subscription packages available right now. Please try again later.", variant: "destructive" });
-        return;
-      }
-
-      const packages = offerings.offerings.current.availablePackages;
-      const targetPackage = packages.find((p: any) =>
-        p.identifier?.toLowerCase().includes('basic')
-      ) || packages[0];
-
-      const purchaseResult = await purchasePackage(targetPackage);
-      if (!purchaseResult) {
-        return;
-      }
-
-      const customerInfo = await getCustomerInfo();
-      const tier = getEntitlementTier(customerInfo);
-
-      await apiRequest("POST", "/api/subscription/native-verify", {
-        tier,
-        platform: "ios",
-      });
-
-      toast({ title: "Subscription Active", description: `Your ${tier} plan is now active.` });
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
-    } catch (e: any) {
-      if (e?.message === "PURCHASE_CANCELLED" || e?.code === 1) {
-        return;
-      }
-      console.error("Native purchase error:", e);
-      toast({ title: "Something went wrong. Please try again.", variant: "destructive" });
-    } finally {
-      setIsPurchasing(false);
-    }
-  };
 
   return (
     <div className="relative">
@@ -148,7 +107,11 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
                 </p>
                 <Button
                   className="w-full mb-3"
-                  onClick={handleNativePurchase}
+                  onClick={async () => {
+                    setIsPurchasing(true);
+                    await purchaseSubscription("basic");
+                    setIsPurchasing(false);
+                  }}
                   disabled={isPurchasing}
                   data-testid="btn-native-subscribe"
                 >
@@ -163,6 +126,20 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={async () => {
+                    setIsRestoring(true);
+                    await restoreNativePurchases();
+                    setIsRestoring(false);
+                  }}
+                  disabled={isRestoring}
+                  data-testid="btn-restore-purchases-gate"
+                >
+                  {isRestoring ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Restore Purchases
                 </Button>
               </>
             ) : (

@@ -3,8 +3,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock, CreditCard, Loader2 } from "lucide-react";
+import { Lock, Loader2 } from "lucide-react";
 import { isNativeApp } from "@/lib/native";
+import { useState } from "react";
 
 interface SubscriptionGateProps {
   children: React.ReactNode;
@@ -13,8 +14,10 @@ interface SubscriptionGateProps {
 
 export function SubscriptionGate({ children, requirePaid = false }: SubscriptionGateProps) {
   const { user, isLoading: authLoading } = useAuth();
-  const { hasSubscription, subscriptionTier, isLoading: subLoading, checkout, isCheckingOut, error } = useSubscription();
+  const { hasSubscription, subscriptionTier, isLoading: subLoading, checkout, isCheckingOut, purchaseSubscription, restoreNativePurchases, error } = useSubscription();
   const [, setLocation] = useLocation();
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   if (authLoading) {
     return (
@@ -64,23 +67,55 @@ export function SubscriptionGate({ children, requirePaid = false }: Subscription
             </div>
             <CardTitle>Upgrade Required</CardTitle>
             <CardDescription>
-              {isNativeApp()
-                ? "Subscribe at restaurantai.consulting to access this feature."
-                : "Upgrade your plan to access this feature."}
+              Upgrade your plan to access this feature.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!isNativeApp() && (
-              <Button 
-                className="w-full" 
+            {isNativeApp() ? (
+              <>
+                <Button
+                  className="w-full"
+                  disabled={isPurchasing}
+                  onClick={async () => {
+                    setIsPurchasing(true);
+                    await purchaseSubscription("basic");
+                    setIsPurchasing(false);
+                  }}
+                  data-testid="btn-subscribe-native"
+                >
+                  {isPurchasing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : null}
+                  Subscribe Now
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={isRestoring}
+                  onClick={async () => {
+                    setIsRestoring(true);
+                    await restoreNativePurchases();
+                    setIsRestoring(false);
+                  }}
+                  data-testid="btn-restore-purchases"
+                >
+                  {isRestoring ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : null}
+                  Restore Purchases
+                </Button>
+              </>
+            ) : (
+              <Button
+                className="w-full"
                 onClick={() => setLocation("/pricing")}
                 data-testid="btn-view-plans"
               >
                 View Plans
               </Button>
             )}
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               variant="outline"
               onClick={() => setLocation("/")}
               data-testid="btn-go-back"

@@ -87,17 +87,23 @@ const tiers = [
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
-  const { subscriptionTier, checkout, isCheckingOut, openPortal } = useSubscription();
+  const { subscriptionTier, checkout, isCheckingOut, openPortal, purchaseSubscription, restoreNativePurchases } = useSubscription();
   const [, setLocation] = useLocation();
   const [checkingOutTier, setCheckingOutTier] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
-  const handleCheckout = (tierId: string) => {
+  const handleCheckout = async (tierId: string) => {
     if (!user) {
       startLogin();
       return;
     }
     setCheckingOutTier(tierId);
-    checkout({ tier: tierId, interval: isAnnual ? "year" : "month" });
+    if (isNativeApp()) {
+      await purchaseSubscription(tierId);
+      setCheckingOutTier(null);
+    } else {
+      checkout({ tier: tierId, interval: isAnnual ? "year" : "month" });
+    }
   };
 
   const getButtonState = (tierId: string) => {
@@ -287,6 +293,26 @@ export default function PricingPage() {
             );
           })}
         </div>
+
+        {isNativeApp() && (
+          <div className="mt-6 text-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isRestoring}
+              onClick={async () => {
+                setIsRestoring(true);
+                await restoreNativePurchases();
+                setIsRestoring(false);
+              }}
+              className="text-muted-foreground"
+              data-testid="btn-restore-purchases-pricing"
+            >
+              {isRestoring ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : null}
+              Restore Purchases
+            </Button>
+          </div>
+        )}
 
         <div className="mt-12 max-w-2xl mx-auto space-y-6">
           <div

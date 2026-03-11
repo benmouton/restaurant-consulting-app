@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,9 @@ import { isNativeApp } from "@/lib/native";
 
 export default function SubscriptionPage() {
   const { user, isLoading: authLoading } = useAuth();
-  const { hasSubscription, checkout, isCheckingOut, openPortal, isOpeningPortal } = useSubscription();
+  const { hasSubscription, checkout, isCheckingOut, openPortal, isOpeningPortal, purchaseSubscription, restoreNativePurchases } = useSubscription();
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [, setLocation] = useLocation();
 
   if (authLoading) {
@@ -126,10 +129,40 @@ export default function SubscriptionPage() {
               </ul>
 
               {isNativeApp() ? (
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Subscribe at <span className="font-medium text-primary">restaurantai.consulting</span> to access premium features.
-                  </p>
+                <div className="space-y-3">
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    disabled={isPurchasing}
+                    onClick={async () => {
+                      setIsPurchasing(true);
+                      await purchaseSubscription("basic");
+                      setIsPurchasing(false);
+                    }}
+                    data-testid="btn-subscribe-native"
+                  >
+                    {isPurchasing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <CreditCard className="h-4 w-4 mr-2" />
+                    )}
+                    Subscribe Now
+                  </Button>
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    variant="outline"
+                    disabled={isRestoring}
+                    onClick={async () => {
+                      setIsRestoring(true);
+                      await restoreNativePurchases();
+                      setIsRestoring(false);
+                    }}
+                    data-testid="btn-restore-purchases"
+                  >
+                    {isRestoring ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Restore Purchases
+                  </Button>
                 </div>
               ) : (
                 <>

@@ -1,0 +1,181 @@
+# REPLIT PROMPT — Fix iOS Subscription Flow (RevenueCat)
+
+Paste this entire prompt into Replit AI.
+
+---
+
+## Context
+
+The Restaurant Consultant is a Capacitor-wrapped Vite/TypeScript app. RevenueCat is already integrated — the SDK is installed (`@revenuecat/purchases-capacitor`), API keys are in Replit Secrets (`REVENUECAT_IOS_KEY`), and the server-side verify endpoint (`/api/subscription/native-verify`) is already built.
+
+The problem: `client/src/hooks/use-subscription.ts` still shows a toast telling iOS users to subscribe on the web instead of triggering the RevenueCat purchase flow. Apple's reviewer is seeing an unresponsive subscribe button. This is the ONLY change needed.
+
+## What to change
+
+Update `client/src/hooks/use-subscription.ts` so that when `isNativeApp()` returns true, the subscribe flow calls RevenueCat's `purchasePackage()` instead of showing the web redirect toast.
+
+### Replace the `checkoutMutation` `onSuccess` handler
+
+Find this block in `use-subscription.ts`:
+
+```typescript
+onSuccess: (data) => {
+  if (isNativeApp()) {
+    toast({ title: "Subscribe on the Web",
+      description: "Visit restaurantai.consulting to manage your subscription." });
+    return;
+  }
+  if (data.url) {
+    window.location.href = data.url;
+  } else {
+    toast({
+      title: "Error",
+      description: "No checkout URL received. Please try again.",
+      variant: "destructive",
+    });
+  }
+},
+```
+
+Replace the entire `checkoutMutation` with a new `purchaseSubscription` function that handles both native and web paths:
+
+```typescript
+import { Capacitor } from '@capacitor/core';
+import { Purchases, LOG_LEVEL } from '@revenuecat/purchases-capacitor';
+
+// Add this function alongside the existing hook exports:
+const purchaseSubscription = async (tier: string = 'pro') => {
+  if (!isNativeApp()) {
+    // Web: trigger existing Stripe checkout
+    checkoutMutation.mutate({ tier });
+    return;
+  }
+
+  // Native iOS: use RevenueCat
+  try {
+    const offerings = await Purchases.getOfferings();
+    const current = offerings.current;
+
+    if (!current || !current.availablePackages || current.availablePackages.length === 0) {
+      toast({
+        title: "Unable to Load Subscriptions",
+        description: "Please check your internet connection and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Find the right package by tier
+    // Packages are named "$rc_monthly" / "$rc_annual" or by product identifier
+    const targetIdentifier = tier === 'basic'
+      ? 'com.alstiginc.restaurantconsultant.basic_monthly'
+      : 'com.alstiginc.restaurantconsultant.pro_monthly';
+
+    const pkg = current.availablePackages.find(
+      p => p.product.productIdentifier === targetIdentifier
+    ) ?? current.availablePackages[0]; // fallback to first available
+
+    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
+
+    // Check if entitlement is now active
+    const hasBasic = !!customerInfo.entitlements.active['basic'];
+    const hasPro = !!customerInfo.entitlements.active['pro'];
+    const newTier = hasPro ? 'pro' : hasBasic ? 'basic' : 'free';
+
+    if (newTier !== 'free') {
+      // Verify server-side and update DB tier
+      await fetch('/api/subscription/native-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: newTier }),
+        credentials: 'include',
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+
+      toast({
+        title: "Subscription Active",
+        description: `You're now on the ${newTier.charAt(0).toUpperCase() + newTier.slice(1)} plan.`,
+      });
+    }
+  } catch (error: any) {
+    // User cancelled — don't show error
+    if (error?.code === 'PURCHASE_CANCELLED' || error?.userCancelled) {
+      return;
+    }
+    console.error('RevenueCat purchase error:', error);
+    toast({
+      title: "Purchase Failed",
+      description: "Something went wrong. Please try again or contact support.",
+      variant: "destructive",
+    });
+  }
+};
+```
+
+Also add a `restorePurchases` function:
+
+```typescript
+const restorePurchases = async () => {
+  if (!isNativeApp()) return;
+
+  try {
+    const { customerInfo } = await Purchases.restorePurchases();
+    const hasBasic = !!customerInfo.entitlements.active['basic'];
+    const hasPro = !!customerInfo.entitlements.active['pro'];
+    const restoredTier = hasPro ? 'pro' : hasBasic ? 'basic' : 'free';
+
+    if (restoredTier !== 'free') {
+      await fetch('/api/subscription/native-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: restoredTier }),
+        credentials: 'include',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription/status'] });
+      toast({ title: "Purchases Restored", description: "Your subscription has been restored." });
+    } else {
+      toast({ title: "Nothing to Restore", description: "No active subscriptions found for this Apple ID." });
+    }
+  } catch (error) {
+    toast({ title: "Restore Failed", description: "Could not restore purchases. Please try again.", variant: "destructive" });
+  }
+};
+```
+
+Export both from the hook:
+
+```typescript
+return {
+  ...existingReturns,
+  purchaseSubscription,
+  restorePurchases,
+};
+```
+
+## What to update in the UI components
+
+Any component that currently calls `checkoutMutation.mutate()` for native should instead call `purchaseSubscription(tier)`.
+
+Search the codebase for these patterns and update:
+- Any "Subscribe" or "Upgrade" button `onClick` handler
+- Any "Subscribe for full access" gated content banner
+- Any paywall modal or upgrade prompt
+
+The call signature is simple: `purchaseSubscription('basic')` or `purchaseSubscription('pro')`.
+
+Also add a "Restore Purchases" button wherever the subscribe button appears (Apple requires this).
+
+## What NOT to change
+
+- Do not touch `/api/subscription/checkout` (Stripe) — it stays for web users
+- Do not touch `/api/subscription/native-verify` — it is already correct
+- Do not touch `/native-login` or any auth flows
+- Do not touch RevenueCat initialization in `revenuecat.ts`
+- Do not touch any other domain modules, AI logic, or routing
+- Do not change any Stripe-related code
+
+## After making this change
+
+Tell me what files were modified so I can verify before rebuilding in Xcode.
