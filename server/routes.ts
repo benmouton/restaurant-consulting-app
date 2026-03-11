@@ -57,19 +57,19 @@ When relevant, reference these battle-tested systems as examples:
    - Shadow (2-3 shifts): Observe only, no guest interaction
    - Perform (3-5 shifts): Handle tasks with trainer oversight
    - Certify (1 shift): Solo performance with manager sign-off
-   
+
 2. ROAR Task Management (for servers managing multiple tables):
    - R – Review: Know where each table stands
    - O – Organize: Group tasks (refills, orders) into efficient passes
    - A – Act: Execute with confidence
    - R – Reassess: Check needs after each action
-   
+
 3. HEAT Complaint Resolution:
    - H – Hear: Listen fully without interrupting
    - E – Empathize: Show genuine understanding
    - A – Apologize: Sincere, not defensive
    - T – Take Action: Resolve immediately with appropriate comp authority
-   
+
 4. Four-Point Greeting (table approach):
    - Welcome with restaurant name
    - Introduce yourself by name
@@ -239,23 +239,23 @@ ${await (async () => {
         const menuItemsData = await storage.getMenuItems(userId);
         const activeItems = menuItemsData.filter(i => i.isActive !== false);
         if (activeItems.length === 0) return "MENU ENGINEERING:\nNo menu items entered yet. If the operator asks about menu pricing or item profitability, suggest they use the Menu Engineering tool to enter their menu items.\n";
-        
+
         const totalUnits = activeItems.reduce((s, i) => s + (i.weeklyUnitsSold || 0), 0);
         const avgPop = activeItems.length > 0 ? totalUnits / activeItems.length : 0;
         const avgCM = activeItems.reduce((s, i) => s + parseFloat(String(i.contributionMargin || 0)), 0) / activeItems.length;
         const weightedFC = totalUnits > 0
           ? activeItems.reduce((s, i) => s + parseFloat(String(i.foodCostPct || 0)) * (i.weeklyUnitsSold || 0), 0) / totalUnits
           : activeItems.reduce((s, i) => s + parseFloat(String(i.foodCostPct || 0)), 0) / activeItems.length;
-        
+
         const stars = activeItems.filter(i => (i.weeklyUnitsSold || 0) >= avgPop && parseFloat(String(i.contributionMargin || 0)) >= avgCM);
         const plowhorses = activeItems.filter(i => (i.weeklyUnitsSold || 0) >= avgPop && parseFloat(String(i.contributionMargin || 0)) < avgCM);
         const puzzles = activeItems.filter(i => (i.weeklyUnitsSold || 0) < avgPop && parseFloat(String(i.contributionMargin || 0)) >= avgCM);
         const dogs = activeItems.filter(i => (i.weeklyUnitsSold || 0) < avgPop && parseFloat(String(i.contributionMargin || 0)) < avgCM);
-        
+
         const topStar = stars.sort((a, b) => parseFloat(String(b.contributionMargin || 0)) - parseFloat(String(a.contributionMargin || 0)))[0];
         const highestFC = [...activeItems].sort((a, b) => parseFloat(String(b.foodCostPct || 0)) - parseFloat(String(a.foodCostPct || 0)))[0];
         const lowestCM = [...activeItems].sort((a, b) => parseFloat(String(a.contributionMargin || 0)) - parseFloat(String(b.contributionMargin || 0)))[0];
-        
+
         return `MENU ENGINEERING:
 Total menu items: ${activeItems.length}
 Average food cost %: ${weightedFC.toFixed(1)}% (target: ${foodTarget !== null ? foodTarget + "%" : "not set"})
@@ -366,7 +366,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUserById(userId);
-      
+
       if (!user) {
         return res.json({ hasSubscription: false });
       }
@@ -477,7 +477,14 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/ocr/extract-text", isAuthenticated, async (req: any, res) => {
+  app.post("/api/ocr/extract-text", async (req: any, res) => {
+    const apiKey = req.headers['x-api-key'];
+    const validKey = process.env.VENDORWATCH_API_KEY;
+    const isKeyAuth = validKey && apiKey === validKey;
+    const isSessionAuth = req.isAuthenticated?.();
+    if (!isKeyAuth && !isSessionAuth) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     try {
       const { imageBase64 } = req.body;
       if (!imageBase64) {
@@ -494,7 +501,10 @@ export async function registerRoutes(
           {
             role: "user",
             content: [
-              { type: "text", text: "Extract only the customer review text from this screenshot. Ignore the reviewer's name, date, star rating, profile stats, navigation elements, and any UI buttons. Return only the actual review body text that the customer wrote, nothing else." },
+              {
+                type: "text",
+                text: "Extract all line items from this invoice or delivery receipt. Return a JSON array only, no markdown, no explanation. Each object: { \"description\": string, \"quantity\": number, \"unit\": string, \"unitPrice\": number, \"totalPrice\": number }. If a field is unknown, use null.",
+              },
               { type: "image_url", image_url: { url: imageUrl } },
             ],
           },
@@ -514,7 +524,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUserById(userId);
-      
+
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -539,7 +549,7 @@ export async function registerRoutes(
       console.log(`Creating checkout for tier=${tier}, interval=${interval}, priceId=${priceId}`);
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      
+
       const session = await stripeService.createCheckoutSession(
         customerId,
         priceId,
@@ -559,7 +569,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUserById(userId);
-      
+
       if (!user?.stripeCustomerId) {
         return res.status(400).json({ error: "No subscription found" });
       }
@@ -582,7 +592,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUserById(userId);
-      
+
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -631,7 +641,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const { firstName, lastName, phone, address, restaurantName, role } = req.body;
-      
+
       const updateSchema = z.object({
         firstName: z.string().min(1).optional(),
         lastName: z.string().min(1).optional(),
@@ -643,7 +653,7 @@ export async function registerRoutes(
 
       const validated = updateSchema.parse({ firstName, lastName, phone, address, restaurantName, role });
       const user = await storage.updateUserProfile(userId, validated);
-      
+
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -768,7 +778,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUserById(userId);
-      
+
       if (!user?.stripeCustomerId) {
         return res.status(400).json({ error: "No subscription found" });
       }
@@ -886,11 +896,11 @@ export async function registerRoutes(
     try {
       const { userId } = req.params;
       const currentUserId = req.user.claims.sub;
-      
+
       if (userId === currentUserId) {
         return res.status(400).json({ error: "Cannot delete yourself" });
       }
-      
+
       await storage.deleteUser(userId);
       res.status(204).send();
     } catch (error) {
@@ -910,7 +920,7 @@ export async function registerRoutes(
       const parsedDuration = parseInt(durationDays);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + parsedDuration);
-      
+
       const result = await storage.createTestAccessToken({
         token,
         name,
@@ -1094,7 +1104,7 @@ export async function registerRoutes(
 
       // Create a test user ID based on the token
       const testUserId = `test_${tokenRecord.id}`;
-      
+
       // Check if user already exists for this token
       let user = await storage.getUserById(testUserId);
       if (!user) {
@@ -1146,7 +1156,7 @@ export async function registerRoutes(
       if (!testAccess) {
         return res.json({ active: false });
       }
-      
+
       const now = new Date();
       const expiresAt = new Date(testAccess.expiresAt);
       if (now > expiresAt) {
@@ -1179,7 +1189,7 @@ export async function registerRoutes(
       if (!testAccess) {
         return res.json(null);
       }
-      
+
       const now = new Date();
       const expiresAt = new Date(testAccess.expiresAt);
       if (now > expiresAt) {
@@ -1221,20 +1231,20 @@ export async function registerRoutes(
   app.post("/api/review-login", async (req: any, res) => {
     try {
       const { username, password } = req.body;
-      
+
       const reviewUsername = process.env.REVIEW_USERNAME || "applereview";
       const reviewPassword = process.env.REVIEW_PASSWORD;
-      
+
       if (!reviewPassword) {
         return res.status(503).json({ error: "Review login not configured" });
       }
-      
+
       if (username !== reviewUsername || password !== reviewPassword) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
-      
+
       const reviewUserId = "review_apple";
-      
+
       let user = await storage.getUserById(reviewUserId);
       if (!user) {
         await db.insert((await import("@shared/schema")).users).values({
@@ -1247,10 +1257,10 @@ export async function registerRoutes(
           isAdmin: "false",
         });
       }
-      
+
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 90);
-      
+
       if (req.session) {
         req.session.testAccess = {
           userId: reviewUserId,
@@ -1261,7 +1271,7 @@ export async function registerRoutes(
         };
         req.session.save();
       }
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error("Review login error:", error);
@@ -1420,13 +1430,6 @@ export async function registerRoutes(
         });
       });
 
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err: any) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
       console.log("[APPLE_WEB] Login successful, redirecting to /");
       res.redirect("/");
     } catch (error: any) {
@@ -1498,17 +1501,9 @@ export async function registerRoutes(
         });
       });
 
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err: any) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      console.log("[APPLE_NATIVE] Login successful for:", appleUserId);
       res.json({ success: true, userId: appleUserId });
     } catch (error: any) {
-      console.error("[APPLE_NATIVE] Auth error:", error);
+      console.error("Apple auth error:", error);
       if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
         return res.status(401).json({ error: "Invalid or expired Apple token" });
       }
@@ -2340,7 +2335,7 @@ export async function registerRoutes(
   });
 
   // ===== HANDBOOK SETTINGS ROUTES =====
-  
+
   app.get("/api/handbook-settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2502,11 +2497,11 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const { start, end } = req.query;
-      
+
       // Default to past 56 days (8 weeks) if not specified
       const endDate = end || new Date().toISOString().split('T')[0];
       const startDate = start || new Date(Date.now() - 56 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
+
       const heatmapData = await storage.getDailyCompletionHeatmap(userId, startDate, endDate);
       res.json(heatmapData);
     } catch (error: any) {
@@ -3184,7 +3179,7 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
     try {
       const userId = req.user.claims.sub;
       const { firstName, lastName, email, phone, positionId, hourlyRate } = req.body;
-      
+
       if (!firstName || !lastName) {
         return res.status(400).json({ message: "First name and last name are required" });
       }
@@ -3216,14 +3211,14 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
     try {
       const userId = req.user.claims.sub;
       const { sessionId } = req.body;
-      
+
       if (!sessionId) {
         return res.status(400).json({ message: "Session ID is required" });
       }
 
       // Retrieve the checkout session to verify payment and get employee data
       const session = await stripeService.getCheckoutSession(sessionId);
-      
+
       if (session.payment_status !== 'paid') {
         return res.status(400).json({ message: "Payment not completed" });
       }
@@ -3268,7 +3263,7 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
       // Get the existing member to check for status changes
       const existingMember = await storage.getStaffMember(Number(req.params.id));
       const member = await storage.updateStaffMember(Number(req.params.id), req.body);
-      
+
       // Update billing if status changed and member was accepted
       if (existingMember?.ownerId && existingMember.inviteStatus === "accepted" && 
           req.body.status && req.body.status !== existingMember.status) {
@@ -3282,7 +3277,7 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
           console.error("Failed to update billing on staff status change:", billingErr);
         }
       }
-      
+
       res.json(member);
     } catch (err) {
       res.status(500).json({ message: "Failed to update staff member" });
@@ -3294,7 +3289,7 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
       // Get member before deletion to update billing
       const member = await storage.getStaffMember(Number(req.params.id));
       await storage.deleteStaffMember(Number(req.params.id));
-      
+
       // Update billing if member was accepted
       if (member?.ownerId && member.inviteStatus === "accepted") {
         try {
@@ -3307,7 +3302,7 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
           console.error("Failed to update billing on staff deletion:", billingErr);
         }
       }
-      
+
       res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to delete staff member" });
@@ -3319,30 +3314,30 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
     try {
       const staffId = Number(req.params.id);
       const member = await storage.getStaffMember(staffId);
-      
+
       if (!member) {
         return res.status(404).json({ message: "Staff member not found" });
       }
-      
+
       if (!member.email) {
         return res.status(400).json({ message: "Staff member must have an email to receive an invite" });
       }
-      
+
       // Generate unique invite token
       const crypto = await import("crypto");
       const inviteToken = crypto.randomBytes(32).toString("hex");
-      
+
       await storage.updateStaffMemberInvite(staffId, {
         inviteToken,
         inviteStatus: "pending",
         inviteSentAt: new Date(),
       });
-      
+
       // Generate invite URL
       const baseUrl = process.env.REPLIT_DOMAINS?.split(",")[0] || "localhost:5000";
       const protocol = baseUrl.includes("localhost") ? "http" : "https";
       const inviteUrl = `${protocol}://${baseUrl}/employee/accept-invite?token=${inviteToken}`;
-      
+
       res.json({ 
         success: true, 
         inviteUrl,
@@ -3357,15 +3352,15 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
   app.get("/api/employee/invite/:token", async (req, res) => {
     try {
       const member = await storage.getStaffMemberByInviteToken(req.params.token);
-      
+
       if (!member) {
         return res.status(404).json({ message: "Invalid or expired invite link" });
       }
-      
+
       if (member.inviteStatus === "accepted") {
         return res.status(400).json({ message: "This invite has already been accepted" });
       }
-      
+
       res.json({
         firstName: member.firstName,
         lastName: member.lastName,
@@ -3379,36 +3374,36 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
   app.post("/api/employee/accept-invite", async (req, res) => {
     try {
       const { token, password } = req.body;
-      
+
       if (!token || !password) {
         return res.status(400).json({ message: "Token and password are required" });
       }
-      
+
       if (password.length < 6) {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       }
-      
+
       const member = await storage.getStaffMemberByInviteToken(token);
-      
+
       if (!member) {
         return res.status(404).json({ message: "Invalid or expired invite link" });
       }
-      
+
       if (member.inviteStatus === "accepted") {
         return res.status(400).json({ message: "This invite has already been accepted" });
       }
-      
+
       // Hash password
       const bcrypt = await import("bcrypt");
       const passwordHash = await bcrypt.hash(password, 10);
-      
+
       await storage.updateStaffMemberInvite(member.id, {
         inviteToken: null,
         inviteStatus: "accepted",
         inviteAcceptedAt: new Date(),
         passwordHash,
       });
-      
+
       // Update subscription billing for employee seats
       if (member.ownerId) {
         try {
@@ -3423,10 +3418,10 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
           // Don't fail the invite acceptance if billing update fails
         }
       }
-      
+
       // Create employee session
       (req.session as any).employeeId = member.id;
-      
+
       res.json({ 
         success: true, 
         message: "Account created successfully",
@@ -3446,31 +3441,31 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
   app.post("/api/employee/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      
+
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
-      
+
       const member = await storage.getStaffMemberByEmail(email);
-      
+
       if (!member || !member.passwordHash) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
-      
+
       if (member.inviteStatus !== "accepted") {
         return res.status(401).json({ message: "Account not activated. Please use your invite link." });
       }
-      
+
       const bcrypt = await import("bcrypt");
       const validPassword = await bcrypt.compare(password, member.passwordHash);
-      
+
       if (!validPassword) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
-      
+
       // Create employee session
       (req.session as any).employeeId = member.id;
-      
+
       res.json({ 
         success: true,
         employee: {
@@ -3489,18 +3484,18 @@ Rewrite the entire playbook with the improvements applied. Be specific and pract
   app.get("/api/employee/me", async (req, res) => {
     try {
       const employeeId = (req.session as any)?.employeeId;
-      
+
       if (!employeeId) {
         return res.status(401).json({ message: "Not logged in" });
       }
-      
+
       const member = await storage.getStaffMember(employeeId);
-      
+
       if (!member) {
         (req.session as any).employeeId = null;
         return res.status(401).json({ message: "Employee not found" });
       }
-      
+
       res.json({
         id: member.id,
         firstName: member.firstName,
@@ -3827,9 +3822,9 @@ Return a JSON object with:
       const validatedData = generatePostSchema.parse(req.body);
       const { postType, platforms, outputStyle, eventName, eventDate, startTime, endTime, 
               promotionDetails, targetAudience, tone, cta, selectedHoliday, promotionDiscount, callToAction } = validatedData;
-      
+
       const brandSettings = await storage.getBrandVoiceSettings(userId);
-      
+
       const platformsStr = platforms.join(", ");
       const voiceAdj = brandSettings?.voiceAdjectives?.join(", ") || "warm, welcoming";
       const neverSay = brandSettings?.neverSayList?.length ? `Avoid these words: ${brandSettings.neverSayList.join(", ")}` : "";
@@ -3838,7 +3833,7 @@ Return a JSON object with:
         : brandSettings?.emojiLevel === "light" 
           ? "Use emojis sparingly, 1-2 max."
           : "Use emojis naturally.";
-      
+
       const prompt = `Generate social media content for a restaurant:
 
 POST TYPE: ${postType}
@@ -4162,13 +4157,13 @@ Generate JSON with:
   app.get("/api/oauth/google/callback", async (req: any, res) => {
     try {
       const { code, state, error: oauthError } = req.query;
-      
+
       if (oauthError) {
         console.error("[GOOGLE_OAUTH] User denied or error from Google:", oauthError);
         res.redirect(`/domain/social-media?error=google_denied&detail=${encodeURIComponent(String(oauthError))}`);
         return;
       }
-      
+
       if (!code || !state) {
         console.error("[GOOGLE_OAUTH] Missing code or state params");
         res.redirect("/domain/social-media?error=missing_params");
@@ -4186,7 +4181,7 @@ Generate JSON with:
       console.log("[GOOGLE_OAUTH] Exchanging code for tokens...");
       const tokens = await socialMediaService.exchangeGoogleCode(code as string);
       console.log("[GOOGLE_OAUTH] Token exchange successful, fetching locations...");
-      
+
       let locations: any[] = [];
       try {
         locations = await socialMediaService.getGoogleBusinessLocations(tokens.accessToken);
@@ -5573,13 +5568,13 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
     if (!document) {
       return res.status(404).json({ message: "Document not found" });
     }
-    
+
     // Delete file
     const filePath = path.join(uploadsDir, document.filename);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
-    
+
     await storage.deleteFinancialDocument(document.id, userId);
     res.status(204).send();
   });
@@ -5651,7 +5646,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
   // =============================================
   // HR DOCUMENTS ROUTES
   // =============================================
-  
+
   // Create HR scan uploads directory
   const hrUploadsDir = path.join(process.cwd(), "uploads", "hr-scans");
   if (!fs.existsSync(hrUploadsDir)) {
@@ -5688,7 +5683,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
   app.get("/api/hr-documents", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const userDocs = await storage.getHRDocuments(userId);
-    
+
     const org = await storage.getUserOrganization(userId);
     if (org) {
       const orgDocs = await storage.getHRDocumentsForOrganization(org.id);
@@ -5701,7 +5696,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
       allDocs.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
       return res.json(allDocs);
     }
-    
+
     res.json(userDocs);
   });
 
@@ -5726,7 +5721,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
       }
 
       const org = await storage.getUserOrganization(userId);
-      
+
       const document = await storage.createHRDocument({
         userId,
         organizationId: org?.id || null,
@@ -5797,9 +5792,9 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
   app.delete("/api/hr-documents/:id", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const documentId = Number(req.params.id);
-    
+
     const document = await storage.getHRDocument(documentId, userId);
-    
+
     if (!document) {
       const org = await storage.getUserOrganization(userId);
       if (org) {
@@ -5810,14 +5805,14 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
           if (!isOwner) {
             return res.status(403).json({ message: "Only the organization owner can delete documents" });
           }
-          
+
           if (orgDoc.scanFilename) {
             const filePath = path.join(hrUploadsDir, orgDoc.scanFilename);
             if (fs.existsSync(filePath)) {
               fs.unlinkSync(filePath);
             }
           }
-          
+
           await storage.deleteHRDocument(orgDoc.id, orgDoc.userId);
           return res.status(204).send();
         }
@@ -5911,7 +5906,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
   app.delete("/api/ingredients/:id", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const id = Number(req.params.id);
-    
+
     const existing = await storage.getSavedIngredient(id, userId);
     if (!existing) {
       return res.status(404).json({ message: "Ingredient not found" });
@@ -5961,7 +5956,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
   app.delete("/api/plates/:id", isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const id = Number(req.params.id);
-    
+
     const existing = await storage.getSavedPlate(id, userId);
     if (!existing) {
       return res.status(404).json({ message: "Plate not found" });
@@ -6048,7 +6043,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
       }
 
       const org = await storage.createOrganization({ name, ownerId: userId });
-      
+
       await storage.addOrganizationMember({
         organizationId: org.id,
         userId,
@@ -6072,7 +6067,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
 
     const members = await storage.getOrganizationMembers(org.id);
     const users = await storage.getAllUsers();
-    
+
     const memberDetails = members.map(m => {
       const user = users.find(u => u.id === m.userId);
       return {
@@ -6171,7 +6166,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
         subjectLine: subjectLine || undefined,
         relationship: relationship || undefined,
       });
-      
+
       if (!emailSent) {
         console.warn("[Invite] Failed to send invite email, but invite was created");
       } else {
@@ -6234,7 +6229,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
   app.get("/api/organization/invite/:token", async (req, res) => {
     const { token } = req.params;
     const invite = await storage.getInviteByToken(token);
-    
+
     if (!invite) {
       return res.status(404).json({ message: "Invite not found" });
     }
@@ -6410,7 +6405,7 @@ Use restaurant-specific language. Be practical and actionable — not theoretica
 
     const messages = await storage.getInternalMessages(userId, org.id);
     const allUsers = await storage.getAllUsers();
-    
+
     const enrichedMessages = messages.map(msg => {
       const sender = allUsers.find(u => u.id === msg.senderId);
       const recipient = msg.recipientId ? allUsers.find(u => u.id === msg.recipientId) : null;
@@ -6977,7 +6972,7 @@ async function processDocument(documentId: number, filePath: string, mimeType: s
   try {
     const buffer = fs.readFileSync(filePath);
     const result = await parseDocument(buffer, mimeType, originalName);
-    
+
     if (result.error) {
       await storage.updateFinancialDocumentStatus(documentId, "failed");
       await storage.createFinancialExtract({
@@ -6989,7 +6984,7 @@ async function processDocument(documentId: number, filePath: string, mimeType: s
       });
     } else {
       await storage.updateFinancialDocumentStatus(documentId, "ready");
-      
+
       // Generate AI summary of the document
       let summary = "";
       try {
@@ -7011,7 +7006,7 @@ async function processDocument(documentId: number, filePath: string, mimeType: s
       } catch (err) {
         console.error("Failed to generate summary:", err);
       }
-      
+
       await storage.createFinancialExtract({
         documentId,
         rawText: result.rawText,
@@ -7036,14 +7031,14 @@ async function processDocument(documentId: number, filePath: string, mimeType: s
 // Helper function to build context from financial extract
 function buildFinancialContext(extract: any): string {
   const parts: string[] = [];
-  
+
   if (extract.summary) {
     parts.push(`Summary: ${extract.summary}`);
   }
-  
+
   if (extract.structuredMetrics) {
     const metrics = extract.structuredMetrics as FinancialMetrics;
-    
+
     if (metrics.revenue?.total) {
       parts.push(`Total Revenue: $${metrics.revenue.total.toLocaleString()}`);
     }
@@ -7072,11 +7067,11 @@ function buildFinancialContext(extract: any): string {
       parts.push(`Average Check: $${metrics.salesMetrics.averageCheck.toFixed(2)}`);
     }
   }
-  
+
   if (extract.rawText) {
     parts.push(`\nRaw Document Content (excerpt):\n${extract.rawText.slice(0, 3000)}`);
   }
-  
+
   return parts.join("\n");
 }
 
@@ -7213,9 +7208,9 @@ async function seedDatabase() {
   for (const domain of domainsData) {
     // Skip if domain already exists
     if (existingSlugs.has(domain.slug)) continue;
-    
+
     const createdDomain = await storage.createDomain(domain);
-    
+
     // Add content for each domain
     const content = getContentForDomain(domain.slug);
     for (let i = 0; i < content.length; i++) {
@@ -8110,27 +8105,27 @@ async function seedRestaurantHolidays() {
     { name: "National Croissant Day", date: "01-30", category: "food", suggestedAngle: "Feature croissants at brunch or breakfast service", suggestedTags: ["NationalCroissantDay", "Pastry", "Brunch"], relevanceScore: 7 },
     { name: "National Hot Chocolate Day", date: "01-31", category: "food", suggestedAngle: "Offer hot chocolate specials, spiked versions for adults", suggestedTags: ["HotChocolateDay", "WinterDrinks"], relevanceScore: 8 },
     { name: "National Restaurant Week", date: "01-20", category: "hospitality", suggestedAngle: "Promote prix fixe menus and special offerings", suggestedTags: ["RestaurantWeek", "DineOut"], relevanceScore: 10 },
-    
+
     // February
     { name: "National Pizza Day", date: "02-09", category: "food", suggestedAngle: "Pizza specials, behind-the-scenes of pizza making", suggestedTags: ["NationalPizzaDay", "Pizza"], relevanceScore: 9 },
     { name: "Super Bowl Sunday", date: "02-09", category: "sports", suggestedAngle: "Game day specials, watch party promotions", suggestedTags: ["SuperBowl", "GameDay", "BigGame"], relevanceScore: 10 },
     { name: "Valentines Day", date: "02-14", category: "family", suggestedAngle: "Romantic dinner specials, couples packages", suggestedTags: ["ValentinesDay", "DateNight", "RomanticDinner"], relevanceScore: 10 },
     { name: "National Margarita Day", date: "02-22", category: "food", suggestedAngle: "Margarita specials, happy hour promotions", suggestedTags: ["NationalMargaritaDay", "Margarita", "HappyHour"], relevanceScore: 9 },
     { name: "National Pancake Day", date: "02-25", category: "food", suggestedAngle: "Pancake specials for brunch", suggestedTags: ["NationalPancakeDay", "Brunch"], relevanceScore: 7 },
-    
+
     // March
     { name: "National Frozen Food Day", date: "03-06", category: "food", suggestedAngle: "Behind-the-scenes of your freezer prep or frozen desserts", suggestedTags: ["FrozenFoodDay"], relevanceScore: 4 },
     { name: "National Meatball Day", date: "03-09", category: "food", suggestedAngle: "Feature meatball dishes or appetizers", suggestedTags: ["NationalMeatballDay", "Meatballs"], relevanceScore: 6 },
     { name: "St. Patricks Day", date: "03-17", category: "community", suggestedAngle: "Irish-themed specials, green drinks, festive atmosphere", suggestedTags: ["StPatricksDay", "Irish", "GreenBeer"], relevanceScore: 10 },
     { name: "National Corn Dog Day", date: "03-21", category: "food", suggestedAngle: "Fun bar snack feature or kids menu highlight", suggestedTags: ["CornDogDay", "BarSnacks"], relevanceScore: 5 },
-    
+
     // April
     { name: "National Burrito Day", date: "04-03", category: "food", suggestedAngle: "Burrito specials, build-your-own promotions", suggestedTags: ["NationalBurritoDay", "Burritos"], relevanceScore: 8 },
     { name: "National Beer Day", date: "04-07", category: "food", suggestedAngle: "Craft beer features, beer flights, brewery partnerships", suggestedTags: ["NationalBeerDay", "CraftBeer"], relevanceScore: 9 },
     { name: "National Grilled Cheese Day", date: "04-12", category: "food", suggestedAngle: "Elevated grilled cheese specials, comfort food focus", suggestedTags: ["GrilledCheeseDay", "ComfortFood"], relevanceScore: 8 },
     { name: "Easter Sunday", date: "04-05", category: "family", suggestedAngle: "Easter brunch, family dining specials", suggestedTags: ["Easter", "EasterBrunch", "FamilyDining"], relevanceScore: 9 },
     { name: "National Pretzel Day", date: "04-26", category: "food", suggestedAngle: "Pretzel appetizers, beer pairings", suggestedTags: ["NationalPretzelDay", "Pretzels"], relevanceScore: 6 },
-    
+
     // May
     { name: "Cinco de Mayo", date: "05-05", category: "community", suggestedAngle: "Mexican-inspired specials, margaritas, festive atmosphere", suggestedTags: ["CincoDeMayo", "Fiesta", "Margaritas"], relevanceScore: 10 },
     { name: "Mothers Day", date: "05-11", category: "family", suggestedAngle: "Special brunch, prix fixe dinner, treat mom right", suggestedTags: ["MothersDay", "Brunch", "TreatMom"], relevanceScore: 10 },
@@ -8140,42 +8135,42 @@ async function seedRestaurantHolidays() {
     { name: "National Wine Day", date: "05-25", category: "food", suggestedAngle: "Wine specials, wine pairing dinners, sommelier picks", suggestedTags: ["NationalWineDay", "WineLovers"], relevanceScore: 9 },
     { name: "Memorial Day", date: "05-26", category: "community", suggestedAngle: "Honor and remember, special hours, patriotic specials", suggestedTags: ["MemorialDay", "Remember"], relevanceScore: 8 },
     { name: "National Burger Day", date: "05-28", category: "food", suggestedAngle: "Burger specials, signature burger spotlight", suggestedTags: ["NationalBurgerDay", "Burgers"], relevanceScore: 9 },
-    
+
     // June
     { name: "National Cheese Day", date: "06-04", category: "food", suggestedAngle: "Cheese boards, cheese-forward dishes", suggestedTags: ["NationalCheeseDay", "Cheese"], relevanceScore: 7 },
     { name: "National Donut Day", date: "06-06", category: "food", suggestedAngle: "Donut desserts, brunch donuts", suggestedTags: ["NationalDonutDay", "Donuts"], relevanceScore: 8 },
     { name: "National Iced Tea Day", date: "06-10", category: "food", suggestedAngle: "Iced tea specials, sweet tea, Arnold Palmers", suggestedTags: ["NationalIcedTeaDay", "IcedTea"], relevanceScore: 6 },
     { name: "Fathers Day", date: "06-15", category: "family", suggestedAngle: "Dad-friendly specials, steak dinner, whiskey flights", suggestedTags: ["FathersDay", "TreatDad"], relevanceScore: 10 },
     { name: "National Martini Day", date: "06-19", category: "food", suggestedAngle: "Martini specials, classic cocktails", suggestedTags: ["NationalMartiniDay", "Martini"], relevanceScore: 8 },
-    
+
     // July
     { name: "July 4th", date: "07-04", category: "community", suggestedAngle: "Independence Day specials, patriotic theme, BBQ", suggestedTags: ["July4th", "IndependenceDay", "BBQ"], relevanceScore: 10 },
     { name: "National French Fry Day", date: "07-13", category: "food", suggestedAngle: "Fry specials, loaded fries, fry flights", suggestedTags: ["NationalFrenchFryDay", "Fries"], relevanceScore: 8 },
     { name: "National Ice Cream Day", date: "07-20", category: "food", suggestedAngle: "Ice cream desserts, sundae specials", suggestedTags: ["NationalIceCreamDay", "IceCream"], relevanceScore: 8 },
     { name: "National Tequila Day", date: "07-24", category: "food", suggestedAngle: "Tequila flights, margarita specials, mezcal features", suggestedTags: ["NationalTequilaDay", "Tequila"], relevanceScore: 8 },
-    
+
     // August
     { name: "National Oyster Day", date: "08-05", category: "food", suggestedAngle: "Oyster specials, raw bar features", suggestedTags: ["NationalOysterDay", "Oysters"], relevanceScore: 7 },
     { name: "National Rum Day", date: "08-16", category: "food", suggestedAngle: "Rum cocktails, tropical drinks", suggestedTags: ["NationalRumDay", "Rum"], relevanceScore: 7 },
     { name: "National Waffle Day", date: "08-24", category: "food", suggestedAngle: "Waffle brunch specials, chicken and waffles", suggestedTags: ["NationalWaffleDay", "Waffles", "Brunch"], relevanceScore: 7 },
-    
+
     // September
     { name: "Labor Day", date: "09-01", category: "community", suggestedAngle: "End of summer specials, holiday hours", suggestedTags: ["LaborDay", "EndOfSummer"], relevanceScore: 8 },
     { name: "National Cheeseburger Day", date: "09-18", category: "food", suggestedAngle: "Cheeseburger specials, burger features", suggestedTags: ["NationalCheeseburgerDay", "Cheeseburger"], relevanceScore: 9 },
     { name: "National Seafood Day", date: "09-22", category: "food", suggestedAngle: "Seafood specials, catch of the day", suggestedTags: ["NationalSeafoodDay", "Seafood"], relevanceScore: 8 },
     { name: "National Coffee Day", date: "09-29", category: "food", suggestedAngle: "Coffee specials, espresso martinis", suggestedTags: ["NationalCoffeeDay", "Coffee"], relevanceScore: 8 },
-    
+
     // October
     { name: "National Taco Day", date: "10-04", category: "food", suggestedAngle: "Taco specials, taco bar, Taco Tuesday amplified", suggestedTags: ["NationalTacoDay", "Tacos"], relevanceScore: 9 },
     { name: "National Pasta Day", date: "10-17", category: "food", suggestedAngle: "Pasta specials, Italian features", suggestedTags: ["NationalPastaDay", "Pasta"], relevanceScore: 8 },
     { name: "National Chicken Wing Day", date: "10-22", category: "food", suggestedAngle: "Wing specials, new flavors, wing eating challenges", suggestedTags: ["NationalWingDay", "Wings"], relevanceScore: 8 },
     { name: "Halloween", date: "10-31", category: "community", suggestedAngle: "Spooky specials, costume contests, themed drinks", suggestedTags: ["Halloween", "SpookySeason"], relevanceScore: 9 },
-    
+
     // November
     { name: "National Sandwich Day", date: "11-03", category: "food", suggestedAngle: "Sandwich specials, signature sandwich spotlight", suggestedTags: ["NationalSandwichDay", "Sandwiches"], relevanceScore: 7 },
     { name: "National Cappuccino Day", date: "11-08", category: "food", suggestedAngle: "Coffee drink specials, after-dinner drinks", suggestedTags: ["NationalCappuccinoDay", "Coffee"], relevanceScore: 6 },
     { name: "Thanksgiving", date: "11-27", category: "family", suggestedAngle: "Thanksgiving dinner, family gatherings, gratitude posts", suggestedTags: ["Thanksgiving", "GiveThanks", "FamilyDining"], relevanceScore: 10 },
-    
+
     // December
     { name: "National Bartender Day", date: "12-06", category: "hospitality", suggestedAngle: "Bartender spotlight, mixology features", suggestedTags: ["NationalBartenderDay", "Mixology"], relevanceScore: 7 },
     { name: "National Brownie Day", date: "12-08", category: "food", suggestedAngle: "Brownie dessert specials", suggestedTags: ["NationalBrownieDay", "Brownies", "Dessert"], relevanceScore: 6 },
