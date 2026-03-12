@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { BrandLogoNav } from "@/components/BrandLogo";
 import { isNativeApp } from "@/lib/native";
 import { Link } from "wouter";
-import { SiGoogle, SiFacebook, SiLinkedin, SiX } from "react-icons/si";
+import { SiGoogle, SiX } from "react-icons/si";
 
 const AppleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -71,32 +71,12 @@ export default function LoginPage() {
             </button>
 
             <button
-              onClick={() => { window.location.href = "/api/auth/meta"; }}
-              className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-colors border border-transparent"
-              style={{ backgroundColor: '#1877F2' }}
-              data-testid="button-signin-meta"
-            >
-              <SiFacebook className="h-5 w-5" />
-              Sign in with Facebook
-            </button>
-
-            <button
               onClick={() => { window.location.href = "/api/auth/x"; }}
               className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 bg-black text-white rounded-lg text-sm font-medium hover:bg-black/90 transition-colors border border-black"
               data-testid="button-signin-x"
             >
               <SiX className="h-5 w-5" />
               Sign in with X
-            </button>
-
-            <button
-              onClick={() => { window.location.href = "/api/auth/linkedin"; }}
-              className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-colors border border-transparent"
-              style={{ backgroundColor: '#0A66C2' }}
-              data-testid="button-signin-linkedin"
-            >
-              <SiLinkedin className="h-5 w-5" />
-              Sign in with LinkedIn
             </button>
 
             <div className="relative my-4">
