@@ -77,40 +77,42 @@ export function useSubscription() {
   });
 
   // ── Native RevenueCat purchase ──────────────────────────────────────────────
-  const purchaseSubscription = async (tier: string = "basic", interval: string = "month") => {
+  // Pass rcPackage directly from the UI to avoid re-fetching and losing the native object reference
+  const purchaseSubscription = async (tier: string = "basic", interval: string = "month", rcPackage?: any) => {
     if (!isNativeApp()) {
       checkoutMutation.mutate({ tier, interval });
       return;
     }
 
     try {
-      const offerings = await getOfferings();
-      const current = offerings?.current;
+      let pkg = rcPackage;
 
-      if (!current?.availablePackages?.length) {
+      // Fallback: look up if no package passed directly
+      if (!pkg) {
+        const offerings = await getOfferings();
+        const current = offerings?.current;
+        if (current?.availablePackages?.length) {
+          const suffix = interval === "year" ? "annual" : "monthly";
+          const targetId = `com.alstiginc.restaurantconsultant.${tier}_${suffix}`;
+          pkg = current.availablePackages.find(
+            (p: any) => p.product?.productIdentifier === targetId,
+          );
+        }
+      }
+
+      if (!pkg) {
         toast({
-          title: "Unable to Load Subscriptions",
-          description: "Please check your internet connection and try again.",
+          title: "Unable to Load Subscription",
+          description: "Could not find the selected plan. Please try again.",
           variant: "destructive",
         });
         return;
       }
 
-      const suffix = interval === "year" ? "annual" : "monthly";
-      const targetIdentifier =
-        `com.alstiginc.restaurantconsultant.${tier}_${suffix}`;
-
-      const pkg =
-        current.availablePackages.find(
-          (p: any) => p.product?.productIdentifier === targetIdentifier,
-        ) ??
-        current.availablePackages.find((p: any) => {
-          const id = (p.product?.productIdentifier || p.identifier || "").toLowerCase();
-          return id.includes(tier) && id.includes(suffix);
-        }) ??
-        current.availablePackages.find((p: any) =>
-          (p.product?.productIdentifier || p.identifier || "").toLowerCase().includes(tier),
-        );
+      console.log("Purchasing package:", JSON.stringify({
+        identifier: pkg.identifier,
+        productId: pkg.product?.productIdentifier ?? pkg.product?.identifier,
+      }));
 
       const purchaseResult = await purchasePackage(pkg);
       if (!purchaseResult) return; // user cancelled — silent

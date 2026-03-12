@@ -114,17 +114,20 @@ export default function PricingPage() {
     })();
   }, []);
 
-  // Helper to find RC price for a given tier+interval
-  const getRcPrice = (tier: string, interval: string): string | null => {
+  // Helper to find RC package for a given tier+interval
+  const findRcPackage = (tier: string, interval: string): any => {
     const suffix = interval === "year" ? "annual" : "monthly";
-    const pkg = rcPackages.find((p: any) => {
-      const id = (p.product?.productIdentifier ?? p.product?.identifier ?? p.identifier ?? "").toLowerCase();
-      return id.includes(tier) && id.includes(suffix);
-    }) ?? rcPackages.find((p: any) => {
-      const id = (p.product?.productIdentifier ?? p.product?.identifier ?? p.identifier ?? "").toLowerCase();
-      return id.includes(tier);
-    });
-    return pkg?.product?.priceString ?? null;
+    const targetId = `com.alstiginc.restaurantconsultant.${tier}_${suffix}`;
+    return rcPackages.find((p: any) => p.product?.productIdentifier === targetId)
+      ?? rcPackages.find((p: any) => {
+        const id = (p.product?.productIdentifier ?? p.product?.identifier ?? p.identifier ?? "").toLowerCase();
+        return id.includes(tier) && id.includes(suffix);
+      });
+  };
+
+  // Helper to find RC price string
+  const getRcPrice = (tier: string, interval: string): string | null => {
+    return findRcPackage(tier, interval)?.product?.priceString ?? null;
   };
 
   const handleCheckout = async (tierId: string) => {
@@ -134,7 +137,9 @@ export default function PricingPage() {
     }
     setCheckingOutTier(tierId);
     if (isNativeApp()) {
-      await purchaseSubscription(tierId, isAnnual ? "year" : "month");
+      const interval = isAnnual ? "year" : "month";
+      const pkg = findRcPackage(tierId, interval);
+      await purchaseSubscription(tierId, interval, pkg);
       setCheckingOutTier(null);
     } else {
       checkout({ tier: tierId, interval: isAnnual ? "year" : "month" });
