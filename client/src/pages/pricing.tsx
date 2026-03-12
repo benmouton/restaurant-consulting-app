@@ -199,19 +199,38 @@ export default function PricingPage() {
               {isAnnual && <Badge variant="secondary" className="text-xs">Save ~20%</Badge>}
             </div>
 
+            {/* ── Basic Plan Card ── */}
             <div className="rounded-xl p-6 mb-4" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
-              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>Basic Plan</div>
-              <div className="font-semibold text-base mb-3">The Restaurant Consultant — Basic</div>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>Auto-Renewable Subscription</div>
+              <div className="font-semibold text-lg mb-1">The Restaurant Consultant — Basic</div>
+              <div className="text-sm mb-3" style={{ color: '#9ca3af' }}>
+                {isAnnual
+                  ? 'Subscription length: 1 year (12 months)'
+                  : 'Subscription length: 1 month'}
+              </div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-bold">{getRcPrice('basic', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$96.00' : '$9.99')}</span>
-                <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? '/year' : '/month'}</span>
+                <span className="text-4xl font-bold">{getRcPrice('basic', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$99.99' : '$9.99')}</span>
+                <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? ' per year' : ' per month'}</span>
               </div>
+              {isAnnual && (
+                <div className="text-sm mb-3" style={{ color: '#9ca3af' }}>
+                  That's {getRcPrice('basic', 'year') ? `approximately $${(99.99 / 12).toFixed(2)}` : '$8.33'} per month
+                </div>
+              )}
               <div className="text-sm mb-4" style={{ color: '#9ca3af' }}>
-                {isAnnual ? 'Annual subscription · billed once per year' : 'Monthly subscription · billed every 30 days'}
+                {isAnnual
+                  ? 'Billed as one payment per year. Renews automatically every 12 months.'
+                  : 'Billed monthly. Renews automatically every 30 days.'}
               </div>
-              <div className="flex items-start gap-2 mb-5">
-                <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
-                <span className="text-sm" style={{ color: '#9ca3af' }}>Access to all {TOTAL_DOMAIN_COUNT} operational domains</span>
+              <div className="space-y-2 mb-5">
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>Access to all {TOTAL_DOMAIN_COUNT} operational domains</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>Operations Consultant, staff scheduling, food costing</span>
+                </div>
               </div>
               <Button
                 className="w-full"
@@ -220,28 +239,41 @@ export default function PricingPage() {
                 data-testid="btn-native-basic"
               >
                 {checkingOutTier === 'basic' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Subscribe — {getRcPrice('basic', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$96.00/year' : '$9.99/month')}
+                Subscribe — {getRcPrice('basic', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$99.99/year' : '$9.99/month')}
               </Button>
             </div>
 
+            {/* ── Pro Plan Card ── */}
             <div className="rounded-xl p-6 mb-4" style={{ backgroundColor: '#1a1d2e', border: '2px solid #d4a017' }}>
-              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#d4a017' }}>Pro Plan</div>
-              <div className="font-semibold text-base mb-3">The Restaurant Consultant — Pro</div>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#d4a017' }}>Auto-Renewable Subscription</div>
+              <div className="font-semibold text-lg mb-1">The Restaurant Consultant — Pro</div>
+              <div className="text-sm mb-3" style={{ color: '#9ca3af' }}>
+                {isAnnual
+                  ? 'Subscription length: 1 year (12 months)'
+                  : 'Subscription length: 1 month'}
+              </div>
               <div className="flex items-baseline gap-1 mb-1">
                 <span className="text-4xl font-bold">{getRcPrice('pro', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$249.99' : '$24.99')}</span>
-                <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? '/year' : '/month'}</span>
+                <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? ' per year' : ' per month'}</span>
               </div>
+              {isAnnual && (
+                <div className="text-sm mb-3" style={{ color: '#9ca3af' }}>
+                  That's approximately ${(249 / 12).toFixed(2)} per month
+                </div>
+              )}
               <div className="text-sm mb-4" style={{ color: '#9ca3af' }}>
-                {isAnnual ? 'Annual subscription · billed once per year' : 'Monthly subscription · billed every 30 days'}
+                {isAnnual
+                  ? 'Billed as one payment per year. Renews automatically every 12 months.'
+                  : 'Billed monthly. Renews automatically every 30 days.'}
               </div>
               <div className="space-y-2 mb-5">
                 <div className="flex items-start gap-2">
                   <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
-                  <span className="text-sm" style={{ color: '#9ca3af' }}>Full access to all {TOTAL_DOMAIN_COUNT} operational domains</span>
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>Everything in Basic, plus:</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
-                  <span className="text-sm" style={{ color: '#9ca3af' }}>Priority support + advanced analytics</span>
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>Data export, priority support, advanced analytics</span>
                 </div>
               </div>
               <Button
@@ -256,6 +288,7 @@ export default function PricingPage() {
               </Button>
             </div>
 
+            {/* ── Restore Purchases ── */}
             <Button
               variant="ghost"
               className="w-full mb-6 text-muted-foreground"
@@ -267,14 +300,24 @@ export default function PricingPage() {
               Restore Purchases
             </Button>
 
+            {/* ── Subscription Terms (Apple Required) ── */}
             <div className="text-center space-y-3 pb-8">
-              <p className="text-xs leading-relaxed" style={{ color: '#9ca3af' }}>
-                Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Manage or cancel your subscription in your Apple ID settings.
-              </p>
+              <div className="rounded-lg p-4 mb-2" style={{ backgroundColor: '#12141f', border: '1px solid #2a2d3e' }}>
+                <p className="text-xs leading-relaxed mb-2" style={{ color: '#9ca3af' }}>
+                  Payment will be charged to your Apple ID account at confirmation of purchase.
+                  Subscription automatically renews unless it is cancelled at least 24 hours before
+                  the end of the current period. Your account will be charged for renewal within
+                  24 hours prior to the end of the current period. You can manage and cancel your
+                  subscriptions by going to Settings &gt; Apple ID &gt; Subscriptions.
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: '#9ca3af' }}>
+                  Any unused portion of a free trial period will be forfeited when you purchase a subscription.
+                </p>
+              </div>
               <div className="flex items-center justify-center gap-4">
                 <a href="https://restaurantai.consulting/privacy" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-privacy-native">Privacy Policy</a>
                 <span style={{ color: '#2a2d3e' }}>·</span>
-                <a href="https://restaurantai.consulting/terms" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-terms-native">Terms of Use</a>
+                <a href="https://restaurantai.consulting/terms" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-terms-native">Terms of Use (EULA)</a>
               </div>
             </div>
           </div>
