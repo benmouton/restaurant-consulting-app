@@ -53,6 +53,7 @@ import NotFound from "@/pages/not-found";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { initRevenueCat, getOfferings } from '@/lib/revenuecat';
 import { TestAccessBanner } from "@/components/TestAccessBanner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
   return (
@@ -245,17 +246,19 @@ function App() {
   init();
 }, []);
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <Toaster />
-          <BiometricGuard>
-            <Router />
-          </BiometricGuard>
-          <PwaInstallBanner />
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <BiometricGuard>
+              <Router />
+            </BiometricGuard>
+            <PwaInstallBanner />
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

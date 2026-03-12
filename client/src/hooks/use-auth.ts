@@ -3,27 +3,36 @@ import type { User } from "@shared/models/auth";
 import { startLogout } from "@/lib/native";
 
 async function fetchUser(): Promise<(User & { isTestUser?: boolean; testAccessExpiresAt?: string; testAccessLevel?: string }) | null> {
-  // First check for test access session
-  const testRes = await fetch("/api/test-access/user", { credentials: "include" });
-  if (testRes.ok) {
-    const testUser = await testRes.json();
-    if (testUser) return testUser;
+  try {
+    // First check for test access session
+    const testRes = await fetch("/api/test-access/user", { credentials: "include" });
+    if (testRes.ok) {
+      const testUser = await testRes.json();
+      if (testUser) return testUser;
+    }
+  } catch {
+    // Test access check failed, continue to normal auth
   }
 
-  // Fall back to normal Replit Auth
-  const response = await fetch("/api/auth/user", {
-    credentials: "include",
-  });
+  try {
+    // Fall back to normal Replit Auth
+    const response = await fetch("/api/auth/user", {
+      credentials: "include",
+    });
 
-  if (response.status === 401) {
+    if (response.status === 401) {
+      return null;
+    }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return response.json();
+  } catch {
+    // Network error — treat as unauthenticated rather than crashing
     return null;
   }
-
-  if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
 }
 
 export function useAuth() {
