@@ -102,9 +102,16 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
             </p>
             {isNativeApp() ? (
               <>
-                <p className="text-sm font-medium mb-6">
-                  Unlock all {TOTAL_DOMAIN_COUNT} domains + tools with a subscription
-                </p>
+                <div className="w-full rounded-lg p-4 mb-4 text-left" style={{ backgroundColor: '#12141f', border: '1px solid #2a2d3e' }}>
+                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>Basic Plan</div>
+                  <div className="text-sm font-semibold mb-1">The Restaurant Consultant — Basic</div>
+                  <div className="flex items-baseline gap-1 mb-0.5">
+                    <span className="text-2xl font-bold">$10.00</span>
+                    <span className="text-xs" style={{ color: '#9ca3af' }}>/month</span>
+                  </div>
+                  <div className="text-xs mb-2" style={{ color: '#9ca3af' }}>Monthly subscription · billed every 30 days</div>
+                  <div className="text-xs" style={{ color: '#9ca3af' }}>Access to all {TOTAL_DOMAIN_COUNT} operational domains</div>
+                </div>
                 <Button
                   className="w-full mb-3"
                   onClick={async () => {
@@ -122,13 +129,13 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
                     </>
                   ) : (
                     <>
-                      Subscribe Now
+                      Subscribe — $10.00/month
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   )}
                 </Button>
                 <Button
-                  className="w-full"
+                  className="w-full mb-4"
                   variant="outline"
                   onClick={async () => {
                     setIsRestoring(true);
@@ -141,6 +148,14 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
                   {isRestoring ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Restore Purchases
                 </Button>
+                <p className="text-xs leading-relaxed mb-3" style={{ color: '#9ca3af' }}>
+                  Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Manage or cancel your subscription in your Apple ID settings.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <a href="https://restaurantai.consulting/privacy" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-gate-privacy">Privacy Policy</a>
+                  <span style={{ color: '#2a2d3e' }}>·</span>
+                  <a href="https://restaurantai.consulting/terms" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-gate-terms">Terms of Use</a>
+                </div>
               </>
             ) : (
               <>

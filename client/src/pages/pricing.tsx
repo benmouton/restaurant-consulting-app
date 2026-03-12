@@ -151,20 +151,93 @@ export default function PricingPage() {
         </div>
 
         {isNativeApp() ? (
-          <Card className="max-w-md mx-auto">
-            <CardContent className="p-8 text-center space-y-4">
-              <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                <Crown className="h-6 w-6 text-primary" />
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-center justify-center gap-3 mb-8">
+              <Label htmlFor="native-billing-toggle" className={`text-sm ${!isAnnual ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>Monthly</Label>
+              <Switch id="native-billing-toggle" checked={isAnnual} onCheckedChange={setIsAnnual} data-testid="switch-native-billing" />
+              <Label htmlFor="native-billing-toggle" className={`text-sm ${isAnnual ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>Annual</Label>
+              {isAnnual && <Badge variant="secondary" className="text-xs">Save ~20%</Badge>}
+            </div>
+
+            <div className="rounded-xl p-6 mb-4" style={{ backgroundColor: '#1a1d2e', border: '1px solid #2a2d3e' }}>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>Basic Plan</div>
+              <div className="font-semibold text-base mb-3">The Restaurant Consultant — Basic</div>
+              <div className="flex items-baseline gap-1 mb-1">
+                <span className="text-4xl font-bold">{isAnnual ? '$96.00' : '$10.00'}</span>
+                <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? '/year' : '/month'}</span>
               </div>
-              <h2 className="text-xl font-bold">Subscribe on the Web</h2>
-              <p className="text-muted-foreground">To subscribe or manage your plan, visit</p>
-              <p className="font-medium text-primary">restaurantai.consulting</p>
-              <p className="text-xs text-muted-foreground">Open the site in your browser to get started.</p>
-              <Button variant="outline" className="w-full" onClick={() => setLocation("/")} data-testid="btn-go-back">
-                Go Back
+              <div className="text-sm mb-4" style={{ color: '#9ca3af' }}>
+                {isAnnual ? 'Annual subscription · billed once per year ($8.00/month)' : 'Monthly subscription · billed every 30 days'}
+              </div>
+              <div className="flex items-start gap-2 mb-5">
+                <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
+                <span className="text-sm" style={{ color: '#9ca3af' }}>Access to all 12 operational domains</span>
+              </div>
+              <Button
+                className="w-full"
+                disabled={checkingOutTier === 'basic'}
+                onClick={() => handleCheckout('basic')}
+                data-testid="btn-native-basic"
+              >
+                {checkingOutTier === 'basic' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Subscribe — {isAnnual ? '$96.00/year' : '$10.00/month'}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+
+            <div className="rounded-xl p-6 mb-4" style={{ backgroundColor: '#1a1d2e', border: '2px solid #d4a017' }}>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#d4a017' }}>Pro Plan</div>
+              <div className="font-semibold text-base mb-3">The Restaurant Consultant — Pro</div>
+              <div className="flex items-baseline gap-1 mb-1">
+                <span className="text-4xl font-bold">{isAnnual ? '$240.00' : '$25.00'}</span>
+                <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? '/year' : '/month'}</span>
+              </div>
+              <div className="text-sm mb-4" style={{ color: '#9ca3af' }}>
+                {isAnnual ? 'Annual subscription · billed once per year ($20.00/month)' : 'Monthly subscription · billed every 30 days'}
+              </div>
+              <div className="space-y-2 mb-5">
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>Full access to all 12 operational domains</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>Priority support + advanced analytics</span>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                disabled={checkingOutTier === 'pro'}
+                onClick={() => handleCheckout('pro')}
+                data-testid="btn-native-pro"
+                style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
+              >
+                {checkingOutTier === 'pro' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Subscribe — {isAnnual ? '$240.00/year' : '$25.00/month'}
+              </Button>
+            </div>
+
+            <Button
+              variant="ghost"
+              className="w-full mb-6 text-muted-foreground"
+              disabled={isRestoring}
+              onClick={async () => { setIsRestoring(true); await restoreNativePurchases(); setIsRestoring(false); }}
+              data-testid="btn-restore-native"
+            >
+              {isRestoring ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : null}
+              Restore Purchases
+            </Button>
+
+            <div className="text-center space-y-3 pb-8">
+              <p className="text-xs leading-relaxed" style={{ color: '#9ca3af' }}>
+                Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Manage or cancel your subscription in your Apple ID settings.
+              </p>
+              <div className="flex items-center justify-center gap-4">
+                <a href="https://restaurantai.consulting/privacy" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-privacy-native">Privacy Policy</a>
+                <span style={{ color: '#2a2d3e' }}>·</span>
+                <a href="https://restaurantai.consulting/terms" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-terms-native">Terms of Use</a>
+              </div>
+            </div>
+          </div>
         ) : (
         <>
         <div className="flex items-center justify-center gap-3 mb-10">

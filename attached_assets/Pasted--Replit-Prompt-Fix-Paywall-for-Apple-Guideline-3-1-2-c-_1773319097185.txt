@@ -1,0 +1,85 @@
+# Replit Prompt — Fix Paywall for Apple Guideline 3.1.2(c)
+
+## Context
+The Restaurant Consultant was rejected under Guideline 3.1.2(c) because the paywall/upgrade screen does not explicitly display:
+- Title of the subscription
+- Length of subscription (duration + what's included)
+- Price of subscription
+- Functional links to Privacy Policy and Terms of Use
+
+This is a UI-only fix. Do NOT change any API logic, RevenueCat integration, Stripe logic, auth, routing, or any other domain modules.
+
+---
+
+## Task
+
+Find the subscription/upgrade/paywall screen in the codebase. It may be named something like `upgrade.tsx`, `paywall.tsx`, `subscription.tsx`, or similar — check the client/src/pages or client/src directory.
+
+Update that screen to prominently display all of the following for EACH subscription tier:
+
+### Required elements per tier:
+
+**Basic Monthly**
+- Title: "The Restaurant Consultant — Basic"
+- Duration: "Monthly subscription · billed every 30 days"
+- Price: "$10.00 / month"
+- What's included: "Access to 3 of 12 operational domains"
+
+**Basic Annual**
+- Title: "The Restaurant Consultant — Basic"
+- Duration: "Annual subscription · billed once per year"
+- Price: "$96.00 / year ($8.00/month)"
+- What's included: "Access to 3 of 12 operational domains"
+
+**Pro Monthly**
+- Title: "The Restaurant Consultant — Pro"
+- Duration: "Monthly subscription · billed every 30 days"
+- Price: "$25.00 / month"
+- What's included: "Full access to all 12 operational domains"
+
+**Pro Annual**
+- Title: "The Restaurant Consultant — Pro"
+- Duration: "Annual subscription · billed once per year"
+- Price: "$240.00 / year ($20.00/month)"
+- What's included: "Full access to all 12 operational domains"
+
+---
+
+### Required legal footer (must appear on all paywall/upgrade views):
+
+Add a legal footer section below the subscription options containing:
+
+1. A "Restore Purchases" button (use the existing restore logic if present, or add a placeholder button)
+2. The following disclaimer text:
+   > "Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Manage or cancel your subscription in your Apple ID settings."
+3. Two functional links:
+   - Privacy Policy → https://restaurantai.consulting/privacy
+   - Terms of Use → https://restaurantai.consulting/terms
+
+---
+
+### Design requirements:
+- Match the existing dark design system: background `#0f1117`, card background `#1a1d2e`, gold accent `#d4a017`, secondary text `#9ca3af`
+- Price must be displayed in a larger, clearly readable font
+- Duration text should appear directly beneath the price in smaller secondary text
+- Legal footer text should be small (`text-xs`) and use secondary text color
+- Links must be actual anchor tags (`<a href="..." target="_blank">`) — not just styled text
+- Layout must be responsive and readable on iPad (large screen) as well as iPhone
+
+---
+
+## What NOT to change:
+- Do not touch RevenueCat purchase logic
+- Do not touch Stripe or web checkout logic
+- Do not touch auth, routing, or any other pages
+- Do not change tier access logic in tierConfig.ts
+- Do not modify any backend/server files
+
+---
+
+## Verification
+After making changes, confirm:
+- [ ] Each tier card shows: title, duration, price
+- [ ] A "Restore Purchases" button is present
+- [ ] Privacy Policy and Terms of Use links are present and clickable
+- [ ] The layout looks correct on both narrow (iPhone) and wide (iPad) viewports
