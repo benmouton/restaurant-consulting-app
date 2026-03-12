@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/use-subscription";
 import { FREE_DOMAIN_COUNT, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { startLogin, isNativeApp } from "@/lib/native";
+import { getOfferings } from "@/lib/revenuecat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +92,40 @@ export default function PricingPage() {
   const [, setLocation] = useLocation();
   const [checkingOutTier, setCheckingOutTier] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [rcPackages, setRcPackages] = useState<any[]>([]);
+
+  // Load real App Store prices from RevenueCat on native
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    (async () => {
+      try {
+        const offerings = await getOfferings();
+        const pkgs = offerings?.current?.availablePackages ?? [];
+        console.log("RC available packages:", JSON.stringify(pkgs.map((p: any) => ({
+          id: p.identifier,
+          productId: p.product?.productIdentifier ?? p.product?.identifier,
+          price: p.product?.price,
+          priceString: p.product?.priceString,
+        }))));
+        setRcPackages(pkgs);
+      } catch (e) {
+        console.error("Failed to load RC offerings:", e);
+      }
+    })();
+  }, []);
+
+  // Helper to find RC price for a given tier+interval
+  const getRcPrice = (tier: string, interval: string): string | null => {
+    const suffix = interval === "year" ? "annual" : "monthly";
+    const pkg = rcPackages.find((p: any) => {
+      const id = (p.product?.productIdentifier ?? p.product?.identifier ?? p.identifier ?? "").toLowerCase();
+      return id.includes(tier) && id.includes(suffix);
+    }) ?? rcPackages.find((p: any) => {
+      const id = (p.product?.productIdentifier ?? p.product?.identifier ?? p.identifier ?? "").toLowerCase();
+      return id.includes(tier);
+    });
+    return pkg?.product?.priceString ?? null;
+  };
 
   const handleCheckout = async (tierId: string) => {
     if (!user) {
@@ -99,7 +134,7 @@ export default function PricingPage() {
     }
     setCheckingOutTier(tierId);
     if (isNativeApp()) {
-      await purchaseSubscription(tierId);
+      await purchaseSubscription(tierId, isAnnual ? "year" : "month");
       setCheckingOutTier(null);
     } else {
       checkout({ tier: tierId, interval: isAnnual ? "year" : "month" });
@@ -163,15 +198,15 @@ export default function PricingPage() {
               <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>Basic Plan</div>
               <div className="font-semibold text-base mb-3">The Restaurant Consultant — Basic</div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-bold">{isAnnual ? '$96.00' : '$10.00'}</span>
+                <span className="text-4xl font-bold">{getRcPrice('basic', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$96.00' : '$9.99')}</span>
                 <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? '/year' : '/month'}</span>
               </div>
               <div className="text-sm mb-4" style={{ color: '#9ca3af' }}>
-                {isAnnual ? 'Annual subscription · billed once per year ($8.00/month)' : 'Monthly subscription · billed every 30 days'}
+                {isAnnual ? 'Annual subscription · billed once per year' : 'Monthly subscription · billed every 30 days'}
               </div>
               <div className="flex items-start gap-2 mb-5">
                 <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
-                <span className="text-sm" style={{ color: '#9ca3af' }}>Access to all 12 operational domains</span>
+                <span className="text-sm" style={{ color: '#9ca3af' }}>Access to all {TOTAL_DOMAIN_COUNT} operational domains</span>
               </div>
               <Button
                 className="w-full"
@@ -180,7 +215,7 @@ export default function PricingPage() {
                 data-testid="btn-native-basic"
               >
                 {checkingOutTier === 'basic' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Subscribe — {isAnnual ? '$96.00/year' : '$10.00/month'}
+                Subscribe — {getRcPrice('basic', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$96.00/year' : '$9.99/month')}
               </Button>
             </div>
 
@@ -188,16 +223,16 @@ export default function PricingPage() {
               <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#d4a017' }}>Pro Plan</div>
               <div className="font-semibold text-base mb-3">The Restaurant Consultant — Pro</div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-bold">{isAnnual ? '$240.00' : '$25.00'}</span>
+                <span className="text-4xl font-bold">{getRcPrice('pro', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$249.99' : '$24.99')}</span>
                 <span className="text-sm" style={{ color: '#9ca3af' }}>{isAnnual ? '/year' : '/month'}</span>
               </div>
               <div className="text-sm mb-4" style={{ color: '#9ca3af' }}>
-                {isAnnual ? 'Annual subscription · billed once per year ($20.00/month)' : 'Monthly subscription · billed every 30 days'}
+                {isAnnual ? 'Annual subscription · billed once per year' : 'Monthly subscription · billed every 30 days'}
               </div>
               <div className="space-y-2 mb-5">
                 <div className="flex items-start gap-2">
                   <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
-                  <span className="text-sm" style={{ color: '#9ca3af' }}>Full access to all 12 operational domains</span>
+                  <span className="text-sm" style={{ color: '#9ca3af' }}>Full access to all {TOTAL_DOMAIN_COUNT} operational domains</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <Check className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#d4a017' }} />
@@ -212,7 +247,7 @@ export default function PricingPage() {
                 style={{ backgroundColor: '#d4a017', color: '#0f1117' }}
               >
                 {checkingOutTier === 'pro' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Subscribe — {isAnnual ? '$240.00/year' : '$25.00/month'}
+                Subscribe — {getRcPrice('pro', isAnnual ? 'year' : 'month') ?? (isAnnual ? '$249.99/year' : '$24.99/month')}
               </Button>
             </div>
 

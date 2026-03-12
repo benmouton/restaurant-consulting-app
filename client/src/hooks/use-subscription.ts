@@ -77,9 +77,9 @@ export function useSubscription() {
   });
 
   // ── Native RevenueCat purchase ──────────────────────────────────────────────
-  const purchaseSubscription = async (tier: string = "basic") => {
+  const purchaseSubscription = async (tier: string = "basic", interval: string = "month") => {
     if (!isNativeApp()) {
-      checkoutMutation.mutate({ tier });
+      checkoutMutation.mutate({ tier, interval });
       return;
     }
 
@@ -96,19 +96,21 @@ export function useSubscription() {
         return;
       }
 
+      const suffix = interval === "year" ? "annual" : "monthly";
       const targetIdentifier =
-        tier === "pro"
-          ? "com.alstiginc.restaurantconsultant.pro_monthly"
-          : "com.alstiginc.restaurantconsultant.basic_monthly";
+        `com.alstiginc.restaurantconsultant.${tier}_${suffix}`;
 
       const pkg =
         current.availablePackages.find(
           (p: any) => p.product?.productIdentifier === targetIdentifier,
         ) ??
+        current.availablePackages.find((p: any) => {
+          const id = (p.product?.productIdentifier || p.identifier || "").toLowerCase();
+          return id.includes(tier) && id.includes(suffix);
+        }) ??
         current.availablePackages.find((p: any) =>
-          p.identifier?.toLowerCase().includes(tier),
-        ) ??
-        current.availablePackages[0];
+          (p.product?.productIdentifier || p.identifier || "").toLowerCase().includes(tier),
+        );
 
       const purchaseResult = await purchasePackage(pkg);
       if (!purchaseResult) return; // user cancelled — silent

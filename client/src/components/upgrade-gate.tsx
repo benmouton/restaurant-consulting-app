@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { useTierAccess } from "@/hooks/use-tier-access";
-import { useSubscription } from "@/hooks/use-subscription";
 import { DOMAIN_TIER_MAP, TOTAL_DOMAIN_COUNT } from "@/config/tierConfig";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
-import { isNativeApp } from "@/lib/native";
 
 const upgradeGateCopy: Record<string, { headline: string; sub: string }> = {
   hr: {
@@ -70,9 +67,6 @@ interface UpgradeGateProps {
 
 export function UpgradeGate({ domain, children }: UpgradeGateProps) {
   const { canAccessDomain } = useTierAccess();
-  const { purchaseSubscription, restoreNativePurchases } = useSubscription();
-  const [isPurchasing, setIsPurchasing] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
 
   if (canAccessDomain(domain)) {
     return <>{children}</>;
@@ -100,79 +94,18 @@ export function UpgradeGate({ domain, children }: UpgradeGateProps) {
             <p className="text-sm text-muted-foreground mb-4">
               {domainCopy ? domainCopy.sub : domainDescription}
             </p>
-            {isNativeApp() ? (
-              <>
-                <div className="w-full rounded-lg p-4 mb-4 text-left" style={{ backgroundColor: '#12141f', border: '1px solid #2a2d3e' }}>
-                  <div className="text-xs uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>Basic Plan</div>
-                  <div className="text-sm font-semibold mb-1">The Restaurant Consultant — Basic</div>
-                  <div className="flex items-baseline gap-1 mb-0.5">
-                    <span className="text-2xl font-bold">$10.00</span>
-                    <span className="text-xs" style={{ color: '#9ca3af' }}>/month</span>
-                  </div>
-                  <div className="text-xs mb-2" style={{ color: '#9ca3af' }}>Monthly subscription · billed every 30 days</div>
-                  <div className="text-xs" style={{ color: '#9ca3af' }}>Access to all {TOTAL_DOMAIN_COUNT} operational domains</div>
-                </div>
-                <Button
-                  className="w-full mb-3"
-                  onClick={async () => {
-                    setIsPurchasing(true);
-                    await purchaseSubscription("basic");
-                    setIsPurchasing(false);
-                  }}
-                  disabled={isPurchasing}
-                  data-testid="btn-native-subscribe"
-                >
-                  {isPurchasing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      Subscribe — $10.00/month
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-                <Button
-                  className="w-full mb-4"
-                  variant="outline"
-                  onClick={async () => {
-                    setIsRestoring(true);
-                    await restoreNativePurchases();
-                    setIsRestoring(false);
-                  }}
-                  disabled={isRestoring}
-                  data-testid="btn-restore-purchases-gate"
-                >
-                  {isRestoring ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Restore Purchases
-                </Button>
-                <p className="text-xs leading-relaxed mb-3" style={{ color: '#9ca3af' }}>
-                  Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Manage or cancel your subscription in your Apple ID settings.
-                </p>
-                <div className="flex items-center justify-center gap-3">
-                  <a href="https://restaurantai.consulting/privacy" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-gate-privacy">Privacy Policy</a>
-                  <span style={{ color: '#2a2d3e' }}>·</span>
-                  <a href="https://restaurantai.consulting/terms" target="_blank" rel="noopener noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#9ca3af' }} data-testid="link-gate-terms">Terms of Use</a>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-medium mb-6">
-                  All {TOTAL_DOMAIN_COUNT} domains + tools starting at <span className="text-primary">$10/month</span>
-                </p>
-                <Link href="/pricing">
-                  <Button className="w-full mb-3" data-testid="btn-upgrade-now">
-                    Unlock for $10/month
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </Link>
-                <Link href="/pricing" className="text-sm text-muted-foreground underline underline-offset-4" data-testid="link-see-plans">
-                  See all plans
-                </Link>
-              </>
-            )}
+            <p className="text-sm font-medium mb-6">
+              All {TOTAL_DOMAIN_COUNT} domains + tools starting at <span className="text-primary">$9.99/month</span>
+            </p>
+            <Link href="/pricing">
+              <Button className="w-full mb-3" data-testid="btn-upgrade-now">
+                See Plans
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+            <Link href="/pricing" className="text-sm text-muted-foreground underline underline-offset-4" data-testid="link-see-plans">
+              Compare all plans
+            </Link>
           </CardContent>
         </Card>
       </div>
